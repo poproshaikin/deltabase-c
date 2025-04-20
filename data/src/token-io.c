@@ -2,15 +2,20 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
 
 #include "../../utils/stream-utils.h"
 
-u_long write_token(DataToken *tkn, FILE *dest) {
-    u_long written = fwrite(tkn->bytes, sizeof(char), tkn->size, dest);
+u_long writedtok(DataToken *tkn, FILE *dest) {
+    u_long written = 0;
+    if (tkn->type >= DT_STRING) {
+        written += fwrite(&tkn->size, sizeof(toklen_t), 1, dest);   
+    } 
+    written += fwrite(tkn->bytes, sizeof(char), tkn->size, dest);
     return written;
 }
 
-DataToken *read_token(DataTokenSize size, FILE *src) {
+DataToken *readdtok(toklen_t size, FILE *src) {
     char *buffer = malloc(sizeof(char) * size);
     if (buffer == NULL) {
         printf("Failed to allocate memory");
@@ -20,28 +25,32 @@ DataToken *read_token(DataTokenSize size, FILE *src) {
 
     int read = fread(buffer, sizeof(char), size, src);
     if (read < 0) {
-        printf("Failed to read token. Size: %i. Pos: %li. Fd: %i\n", size, ftell(src), fileno(src));
+        printf("Failed to read token. Size: %lu. Pos: %li. Fd: %i\n", size, ftell(src), fileno(src));
         perror("Error");
         free(buffer);
         return NULL;
     }
 
-    DataToken *tkn = malloc(sizeof(DataToken));
-    if (tkn == NULL) {
+    DataToken *token = malloc(sizeof(DataToken));
+    if (token == NULL) {
         printf("Failed to allocate memory");
         free(buffer);
         return NULL;
     }
 
-    tkn->size = size;
-    tkn->bytes = buffer;
-    return tkn;
+    token->size = size;
+    token->bytes = buffer;
+    return token;
 }
 
-int insert_token(DataToken *tkn, int pos, FILE *file) {
+int insdtok(DataToken *tkn, int pos, FILE *file) {
     fseek(file, pos, SEEK_SET);   
     int writingPos = fmove(pos, tkn->size, file);
     fseek(file, writingPos, SEEK_SET);
-    write_token(tkn, file);
+    writedtok(tkn, file);
     return 0;
+}
+
+toklen_t dtoksize(const DataToken *tkn) {
+    return tkn->size;
 }
