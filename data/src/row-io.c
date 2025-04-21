@@ -31,12 +31,6 @@ static toklen_t drowsize(DataScheme *scheme, DataToken *tokens) {
     return totalSize;
 }
 
-static toklen_t readlenprefix(FILE *file) {
-    toklen_t len;
-    fread(&len, sizeof(toklen_t), 1, file);
-    return len;
-}
-
 static char *readnullbitmap(DataScheme *scheme, FILE *file) {
     int nbSize = nullbitmapsize(scheme);
     char *bitmap = malloc(nbSize * sizeof(char));
@@ -61,22 +55,22 @@ int writedrow(DataScheme *scheme, DataToken *tokens, FILE *file) {
     return 0;
 }
 
-DataToken *readdrow(DataScheme *scheme, FILE *file) {
+DataToken **readdrow(DataScheme *scheme, FILE *file) {
     if (scheme == NULL || file == NULL) {
         return NULL;
     }
 
     toklen_t rowSize = readlenprefix(file);
     char *nb = readnullbitmap(scheme, file);
-    DataToken *tokens = malloc(scheme->columns_count * sizeof(DataToken));
+    DataToken **tokens = malloc(scheme->columns_count * sizeof(DataToken*));
 
     for (int i = 0; i < scheme->columns_count; i++) {
         toklen_t len;
-        if (scheme->columns[i].data_type >= DT_STRING) {
+        if (scheme->columns[i]->data_type >= DT_STRING) {
             len = readlenprefix(file);
         }
         else {
-            len = scheme->columns[i].size;
+            len = scheme->columns[i]->size;
         }
 
         DataToken *token = readdtok(len, file);
@@ -87,8 +81,8 @@ DataToken *readdrow(DataScheme *scheme, FILE *file) {
             return NULL;
         }
 
-        token->type = scheme->columns[i].data_type;
-        tokens[i] = *token;
+        token->type = scheme->columns[i]->data_type;
+        tokens[i] = token;
     }
 
     return tokens;

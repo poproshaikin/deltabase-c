@@ -6,13 +6,48 @@
 
 #include "../../utils/stream-utils.h"
 
-u_long writedtok(DataToken *tkn, FILE *dest) {
-    u_long written = 0;
-    if (tkn->type >= DT_STRING) {
-        written += fwrite(&tkn->size, sizeof(toklen_t), 1, dest);   
+toklen_t readlenprefix(FILE *file) {
+    toklen_t len;
+    fread(&len, sizeof(toklen_t), 1, file);
+    return len;
+}
+
+int writedtok_v(const char *bytes, toklen_t size, DataType type, FILE *dest) {
+    if (type == 0) {
+        return -1;
+    }
+    if (type > 0 && type < 100) {
+        fwrite(bytes, sizeof(char), size, dest);
+        return 0;
     } 
-    written += fwrite(tkn->bytes, sizeof(char), tkn->size, dest);
-    return written;
+    else if (type >= 100 && type < 1000) {
+        fwrite(&size, sizeof(toklen_t), 1, dest);    
+        fwrite(bytes, sizeof(char), size, dest);
+        return 0;
+    }
+    printf("Cannot write token: unknown type\n");
+    return -2;
+}
+
+int writedtok(DataToken *tkn, FILE *dest) {
+    return writedtok_v(tkn->bytes, tkn->size, tkn->type, dest);
+}
+
+int writedtokarr_v(DataToken **tokens, int count, DataTokenArrayType type, FILE *file) {
+    if (tokens == NULL || count == 0) {
+        return 0;
+    }
+
+    writedtok_v((char*)&count, sizeof(int), DT_INTEGER, file);
+    for (int i = 0; i < count; i++) {
+        writedtok(tokens[i], file);
+    }
+
+    return 0;
+}
+
+int writedtokarr(DataTokenArray *tokens, FILE *file) {
+    return writedtokarr_v(tokens->array, tokens->count, tokens->type, file);
 }
 
 DataToken *readdtok(toklen_t size, FILE *src) {
@@ -41,6 +76,39 @@ DataToken *readdtok(toklen_t size, FILE *src) {
     token->size = size;
     token->bytes = buffer;
     return token;
+}
+
+DataTokenArray *readdtokarr_fs(toklen_t el_size, FILE *file) {
+    toklen_t elementCount = readlenprefix(file);
+    DataToken **tokens = malloc(elementCount * sizeof(DataToken));
+
+    for (int i = 0; i < elementCount; i++) {
+        tokens[i] = readdtok(el_size, file);
+    }
+
+    DataTokenArray *array = malloc(sizeof(DataTokenArray));
+    if (array == NULL)
+
+    array->array = tokens;
+    array->count = elementCount;
+    array->type = DTA_FIXED_SIZE;
+    return array;
+}
+
+DataTokenArray *readdtokarr_ds(FILE *file) {
+    toklen_t elementCount = readlenprefix(file);
+    DataToken **tokens = malloc(elementCount * sizeof(DataToken*));
+
+    for (int i = 0; i < elementCount; i++) {
+        toklen_t elSize = readlenprefix(file);
+        tokens[i] = readdtok(elSize, file);
+    }
+
+    DataTokenArray *array = malloc(sizeof(DataTokenArray));
+    array->array = tokens;
+    array->count = elementCount;
+    array->type = DTA_DYNAMIC_SIZE;
+    return array;
 }
 
 int insdtok(DataToken *tkn, int pos, FILE *file) {
