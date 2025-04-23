@@ -1,6 +1,9 @@
 #include "../data-storage.h"
+
 #include <limits.h>
 #include <stdlib.h>
+
+#include "internal.h"
 
 static int nullbitmapsize(DataScheme *scheme) {
     return (scheme->columns_count + CHAR_BIT - 1) / CHAR_BIT;

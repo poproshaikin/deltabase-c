@@ -12,7 +12,7 @@ long fsize(FILE *file) {
     return end;
 }
 
-long fleftat(int pos, FILE *file) {
+long fleftat(unsigned long int pos, FILE *file) {
     fseek(file, 0, SEEK_END);
     long endPos = ftell(file);
     fseek(file, pos, SEEK_SET);
@@ -23,7 +23,7 @@ long fleft(FILE *file) {
     return fleftat(ftell(file), file);
 }
 
-static int fmove_pos(int pos, int offset, FILE *file) {
+static int fmove_pos(unsigned long int pos, unsigned long int offset, FILE *file) {
     long movingSize = fleftat(pos, file);
 
     char *moving = malloc(movingSize * sizeof(char));
@@ -41,7 +41,7 @@ static int fmove_pos(int pos, int offset, FILE *file) {
     }
 
     fseek(file, pos, SEEK_SET);
-    int fillStartIndex = ftell(file);
+    unsigned long int fillStartIndex = ftell(file);
     fwrite(filling, sizeof(char), offset, file);
     fwrite(moving, sizeof(char), movingSize, file);
 
@@ -51,7 +51,7 @@ static int fmove_pos(int pos, int offset, FILE *file) {
     return fillStartIndex;
 }
 
-static int fmove_neg(int pos, int offset, FILE *file) {
+static int fmove_neg(unsigned long int pos, long int offset, FILE *file) {
     int savingSize = pos + offset;
     int movingSize = fleftat(pos, file);
     char *movingbuffer = malloc(movingSize * sizeof(char));
@@ -76,7 +76,7 @@ static int fmove_neg(int pos, int offset, FILE *file) {
     return movingSize;
 }
 
-int fmove(int pos, int offset, FILE *file) {
+int fmove(unsigned long pos, long int offset, FILE *file) {
     int finalOffset = offset;
     if (offset > 0) {
         return fmove_pos(pos, finalOffset, file);
