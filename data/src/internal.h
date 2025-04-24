@@ -14,35 +14,28 @@ int writedtok_v(const char *bytes, toklen_t size, DataType type, FILE *dest);
 int writedtok(DataToken *tkn, FILE *file);
 
 /* Writes a token array from tokens */
-int writedtokarr_v(DataToken **tokens, toklen_t count, DataTokenArrayType type, FILE *file);
+int writedtokarr_v(DataToken **tokens, toklen_t count, FILE *file);
 
 /* Writes a DataTokenArray to file */
 int writedtokarr(DataTokenArray *arr, FILE *file);
 
 
 /* Reads a DataToken from file */
-DataToken *readdtok(toklen_t size, FILE *file);
+DataToken *readdtok(FILE *file);
 
-/* Reads fixed-size token array from file */
-DataTokenArray *readdtokarr_fs(toklen_t el_size, FILE *file);
-
-/* Reads dynamic-size token array from file */
-DataTokenArray *readdtokarr_ds(FILE *file);
+/* Reads token array from file */
+DataTokenArray *readdtokarr(FILE *file);
 
 
-/* Creates a new DataToken from bytes */
-DataToken *newdtok(char *bytes, toklen_t size, DataType data_type);
+/* Writes a row of tokens to file */
+int writedrow(DataScheme *scheme, DataToken *tkns, FILE *file);
 
-/* Creates a DataTokenArray from value block */
-DataTokenArray *newdta_from_values(void *values, toklen_t el_size, toklen_t count, DataTokenArrayType arr_type, DataType el_type);
-
-/* Creates a DataTokenArray from pointers */
-DataTokenArray *newdta_from_ptrs(void **ptrs, toklen_t el_size, toklen_t count, DataTokenArrayType arr_type, DataType el_type);
+/* Reads a row of tokens from file */
+DataToken **readdrow(DataScheme *scheme, FILE *file);
 
 
 /* Inserts a DataToken into file at position */
 int insdtok(DataToken *tkn, toklen_t pos, FILE *file);
-
 
 /* Returns size of DataToken */
 toklen_t dtoksize(const DataToken *tkn);

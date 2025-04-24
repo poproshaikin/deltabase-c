@@ -1,4 +1,5 @@
-#include "../ds-utils.h"
+
+#include "../data-storage-utils.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -18,7 +19,7 @@ char **dtokarr_bytes(DataTokenArray *array, toklen_t *out_count) {
     for (int i = 0; i < array->count; i++) {
         values[i] = array->array[i]->bytes;
     }
-    
+
     if (out_count != NULL) *out_count = array->count;
     return values;
 }
@@ -61,4 +62,28 @@ void freedtokarr(DataTokenArray *array) {
 void freeph(PageHeader *header) {
     free(header->free_rows);
     free(header);
+}
+
+DataTypeSize dtypesize(DataType type) {
+    DataTypeSize size;
+
+    switch (type) {
+        case DT_INTEGER:
+            size = DTS_INTEGER;
+            break;
+        case DT_REAL:
+            size = DTS_REAL;
+            break;
+        case DT_CHAR:
+            size = DTS_CHAR;
+            break;
+        case DT_LENGTH:
+            size = DTS_LENGTH;
+            break;
+        case DT_STRING:
+            size = DTS_DYNAMIC;
+            break;
+    }
+
+    return size;
 }

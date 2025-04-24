@@ -16,26 +16,24 @@ typedef enum {
     DT_REAL,
     DT_CHAR,
     DT_LENGTH,
-    DT_STRING = 100,
+    DT_STRING,
 } DataType;
 
 /* Data type sizes */
 typedef enum {
+    DTS_UNDEFINED = 0,
+
     DTS_CHAR = 1,
     DTS_INTEGER = 4,
     DTS_REAL = 8,
-    DTS_LENGTH = 8
-} DataTypeSize;
+    DTS_LENGTH = 8,
 
-/* Token array type */
-typedef enum {
-    DTA_FIXED_SIZE = 1,
-    DTA_DYNAMIC_SIZE,
-} DataTokenArrayType;
+    DTS_DYNAMIC = -1
+} DataTypeSize;
 
 /* Single data token */
 typedef struct {
-    toklen_t size;
+    toklen_t size; /* Used if the TYPE has dynamic size */
     char *bytes;
     DataType type;
 } DataToken;
@@ -44,7 +42,6 @@ typedef struct {
 typedef struct {
     DataToken **array;
     toklen_t count;
-    DataTokenArrayType type;
 } DataTokenArray;
 
 /* Column description */
@@ -71,6 +68,7 @@ typedef struct {
 /* Data row */
 typedef struct {
     toklen_t row_id;
+    char *null_bm;
     DataTokenArray *tokens;
 } PageRow;
 
@@ -79,11 +77,5 @@ int writeph(PageHeader *header, FILE *file);
 
 /* Reads a page header from file */
 PageHeader *readph(FILE *file);
-
-/* Writes a row of tokens to file */
-int writedrow(DataScheme *scheme, DataToken *tkns, FILE *file);
-
-/* Reads a row of tokens from file */
-DataToken **readdrow(DataScheme *scheme, FILE *file);
 
 #endif

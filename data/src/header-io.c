@@ -8,10 +8,9 @@ int writeph(PageHeader *header, FILE *file) {
     writedtok_v((char*)&header->page_id, DTS_LENGTH, DT_LENGTH, file);
     writedtok_v((char*)&header->rows_count, DTS_LENGTH, DT_LENGTH, file);
 
-    DataTokenArray *arr = newdta_from_values((void*)header->free_rows, 
+    DataTokenArray *arr = newdtokarr_from_values((void*)header->free_rows, 
             DTS_LENGTH, 
             header->free_rows_count, 
-            DTA_FIXED_SIZE, 
             DT_LENGTH); 
 
     writedtokarr(arr, file);
@@ -22,9 +21,9 @@ int writeph(PageHeader *header, FILE *file) {
 }
 
 PageHeader *readph(FILE *file) {
-    DataToken *pageId = readdtok(DTS_LENGTH, file);
-    DataToken *rowsCount = readdtok(DTS_LENGTH, file);
-    DataTokenArray *freeRows = readdtokarr_fs(DTS_LENGTH, file);
+    DataToken *pageId = readdtok(file);
+    DataToken *rowsCount = readdtok(file);
+    DataTokenArray *freeRows = readdtokarr(file);
     if (freeRows == NULL) {
         printf("Failed to read tokens array\n");
         freedtok(pageId);

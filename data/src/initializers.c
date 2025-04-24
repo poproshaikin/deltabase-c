@@ -1,4 +1,5 @@
 #include "../data-storage.h"
+#include "../data-storage-utils.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -22,7 +23,7 @@ DataToken *newdtok(char *bytes, toklen_t size, DataType data_type) {
     return token;
 }
 
-DataTokenArray *newdta_from_values(void *values, toklen_t el_size, toklen_t count, DataTokenArrayType arr_type, DataType el_type) {
+DataTokenArray *newdtokarr_from_values(void *values, toklen_t el_size, toklen_t count, DataType el_type) {
     DataToken **tokens = malloc(count * sizeof(DataToken*));
     if (tokens == NULL) {
         printf("Failed to allocate memory in newdta_from_values\n");
@@ -45,11 +46,10 @@ DataTokenArray *newdta_from_values(void *values, toklen_t el_size, toklen_t coun
 
     array->array = tokens;
     array->count = count;
-    array->type = arr_type;
     return array;
 }
 
-DataTokenArray *newdta_from_ptrs(void **ptrs, toklen_t el_size, toklen_t count, DataTokenArrayType arr_type, DataType el_type) {
+DataTokenArray *newdtokarr_from_ptrs(void **ptrs, toklen_t el_size, toklen_t count, DataType el_type) {
     DataToken **tokens = malloc(count * sizeof(DataToken*));
     if (tokens == NULL) {
         printf("Failed to allocate memory in newdta");
@@ -72,6 +72,5 @@ DataTokenArray *newdta_from_ptrs(void **ptrs, toklen_t el_size, toklen_t count, 
 
     array->array = tokens;
     array->count = count;
-    array->type = arr_type;
     return array;
 }
