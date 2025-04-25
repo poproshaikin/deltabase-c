@@ -72,10 +72,4 @@ typedef struct {
     DataTokenArray *tokens;
 } PageRow;
 
-/* Writes a page header to file */
-int writeph(PageHeader *header, FILE *file);
-
-/* Reads a page header from file */
-PageHeader *readph(FILE *file);
-
 #endif

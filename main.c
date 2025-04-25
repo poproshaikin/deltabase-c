@@ -1,6 +1,6 @@
 #include "data/data-storage.h"
+#include "data/src/row/row-io.h"
 #include <stdlib.h>
-#include "data/src/internal.h"
 #include "utils/stream-utils.h"
 #include <unistd.h>
 

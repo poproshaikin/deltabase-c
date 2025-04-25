@@ -5,11 +5,11 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 
 set (SOURCES
 main.c
-data/src/header-io.c
-data/src/token-io.c
-data/src/row-io.c
-data/src/utils.c
-data/src/initializers.c
+data/src/header/header-io.c
+data/src/token/token-io.c
+data/src/row/row-io.c
+data/src/utils/utils.c
+data/src/utils/initializers.c
 utils/stream-utils.c
 utils/string-utils.c
 )
