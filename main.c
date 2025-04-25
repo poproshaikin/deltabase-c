@@ -1,5 +1,8 @@
 #include "data/data-storage.h"
 #include <stdlib.h>
+#include "data/src/internal.h"
+#include "utils/stream-utils.h"
+#include <unistd.h>
 
 // подготовить функции для работы с файлами.
 // используя их начать разработку протокола и планирования структуры страниц.
@@ -43,15 +46,40 @@
 //   совместить все в одну структуру/результат
 //   вернуть
 
+void hexdump(FILE *file) {
+    rewind(file);
+
+    unsigned char buffer[16];
+    size_t bytesRead;
+
+    printf("%lu\n", fleft(file));
+
+    while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+        for (size_t i = 0; i < bytesRead; i++) {
+            printf("%02X ", buffer[i]);
+        }
+        printf("\n");
+    }
+}
 int main(void) {
     FILE *file = fopen("hello.txt", "r+");
     if (file == NULL) {
         perror("fopen failed");
         return -1;
     }
+    
+    ftruncate(fileno(file), 0);
+
+    /*DataToken token = {*/
+    /*    .bytes = (char[]){'h', 'e', 'l', 'l', 'o'},*/
+    /*    .size = 5,*/
+    /*    .type = DT_STRING*/
+    /*};*/
+    /**/
+    /*writedtok(&token, file);*/
 
     Column col1 = { .name = "id", .data_type = DT_INTEGER, .size = DTS_INTEGER };
-    Column col2 = { .name = "name", .data_type = DT_STRING };
+    Column col2 = { .name = "name", .data_type = DT_STRING, .size = DTS_DYNAMIC };
     Column col3 = { .name = "age", .data_type = DT_REAL, .size = DTS_REAL };
 
     Column *columns[3] = { &col1, &col2, &col3 };
@@ -61,6 +89,15 @@ int main(void) {
         .columns_count = 3,
     };
 
+    DataToken tokens[3] = {
+        { .bytes = (char*)&(int){1}, .type = DT_INTEGER },
+        { .size = 4, .bytes = (char[]){ 'i', 'v', 'a', 'n' }, .type = DT_STRING },
+        { .bytes = (char*)&(double){18.5}, .type = DT_REAL },
+    };
+
+    writedrow(&scheme, tokens, 3, file);
+
+    hexdump(file);
 
     /**/
     /*DataToken **tokens = readdrow(&scheme, file);*/
@@ -95,30 +132,16 @@ int main(void) {
     /**/
     /*writeph(&header, file);*/
 
-    /*unsigned char buffer[16];*/
-    /*size_t bytesRead;*/
     /**/
-    /*while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {*/
-    /*    for (size_t i = 0; i < bytesRead; i++) {*/
-    /*        printf("%02X ", buffer[i]);*/
-    /*    }*/
-    /*    printf("\n");*/
+    /*PageHeader *header = readph(file);  */
+    /*if (header == NULL) {*/
+    /*    return 1;*/
     /*}*/
-    /**/
-    PageHeader *header = readph(file);  
-    if (header == NULL) {
-        return 1;
-    }
-    printf("Page id: %lu\n", header->page_id);
-    printf("Rows count: %lu\n", header->rows_count);
-    printf("Free rows count: %lu\n", header->free_rows_count);
+    /*printf("Page id: %lu\n", header->page_id);*/
+    /*printf("Rows count: %lu\n", header->rows_count);*/
+    /*printf("Free rows count: %lu\n", header->free_rows_count);*/
 
-    /*DataToken tokens[3] = {*/
-    /*    { .size = 4, .bytes = (char*)&(int){1}, .type = DT_INTEGER },*/
-    /*    { .size = 4, .bytes = (char[]){ 'i', 'v', 'a', 'n' }, .type = DT_STRING },*/
-    /*    { .size = 8, .bytes = (char*)&(double){18.5}, .type = DT_REAL },*/
-    /*};*/
-    /*writedrow(&scheme, tokens, file);*/
 
     fclose(file);
 }
+

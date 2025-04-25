@@ -28,7 +28,7 @@ DataTokenArray *readdtokarr(FILE *file);
 
 
 /* Writes a row of tokens to file */
-int writedrow(DataScheme *scheme, DataToken *tkns, FILE *file);
+int writedrow(DataScheme *scheme, DataToken *tkns, int tokens_count, FILE *file);
 
 /* Reads a row of tokens from file */
 DataToken **readdrow(DataScheme *scheme, FILE *file);

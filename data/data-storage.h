@@ -68,7 +68,7 @@ typedef struct {
 /* Data row */
 typedef struct {
     toklen_t row_id;
-    char *null_bm;
+    unsigned char *null_bm;
     DataTokenArray *tokens;
 } PageRow;
 

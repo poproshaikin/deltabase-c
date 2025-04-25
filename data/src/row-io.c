@@ -5,12 +5,27 @@
 
 #include "internal.h"
 
+/* Calculates null bitmap size in bytes */
 static int nullbitmapsize(DataScheme *scheme) {
     return (scheme->columns_count + CHAR_BIT - 1) / CHAR_BIT;
 }
 
-static char *buildnullbitmap(DataScheme *scheme, DataToken *tkns) {
-    char *bitmap = calloc(nullbitmapsize(scheme), sizeof(char));
+/* Calculates an amount of null tokens in a null bitmap */
+static int nullscount(unsigned char *nb, int len) {
+    int count = 0;
+    for (int i = 0; i < len; i++) {
+        unsigned char byte = nb[i];
+        for (int bit = 0; bit < 0; bit++) {
+            if ((byte & (1 << bit)) == 1) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+static unsigned char *buildnullbitmap(DataScheme *scheme, DataToken *tkns) {
+    unsigned char *bitmap = calloc(nullbitmapsize(scheme), sizeof(char));
 
     for (int i = 0; i < scheme->columns_count; i++) {
         if (tkns[i].bytes == NULL) {
@@ -23,35 +38,35 @@ static char *buildnullbitmap(DataScheme *scheme, DataToken *tkns) {
     return bitmap;
 }
 
-static toklen_t drowsize(DataScheme *scheme, DataToken *tokens) {
-    toklen_t totalSize = 0;
-    totalSize += nullbitmapsize(scheme);
-    for (int i = 0; i < scheme->columns_count; i++) {
-        toklen_t size = dtoksize(&tokens[i]); 
-        printf("token size: %lu\n", size);
-        totalSize += size;
+/* Calculates a byte length of a row */
+static toklen_t drowsize(DataScheme *scheme, DataToken *tokens, int tokensCount) {
+    int nbSize = nullbitmapsize(scheme);
+    toklen_t totalSize = nbSize;
+    for (int i = 0; i < tokensCount; i++) {
+        totalSize += dtoksize(&tokens[i]); 
     }
     return totalSize;
 }
 
-static char *readnullbitmap(DataScheme *scheme, FILE *file) {
+static unsigned char *readnullbitmap(DataScheme *scheme, FILE *file) {
     int nbSize = nullbitmapsize(scheme);
-    char *bitmap = malloc(nbSize * sizeof(char));
+    unsigned char *bitmap = malloc(nbSize * sizeof(char));
     fread(bitmap, sizeof(char), nbSize, file);
     return bitmap;
 }
 
-int writedrow(DataScheme *scheme, DataToken *tokens, FILE *file) {
+int writedrow(DataScheme *scheme, DataToken *tokens, int tokens_count, FILE *file) {
     if (scheme == NULL || tokens == NULL || file == NULL) {
         return -1;
     }
-    toklen_t rowSize = drowsize(scheme, tokens);
-    fwrite(&rowSize, sizeof(toklen_t), 1, file);
+    toklen_t rowSize = drowsize(scheme, tokens, tokens_count);
+    fwrite(&rowSize, DT_LENGTH, 1, file);
 
-    char *nb = buildnullbitmap(scheme, tokens);
-    fwrite(nb, sizeof(char), nullbitmapsize(scheme), file);
+    unsigned char *nb = buildnullbitmap(scheme, tokens);
+    int nbSize = nullbitmapsize(scheme);
+    fwrite(nb, sizeof(char), nbSize, file);
 
-    for (int i = 0; i < scheme->columns_count; i++) {
+    for (int i = 0; i < tokens_count; i++) {
         writedtok(&tokens[i], file);
     }
 
@@ -64,27 +79,17 @@ DataToken **readdrow(DataScheme *scheme, FILE *file) {
     }
 
     toklen_t rowSize = readlenprefix(file);
-    char *nb = readnullbitmap(scheme, file);
+    unsigned char *nb = readnullbitmap(scheme, file);
     DataToken **tokens = malloc(scheme->columns_count * sizeof(DataToken*));
 
     for (int i = 0; i < scheme->columns_count; i++) {
-        toklen_t len;
-        if (scheme->columns[i]->data_type >= DT_STRING) {
-            len = readlenprefix(file);
-        }
-        else {
-            len = scheme->columns[i]->size;
-        }
-
-        DataToken *token = readdtok(len, file);
+        DataToken *token = readdtok(file);
         if (token == NULL) {
             printf("Failed to read %i token", i);
             free(tokens);
             free(nb);
             return NULL;
         }
-
-        token->type = scheme->columns[i]->data_type;
         tokens[i] = token;
     }
 

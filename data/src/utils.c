@@ -80,6 +80,7 @@ DataTypeSize dtypesize(DataType type) {
         case DT_LENGTH:
             size = DTS_LENGTH;
             break;
+
         case DT_STRING:
             size = DTS_DYNAMIC;
             break;

@@ -35,7 +35,7 @@ int writedtok_v(const char *bytes, toklen_t size, DataType type, FILE *dest) {
     writedtype(type, dest);
     if (typeSize == DTS_DYNAMIC) 
         writelenprefix(size, dest);
-    writedbuffer(bytes, size, dest);
+    writedbuffer(bytes, typeSize == DTS_DYNAMIC ? size : typeSize, dest);
 
     return 0;
 }
@@ -138,5 +138,16 @@ int insdtok(DataToken *tkn, toklen_t pos, FILE *file) {
 }
 
 toklen_t dtoksize(const DataToken *tkn) {
-    return tkn->size;
+    toklen_t size = 0;
+    size += sizeof(tkn->type); 
+    DataTypeSize typeSize = dtypesize(tkn->type);
+
+    if (typeSize == DTS_DYNAMIC) {
+        size += DTS_LENGTH;
+        size += tkn->size; 
+    } else {
+        size += typeSize;
+    }
+
+    return size;
 }
