@@ -15,6 +15,7 @@ typedef enum {
     DT_INTEGER = 1,
     DT_REAL,
     DT_CHAR,
+    DT_BOOL,
     DT_LENGTH,
     DT_STRING,
 } DataType;
@@ -48,12 +49,11 @@ typedef struct {
 typedef struct {
     char *name;
     DataType data_type;
-    DataTypeSize size;
-} Column;
+} DataColumn;
 
 /* Table scheme */
 typedef struct {
-    Column **columns;
+    DataColumn **columns;
     dulen_t columns_count;
 } DataScheme;
 

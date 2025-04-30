@@ -10,6 +10,7 @@ data/src/token/token-io.c
 data/src/row/row-io.c
 data/src/utils/utils.c
 data/src/utils/initializers.c
+sql/src/ast-eval.c
 utils/stream-utils.c
 utils/string-utils.c
 )

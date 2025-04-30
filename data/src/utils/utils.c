@@ -60,7 +60,6 @@ void freedtokarr(DataTokenArray *array) {
 }
 
 void freeph(PageHeader *header) {
-    free(header->free_rows);
     free(header);
 }
 

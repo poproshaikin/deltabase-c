@@ -79,11 +79,11 @@ int main(void) {
     /**/
     /*writedtok(&token, file);*/
 
-    Column col1 = { .name = "id", .data_type = DT_INTEGER, .size = DTS_INTEGER };
-    Column col2 = { .name = "name", .data_type = DT_STRING, .size = DTS_DYNAMIC };
-    Column col3 = { .name = "age", .data_type = DT_REAL, .size = DTS_REAL };
+    DataColumn col1 = { .name = "id", .data_type = DT_INTEGER, };
+    DataColumn col2 = { .name = "name", .data_type = DT_STRING, };
+    DataColumn col3 = { .name = "age", .data_type = DT_REAL, };
 
-    Column *columns[3] = { &col1, &col2, &col3 };
+    DataColumn *columns[3] = { &col1, &col2, &col3 };
 
     DataScheme scheme = {
         .columns = columns,
@@ -108,18 +108,18 @@ int main(void) {
     /**/
     /*}*/
     /**/
-    /*for (int i = 0; i < scheme.columns_count; i++) {*/
+    /*for (int i = 0; i < scheme.DataColumns_count; i++) {*/
     /*    printf("i: %i\n", i);*/
     /*    if (tokens[i]->bytes == NULL) {*/
     /*        printf("bytes are empty\n");*/
     /*    }*/
-    /*    else if (scheme.columns[i]->data_type == DT_INTEGER) {*/
+    /*    else if (scheme.DataColumns[i]->data_type == DT_INTEGER) {*/
     /*        printf("int: %i\n", *(int*)tokens[i]->bytes);*/
     /*    }*/
-    /*    else if (scheme.columns[i]->data_type == DT_STRING) {*/
+    /*    else if (scheme.DataColumns[i]->data_type == DT_STRING) {*/
     /*        printf("str: %s\n", tokens[i]->bytes);*/
     /*    }*/
-    /*    else if (scheme.columns[i]->data_type == DT_REAL) {*/
+    /*    else if (scheme.DataColumns[i]->data_type == DT_REAL) {*/
     /*        printf("real: %f", *(double*)tokens[i]->bytes);*/
     /*    }*/
     /*}*/
