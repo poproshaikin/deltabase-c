@@ -61,6 +61,7 @@ void hexdump(FILE *file) {
         printf("\n");
     }
 }
+
 int main(void) {
     FILE *file = fopen("hello.txt", "r+");
     if (file == NULL) {

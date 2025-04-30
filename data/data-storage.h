@@ -8,7 +8,7 @@
 #define DATA_STORAGE_H
 
 /* Token length type */
-typedef unsigned long int toklen_t;
+typedef unsigned long int dulen_t;
 
 /* Data types */
 typedef enum {
@@ -33,7 +33,7 @@ typedef enum {
 
 /* Single data token */
 typedef struct {
-    toklen_t size; /* Used if the TYPE has dynamic size */
+    dulen_t size; /* Used if the TYPE has dynamic size */
     char *bytes;
     DataType type;
 } DataToken;
@@ -41,7 +41,7 @@ typedef struct {
 /* Array of data tokens */
 typedef struct {
     DataToken **array;
-    toklen_t count;
+    dulen_t count;
 } DataTokenArray;
 
 /* Column description */
@@ -54,20 +54,19 @@ typedef struct {
 /* Table scheme */
 typedef struct {
     Column **columns;
-    toklen_t columns_count;
+    dulen_t columns_count;
 } DataScheme;
 
 /* Page header info */
 typedef struct {
-    toklen_t page_id;
-    toklen_t rows_count;
-    toklen_t *free_rows;
-    toklen_t free_rows_count;
+    dulen_t page_id;
+    dulen_t rows_count;
+    dulen_t data_start_offset;
 } PageHeader;
 
 /* Data row */
 typedef struct {
-    toklen_t row_id;
+    dulen_t row_id;
     unsigned char *null_bm;
     DataTokenArray *tokens;
 } PageRow;

@@ -10,7 +10,7 @@ char *dtok_bytes(DataToken *token) {
     return buffer;
 }
 
-char **dtokarr_bytes(DataTokenArray *array, toklen_t *out_count) { 
+char **dtokarr_bytes(DataTokenArray *array, dulen_t *out_count) { 
     char **values = malloc(array->count * sizeof(char *));
     if (values == NULL) {
         printf("Failed to allocate memory in dtokarr_bytes\n");
@@ -24,8 +24,8 @@ char **dtokarr_bytes(DataTokenArray *array, toklen_t *out_count) {
     return values;
 }
 
-char *dtokarr_bytes_seq(DataTokenArray *array, toklen_t *out_size) {
-    toklen_t totalBytes = 0;
+char *dtokarr_bytes_seq(DataTokenArray *array, dulen_t *out_size) {
+    dulen_t totalBytes = 0;
     for (int i = 0; i < array->count; i++) {
         totalBytes += array->array[i]->size;
     }
@@ -37,7 +37,7 @@ char *dtokarr_bytes_seq(DataTokenArray *array, toklen_t *out_size) {
     }
     
     char *ptr = buffer;
-    for (toklen_t i = 0; i < array->count; i++) {
+    for (dulen_t i = 0; i < array->count; i++) {
         DataToken *token = array->array[i];
         memcpy(ptr, token->bytes, token->size);
         ptr += token->size;

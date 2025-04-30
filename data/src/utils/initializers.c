@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-DataToken *newdtok(char *bytes, toklen_t size, DataType data_type) {
+DataToken *newdtok(char *bytes, dulen_t size, DataType data_type) {
     DataToken *token = malloc(sizeof(DataToken));
     if (token == NULL) {
         printf("Failed to allocate memory in newdtok\n");
@@ -21,21 +21,21 @@ DataToken *newdtok(char *bytes, toklen_t size, DataType data_type) {
     return token;
 }
 
-DataTokenArray *newdtokarr_from_values(void *values, toklen_t el_size, toklen_t count, DataType el_type) {
+DataTokenArray *newdtokarr_from_values(void *values, dulen_t el_size, dulen_t count, DataType el_type) {
     DataToken **tokens = malloc(count * sizeof(DataToken*));
     if (tokens == NULL) {
         printf("Failed to allocate memory in newdta_from_values\n");
         return NULL;
     }
 
-    for (toklen_t i = 0; i < count; i++) {
+    for (dulen_t i = 0; i < count; i++) {
         tokens[i] = newdtok(((char*)values) + i * el_size, el_size, el_type);
     }
 
     DataTokenArray *array = malloc(sizeof(DataTokenArray));
     if (array == NULL) {
         printf("Failed to allocate memory in newdta_from_values\n");
-        for (toklen_t i = 0; i < count; i++) {
+        for (dulen_t i = 0; i < count; i++) {
             free(tokens[i]);
         }
         free(tokens);
@@ -47,7 +47,7 @@ DataTokenArray *newdtokarr_from_values(void *values, toklen_t el_size, toklen_t 
     return array;
 }
 
-DataTokenArray *newdtokarr_from_ptrs(void **ptrs, toklen_t el_size, toklen_t count, DataType el_type) {
+DataTokenArray *newdtokarr_from_ptrs(void **ptrs, dulen_t el_size, dulen_t count, DataType el_type) {
     DataToken **tokens = malloc(count * sizeof(DataToken*));
     if (tokens == NULL) {
         printf("Failed to allocate memory in newdta");
