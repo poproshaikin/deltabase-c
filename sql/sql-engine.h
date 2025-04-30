@@ -3,7 +3,7 @@
 
 #include "src/sql-value.h"
 #include "src/sql-ast.h"
-
-Value eval(AstNode *node);
+#include "src/sql-lexing.h"
+#include "src/sql-parsing.h"
 
 #endif

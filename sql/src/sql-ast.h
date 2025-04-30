@@ -5,31 +5,21 @@
 #include "sql-value.h"
 
 typedef enum {
-    AST_IDENTIFIER = 1,
-    AST_LITERAL,
-    AST_BINARY_EXPR,
-    AST_SELECT,
-    AST_INSERT,
-    AST_UPDATE,
-    AST_DELETE
+    AST_N_IDENTIFIER = 1,
+    AST_N_LITERAL,
+    AST_N_BINARY_EXPR,
+    AST_N_SELECT,
+    AST_N_INSERT,
+    AST_N_UPDATE,
+    AST_N_DELETE
 } AstNodeType;
 
 typedef struct AstLiteral {
-    ValueType type;
-    union {
-        struct { 
-            char *str_value; 
-            dulen_t len;
-        } string; 
-        int int_value;
-        double real_value;
-        bool bool_value;
-    };
+    Token *token;
 } AstLiteral;
 
 typedef struct AstIdentifier {
-    char *name;
-    dulen_t len;
+    Token *token;
 } AstIdentifier;
 
 typedef enum AstOperatorType {

@@ -3,18 +3,18 @@
 
 #include "../../data/data-storage.h"
 
-typedef enum ValueType {
-    VT_INTEGER = 1,
-    VT_REAL,
-    VT_STRING,
-    VT_BOOL,
-    VT_TABLE,
-} ValueType;
+typedef enum TokenType {
+    TT_INTEGER = 1,
+    TT_REAL,
+    TT_STRING,
+    TT_BOOL,
+    TT_TABLE,
+} TokenType;
 
 typedef struct TableColumn {
     char *name;
     int name_len;
-    ValueType valueType;
+    TokenType tokenType;
 } TableColumn;
 
 typedef struct TableRow TableRow; // forward declaration
@@ -22,12 +22,15 @@ typedef struct TableRow TableRow; // forward declaration
 typedef struct Table {
     TableColumn *columns;
     int columns_count;
+
     TableRow *rows;
     int rows_count;
 } Table;
 
-typedef struct Value {
-    ValueType type;
+typedef struct Token {
+    TokenType type;
+    char *lexeme;
+    dulen_t lexeme_len;
     union {
         int int_value;
         double real_value;
@@ -36,12 +39,12 @@ typedef struct Value {
             dulen_t len;
         } string;
         bool bool_value;
-        Table table; 
-    };
-} Value;
+        Table *table; 
+    } value;
+} Token;
 
 struct TableRow {
-    Value *values;
+    Token *tokens;
     dulen_t count;
 };
 
