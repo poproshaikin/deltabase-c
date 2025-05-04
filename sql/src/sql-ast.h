@@ -2,16 +2,16 @@
 #define SQL_AST_H
 
 #include "../../data/data-storage.h"
-#include "sql-value.h"
+#include "sql-token.h"
 
 typedef enum {
-    AST_N_IDENTIFIER = 1,
-    AST_N_LITERAL,
-    AST_N_BINARY_EXPR,
-    AST_N_SELECT,
-    AST_N_INSERT,
-    AST_N_UPDATE,
-    AST_N_DELETE
+    NT_IDENTIFIER = 1,
+    NT_LITERAL,
+    NT_BINARY_EXPR,
+    NT_SELECT,
+    NT_INSERT,
+    NT_UPDATE,
+    NT_DELETE
 } AstNodeType;
 
 typedef struct AstLiteral {
@@ -23,12 +23,17 @@ typedef struct AstIdentifier {
 } AstIdentifier;
 
 typedef enum AstOperatorType {
-    ASTOP_ADD = 1,
-    ASTOP_SUBTRACTION,
-    ASTOP_MULTIPLICATION,
-    ASTOP_DIVISION,
-    ASTOP_AND,
-    ASTOP_OR
+    OP_ADD = 1, // addition
+    OP_SUB,     // subtraction
+    OP_MUL,     // multiplication
+    OP_DIV,     // division
+
+    OP_AND,     // binary AND
+    OP_OR,      // binary OR
+
+    OP_EQU,     // equality
+    OP_GRT,     // greater than
+    OP_LST      // less than
 } AstOperatorType;
 
 typedef struct AstNode AstNode; // forward declaration
@@ -60,6 +65,5 @@ struct AstNode {
         } binary_expr;
     } value;
 };
-
 
 #endif

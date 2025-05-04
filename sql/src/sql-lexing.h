@@ -3,6 +3,8 @@
 
 #include "sql-ast.h"
 
-Token *lex(const char *command, int len);
+#include "../../errors.h"
+
+Token **lex(char *command, size_t *out_count, ErrorCode *out_error);
  
 #endif

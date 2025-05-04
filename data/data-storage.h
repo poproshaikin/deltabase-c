@@ -1,14 +1,11 @@
+#ifndef DATA_STORAGE_H
+#define DATA_STORAGE_H
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <sys/types.h>
 #include <stdio.h>
-
-#ifndef DATA_STORAGE_H
-#define DATA_STORAGE_H
-
-/* Token length type */
-typedef unsigned long int dulen_t;
 
 /* Data types */
 typedef enum {
@@ -34,7 +31,7 @@ typedef enum {
 
 /* Single data token */
 typedef struct {
-    dulen_t size; /* Used if the TYPE has dynamic size */
+    size_t size; /* Used if the TYPE has dynamic size */
     char *bytes;
     DataType type;
 } DataToken;
@@ -42,7 +39,7 @@ typedef struct {
 /* Array of data tokens */
 typedef struct {
     DataToken **array;
-    dulen_t count;
+    size_t count;
 } DataTokenArray;
 
 /* Column description */
@@ -54,19 +51,19 @@ typedef struct {
 /* Table scheme */
 typedef struct {
     DataColumn **columns;
-    dulen_t columns_count;
+    size_t columns_count;
 } DataScheme;
 
 /* Page header info */
 typedef struct {
-    dulen_t page_id;
-    dulen_t rows_count;
-    dulen_t data_start_offset;
+    size_t page_id;
+    size_t rows_count;
+    size_t data_start_offset;
 } PageHeader;
 
 /* Data row */
 typedef struct {
-    dulen_t row_id;
+    size_t row_id;
     unsigned char *null_bm;
     DataTokenArray *tokens;
 } PageRow;

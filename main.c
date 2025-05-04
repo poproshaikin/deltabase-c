@@ -1,8 +1,10 @@
 #include "data/data-storage.h"
 #include "data/src/row/row-io.h"
 #include <stdlib.h>
-#include "utils/stream-utils.h"
+#include "sql/src/sql-constants.h"
+#include "utils/utils.h"
 #include <unistd.h>
+#include "globals.h"
 
 // подготовить функции для работы с файлами.
 // используя их начать разработку протокола и планирования структуры страниц.
@@ -63,6 +65,8 @@ void hexdump(FILE *file) {
 }
 
 int main(void) {
+    init_sql_constants();
+
     FILE *file = fopen("hello.txt", "r+");
     if (file == NULL) {
         perror("fopen failed");
