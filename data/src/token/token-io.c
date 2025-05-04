@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
-#include "../../../utils/stream-utils.h"
 #include "../utils/utils.h"
+#include "../../../utils/utils.h"
 
-dulen_t readlenprefix(FILE *file) {
-    dulen_t len;
-    fread(&len, sizeof(dulen_t), 1, file);
+size_t readlenprefix(FILE *file) {
+    size_t len;
+    fread(&len, sizeof(size_t), 1, file);
     return len;
 }
 
@@ -16,11 +16,11 @@ static int writedtype(DataType type, FILE *dest) {
     return fwrite(&type, sizeof(DataType), 1, dest);
 }
 
-static int writelenprefix(dulen_t size, FILE *dest) {
-    return fwrite(&size, sizeof(dulen_t), 1, dest);
+static int writelenprefix(size_t size, FILE *dest) {
+    return fwrite(&size, sizeof(size_t), 1, dest);
 }
 
-static int writedbuffer(const char *bytes, dulen_t size, FILE *dest) {
+static int writedbuffer(const char *bytes, size_t size, FILE *dest) {
     return fwrite(bytes, 1, size, dest);
 }
 
@@ -37,7 +37,7 @@ int writedtok_v(const char *bytes, DataType type, FILE *dest) {
     return 0;
 }
 
-int writedtok_d_v(const char *bytes, dulen_t size, DataType type, FILE *dest) {
+int writedtok_d_v(const char *bytes, size_t size, DataType type, FILE *dest) {
     if (bytes == NULL || type == 0) {
         return -1;
     }
@@ -55,7 +55,7 @@ int writedtok(DataToken *tkn, FILE *dest) {
         writedtok_v(tkn->bytes, tkn->type, dest);
 }
 
-int writedtokarr_v(DataToken **tokens, dulen_t count, FILE *file) {
+int writedtokarr_v(DataToken **tokens, size_t count, FILE *file) {
     if (tokens == NULL || count == 0) {
         return 0;
     }
@@ -89,7 +89,7 @@ DataToken *readdtok(FILE *src) {
         return NULL;
     }
 
-    dulen_t finalSize = dtypesize(type);
+    size_t finalSize = dtypesize(type);
     if (finalSize == DTS_DYNAMIC) {
         finalSize = readlenprefix(src);
     }
@@ -101,7 +101,7 @@ DataToken *readdtok(FILE *src) {
         return NULL;
     }
 
-    dulen_t read = fread(buffer, sizeof(char), finalSize, src);
+    size_t read = fread(buffer, sizeof(char), finalSize, src);
     if (read < finalSize) {
         printf("Failed to read token. Size: %lu. Pos: %li. Fd: %i\n", finalSize, ftell(src), fileno(src));
         perror("Error");
@@ -122,14 +122,14 @@ DataToken *readdtok(FILE *src) {
     return token;
 }
 
-char *readdtok_v(FILE *file, dulen_t *out_len) {
+char *readdtok_v(FILE *file, size_t *out_len) {
     DataType type = readdtype(file);
     if (type == 0) {
         printf("Failed to read data type in readdtok_v\n");
         return NULL;
     }
 
-    dulen_t finalSize = dtypesize(type);
+    size_t finalSize = dtypesize(type);
     if (finalSize == DTS_DYNAMIC) {
         finalSize = readlenprefix(file);
     }
@@ -141,7 +141,7 @@ char *readdtok_v(FILE *file, dulen_t *out_len) {
         return NULL;
     }
 
-    dulen_t read = fread(buffer, sizeof(char), finalSize, file);
+    size_t read = fread(buffer, sizeof(char), finalSize, file);
     if (read < finalSize) {
         printf("Failed to read token. Size: %lu. Pos: %li. Fd: %i\n", finalSize, ftell(file), fileno(file));
         perror("Error");
@@ -157,7 +157,7 @@ char *readdtok_v(FILE *file, dulen_t *out_len) {
 }
 
 DataTokenArray *readdtokarr(FILE *file) {
-    dulen_t elementCount = readlenprefix(file);
+    size_t elementCount = readlenprefix(file);
     DataToken **tokens = malloc(elementCount * sizeof(DataToken*));
     if (tokens == NULL) {
         printf("Failed to allocate memory at readdtokarr_fs\n");
@@ -180,7 +180,7 @@ DataTokenArray *readdtokarr(FILE *file) {
     return array;
 }
 
-int insdtok(DataToken *tkn, dulen_t pos, FILE *file) {
+int insdtok(DataToken *tkn, size_t pos, FILE *file) {
     fseek(file, pos, SEEK_SET);   
     int writingPos = fmove(pos, tkn->size, file);
     fseek(file, writingPos, SEEK_SET);
@@ -188,8 +188,8 @@ int insdtok(DataToken *tkn, dulen_t pos, FILE *file) {
     return 0;
 }
 
-dulen_t dtoksize(const DataToken *tkn) {
-    dulen_t size = 0;
+size_t dtoksize(const DataToken *tkn) {
+    size_t size = 0;
     size += sizeof(tkn->type); 
     DataTypeSize typeSize = dtypesize(tkn->type);
 

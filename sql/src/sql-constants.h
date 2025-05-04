@@ -31,6 +31,4 @@ const Operator operators[] = {
     { "OR",  TT_OP_OR },
 };
 
-void init_sql_constants();
-
 #endif

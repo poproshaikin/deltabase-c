@@ -1,7 +1,7 @@
 #include "data/data-storage.h"
 #include "data/src/row/row-io.h"
 #include <stdlib.h>
-#include "sql/src/sql-constants.h"
+#include "sql/sql-engine.h"
 #include "utils/utils.h"
 #include <unistd.h>
 #include "globals.h"
@@ -65,7 +65,20 @@ void hexdump(FILE *file) {
 }
 
 int main(void) {
-    init_sql_constants();
+    printf("Enter command: ");
+    char cmd[128];
+    scanf("%s", cmd);
+
+    size_t count;
+    ErrorCode err;
+    Token **tokens = lex(cmd, &count, &err);
+
+    for (int i = 0; i < count; i++) {
+        printf("lexeme: %s, type: %i\n", tokens[i]->lexeme, tokens[i]->type);
+    }
+}
+
+int maind(void) {
 
     FILE *file = fopen("hello.txt", "r+");
     if (file == NULL) {
@@ -105,7 +118,31 @@ int main(void) {
     hexdump(file);
 
     /**/
-    /*DataToken **tokens = readdrow(&scheme, file);*/
+    /*DataToken **tokens = readdrobool str_isint(const char *str) {
+    // Если строка пуста, то это не целое число
+    if (str == NULL || *str == '\0') {
+        return false;
+    }
+
+    // Пропускаем возможный знак в начале
+    if (*str == '+' || *str == '-') {
+        str++;
+    }
+
+    // Проверяем, что после знака идут только цифры
+    if (*str == '\0') {
+        return false;  // Если после знака нет цифр, это не целое число
+    }
+
+    while (*str) {
+        if (!isdigit(*str)) {
+            return false;  // Если встречаем нецифровой символ, то строка не целое число
+        }
+        str++;
+    }
+
+    return true;  // Если строка состоит только из цифр (с учётом возможного знака), это целое число
+}w(&scheme, file);*/
     /*if (tokens == NULL) {*/
     /*    printf("tokens are null\n");*/
     /*    return -1;*/

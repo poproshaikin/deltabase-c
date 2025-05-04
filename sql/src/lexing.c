@@ -5,13 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../errors.h"
+#include "../../utils/utils.h"
 
 const char space_delim = ' ';
 
 Token **lex(char *command, size_t *out_count, ErrorCode *out_error) {
-    out_count = NULL;
-    out_error = NULL;
-
     size_t capacity = 128;
     size_t count = 0;
     size_t i = 0;
@@ -95,7 +93,8 @@ Token **lex(char *command, size_t *out_count, ErrorCode *out_error) {
             size_t len = i - start;
             char *str = strndup(command + start, len);
             if (!str_isnumber(str)) {
-                *out_error = ERR_SQL_INV_NUM_LIT; 
+                if (out_error) 
+                    *out_error = ERR_SQL_INV_NUM_LIT; 
                 return NULL;
             }
             TokenType numberType = str_isint(str) ? TT_LIT_INTEGER : TT_LIT_REAL;
@@ -104,7 +103,8 @@ Token **lex(char *command, size_t *out_count, ErrorCode *out_error) {
         }
     }
 
-    *out_count = count; 
+    if (out_count)
+        *out_count = count; 
     return tokens;
 }
 

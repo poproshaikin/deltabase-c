@@ -5,25 +5,25 @@
 
 char *dtok_bytes(DataToken *token);
 
-char **dtokarr_bytes(DataTokenArray *array, dulen_t *out_count);
-char *dtokarr_bytes_seq(DataTokenArray *array, dulen_t *out_size);
+char **dtokarr_bytes(DataTokenArray *array, size_t *out_count);
+char *dtokarr_bytes_seq(DataTokenArray *array, size_t *out_size);
 
 void freedtok(DataToken *token);
 void freedtokarr(DataTokenArray *array);
 void freeph(PageHeader *header);
 
 /* Creates a new DataToken from bytes */
-DataToken *newdtok(char *bytes, dulen_t size, DataType data_type);
+DataToken *newdtok(char *bytes, size_t size, DataType data_type);
 
 /* Creates a DataTokenArray from value block */
-DataTokenArray *newdtokarr_from_values(void *values, dulen_t el_size, dulen_t count, DataType el_type);
+DataTokenArray *newdtokarr_from_values(void *values, size_t el_size, size_t count, DataType el_type);
 
 /* Creates a DataTokenArray from pointers */
-DataTokenArray *newdtokarr_from_ptrs(void **ptrs, dulen_t el_size, dulen_t count, DataType el_type);
+DataTokenArray *newdtokarr_from_ptrs(void **ptrs, size_t el_size, size_t count, DataType el_type);
 
 DataTypeSize dtypesize(DataType type);
 
 /* Reads a length prefix from file */
-dulen_t readlenprefix(FILE *file);
+size_t readlenprefix(FILE *file);
 
 #endif

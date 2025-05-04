@@ -40,9 +40,9 @@ static unsigned char *buildnullbitmap(DataScheme *scheme, DataToken *tkns) {
 }
 
 /* Calculates a byte length of a row */
-static dulen_t drowsize(DataScheme *scheme, DataToken *tokens, int tokensCount) {
+static size_t drowsize(DataScheme *scheme, DataToken *tokens, int tokensCount) {
     int nbSize = nullbitmapsize(scheme);
-    dulen_t totalSize = nbSize;
+    size_t totalSize = nbSize;
     for (int i = 0; i < tokensCount; i++) {
         totalSize += dtoksize(&tokens[i]); 
     }
@@ -60,7 +60,7 @@ int writedrow(DataScheme *scheme, DataToken *tokens, int tokens_count, FILE *fil
     if (scheme == NULL || tokens == NULL || file == NULL) {
         return -1;
     }
-    dulen_t rowSize = drowsize(scheme, tokens, tokens_count);
+    size_t rowSize = drowsize(scheme, tokens, tokens_count);
     fwrite(&rowSize, DT_LENGTH, 1, file);
 
     unsigned char *nb = buildnullbitmap(scheme, tokens);
@@ -79,7 +79,7 @@ DataToken **readdrow(DataScheme *scheme, FILE *file) {
         return NULL;
     }
 
-    dulen_t rowSize = readlenprefix(file);
+    size_t rowSize = readlenprefix(file);
     unsigned char *nb = readnullbitmap(scheme, file);
     DataToken **tokens = malloc(scheme->columns_count * sizeof(DataToken*));
 

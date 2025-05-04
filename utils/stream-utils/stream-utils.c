@@ -76,7 +76,7 @@ static int fmove_neg(unsigned long int pos, long int offset, FILE *file) {
     return movingSize;
 }
 
-int fmove(unsigned long pos, long int offset, FILE *file) {
+int fmove(size_t pos, long int offset, FILE *file) {
     int finalOffset = offset;
     if (offset > 0) {
         return fmove_pos(pos, finalOffset, file);

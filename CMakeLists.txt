@@ -10,9 +10,10 @@ data/src/token/token-io.c
 data/src/row/row-io.c
 data/src/utils/utils.c
 data/src/utils/initializers.c
-sql/src/ast-eval.c
-utils/stream-utils.c
-utils/string-utils.c
+sql/src/token.c
+sql/src/lexing.c
+utils/stream-utils/stream-utils.c
+utils/string-utils/string-utils.c
 )
 
 add_executable(exe ${SOURCES})
