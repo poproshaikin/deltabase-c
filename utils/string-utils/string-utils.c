@@ -115,5 +115,32 @@ bool str_isint(const char *str) {
         str++;
     }
 
-    return true;  // Если строка состоит только из цифр (с учётом возможного знака), это целое число
+    return true; 
+}
+
+char *str_tolower(const char *str) {
+    int len = strlen(str);
+    char *new = malloc(len * sizeof(char));
+    for (int i = 0; i < len; i++) {
+        new[i] = (char)tolower(str[i]);
+    }
+    return new;
+}
+
+int str_indexat(const char *str, char c) {
+    for (int i = 0; i < strlen(str); i++) {
+        if (str[i] == c) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void str_rm(char *str, int index) {
+    int len = strlen(str);
+    if (index < 0 || index >= len) return; 
+
+    for (int i = index; i < len; i++) {
+        str[i] = str[i + 1]; 
+    }
 }

@@ -66,12 +66,20 @@ void hexdump(FILE *file) {
 
 int main(void) {
     printf("Enter command: ");
-    char cmd[128];
-    scanf("%s", cmd);
+
+    char *str = NULL;
+    size_t len = 0;
+
+    ssize_t read = getline(&str, &len, stdin);
+    if (read == -1) {
+        return 1;
+    }
 
     size_t count;
-    ErrorCode err;
-    Token **tokens = lex(cmd, &count, &err);
+    Error err;
+    Token **tokens = lex(str, &count, &err);
+
+    printf(describe_error(err));
 
     for (int i = 0; i < count; i++) {
         printf("lexeme: %s, type: %i\n", tokens[i]->lexeme, tokens[i]->type);

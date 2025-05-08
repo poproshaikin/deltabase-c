@@ -2,6 +2,7 @@
 #define SQL_TOKEN_H
 
 #include "../../data/data-storage.h"
+#include "../../errors.h"
 
 typedef enum TokenType {
     TT_UNDEFINED = 0,
@@ -29,10 +30,12 @@ typedef enum TokenType {
     TT_OP_AND,
     TT_OP_OR,
     TT_OP_ASSIGN,
+    TT_OP_ASTERISK,
 
     TT_SP_LEFT_BRACE = 40,
     TT_SP_RIGHT_BRACE,
-    TT_SP_COMMA
+    TT_SP_COMMA,
+    TT_SP_TERMINATOR
 } TokenType;
 
 typedef struct Token {
@@ -57,7 +60,8 @@ Token *create_token(char *lexeme,
     size_t lexeme_len, 
     TokenType type, 
     size_t row, 
-    size_t symbol
+    size_t symbol,
+    Error *out_error
 );
 
 typedef struct TableRow {
