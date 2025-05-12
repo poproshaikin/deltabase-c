@@ -36,26 +36,34 @@ void prepare_command(char *cmd) {
     }
 }
 
+void incr_counter(size_t *i, size_t *symbol) {
+    (*i)++;
+    (*symbol)++;
+}
+
 Token *parse_identifier(PARSING_FUNC_PARAMS) {
-    size_t start = ++(*i);
-    while (*i < len && command[*i] != '"') (*i)++;
+    incr_counter(i, symbol);
+    size_t start = *i;
+    while (*i < len && command[*i] != '"') {
+        incr_counter(i, symbol);
+    }
     size_t tok_len = *i - start;
     char *str = strndup(command + start, tok_len);
 
-    *symbol = *i;
     Token *token = create_token(str, tok_len, TT_IDENTIFIER, row, *symbol, out_error);
 
     return token;
 }
 
 Token *parse_string_literal(PARSING_FUNC_PARAMS) {
-    size_t start = ++(*i);
-
-    while (*i < len && command[*i] != '\'') i++;
+    incr_counter(i, symbol);
+    size_t start = *i;
+    while (*i < len && command[*i] != '\'') {
+        incr_counter(i, symbol);
+    }
     size_t tok_len = *i - start;
     char *str = strndup(command + start, tok_len);
 
-    *symbol = *i;
     Token *token = create_token(str, tok_len, TT_LIT_STRING, row, *symbol, out_error);
 
     return token;
@@ -87,7 +95,9 @@ Token *parse_comma(size_t row, size_t symbol, Error *out_error) {
 
 Token *parse_number_literal(PARSING_FUNC_PARAMS) {
     size_t start = *i;
-    while (*i < len && char_isnumber(command[*i])) (*i)++;
+    while (*i < len && char_isnumber(command[*i])) {
+        incr_counter(i, symbol);
+    }
     size_t tok_len = *i - start;
     char *str = strndup(command + start, tok_len);
     if (!str_isnumber(str)) {
@@ -102,7 +112,9 @@ Token *parse_number_literal(PARSING_FUNC_PARAMS) {
 
 Token *parse_keyword(PARSING_FUNC_PARAMS) {
     size_t start = *i;
-    while (*i < len && isalnum(command[*i])) (*i)++;
+    while (*i < len && isalnum(command[*i])) {
+        incr_counter(i, symbol);
+    }
     size_t tok_len = *i - start;
     char *str = str_tolower(strndup(command + start, tok_len));
     Token *token = NULL;
@@ -117,18 +129,21 @@ Token *parse_keyword(PARSING_FUNC_PARAMS) {
 
 Token *parse_operator(PARSING_FUNC_PARAMS) {
     size_t start = *i;
-    while (*i < len && !isspace(command[*i])) (*i)++;
+    while (*i < len && !isspace(command[*i])) {
+        incr_counter(i, symbol);
+    }
     size_t tok_len = *i - start;
     char *str = strndup(command + start, tok_len);
     return resolve_operator(str, row, symbol, out_error);
 }
+
 
 Token **lex(char *command, size_t *out_count, Error *out_error) {
     size_t capacity = 128;
     size_t count = 0;
     size_t i = 0;
     size_t len = strlen(command);
-    size_t row = 0, symbol = 0;
+    size_t row = 1, symbol = 1;
 
     Token **tokens = malloc(sizeof(Token *) * capacity);
     Token *token = NULL;
@@ -139,12 +154,10 @@ Token **lex(char *command, size_t *out_count, Error *out_error) {
         if (command[i] == '\n') {
             symbol = 0;
             row++;
-        } else {
-            symbol++;
-        }
+        } 
 
         if (isspace(command[i])) {
-            i++; symbol++;
+            incr_counter(&i, &symbol);
             continue;
         }
 
@@ -163,14 +176,17 @@ Token **lex(char *command, size_t *out_count, Error *out_error) {
 
         else if (command[i] == '(') {
             token = parse_left_brace(row, symbol, out_error);
+            incr_counter(&i, &symbol);
         }
 
         else if (command[i] == ')') {
             token = parse_right_brace(row, symbol, out_error);
+            incr_counter(&i, &symbol);
         }
 
         else if (command[i] == ',') {
             token = parse_comma(row, symbol, out_error);
+            incr_counter(&i, &symbol);
         }
 
         else if (isdigit(command[i])) {
@@ -187,11 +203,15 @@ Token **lex(char *command, size_t *out_count, Error *out_error) {
 
         else {
             *out_error = create_error(row, symbol, ERR_SQL_UNEXP_SYM);
+            return handle_error(tokens, count);
         }
 
         if (!token) {
             return handle_error(tokens, count);
         }
+
+        printf("i: %lu\n", i);
+        printf("symbol: %lu\n", symbol);
 
         tokens[count++] = token;
     }
