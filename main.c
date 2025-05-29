@@ -1,10 +1,11 @@
 #include "data/data-storage.h"
 #include "data/src/row/row-io.h"
 #include <stdlib.h>
+#include "errors.h"
 #include "sql/sql-engine.h"
+#include "sql/src/sql-parsing.h"
 #include "utils/utils.h"
 #include <unistd.h>
-#include "globals.h"
 
 // подготовить функции для работы с файлами.
 // используя их начать разработку протокола и планирования структуры страниц.
@@ -79,11 +80,20 @@ int main(void) {
     Error err;
     Token **tokens = lex(str, &count, &err);
 
-    printf(describe_error(err));
-
     for (int i = 0; i < count; i++) {
         printf("lexeme: %s, type: %i\n", tokens[i]->lexeme, tokens[i]->type);
     }
+
+    AstNode *tree = parse(tokens, count, &err);
+
+    if (err.error != 0) {
+        printf("%s\n", describe_error(err));
+        return 1;
+    }
+
+    printf("\n\n tree: %s\n", tree->select.table->value->lexeme);
+
+    print_ast(tree, 4);
 }
 
 int maind(void) {
