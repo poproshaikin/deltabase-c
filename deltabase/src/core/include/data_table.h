@@ -13,7 +13,7 @@ typedef struct {
 typedef struct {
     DataColumn **columns;
     size_t columns_count;
-} DataScheme;
+} DataSchema;
 
 /* Data row */
 typedef struct {
@@ -24,7 +24,7 @@ typedef struct {
 } DataRow;
 
 typedef struct {
-    DataScheme *scheme;
+    DataSchema *scheme;
     DataRow **rows;
 } DataTable;
 

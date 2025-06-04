@@ -1,6 +1,7 @@
 #include <cstdio>
 extern "C" {
-#include "../core/include/core.h"
+    #include "../src/core/include/core.h"
+    #include "../src/core/include/data_io.h"
 }
 
 using namespace std;

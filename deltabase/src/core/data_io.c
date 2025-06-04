@@ -1,6 +1,6 @@
-#include "include/core.h"
 #include "include/data_token.h"
 #include "include/utils.h"
+#include "include/data_io.h"
 
 #include <stdlib.h>
 
@@ -184,4 +184,3 @@ int read_ph(PageHeader *out, FILE *src) {
     out->rows_count = read_length_prefix(src);
     return 0;
 }
-

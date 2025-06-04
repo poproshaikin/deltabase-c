@@ -8,3 +8,5 @@ Makefile
 *.a
 *.exe
 *.out
+
+build/

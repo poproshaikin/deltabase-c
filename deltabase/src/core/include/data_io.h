@@ -1,5 +1,5 @@
-#ifndef CORE_H
-#define CORE_H
+#ifndef DATA_IO_H
+#define DATA_IO_H
 
 #include "data_token.h"
 #include "data_page.h"
