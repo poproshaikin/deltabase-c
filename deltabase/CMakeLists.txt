@@ -4,6 +4,12 @@ project(deltabase LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/bin)
+
+set(CMAKE_OBJECT_MAX_PATH 4096)
+
 file(GLOB_RECURSE CORE_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/*.c
 )
@@ -13,12 +19,6 @@ add_library(core STATIC ${CORE_SRCS})
 target_include_directories(core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/include
 )
-
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/bin)
-
-set(CMAKE_OBJECT_MAX_PATH 4096)
 
 function(add_cpp_module module_name)
     file(GLOB_RECURSE MOD_SRCS
@@ -30,7 +30,7 @@ function(add_cpp_module module_name)
     add_library(${module_name} STATIC ${MOD_SRCS})
 
     target_include_directories(${module_name} PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/${module_name}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/${module_name}/include
     )
 
     target_link_libraries(${module_name} PRIVATE core)

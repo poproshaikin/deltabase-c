@@ -6,6 +6,7 @@
 
 /* Data types */
 typedef enum {
+    DT_NULL = -1, 
     DT_INTEGER = 1,
     DT_REAL,
     DT_CHAR,
@@ -19,5 +20,8 @@ typedef struct DataToken {
     char *bytes;
     DataType type;
 } DataToken;
+
+DataToken *make_token(DataType type, const void *data, size_t size);
+void free_token(DataToken *token);
 
 #endif

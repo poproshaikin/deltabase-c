@@ -84,3 +84,7 @@ int fmove(size_t pos, long int offset, FILE *file) {
     }
     return 0;
 }
+
+bool dir_exists(const char *path) {
+    return false;
+}

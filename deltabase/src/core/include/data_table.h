@@ -18,6 +18,7 @@ typedef struct {
 /* Data row */
 typedef struct {
     size_t row_id;
+    unsigned char flags;
     unsigned char *null_bm;
     DataToken **tokens;
     size_t count;
