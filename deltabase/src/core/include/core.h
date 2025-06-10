@@ -8,8 +8,8 @@
 int create_database(const char *name);
 int drop_database(const char *name);
 
-int create_table(const char *table_name, const DataSchema *scheme);
-int drop_table(const char *table_name);
+int create_table(const char *db_name, const char *table_name, const DataSchema *scheme);
+int drop_table(const char *db_name, const char *table_name);
 
 int insert_row(const char *table_name, const DataRow *row);
 int update_row(const char *table_name, size_t row_id, const DataRow *new_row);

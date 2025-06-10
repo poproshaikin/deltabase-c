@@ -11,6 +11,8 @@ typedef struct {
 
 /* Table scheme */
 typedef struct {
+    char *name;
+    
     DataColumn **columns;
     size_t columns_count;
 } DataSchema;

@@ -39,7 +39,7 @@ int main() {
     };
 
     DataRow row;
-    read_dr(&schema, &row, file);
+    read_dr(&schema, &row, fileno(file));
 
     for (int i = 0; i < row.count; i++) {
         DataToken* tok = row.tokens[i];

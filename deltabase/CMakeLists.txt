@@ -14,7 +14,7 @@ file(GLOB_RECURSE CORE_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/*.c
 )
 
-add_library(core STATIC ${CORE_SRCS})
+add_library(core SHARED ${CORE_SRCS})
 
 target_include_directories(core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/include
