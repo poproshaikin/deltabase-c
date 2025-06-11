@@ -11,7 +11,6 @@ typedef enum {
     DT_REAL,
     DT_CHAR,
     DT_BOOL,
-    DT_LENGTH,
     DT_STRING,
 } DataType;
 

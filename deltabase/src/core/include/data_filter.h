@@ -3,6 +3,7 @@
 
 #include "stddef.h"
 #include <stdbool.h>
+#include <uuid/uuid.h>
 
 typedef enum {
     OP_EQ = 1,  // ==
@@ -21,7 +22,7 @@ typedef enum {
 typedef struct DataFilter DataFilter;
 
 typedef struct {
-    const char *field_name;
+    const uuid_t column_id;
     FilterOp op;
     const void *value;
     size_t value_size;

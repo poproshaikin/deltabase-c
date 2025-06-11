@@ -45,13 +45,15 @@ typedef enum {
 typedef struct {
     uint64_t row_id;
     DataRowFlags flags;
-    unsigned char *null_bm;
     DataToken **tokens;
     size_t count;
 } DataRow;
 
 uint64_t dr_size(const MetaTable *schema, const DataRow *row);
 uint64_t dr_size_v(const MetaTable *schema, const DataToken **tokens, int tokens_count);
+
+// gets index of the column COLUMN_ID in the TABLE
+ssize_t get_column_index_meta(const uuid_t column_id, const MetaTable *table);
 
 typedef struct {
     MetaTable *scheme;

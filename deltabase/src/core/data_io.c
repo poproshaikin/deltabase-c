@@ -123,8 +123,6 @@ uint64_t dtype_size(DataType type) {
             return 1;
         case DT_STRING:
             return 0;
-        case DT_LENGTH:
-            return 8;
         case DT_CHAR:
             return 4;
         case DT_NULL:
@@ -185,7 +183,7 @@ uint64_t dt_size(const DataToken *token) {
     uint64_t typeSize = dtype_size(token->type);
 
     if (typeSize == 0) {
-        size += dtype_size(DT_LENGTH);
+        size += sizeof(uint64_t);
         size += token->size; 
     } else {
         size += typeSize;
@@ -442,7 +440,6 @@ int read_dr(const MetaTable *schema, DataRow *out, int fd) {
 
     out->tokens = tokens;
     out->count = schema->columns_count;
-    out->null_bm = nb;
     return 0;
 }
 
