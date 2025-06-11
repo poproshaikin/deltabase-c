@@ -151,7 +151,7 @@ int rmdir_recursive(const char *path) {
     
     closedir(d);
 
-        if (r == 0) {
+    if (r == 0) {
         if (rmdir(path) == -1) {
             perror("remove_directory_recursive: rmdir");
             r = -1; 
@@ -161,12 +161,101 @@ int rmdir_recursive(const char *path) {
     return r;
 }
 
-int create_file(const char *path) {
+int create_file(const char *path, int *out_fd) {
     FILE *tables_meta = fopen(path, "w");
     if (!tables_meta) {
         fprintf(stderr, "Failed to create file\n");
         return 1;
     }
-    fclose(tables_meta);
+    if (!out_fd) {
+        *out_fd = fileno(tables_meta);
+    } 
+    else {
+        fclose(tables_meta);
+    }
     return 0;
+}
+
+static void free_file_list(char **paths, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        free(paths[i]);
+    }
+}
+
+char **get_dir_files(const char *dir_path, size_t *out_count) {
+    DIR *dir = NULL;
+    struct dirent *entry;
+    char **file_list = NULL;
+    int count = 0;
+    int allocated_size = 10;
+
+    if (out_count == NULL) {
+        fprintf(stderr, "Error: out_count cannot be NULL.\n");
+        return NULL;
+    }
+    *out_count = 0; 
+
+    dir = opendir(dir_path);
+    if (dir == NULL) {
+        perror("Error opening directory");
+        return NULL;
+    }
+
+    file_list = (char**)malloc(sizeof(char*) * allocated_size);
+    if (file_list == NULL) {
+        perror("Error allocating memory for file list");
+        closedir(dir);
+        return NULL;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        char full_path[PATH_MAX]; 
+        int path_len = snprintf(full_path, PATH_MAX, "%s/%s", dir_path, entry->d_name);
+        if (path_len >= PATH_MAX || path_len < 0) {
+            fprintf(stderr, "Error: Path too long or snprintf error for '%s/%s'\n", dir_path, entry->d_name);
+            continue;
+        }
+
+        struct stat st;
+        if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
+            if (count >= allocated_size) {
+                allocated_size *= 2; // Удваиваем размер
+                char **new_file_list = (char**)realloc(file_list, sizeof(char*) * allocated_size);
+                if (new_file_list == NULL) {
+                    perror("Error reallocating memory for file list");
+                    free_file_list(file_list, count);
+                    closedir(dir);
+                    return NULL;
+                }
+                file_list = new_file_list;
+            }
+
+            file_list[count] = (char*)malloc(strlen(full_path) + 1);
+            if (file_list[count] == NULL) {
+                perror("Error allocating memory for file name");
+                free_file_list(file_list, count);
+                closedir(dir);
+                return NULL;
+            }
+            strcpy(file_list[count], full_path);
+            count++;
+        }
+    }
+
+    closedir(dir); 
+
+    *out_count = count; 
+
+    if (count < allocated_size) {
+        char **new_file_list = (char**)realloc(file_list, sizeof(char*) * count);
+        if (new_file_list != NULL) {
+            file_list = new_file_list;
+        }
+    }
+
+    return file_list;
 }

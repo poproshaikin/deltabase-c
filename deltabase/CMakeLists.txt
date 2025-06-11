@@ -10,6 +10,14 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/bin)
 
 set(CMAKE_OBJECT_MAX_PATH 4096)
 
+find_package(UUID REQUIRED)
+
+if (UUID_FOUND)
+    message(STATUS "Found libuuid: ${UUID_LIBRARIES}")
+else()
+    message(FATAL_ERROR "libuuid not found. Please install it (e.g., 'sudo pacman -S uuid-dev').")
+endif()
+
 file(GLOB_RECURSE CORE_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/*.c
 )
@@ -19,6 +27,8 @@ add_library(core SHARED ${CORE_SRCS})
 target_include_directories(core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/include
 )
+
+target_link_libraries(core PUBLIC UUID::UUID)
 
 function(add_cpp_module module_name)
     file(GLOB_RECURSE MOD_SRCS
@@ -33,6 +43,7 @@ function(add_cpp_module module_name)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/${module_name}/include
     )
 
+    target_link_libraries(${module_name} PRIVATE UUID::UUID)
     target_link_libraries(${module_name} PRIVATE core)
 endfunction()
 

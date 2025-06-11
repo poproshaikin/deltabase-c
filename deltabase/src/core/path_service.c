@@ -35,3 +35,9 @@ void path_db_table_meta(const char *db_name, const char *table_name, char *out_r
 void path_db_table_data(const char *db_name, const char *table_name, char *out_result, size_t buf_size) {
     snprintf(out_result, buf_size, "%s/%s/%s/%s", DATA, db_name, table_name, DATA);
 }
+
+void path_db_table_page(const char *db_name, const char *table_name, uuid_t uuid, char *out_result, uint64_t buf_size) {
+    char uuid_string[37];
+    uuid_unparse_lower(uuid, uuid_string);
+    snprintf(out_result, buf_size, "%s/%s/%s/%s/%s", DATA, db_name, table_name, DATA, uuid_string);
+}
