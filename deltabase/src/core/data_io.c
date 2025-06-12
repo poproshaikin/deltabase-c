@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -443,69 +444,6 @@ int read_dr(const MetaTable *schema, DataRow *out, int fd) {
     return 0;
 }
 
-int write_mt(const MetaTable *schema, int fd) {
-    ssize_t w;
-
-    w = write(fd, schema->table_id, sizeof(schema->table_id));
-    if (w != sizeof(schema->table_id)) return 1;
-
-    uint64_t name_len = strlen(schema->name);
-    w = write(fd, &name_len, sizeof(size_t));
-    if (w != sizeof(size_t)) return 2;
-
-    w = write(fd, &schema->has_pk, sizeof(schema->has_pk));
-    if (w != sizeof(schema->has_pk)) return 3;
-
-    w = write(fd, &schema->last_rid, sizeof(schema->last_rid));
-    if (w != sizeof(schema->last_rid)) return 4;
-
-    if (schema->has_pk) {
-        w = write(fd, schema->pk, sizeof(schema->pk));
-        if (w != sizeof(schema->pk)) return 5;
-    }
-
-    return 0;
-}
-
-int read_mt(MetaTable *out, int fd) {
-    if (read(fd, out->table_id, sizeof(out->table_id)) != sizeof(out->table_id))
-        return 1;
-
-    uint64_t name_len;
-    if (read(fd, &name_len, sizeof(size_t)) != sizeof(size_t))
-        return 2;
-
-    out->name = malloc(name_len + 1);
-    if (!out->name)
-        return 3;
-
-    if (read(fd, out->name, name_len) != (ssize_t)name_len) {
-        free(out->name);
-        return 4;
-    }
-
-    out->name[name_len] = '\0';
-
-    if (read(fd, &out->has_pk, sizeof(out->has_pk)) != sizeof(out->has_pk)) {
-        free(out->name);
-        return 5;
-    }
-
-    if (read(fd, &out->last_rid, sizeof(out->last_rid)) != sizeof(out->last_rid)) {
-        free(out->name);
-        return 6;
-    }
-
-    if (out->has_pk) {
-        if (read(fd, out->pk, sizeof(out->pk)) != sizeof(out->pk)) {
-            free(out->name);
-            return 7;
-        }
-    }
-
-    return 0;
-}
-
 static inline uint64_t mc_size(const MetaColumn *column) {
     return 
         sizeof(column->column_id) + 
@@ -592,3 +530,109 @@ int read_mc(MetaColumn *column, int fd) {
 
     return 0;
 }
+
+int write_mt(const MetaTable *schema, int fd) {
+    ssize_t w = 0;
+
+    w = write(fd, schema->table_id, sizeof(schema->table_id));
+    if (w != sizeof(schema->table_id)) return 1;
+
+    uint64_t name_len = strlen(schema->name);
+    w = write(fd, &name_len, sizeof(name_len));
+    if (w != sizeof(name_len)) return 2;
+
+    w = write(fd, schema->name, name_len);
+    if (w != name_len) return 3;
+
+    w = write(fd, &schema->has_pk, sizeof(schema->has_pk));
+    if (w != sizeof(schema->has_pk)) return 4;
+
+    w = write(fd, &schema->last_rid, sizeof(schema->last_rid));
+    if (w != sizeof(schema->last_rid)) return 5;
+
+    if (schema->has_pk) {
+        w = write(fd, schema->pk, sizeof(schema->pk));
+        if (w != sizeof(schema->pk)) return 6;
+    }
+
+    w = write(fd, &schema->columns_count, sizeof(schema->columns_count));
+    if (w != sizeof(schema->columns_count)) return 7;
+
+    for (size_t i = 0; i < schema->columns_count; i++) {
+        if (write_mc(schema->columns[i], fd) != 0) {
+            return i + 8;
+        }
+    }
+
+    return 0;
+}
+
+int read_mt(MetaTable *out, int fd) {
+    if (read(fd, out->table_id, sizeof(out->table_id)) != sizeof(out->table_id))
+        return 1;
+
+    uint64_t name_len;
+    if (read(fd, &name_len, sizeof(name_len)) != sizeof(name_len))
+        return 2;
+
+    out->name = malloc(name_len + 1);
+    if (!out->name)
+        return 3;
+
+    if (read(fd, out->name, name_len) != (ssize_t)name_len) {
+        free(out->name);
+        return 4;
+    }
+
+    out->name[name_len] = '\0';
+
+    if (read(fd, &out->has_pk, sizeof(out->has_pk)) != sizeof(out->has_pk)) {
+        free(out->name);
+        return 5;
+    }
+
+    if (read(fd, &out->last_rid, sizeof(out->last_rid)) != sizeof(out->last_rid)) {
+        free(out->name);
+        return 6;
+    }
+
+    if (out->has_pk) {
+        if (read(fd, out->pk, sizeof(out->pk)) != sizeof(out->pk)) {
+            free(out->name);
+            return 7;
+        }
+    }
+
+    if (read(fd, &out->columns_count, sizeof(out->columns_count)) != sizeof(out->columns_count)) {
+        free(out->name);
+        return 8;
+    }
+
+    out->columns = malloc(out->columns_count * sizeof(MetaColumn *));
+    if (!out->columns) {
+        fprintf(stderr, "Failed to allocate memory for columns array in read_mt\n");
+        return 9;
+    }
+
+    for (size_t i = 0; i < out->columns_count; i++) {
+        out->columns[i] = malloc(sizeof(MetaColumn));
+        if (!out->columns[i]) {
+            fprintf(stderr, "Failed to allocate memory for columns array in read_mt\n");
+            return i + 9;
+        }
+
+        if (read_mc(out->columns[i], fd) != 0) {
+            for (size_t j = 0; j < i; j++) {
+                free_col(out->columns[j]);
+            }
+
+            free(out->columns);
+            free(out->name);
+
+            return i + 9;
+        }
+    }
+
+    return 0;
+}
+

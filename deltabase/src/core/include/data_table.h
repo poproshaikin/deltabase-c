@@ -3,6 +3,7 @@
 
 #include "data_token.h"
 #include <stdint.h>
+#include <stdint.h>
 #include <uuid/uuid.h>
 #include <stdbool.h>
 
@@ -24,6 +25,8 @@ typedef struct {
     DataColumnFlags flags;
 } MetaColumn;
 
+void free_col(MetaColumn *column);
+
 /* Table scheme */
 typedef struct {
     uuid_t table_id;
@@ -33,7 +36,7 @@ typedef struct {
     uuid_t pk;
     
     MetaColumn **columns;
-    size_t columns_count;
+    uint64_t columns_count;
 
     uint64_t last_rid;
 } MetaTable;
@@ -48,7 +51,7 @@ typedef struct {
     uint64_t row_id;
     DataRowFlags flags;
     DataToken **tokens;
-    size_t count;
+    uint64_t count;
 } DataRow;
 
 typedef struct {

@@ -97,6 +97,26 @@ bool dir_exists(const char *path) {
     return (info.st_mode & S_IFDIR) != 0;
 }
 
+int mkdir_recursive(const char *path, mode_t mode) {
+    char tmp[PATH_MAX];
+    char *p = NULL;
+    size_t len;
+
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    len = strlen(tmp);
+    if (tmp[len - 1] == '/')
+        tmp[len - 1] = 0;
+
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = 0;
+            mkdir(tmp, mode);
+            *p = '/';
+        }
+    }
+    return mkdir(tmp, mode);
+}
+
 int rmdir_recursive(const char *path) {
     DIR *d = opendir(path);
     size_t path_len = strlen(path);
@@ -159,21 +179,6 @@ int rmdir_recursive(const char *path) {
     }
 
     return r;
-}
-
-int create_file(const char *path, int *out_fd) {
-    FILE *tables_meta = fopen(path, "w");
-    if (!tables_meta) {
-        fprintf(stderr, "Failed to create file\n");
-        return 1;
-    }
-    if (!out_fd) {
-        *out_fd = fileno(tables_meta);
-    } 
-    else {
-        fclose(tables_meta);
-    }
-    return 0;
 }
 
 static void free_file_list(char **paths, size_t count) {

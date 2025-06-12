@@ -8,7 +8,7 @@
 int create_database(const char *name);
 int drop_database(const char *name);
 
-int create_table(const char *db_name, const char *table_name, const MetaTable *scheme);
+int create_table(const char *db_name, const MetaTable *scheme);
 int drop_table(const char *db_name, const char *table_name);
 
 int insert_row(const char *db_name, const char *table_name, const DataRow *row);
@@ -24,7 +24,6 @@ int update_row_by_filter(const char *db_name, const char *table_name, const Data
 int delete_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter);
 
 int full_scan(const char *db_name, const char *table_name, DataTable *out);
-int select_rows(const char *db_name, const char *table_name, const DataFilter *filter, DataRow *out);
 
 int get_table_schema(const char *db_name, const char *table_name, MetaTable *out);
 int list_tables(char ***out_table_names, size_t *count);

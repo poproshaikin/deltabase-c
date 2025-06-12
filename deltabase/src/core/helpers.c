@@ -52,6 +52,12 @@ void free_row(DataRow *row) {
     free_tokens(row->tokens, row->count);
     free(row);
 }
+
+void free_col(MetaColumn *column) {
+    free(column->name);
+    free(column);
+}
+
 ssize_t get_column_index_meta(const uuid_t column_id, const MetaTable *table) {
     for (size_t i = 0; i < table->columns_count; i++) {
         if (uuid_compare(table->columns[i]->column_id, column_id)) {

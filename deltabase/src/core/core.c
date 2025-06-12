@@ -4,6 +4,7 @@
 #include "include/data_io.h"
 
 #include <linux/limits.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <uuid/uuid.h>
 
@@ -11,11 +12,14 @@ int create_database(const char *name) {
     char buffer[PATH_MAX];
     path_db(name, buffer, PATH_MAX);
 
+    printf("%s\n", buffer);
+
     if (dir_exists(buffer)) {
         return 1;
     }
 
-    int created_base = mkdir(buffer, 0755);
+    int created_base = mkdir_recursive(buffer, 0755);
+    printf("%i\n", created_base);
     if (created_base != 0) {
         return 2;
     }
@@ -43,28 +47,39 @@ int drop_database(const char *name) {
     }
 }
 
-int create_table(const char *db_name, const char *table_name, const MetaTable *schema) {
+int create_table(const char *db_name, const MetaTable *schema) {
+    int op = 0;
+
     char buffer[PATH_MAX];
-    path_db_table(db_name, table_name, buffer, PATH_MAX);
+    path_db_table(db_name, schema->name, buffer, PATH_MAX);
     if (dir_exists(buffer)) {
-        fprintf(stderr, "Failed to create a already existing table %s\n", table_name);
+        fprintf(stderr, "Failed to create a already existing table %s\n", schema->name);
         return 1;
     }
 
-    if (mkdir(buffer, 0755) != 0) {
-        fprintf(stderr, "Failed to create a directory for table %s\n", table_name);
+    if (mkdir_recursive(buffer, 0755) != 0) {
+        fprintf(stderr, "Failed to create a directory for table %s\n", schema->name);
         return 2;
     }   
 
-    path_db_table_meta(db_name, table_name, buffer, PATH_MAX);
-    int meta_fd;
-    int created_meta_file = create_file(buffer, &meta_fd);
-    write_mt(schema, meta_fd);
+    path_db_table_meta(db_name, schema->name, buffer, PATH_MAX);
 
-    path_db_table_data(db_name, table_name, buffer, PATH_MAX);
-    if (mkdir(buffer, 0755) != 0) {
-        fprintf(stderr, "Failed to create a directory for table %s\n", table_name);
+    FILE *meta_file = fopen(buffer, "w+");
+    if (!meta_file) {
         return 3;
+    }
+
+    if ((op = write_mt(schema, fileno(meta_file))) != 0) {
+        printf("create_table:write_mt %i\n", op);
+        fclose(meta_file);
+        return 4;
+    }
+    fclose(meta_file);
+
+    path_db_table_data(db_name, schema->name, buffer, PATH_MAX);
+    if (mkdir_recursive(buffer, 0755) != 0) {
+        fprintf(stderr, "Failed to create a directory for table %s\n", schema->name);
+        return 5;
     }
 
     return 0;
@@ -77,14 +92,16 @@ int create_page(const char *db_name, const char *table_name, PageHeader *out_new
     char file_path[PATH_MAX];
     path_db_table_page(db_name, table_name, out_new_page->page_id, file_path, PATH_MAX);
 
-    int fd;
-    int created_file = create_file(file_path, &fd);
-    if (created_file != 0) {
+    FILE *file = fopen(file_path, "w+");
+    if (!file) {
         fprintf(stderr, "Failed to create page file %s\n", out_new_page->page_id);
         return 1;
     }
 
-    write_ph(out_new_page, fd);
+    if (write_ph(out_new_page, fileno(file)) != 0) {
+        return 2;
+    }
+    fclose(file);
     return 0;
 }
 

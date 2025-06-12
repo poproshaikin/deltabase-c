@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unordered_map>
 
 static int write_row_update_state(const DataRow *row, MetaTable *schema, FILE *file) {
     int fd = fileno(file);
@@ -160,6 +159,7 @@ bool apply_filter(const void *value1, const DataType type1, const void *value2, 
 
     return false;
 }
+
 
 bool row_satisfies_filter(const MetaTable *schema, const DataRow *row, const DataFilter *filter) {
     if (schema->columns_count != row->count) {
