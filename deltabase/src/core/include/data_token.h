@@ -21,6 +21,7 @@ typedef struct DataToken {
 } DataToken;
 
 DataToken *make_token(DataType type, const void *data, size_t size);
+DataToken *copy_token(const DataToken *old);
 void free_token(DataToken *token);
 
 #endif

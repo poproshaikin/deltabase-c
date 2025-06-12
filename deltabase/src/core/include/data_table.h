@@ -7,11 +7,12 @@
 #include <stdbool.h>
 
 typedef enum {
-    CF_PK = 0b00001,
-    CF_FK = 0b00010,
-    CF_AI = 0b00100,
-    CF_NN = 0b01000,
-    CF_UN = 0b10000
+    CF_NONE = 0,
+    CF_PK = 1 << 0,
+    CF_FK = 1 << 1,
+    CF_AI = 1 << 2,
+    CF_NN = 1 << 3,
+    CF_UN = 1 << 4
 } DataColumnFlags;
 
 /* Column description */
@@ -38,7 +39,8 @@ typedef struct {
 } MetaTable;
 
 typedef enum {
-    DT_OBSOLETE = 0b1,
+    RF_NONE = 0,
+    RF_OBSOLETE = 1 << 0,
 } DataRowFlags;
 
 /* Data row */
@@ -49,6 +51,14 @@ typedef struct {
     size_t count;
 } DataRow;
 
+typedef struct {
+    DataRow **rows;
+    size_t count;
+} DataRowSet;
+
+void free_tokens(DataToken **tokens, size_t count);
+void free_row(DataRow *row);
+
 uint64_t dr_size(const MetaTable *schema, const DataRow *row);
 uint64_t dr_size_v(const MetaTable *schema, const DataToken **tokens, int tokens_count);
 
@@ -58,6 +68,7 @@ ssize_t get_column_index_meta(const uuid_t column_id, const MetaTable *table);
 typedef struct {
     MetaTable *scheme;
     DataRow **rows;
+    size_t rows_count;
 } DataTable;
 
 #endif

@@ -357,7 +357,7 @@ static inline unsigned char *read_nb(const MetaTable *schema, int fd) {
     return bitmap;
 }
 
-static int write_dr_flags(DataRowFlags flags, int fd) {
+int write_dr_flags(DataRowFlags flags, int fd) {
     if (write(fd, &flags, sizeof(DataRowFlags)) != sizeof(DataRowFlags)) {
         return 1;
     }
@@ -442,7 +442,6 @@ int read_dr(const MetaTable *schema, DataRow *out, int fd) {
     out->count = schema->columns_count;
     return 0;
 }
-
 
 int write_mt(const MetaTable *schema, int fd) {
     ssize_t w;

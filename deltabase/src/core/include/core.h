@@ -13,19 +13,22 @@ int drop_table(const char *db_name, const char *table_name);
 
 int insert_row(const char *db_name, const char *table_name, const DataRow *row);
 
-int update_row_by_rid(const char *db_name, const char *table_name, size_t row_id, const DataRow *new_row);
-int update_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, const DataRow *new_row);
+typedef struct {
+    size_t count;
+    uuid_t *column_indices;
+    const void **values;
+} DataRowUpdate;
+ 
+int update_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, const DataRowUpdate *update);
 
-int delete_row_by_rid(const char *db_name, const char *table_name, size_t row_id);
 int delete_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter);
 
-int full_scan(char *table_name, DataTable *out);
-int select_rows(const char *table_name, const DataFilter *filter, DataRow *out);
-int get_row(const char *table_name, size_t row_id, DataRow *out);
-int write_row(const char *table_name, DataRow row);
+int full_scan(const char *db_name, const char *table_name, DataTable *out);
+int select_rows(const char *db_name, const char *table_name, const DataFilter *filter, DataRow *out);
 
 int get_table_schema(const char *db_name, const char *table_name, MetaTable *out);
 int list_tables(char ***out_table_names, size_t *count);
+int save_table_schema(const char *db_name, const char *table_name, const MetaTable *meta);
 
 int create_page(const char *db_name, const char *table_name, PageHeader *out_new_page);
 ssize_t get_pages(const char *db_name, const char *table_name, char ***out_paths);

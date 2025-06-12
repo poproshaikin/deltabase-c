@@ -123,11 +123,26 @@ int get_table_schema(const char *db_name, const char *table_name, MetaTable *out
     int fd = fileno(file);
 
     if (read_mt(out, fd) != 0) {
+        fclose(file);
         return 1;
     }
 
     fclose(file);
-
     return 0;
 }
 
+int save_table_schema(const char *db_name, const char *table_name, const MetaTable *meta) {
+    char buffer[PATH_MAX];
+    path_db_table_meta(db_name, table_name, buffer, PATH_MAX);
+    
+    FILE *file = fopen(buffer, "w+");
+    int fd = fileno(file);
+
+    if (write_mt(meta, fd) != 0) {
+        fclose(file);
+        return 1;
+    }
+
+    fclose(file);
+    return 0;
+}

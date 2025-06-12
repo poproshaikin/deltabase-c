@@ -23,6 +23,7 @@ int skip_ph(int fd);
 
 int write_dr(const MetaTable *schema, const DataRow *row, int fd);
 int write_dr_v(const MetaTable *schema, const DataToken **tokens, uint64_t count, unsigned char flags, int fd);
+int write_dr_flags(DataRowFlags flags, int fd);
 
 int read_dr(const MetaTable *schema, DataRow *out, int fd);
 
