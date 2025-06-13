@@ -1,11 +1,14 @@
 #include <cstdio>
+#include <cstring>
 #include <iostream>
+#include <ostream>
 #include <string.h>
 
 using namespace std;
 
 extern "C" {
     #include "../src/core/include/core.h"
+    #include "../src/core/include/data_io.h"
 }
 
 namespace test {
@@ -169,6 +172,50 @@ namespace test {
 
         return row;
     }
+
+    void print_dr(DataRow &row) {
+        cout << endl;
+        cout << "Id: " << row.row_id;
+        cout << "Tokens: ";
+        for (size_t i = 0; i < row.count; i++) {
+            cout << "[ " << row.tokens[i]->type;
+            switch (row.tokens[i]->type) {
+                case DT_INTEGER:{
+                    int value = *row.tokens[i]->bytes;
+                    cout << value << " ], ";
+                }
+                case DT_STRING:{
+                    string value(row.tokens[i]->bytes, row.tokens[i]->size);
+                    cout << '"' << value << "\" ], ";
+                }
+                case DT_REAL:{
+                    double value = *row.tokens[i]->bytes;
+                    cout << value << " ], ";
+                }
+                case DT_BOOL:{
+                    bool value = *row.tokens[i]->bytes;
+                    cout << value << " ], ";
+                }
+                case DT_CHAR:{
+                    char value = *row.tokens[i]->bytes;
+                    cout << '\'' << value << "' ], ";
+                }
+                case DT_NULL:{
+                    cout << "NULL ], ";
+                }
+            }   
+        }
+    }
+
+    void print_dt(DataTable& table) {
+        cout << "Rows count: " << table.rows_count << endl;;
+        cout << "Rows: " << endl;
+        for (size_t i = 0; i < table.rows_count; i++) {
+            cout << '[' << endl;
+            print_dr(*table.rows[i]);
+            cout << endl << ']' << endl;
+        }
+    }
 }
 
 using namespace test;
@@ -182,5 +229,13 @@ int main() {
     // }
     // test::print_mt(&table);
 
-    insert_row("testdb", "users", create_mock_row());
+    // insert_row("testdb", "users", create_mock_row());
+
+    DataTable table;
+    int res = full_scan("testdb", "users", &table);
+    if (res != 0) {
+         cout << res << endl;
+         return 0;
+    }
+    test::print_dt(table);
 }

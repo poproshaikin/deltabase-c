@@ -5,6 +5,7 @@
 
 #include <linux/limits.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <uuid/uuid.h>
 
@@ -83,42 +84,6 @@ int create_table(const char *db_name, const MetaTable *schema) {
     }
 
     return 0;
-}
-
-int create_page(const char *db_name, const char *table_name, PageHeader *out_new_page) {
-    uuid_generate_time(out_new_page->page_id);
-    out_new_page->rows_count = 0;
-
-    char file_path[PATH_MAX];
-    path_db_table_page(db_name, table_name, out_new_page->page_id, file_path, PATH_MAX);
-
-    FILE *file = fopen(file_path, "w+");
-    if (!file) {
-        fprintf(stderr, "Failed to create page file %s\n", out_new_page->page_id);
-        return 1;
-    }
-
-    if (write_ph(out_new_page, fileno(file)) != 0) {
-        return 2;
-    }
-    fclose(file);
-    return 0;
-}
-
-// if success, returns count of paths. otherwise, -1
-ssize_t get_pages(const char *db_name, const char *table_name, char ***out_paths) {
-    if (!out_paths) {
-        fprintf(stderr, "get_pages: out_paths cannot be null");
-        return -1;
-    }
-
-    char dir_path[PATH_MAX];
-    path_db_table_data(db_name, table_name, dir_path, PATH_MAX);
-
-    size_t files_count = 0;
-    *out_paths = get_dir_files(dir_path, &files_count);
-
-    return files_count;
 }
 
 int read_page_header(FILE *file, PageHeader *out) {

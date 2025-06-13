@@ -10,6 +10,44 @@
 #include <stdlib.h>
 #include <string.h>
 
+int create_page(const char *db_name, const char *table_name, PageHeader *out_new_page, char **out_path) {
+    uuid_generate_time(out_new_page->page_id);
+    out_new_page->rows_count = 0;
+
+    char file_path[PATH_MAX];
+    path_db_table_page(db_name, table_name, out_new_page->page_id, file_path, PATH_MAX);
+
+    FILE *file = fopen(file_path, "w+");
+    if (!file) {
+        fprintf(stderr, "Failed to create page file %s\n", out_new_page->page_id);
+        return 1;
+    }
+
+    if (write_ph(out_new_page, fileno(file)) != 0) {
+        return 2;
+    }
+
+    memcpy(out_path, file_path, strlen(file_path));
+    fclose(file);
+    return 0;
+}
+
+// if success, returns count of paths. otherwise, -1
+ssize_t get_pages(const char *db_name, const char *table_name, char ***out_paths) {
+    if (!out_paths) {
+        fprintf(stderr, "get_pages: out_paths cannot be null");
+        return -1;
+    }
+
+    char dir_path[PATH_MAX];
+    path_db_table_data(db_name, table_name, dir_path, PATH_MAX);
+
+    size_t files_count = 0;
+    *out_paths = get_dir_files(dir_path, &files_count);
+
+    return files_count;
+}
+
 static int write_row_update_state(const DataRow *row, MetaTable *schema, FILE *file) {
     int fd = fileno(file);
 
@@ -45,24 +83,32 @@ int insert_row(const char *db_name, const char *table_name, const DataRow *row) 
         return 1;
     }
     
-    size_t pages_count;
+    size_t pages_count = 0;
     char **pages = get_dir_files(buffer, &pages_count);
     if (!pages) {
         return 2;
+    }
+
+    if (pages_count == 0) {
+        PageHeader header;
+        if (create_page(db_name, table_name, &header, &pages[0]) != 0) {
+            return 3;
+        };
+        pages_count++;
     }
 
     for (size_t i = 0; i < pages_count; i++) {
         FILE *file = fopen(pages[i], "r+");
         if (!file) {
             fprintf(stderr, "Failed to open page for reading\n");
-            return i + 3; // as the number of iteration it failed on + ensure that collision with two previous error codes wouldn't happen
+            return i + 4; // as the number of iteration it failed on + ensure that collision with two previous error codes wouldn't happen
         }
 
         int result = write_row_update_state(row, &schema, file);
         if (result == 1) { // means that the page is out of space
             continue;
         } else if (result > 1) { // something went wrong
-            return i + 3; 
+            return i + 4; 
         } 
 
         fclose(file);
@@ -326,7 +372,7 @@ int full_scan(const char *db_name, const char *table_name, DataTable *out) {
 
     size_t pages_count;
     char **pages = get_dir_files(buffer, &pages_count);
-    if (!pages) return 2;
+    if (!pages) return 3;
 
     // create an array of pointers to pointers to datarow corresponding for each page 
     DataRow ***page_rows = calloc(pages_count, sizeof(DataRow **));
@@ -349,9 +395,20 @@ int full_scan(const char *db_name, const char *table_name, DataTable *out) {
 
         size_t count = 0;
         DataRow **page = calloc(header.rows_count, sizeof(DataRow *));
+        if (!page) {
+            fprintf(stderr, "Failed to allocate memory in full_scan\n");
+            goto fail_cleanup;
+        }
         for (size_t j = 0; j < header.rows_count; j++) {
             DataRow *row = malloc(sizeof(DataRow));
+            if (!row) {
+                fprintf(stderr, "Failed to allocate memory in full_scan\n");
+                fclose(file);
+                goto fail_cleanup;
+            }
+
             if (read_dr(schema, row, fd) != 0) {
+                fprintf(stderr, "Failed to read data row in full_scan\n");
                 free(row);
                 fclose(file);
                 goto fail_cleanup;
@@ -409,7 +466,7 @@ fail_cleanup:
         free(pages[i]);
     }
 
-    return 3;
+    return 4;
 }
 
 int update_callback(ROW_CALLBACK_PARAMS) {

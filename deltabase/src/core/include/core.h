@@ -29,7 +29,7 @@ int get_table_schema(const char *db_name, const char *table_name, MetaTable *out
 int list_tables(char ***out_table_names, size_t *count);
 int save_table_schema(const char *db_name, const char *table_name, const MetaTable *meta);
 
-int create_page(const char *db_name, const char *table_name, PageHeader *out_new_page);
+int create_page(const char *db_name, const char *table_name, PageHeader *out_new_page, char **out_path);
 ssize_t get_pages(const char *db_name, const char *table_name, char ***out_paths);
 int read_page_header(FILE *file, PageHeader *out);
 
