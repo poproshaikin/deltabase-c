@@ -322,32 +322,35 @@ namespace test {
 }
 
 using namespace test;
-
-int main() {
-    // cout << create_database("testdb") << endl << create_table("testdb", create_mock_table()) << endl;
-    int res = 0;
-    MetaTable metatable;
-    if ((res = get_table_schema("testdb", "users", &metatable)) != 0) {
-        cout << res << endl;
-        return 1;
-    }
-    test::print_mt(&metatable);
-
-    // cout << insert_row("testdb", "users", create_mock_row()) << endl;
-    //
-    // cout << update_row_by_filter("testdb", "users", create_mock_filter(), create_mock_row_update()) << endl;
-    //
-    cout << delete_row_by_filter("testdb", "users", create_mock_filter()) << endl;
-
-    DataTable table;
-    res = full_scan("testdb", "users", &table);
-    if (res != 0) {
-        cout << res << endl;
-        return 1;
-    }
-    test::print_dt(table);
-    /*
-    
-    */
-    // update_row_by_filter("testdb", "users", );
-}
+// int main () {
+//     cout << "here";
+// }
+//
+// int main() {
+//     // cout << create_database("testdb") << endl << create_table("testdb", create_mock_table()) << endl;
+//     int res = 0;
+//     MetaTable metatable;
+//     if ((res = get_table_schema("testdb", "users", &metatable)) != 0) {
+//         cout << res << endl;
+//         return 1;
+//     }
+//     test::print_mt(&metatable);
+//
+//     // cout << insert_row("testdb", "users", create_mock_row()) << endl;
+//     //
+//     // cout << update_row_by_filter("testdb", "users", create_mock_filter(), create_mock_row_update()) << endl;
+//     //
+//     cout << delete_row_by_filter("testdb", "users", create_mock_filter()) << endl;
+//
+//     DataTable table;
+//     res = full_scan("testdb", "users", &table);
+//     if (res != 0) {
+//         cout << res << endl;
+//         return 1;
+//     }
+//     test::print_dt(table);
+//     /*
+//
+//     */
+//     // update_row_by_filter("testdb", "users", );
+// }

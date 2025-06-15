@@ -9,7 +9,7 @@ extern "C" {
 using namespace cli;
 
 int CoreCli::execute(std::string input, std::ostringstream& output) {
-    std::vector<std::string> tokenized = split(input);   
+    std::vector<std::string> tokenized = split(input, ' ');   
 
     int rc = 0;
 
