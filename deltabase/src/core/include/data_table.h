@@ -3,7 +3,6 @@
 
 #include "data_token.h"
 #include <stdint.h>
-#include <stdint.h>
 #include <uuid/uuid.h>
 #include <stdbool.h>
 
@@ -67,6 +66,12 @@ uint64_t dr_size_v(const MetaTable *schema, const DataToken **tokens, int tokens
 
 // gets index of the column COLUMN_ID in the TABLE
 ssize_t get_column_index_meta(const uuid_t column_id, const MetaTable *table);
+
+typedef struct {
+    char *name;
+    int64_t last;
+    int64_t increment;
+} DataSequence;
 
 typedef struct {
     MetaTable *scheme;

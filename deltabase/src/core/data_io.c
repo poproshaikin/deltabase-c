@@ -108,7 +108,7 @@ int write_dt(const DataToken *token, int fd) {
 }
 
 static int read_dtype(DataType *out, int fd) {
-    if (read(fd, out, sizeof(DataType)) != 0) {
+    if (read(fd, out, sizeof(DataType)) != sizeof(DataType)) {
         return 1;
     }
     return 0;
@@ -138,9 +138,8 @@ int read_dt(DataToken *out, int fd) {
     if (read_dtype(&type ,fd) != 0) {
         return 1;
     }
-    printf("\n");
     if (type == 0) {
-        printf("Failed to read token type\n");
+        fprintf(stderr, "Failed to read token type\n");
         return 2;
     }
     uint64_t finalSize = dtype_size(type);
@@ -152,7 +151,7 @@ int read_dt(DataToken *out, int fd) {
 
     char *buffer = malloc(finalSize);
     if (!buffer) {
-        printf("Failed to allocate memory\n");
+        fprintf(stderr, "Failed to allocate memory\n");
         return 4;
     }
 
@@ -163,6 +162,7 @@ int read_dt(DataToken *out, int fd) {
         free(buffer);
         return 5;
     }
+
     out->size = finalSize;
     out->bytes = buffer;
     out->type = type;
@@ -194,7 +194,11 @@ uint64_t dt_size(const DataToken *token) {
 }
 
 static inline uint64_t ph_size(const PageHeader *header) {
-    return sizeof(header->page_id) + sizeof(header->rows_count);
+    return 
+        sizeof(header->page_id) + 
+        sizeof(header->rows_count) +
+        sizeof(header->min_rid) + 
+        sizeof(header->max_rid);
 }
 
 int write_ph(const PageHeader *header, int fd) {
@@ -366,33 +370,29 @@ int write_dr_flags(DataRowFlags flags, int fd) {
     return 0;
 }
 
-int read_dr_flags(DataRowFlags *out, int fd) {
-    if (read(fd, out, sizeof(DataRowFlags)) != sizeof(DataRowFlags)) {
-        return 1;
-    }
-    return 0;
-}
-
-int write_dr_v(const MetaTable *schema, const DataToken **tokens, uint64_t count, unsigned char flags, int fd) {
+int write_dr_v(const MetaTable *schema, const DataToken **tokens, uint64_t rid, uint64_t count, unsigned char flags, int fd) {
     if (schema == NULL || tokens == NULL) {
         return -1;
     }
 
     uint64_t rowSize = dr_size_v(schema, tokens, count);
 
-    if (write_length_prefix(rowSize, fd) != 0) {
+    if (write(fd, &rowSize, sizeof(rowSize)) != sizeof(rowSize)) {
         return 1;
     }
-    if (write_dr_flags(flags, fd) != 0) {
+    if (write(fd, &rid, sizeof(rid)) != sizeof(rid)) {
         return 2;
     }
-    if (write_nb(schema, tokens, fd) != 0) {
+    if (write_dr_flags(flags, fd) != 0) {
         return 3;
+    }
+    if (write_nb(schema, tokens, fd) != 0) {
+        return 4;
     }
 
     for (int i = 0; i < count; i++) {
         if (write_dt(tokens[i], fd) != 0) {
-            return i + 3;
+            return i + 5;
         }
     }
 
@@ -400,30 +400,43 @@ int write_dr_v(const MetaTable *schema, const DataToken **tokens, uint64_t count
 }
 
 int write_dr(const MetaTable *schema, const DataRow *row, int fd) { 
-    return write_dr_v(schema, (const DataToken **)row->tokens, row->count, row->flags, fd);
+    return write_dr_v(schema, (const DataToken **)row->tokens, row->row_id, row->count, row->flags, fd);
+}
+
+int read_dr_flags(DataRowFlags *out, int fd) {
+    if (read(fd, out, sizeof(DataRowFlags)) != sizeof(DataRowFlags)) {
+        return 1;
+    }
+    return 0;
 }
 
 int read_dr(const MetaTable *schema, DataRow *out, int fd) {
     uint64_t row_size;
-    if (read_length_prefix(&row_size, fd) != 0) {
+    if (read(fd, &row_size, sizeof(row_size)) != sizeof(row_size)) {
         return 1;
+    }
+
+    uint64_t rid;
+    if (read(fd, &rid, sizeof(rid)) != sizeof(rid)) {
+        return 2;
     }
 
     DataRowFlags flags;
     if (read_dr_flags(&flags, fd) != 0) {
-        return 2;
+        return 3;
     }
 
     unsigned char *nb = read_nb(schema, fd);
     if (!nb) {
-        return 3;
+        return 4;
     }
+
     int nb__size = nb_size(schema);
     int nulls = nulls_count(nb, nb__size);
 
     DataToken **tokens = malloc(schema->columns_count * sizeof(DataToken *));
     if (!tokens) {
-        return 4;
+        return 5;
     }
 
     for (int i = 0; i < schema->columns_count; i++) {
@@ -433,14 +446,21 @@ int read_dr(const MetaTable *schema, DataRow *out, int fd) {
         }
         else {
             tokens[i] = malloc(sizeof(DataToken));
-            if (read_dt(tokens[i], fd) != 0) {
-                return 5;
+            if (!tokens[i]) {
+                return -i - 6 - 1000;
+            }
+
+            int res;
+            if ((res = read_dt(tokens[i], fd)) != 0) {
+                return -i - 6;
             }
         }   
-    } 
+    }
 
     out->tokens = tokens;
     out->count = schema->columns_count;
+    out->row_id = rid;
+    out->flags = flags;
     return 0;
 }
 
@@ -568,8 +588,11 @@ int write_mt(const MetaTable *schema, int fd) {
 }
 
 int read_mt(MetaTable *out, int fd) {
-    if (read(fd, out->table_id, sizeof(out->table_id)) != sizeof(out->table_id))
+    int r = 0;
+    if ((r = read(fd, out->table_id, sizeof(out->table_id))) != sizeof(out->table_id)) {
+        printf("%i\n", r);
         return 1;
+    }
 
     uint64_t name_len;
     if (read(fd, &name_len, sizeof(name_len)) != sizeof(name_len))

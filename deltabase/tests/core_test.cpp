@@ -119,8 +119,11 @@ namespace test {
                 if (col->flags & CF_NN)  { std::cout << (first ? "" : ", ") << "NN"; first = false; }
                 if (col->flags & CF_UN)  { std::cout << (first ? "" : ", ") << "UN"; first = false; }
 
-                std::cout << "]";
+                std::cout << "] ";
             }
+
+            std::cout << "| Id: ";
+            print_uuid(col->column_id);
 
             std::cout << "\n";
         }
@@ -143,11 +146,11 @@ namespace test {
         row->tokens[0]->type = DT_INTEGER;
         row->tokens[0]->size = sizeof(int32_t);
         row->tokens[0]->bytes = (char*)malloc(sizeof(int32_t));
-        int32_t val0 = 1;
+        int32_t val0 = 2;
         memcpy(row->tokens[0]->bytes, &val0, sizeof(int32_t));
 
         // Token 1: STRING
-        const char* str = "Hello";
+        const char* str = "Bangladesh";
         size_t str_len = strlen(str);
         row->tokens[1] = (DataToken*)malloc(sizeof(DataToken));
         row->tokens[1]->type = DT_STRING;
@@ -155,7 +158,7 @@ namespace test {
         row->tokens[1]->bytes = (char*)malloc(str_len);
         memcpy(row->tokens[1]->bytes, str, str_len);
 
-        const char* str2 = "World";
+        const char* str2 = "Kuba";
         size_t str_len2 = strlen(str2);
         row->tokens[2] = (DataToken*)malloc(sizeof(DataToken));
         row->tokens[2]->type = DT_STRING;
@@ -167,44 +170,77 @@ namespace test {
         row->tokens[3]->type = DT_INTEGER;
         row->tokens[3]->size = sizeof(int32_t);
         row->tokens[3]->bytes = (char*)malloc(sizeof(int32_t));
-        int32_t val1 = 19;
+        int32_t val1 = 16;
         memcpy(row->tokens[3]->bytes, &val1, sizeof(int32_t));
 
         return row;
     }
 
-    void print_dr(DataRow &row) {
-        cout << endl;
-        cout << "Id: " << row.row_id;
-        cout << "Tokens: ";
-        for (size_t i = 0; i < row.count; i++) {
-            cout << "[ " << row.tokens[i]->type;
-            switch (row.tokens[i]->type) {
-                case DT_INTEGER:{
-                    int value = *row.tokens[i]->bytes;
-                    cout << value << " ], ";
-                }
-                case DT_STRING:{
-                    string value(row.tokens[i]->bytes, row.tokens[i]->size);
-                    cout << '"' << value << "\" ], ";
-                }
-                case DT_REAL:{
-                    double value = *row.tokens[i]->bytes;
-                    cout << value << " ], ";
-                }
-                case DT_BOOL:{
-                    bool value = *row.tokens[i]->bytes;
-                    cout << value << " ], ";
-                }
-                case DT_CHAR:{
-                    char value = *row.tokens[i]->bytes;
-                    cout << '\'' << value << "' ], ";
-                }
-                case DT_NULL:{
-                    cout << "NULL ], ";
-                }
-            }   
+    string get_datatype_str(DataType type) {
+        switch (type) {
+            case DT_INTEGER: return "INTEGER";
+            case DT_STRING: return "STRING";
+            case DT_NULL: return "NULL";
+            case DT_CHAR: return "CHAR";
+            case DT_REAL: return "REAL";
+            case DT_BOOL: return "BOOL";
         }
+        return "";
+    }
+
+    void print_dr(DataRow &row) {
+        cout << "\nId: " << row.row_id << endl;
+        cout << "Flags: " << row.flags << endl;
+        cout << "Tokens:";
+
+        for (size_t i = 0; i < row.count; ++i) {
+            DataToken *token = row.tokens[i];
+            cout << "[ " << get_datatype_str(token->type) << ": ";
+
+            switch (token->type) {
+                case DT_INTEGER: {
+                                     int value;
+                                     memcpy(&value, token->bytes, sizeof(int));
+                                     cout << value;
+                                     break;
+                                 }
+                case DT_STRING: {
+                                    string value(token->bytes, token->size);
+                                    cout << '"' << value << '"';
+                                    break;
+                                }
+                case DT_REAL: {
+                                  double value;
+                                  memcpy(&value, token->bytes, sizeof(double));
+                                  cout << value;
+                                  break;
+                              }
+                case DT_BOOL: {
+                                  bool value;
+                                  memcpy(&value, token->bytes, sizeof(bool));
+                                  cout << (value ? "true" : "false");
+                                  break;
+                              }
+                case DT_CHAR: {
+                                  char value;
+                                  memcpy(&value, token->bytes, sizeof(char));
+                                  cout << '\'' << value << '\'';
+                                  break;
+                              }
+                case DT_NULL: {
+                                  cout << "NULL";
+                                  break;
+                              }
+                default: {
+                             cout << "Unknown";
+                             break;
+                         }
+            }
+
+            cout << " ], ";
+        }
+
+        cout << endl;
     }
 
     void print_dt(DataTable& table) {
@@ -216,26 +252,102 @@ namespace test {
             cout << endl << ']' << endl;
         }
     }
+
+    DataFilter *create_mock_filter() {
+        uuid_t id_col;
+        uuid_parse("16f92ad1-d56f-4888-90c3-a92979aa424c", id_col);
+        uuid_t name_col;
+        uuid_parse("16f92ad1-d56f-4888-90c3-a92979aa424c", name_col);
+
+        int *id_value = (int *)malloc(sizeof(int));
+        *id_value = 2;
+        // Итоговый логический фильтр: id = 1 AND name = "hello"
+        DataFilter *root_filter = (DataFilter *)malloc(sizeof(DataFilter));
+        root_filter->is_node = false;
+        root_filter->data.condition = (DataFilterCondition){
+            .op = OP_EQ,
+            .type = DT_INTEGER,
+            .value = id_value,
+        };
+        memcpy(&root_filter->data.condition.column_id, id_col, sizeof(uuid_t));
+        return root_filter;
+
+        // // Значения
+        // const char *name_value = "Bangladesh";
+        // size_t name_len = strlen(name_value);
+        //
+        // // Фильтр для: id = 1
+        // DataFilter *filter_id = (DataFilter *)malloc(sizeof(DataFilter));
+        // filter_id->is_node = false;
+        // filter_id->data.condition = (DataFilterCondition){
+        //     .op = OP_EQ,
+        //     .type = DT_INTEGER,
+        //     .value = &id_value,
+        // };
+        // memcpy(&filter_id->data.condition.column_id, id_col, sizeof(uuid_t));
+        //
+        // // Фильтр для: name = "hello"
+        // DataFilter *filter_name = (DataFilter *)malloc(sizeof(DataFilter));
+        // filter_name->is_node = false;
+        // filter_name->data.condition = (DataFilterCondition){
+        //     .op = OP_EQ,
+        //     .type = DT_STRING,
+        //     .value = (void *)name_value,
+        // };
+        // memcpy(&filter_name->data.condition.column_id, name_col, sizeof(uuid_t));
+        //
+        // // Итоговый логический фильтр: id = 1 AND name = "hello"
+        // DataFilter *root_filter = (DataFilter *)malloc(sizeof(DataFilter));
+        // root_filter->is_node = true;
+        // root_filter->data.node = (DataFilterNode){
+        //     .left = filter_id,
+        //     .op = LOGIC_AND,
+        //     .right = filter_name
+        // };
+        // return root_filter;
+    }
+
+    DataRowUpdate *create_mock_row_update() { 
+        DataRowUpdate *update = new DataRowUpdate;
+        update->column_indices = (uuid_t*)malloc(sizeof(uuid_t*));
+        update->count = 1;
+        uuid_parse("7adad1b1-6a51-4a68-8b69-d435ff4cf55d", update->column_indices[0]); // email column
+        update->values = (void **)malloc(sizeof (void*));
+        char *value = (char *)malloc(15);
+        strcpy(value, "hello");
+
+        update->values[0] = value;
+        return update;
+    }
 }
 
 using namespace test;
 
 int main() {
     // cout << create_database("testdb") << endl << create_table("testdb", create_mock_table()) << endl;
+    int res = 0;
+    MetaTable metatable;
+    if ((res = get_table_schema("testdb", "users", &metatable)) != 0) {
+        cout << res << endl;
+        return 1;
+    }
+    test::print_mt(&metatable);
 
-    // MetaTable table;
-    // if (get_table_schema("testdb", "users", &table) != 0) {
-    //     return 0;
-    // }
-    // test::print_mt(&table);
-
-    // insert_row("testdb", "users", create_mock_row());
+    // cout << insert_row("testdb", "users", create_mock_row()) << endl;
+    //
+    // cout << update_row_by_filter("testdb", "users", create_mock_filter(), create_mock_row_update()) << endl;
+    //
+    cout << delete_row_by_filter("testdb", "users", create_mock_filter()) << endl;
 
     DataTable table;
-    int res = full_scan("testdb", "users", &table);
+    res = full_scan("testdb", "users", &table);
     if (res != 0) {
-         cout << res << endl;
-         return 0;
+        cout << res << endl;
+        return 1;
     }
     test::print_dt(table);
+    /*
+    
+    */
+    // update_row_by_filter("testdb", "users", );
 }

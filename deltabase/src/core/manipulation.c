@@ -1,14 +1,18 @@
 #include "include/core.h"
+#include "include/data_filter.h"
 #include "include/data_io.h"
 #include "include/data_page.h"
 #include "include/data_table.h"
 #include "include/data_token.h"
 #include "include/path_service.h"
 #include "include/utils.h"
+#include <bits/types/cookie_io_functions_t.h>
 #include <linux/limits.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <uuid/uuid.h>
 
 int create_page(const char *db_name, const char *table_name, PageHeader *out_new_page, char **out_path) {
     uuid_generate_time(out_new_page->page_id);
@@ -27,7 +31,17 @@ int create_page(const char *db_name, const char *table_name, PageHeader *out_new
         return 2;
     }
 
-    memcpy(out_path, file_path, strlen(file_path));
+    size_t len = strlen(file_path);
+    char *path = calloc(len + 1, sizeof(char)); 
+    if (!path) {
+        fclose(file);
+        return 3;
+    }
+
+    memcpy(path, file_path, len); 
+    path[len] = '\0'; 
+    *out_path = path; 
+
     fclose(file);
     return 0;
 }
@@ -38,7 +52,6 @@ ssize_t get_pages(const char *db_name, const char *table_name, char ***out_paths
         fprintf(stderr, "get_pages: out_paths cannot be null");
         return -1;
     }
-
     char dir_path[PATH_MAX];
     path_db_table_data(db_name, table_name, dir_path, PATH_MAX);
 
@@ -48,7 +61,7 @@ ssize_t get_pages(const char *db_name, const char *table_name, char ***out_paths
     return files_count;
 }
 
-static int write_row_update_state(const DataRow *row, MetaTable *schema, FILE *file) {
+static int write_row_update_state(const char *db_name, DataRow *row, MetaTable *schema, FILE *file) {
     int fd = fileno(file);
 
     PageHeader header;
@@ -59,7 +72,9 @@ static int write_row_update_state(const DataRow *row, MetaTable *schema, FILE *f
 
     header.rows_count++;
     header.file_size += dr_size(schema, row);
-    header.max_rid = ++schema->last_rid;
+    header.max_rid = schema->last_rid;
+    row->row_id = schema->last_rid;
+    schema->last_rid++;
 
     lseek(fd, 0, SEEK_SET);
     if (write_ph(&header, fd) != 0) {
@@ -71,10 +86,14 @@ static int write_row_update_state(const DataRow *row, MetaTable *schema, FILE *f
         return 3;
     }
 
+    if (save_table_schema(db_name, schema) != 0) {
+        return 4;
+    }
+
     return 0;
 }
 
-int insert_row(const char *db_name, const char *table_name, const DataRow *row) {
+int insert_row(const char *db_name, const char *table_name, DataRow *row) {
     char buffer[PATH_MAX];  
     path_db_table_data(db_name, table_name, buffer, PATH_MAX);
 
@@ -91,10 +110,19 @@ int insert_row(const char *db_name, const char *table_name, const DataRow *row) 
 
     if (pages_count == 0) {
         PageHeader header;
-        if (create_page(db_name, table_name, &header, &pages[0]) != 0) {
+        char *new_page_path = NULL;
+        if (create_page(db_name, table_name, &header, &new_page_path) != 0) {
             return 3;
-        };
-        pages_count++;
+        }
+
+        pages = malloc(sizeof(char*));
+        if (!pages) {
+            free(new_page_path);
+            return 4;
+        }
+
+        pages[0] = new_page_path;
+        pages_count = 1;
     }
 
     for (size_t i = 0; i < pages_count; i++) {
@@ -104,7 +132,7 @@ int insert_row(const char *db_name, const char *table_name, const DataRow *row) 
             return i + 4; // as the number of iteration it failed on + ensure that collision with two previous error codes wouldn't happen
         }
 
-        int result = write_row_update_state(row, &schema, file);
+        int result = write_row_update_state(db_name, row, &schema, file);
         if (result == 1) { // means that the page is out of space
             continue;
         } else if (result > 1) { // something went wrong
@@ -118,27 +146,35 @@ int insert_row(const char *db_name, const char *table_name, const DataRow *row) 
     for (size_t i = 0; i < pages_count; i++) {
         free(pages[i]);
     }
+
     free(pages);
 
     return 0;
 }
 
-bool apply_filter(const void *value1, const DataType type1, const void *value2, const DataType type2, const FilterOp operation) {
-    if (type1 == DT_NULL || type2 == DT_NULL) {
+bool apply_filter(DataFilterCondition condition, const void *db_value, const DataType db_type) {
+    char col_id[37];
+    
+    if (condition.type == DT_NULL || db_type == DT_NULL) {
+        printf("b\n");
         return false; 
     }
 
-    if (type1 != type2) {
+    if (condition.type != db_type) {
+        printf("a\n");
         // TODO: implicit casting for compatible types (e.g. INT to REAL etc)
         return false;
     }
-    
-    switch(type1) {
-        case DT_INTEGER: {
-            int32_t a = *(const int32_t *)value1;
-            int32_t b = *(const int32_t *)value2;
 
-            switch (operation) {
+    switch(condition.type) {
+        case DT_INTEGER: {
+            int32_t a = *(const int32_t *)condition.value;
+            int32_t b = *(const int32_t *)db_value;
+
+            
+            printf("a: %i\nb: %i\n", a, b);
+
+            switch (condition.op) {
                 case OP_EQ:  return a == b;
                 case OP_NEQ: return a != b;
                 case OP_LT:  return a < b;
@@ -149,9 +185,9 @@ bool apply_filter(const void *value1, const DataType type1, const void *value2, 
             break;
         }
         case DT_REAL: {
-            double a = *(const double *)value1;
-            double b = *(const double *)value2;
-            switch (operation) {
+            double a = *(const double *)condition.value;
+            double b = *(const double *)db_value;
+            switch (condition.op) {
                 case OP_EQ:  return a == b;
                 case OP_NEQ: return a != b;
                 case OP_LT:  return a < b;
@@ -162,10 +198,11 @@ bool apply_filter(const void *value1, const DataType type1, const void *value2, 
             break;
         }
         case DT_STRING: {
-            const char *a = (const char *)value1;
-            const char *b = (const char *)value2;
+            const char *a = (const char *)condition.value;
+            const char *b = (const char *)db_value;
+            
             int cmp = strcmp(a, b);
-            switch (operation) {
+            switch (condition.op) {
                 case OP_EQ:  return cmp == 0;
                 case OP_NEQ: return cmp != 0;
                 case OP_LT:  return cmp < 0;
@@ -176,9 +213,9 @@ bool apply_filter(const void *value1, const DataType type1, const void *value2, 
             break;
         }
         case DT_CHAR: {
-            char a = *(const char *)value1;
-            char b = *(const char *)value2;
-            switch (operation) {
+            char a = *(const char *)condition.value;
+            char b = *(const char *)db_value;
+            switch (condition.op) {
                 case OP_EQ:  return a == b;
                 case OP_NEQ: return a != b;
                 case OP_LT:  return a < b;
@@ -189,9 +226,9 @@ bool apply_filter(const void *value1, const DataType type1, const void *value2, 
             break;
         }
         case DT_BOOL: {
-            bool a = *(const bool *)value1;
-            bool b = *(const bool *)value2;
-            switch (operation) {
+            bool a = *(const bool *)condition.value;
+            bool b = *(const bool *)db_value;
+            switch (condition.op) {
                 case OP_EQ:  return a == b;
                 case OP_NEQ: return a != b;
                 default:     return false;
@@ -201,7 +238,7 @@ bool apply_filter(const void *value1, const DataType type1, const void *value2, 
           break;
         }
 
-    fprintf(stderr, "Unsupported comparison: %i to %i\n", type1, type2);
+    fprintf(stderr, "Unsupported comparison: %i to %i\n", condition.type, db_type);
 
     return false;
 }
@@ -209,26 +246,22 @@ bool apply_filter(const void *value1, const DataType type1, const void *value2, 
 
 bool row_satisfies_filter(const MetaTable *schema, const DataRow *row, const DataFilter *filter) {
     if (schema->columns_count != row->count) {
+        fprintf(stderr, "row_satisfies_filter: Count of columns in schema wasn't equal to count of tokens in row\n");
         return false;
     }
 
     if (!filter->is_node) {
         ssize_t col_index = get_column_index_meta(filter->data.condition.column_id, schema);
 
-        if (col_index == -1) { // wtf
-            return false;
-        }
-
         if (col_index < 0 || col_index >= row->count) { // wtf
+            fprintf(stderr, "Column with ID provided in filter was not found in table\n");
             return false;
         }
 
         return apply_filter(
+            filter->data.condition,
             row->tokens[col_index]->bytes, 
-            row->tokens[col_index]->type, 
-            filter->data.condition.value, 
-            schema->columns[col_index]->data_type,
-            filter->data.condition.op
+            row->tokens[col_index]->type
         );
     }
     else {
@@ -262,7 +295,6 @@ static int combine_row(DataRow *out, MetaTable *schema, const DataRow *old_row, 
     for (size_t i = 0; i < schema->columns_count; i++) {
         // if column indices are equal
         if (j < update->count && uuid_compare(schema->columns[i]->column_id, update->column_indices[j]) == 0) {
-
             // count size
             size_t size = dtype_size(schema->columns[i]->data_type);
 
@@ -288,18 +320,22 @@ static int combine_row(DataRow *out, MetaTable *schema, const DataRow *old_row, 
     return 0;
 }
 
-#define ROW_CALLBACK_PARAMS const char *db_name, const char *table_name, MetaTable *schema, int fd, size_t row_pos, uint64_t rid, const DataRow *row, const void *user_data 
+#define ROW_CALLBACK_PARAMS const char *db_name, const char *table_name, MetaTable *schema, PageHeader *header, int fd, size_t row_pos, uint64_t rid, const DataRow *row, const void *user_data 
 
 typedef int (*RowCallback)(ROW_CALLBACK_PARAMS);
 
-int for_each_row_matching_filter(const char *db_name, const char *table_name, const DataFilter *filter, RowCallback callback, const void *user_data) {
-    char buffer[PATH_MAX];
-    path_db_table_meta(db_name, table_name, buffer, PATH_MAX);
+int for_each_row(const char *db_name, const char *table_name, RowCallback callback, const void *user_data) {  
+    return 0;
+}
 
+int for_each_row_matching_filter(const char *db_name, const char *table_name, const DataFilter *filter, RowCallback callback, const void *user_data) {
     MetaTable schema;
     if (get_table_schema(db_name, table_name, &schema) != 0) {
         return 1;
     }
+
+    char buffer[PATH_MAX];
+    path_db_table_data(db_name, table_name, buffer, PATH_MAX);
     
     size_t pages_count;
     char **pages = get_dir_files(buffer, &pages_count);
@@ -317,10 +353,11 @@ int for_each_row_matching_filter(const char *db_name, const char *table_name, co
 
         PageHeader header;
         if (read_ph(&header, fd) != 0) {
-            return i + 3;
+            return i + 4;
         }
 
-        for (size_t j = 0; j < header.rows_count; j++) {
+        int old_rows_count = header.rows_count;
+        for (size_t j = 0; j < old_rows_count; j++) {
             DataRow row;
 
             size_t row_start_pos = lseek(fd, 0, SEEK_CUR);
@@ -328,15 +365,21 @@ int for_each_row_matching_filter(const char *db_name, const char *table_name, co
             if (read_dr(&schema, &row, fd) != 0) {
                 return -1 - j; // just some unique error code
             }
+
+            if (row.flags & RF_OBSOLETE) {
+                continue;
+            }
             
             if (!row_satisfies_filter(&schema, &row, filter)) {
                 continue;
             }
 
+            printf("row satisfied filter\n");
+
             // save position before callback
             ssize_t pos = lseek(fd, 0, SEEK_CUR);
 
-            int result = callback(db_name, table_name, &schema, fd, row_start_pos, row.row_id, &row, user_data);
+            int result = callback(db_name, table_name, &schema, &header, fd, row_start_pos, row.row_id, &row, user_data);
             if (result != 0) {
                 fclose(file);
                 return result;
@@ -344,6 +387,11 @@ int for_each_row_matching_filter(const char *db_name, const char *table_name, co
             
             // restore position
             lseek(fd, pos, SEEK_SET);
+        }   
+
+        lseek(fd, 0, SEEK_SET);
+        if (write_ph(&header, fd) != 0) {
+            return i + 5;
         }
 
         fclose(file);
@@ -354,6 +402,54 @@ int for_each_row_matching_filter(const char *db_name, const char *table_name, co
     }
 
     return 0;
+}
+
+int update_callback(ROW_CALLBACK_PARAMS) {
+    lseek(fd, row_pos, SEEK_SET);
+    lseek(fd, sizeof(uint64_t), SEEK_CUR); // length
+    lseek(fd, sizeof(row->row_id), SEEK_CUR);
+    if (write_dr_flags(row->flags | RF_OBSOLETE, fd) != 0) { 
+        return 1;   
+    }
+
+    lseek(fd, 0, SEEK_END);
+
+    DataRow combined;
+    if (combine_row(&combined, schema, row, (DataRowUpdate *)user_data) != 0) {
+        fprintf(stderr, "Failed to combine row while updating\n");
+        free_tokens(combined.tokens, combined.count);
+        return 2;
+    }
+
+    if (write_dr(schema, &combined, fd) != 0) {
+        return 3;
+    }
+    
+    header->rows_count++; 
+    
+    // need to save because of increasing last_rid in combine_row
+    save_table_schema(db_name, schema);
+    return 0;
+}
+
+int update_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, const DataRowUpdate *update) {
+    return for_each_row_matching_filter(db_name, table_name, filter, update_callback, update);
+}
+
+int delete_callback(ROW_CALLBACK_PARAMS) {
+    lseek(fd, row_pos, SEEK_SET);
+    lseek(fd, sizeof(uint64_t), SEEK_CUR); // size
+    lseek(fd, sizeof(uint64_t), SEEK_CUR); // id
+
+    if (write_dr_flags(row->flags | RF_OBSOLETE, fd) != 0) { 
+        return 1;   
+    }
+
+    return 0;
+}
+
+int delete_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter) {
+    return for_each_row_matching_filter(db_name, table_name, filter, delete_callback, NULL);   
 }
 
 int full_scan(const char *db_name, const char *table_name, DataTable *out) {
@@ -407,12 +503,14 @@ int full_scan(const char *db_name, const char *table_name, DataTable *out) {
                 goto fail_cleanup;
             }
 
-            if (read_dr(schema, row, fd) != 0) {
-                fprintf(stderr, "Failed to read data row in full_scan\n");
+            int res = 0;
+            if ((res = read_dr(schema, row, fd)) != 0) {
+                fprintf(stderr, "Failed to read data row in full_scan: %i\n", res);
                 free(row);
                 fclose(file);
                 goto fail_cleanup;
             }
+            printf("row flags: %i\n", row->flags);
 
             if (row->flags & RF_OBSOLETE) {
                 free_row(row);
@@ -467,50 +565,6 @@ fail_cleanup:
     }
 
     return 4;
-}
-
-int update_callback(ROW_CALLBACK_PARAMS) {
-    lseek(fd, row_pos, SEEK_SET);
-    size_t rowsize = dr_size(schema, row);
-    if (write_dr_flags(row->flags | RF_OBSOLETE, fd) != 0) { 
-        return 1;   
-    }
-
-    lseek(fd, 0, SEEK_END);
-
-    DataRow combined;
-    if (combine_row(&combined, schema, row, (DataRowUpdate*)user_data) != 0) {
-        fprintf(stderr, "Failed to combine row while updating\n");
-        free_tokens(combined.tokens, combined.count);
-        return 2;
-    }
-
-    if (write_dr(schema, &combined, fd) != 0) {
-        return 3;
-    }
-    
-    // need to save because of increasing last_rid in combine_row
-    save_table_schema(db_name, table_name, schema);
-    return 0;
-}
-
-int update_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, const DataRowUpdate *update) {
-    return for_each_row_matching_filter(db_name, table_name, filter, update_callback, update);
-}
-
-int delete_callback(ROW_CALLBACK_PARAMS) {
-    lseek(fd, row_pos, SEEK_SET);
-    size_t row_size = dr_size(schema, row);
-
-    if (write_dr_flags(row->flags | RF_OBSOLETE, fd) != 0) { 
-        return 1;   
-    }
-
-    return 0;
-}
-
-int delete_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter) {
-    for_each_row_matching_filter(db_name, table_name, filter, delete_callback, NULL);   
 }
 
 /*

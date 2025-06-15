@@ -1,6 +1,7 @@
 #ifndef DATA_FILTER_H
 #define DATA_FILTER_H
 
+#include "data_token.h"
 #include "stddef.h"
 #include <stdbool.h>
 #include <uuid/uuid.h>
@@ -22,10 +23,10 @@ typedef enum {
 typedef struct DataFilter DataFilter;
 
 typedef struct {
-    const uuid_t column_id;
+    uuid_t column_id;
     FilterOp op;
-    const void *value;
-    size_t value_size;
+    DataType type;
+    void *value;
 } DataFilterCondition;
 
 typedef struct {

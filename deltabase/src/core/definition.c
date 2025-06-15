@@ -4,8 +4,6 @@
 #include "include/data_io.h"
 
 #include <linux/limits.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <uuid/uuid.h>
 
@@ -98,24 +96,25 @@ int read_page_header(FILE *file, PageHeader *out) {
 }
 
 int get_table_schema(const char *db_name, const char *table_name, MetaTable *out) {
+    int res =0 ;
     char buffer[PATH_MAX];
     path_db_table_meta(db_name, table_name, buffer, PATH_MAX);
     
     FILE *file = fopen(buffer, "r");
     int fd = fileno(file);
 
-    if (read_mt(out, fd) != 0) {
+    if ((res = read_mt(out, fd)) != 0) {
         fclose(file);
-        return 1;
+        return res;
     }
 
     fclose(file);
     return 0;
 }
 
-int save_table_schema(const char *db_name, const char *table_name, const MetaTable *meta) {
+int save_table_schema(const char *db_name, const MetaTable *meta) {
     char buffer[PATH_MAX];
-    path_db_table_meta(db_name, table_name, buffer, PATH_MAX);
+    path_db_table_meta(db_name, meta->name, buffer, PATH_MAX);
     
     FILE *file = fopen(buffer, "w+");
     int fd = fileno(file);
