@@ -34,12 +34,10 @@ namespace sql {
         EQ = 1,
         NEQ,
         
-        GR,
-        GRT,
-        LT,
-        LTE,
+        GR, GRE,
+        LT, LTE,
 
-        AND, OR,
+        AND, OR, NOT,
 
         PLUS, MINUS, MUL, DIV,
 
@@ -94,12 +92,13 @@ namespace sql {
             { "!=", SqlOperator::NEQ },
 
             { ">",  SqlOperator::GR },
-            { ">=", SqlOperator::GRT },
+            { ">=", SqlOperator::GRE },
             { "<",  SqlOperator::LT },
             { "<=", SqlOperator::LTE },
 
             { "AND", SqlOperator::AND },
-            { "OR", SqlOperator::OR },
+            { "OR",  SqlOperator::OR  },
+            { "NOT", SqlOperator::NOT },
 
             { "+",  SqlOperator::PLUS },
             { "-",  SqlOperator::MINUS },
@@ -120,6 +119,7 @@ namespace sql {
         size_t pos;
         SqlTokenDetail detail;
 
+        SqlToken() = default;
         SqlToken(SqlTokenType type, std::string value, size_t line, size_t position, SqlTokenDetail detail = std::monostate());
 
         std::string to_string() const;
@@ -137,5 +137,4 @@ namespace sql {
         std::string to_string(sql::SqlSymbol type);
         std::string to_string(sql::SqlLiteral type, const std::string& value);
     }
-
 }
