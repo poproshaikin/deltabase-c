@@ -46,6 +46,13 @@ int drop_database(const char *name) {
     }
 }
 
+bool exists_database(const char *db_name) {
+    char db_path[PATH_MAX];
+    path_db(db_name, db_path, sizeof(db_path));
+
+    return dir_exists(db_path);
+}
+
 int create_table(const char *db_name, const MetaTable *schema) {
     int op = 0;
 
@@ -84,6 +91,13 @@ int create_table(const char *db_name, const MetaTable *schema) {
     return 0;
 }
 
+bool exists_table(const char *db_name, const char *table_name) {
+    char buffer[PATH_MAX];
+    path_db_table(db_name, table_name, buffer, PATH_MAX);
+
+    return dir_exists(buffer);
+}
+
 int read_page_header(FILE *file, PageHeader *out) {
     int fd = fileno(file);
 
@@ -96,8 +110,13 @@ int read_page_header(FILE *file, PageHeader *out) {
 }
 
 int get_table_schema(const char *db_name, const char *table_name, MetaTable *out) {
+    if (!exists_table(db_name, table_name)) {
+        return 1;
+    }
+
     int res =0 ;
     char buffer[PATH_MAX];
+
     path_db_table_meta(db_name, table_name, buffer, PATH_MAX);
     
     FILE *file = fopen(buffer, "r");

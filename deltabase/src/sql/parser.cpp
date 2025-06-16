@@ -77,32 +77,35 @@ namespace sql {
     }
 
     std::unique_ptr<AstNode> SqlParser::parse() {
-        AstNodeValue value;
+        ;
 
         if (match(SqlKeyword::SELECT)) {
-            value = std::move(parse_select());
+            AstNodeValue value = std::move(parse_select());
+            return std::make_unique<AstNode>(AstNodeType::SELECT, AstNodeValue(std::move(value)));
         }
         else if (match(SqlKeyword::INSERT)) {
-            value = std::move(parse_insert());
+            AstNodeValue value = std::move(parse_insert());
+            return std::make_unique<AstNode>(AstNodeType::INSERT, AstNodeValue(std::move(value)));
         }
         else if (match(SqlKeyword::UPDATE)) {
-            value = std::move(parse_update());
+            AstNodeValue value = std::move(parse_update());
+            return std::make_unique<AstNode>(AstNodeType::UPDATE, AstNodeValue(std::move(value)));
         }
         else if (match(SqlKeyword::DELETE)) {
-            value = std::move(parse_delete());
+            AstNodeValue value = std::move(parse_delete());
+            return std::make_unique<AstNode>(AstNodeType::DELETE, AstNodeValue(std::move(value)));
         }
         else {
             throw std::runtime_error("Unsupported statement");
         }
 
-        return std::make_unique<AstNode>(AstNodeType::SELECT, AstNodeValue(std::move(value)));
     }
 
     SelectStatement SqlParser::parse_select() {
         SelectStatement stmt;
 
         if (!match(SqlOperator::MUL)) {
-    stmt.columns = parse_tokens_list(SqlTokenType::IDENTIFIER, AstNodeType::COLUMN_IDENTIFIER);
+            stmt.columns = parse_tokens_list(SqlTokenType::IDENTIFIER, AstNodeType::COLUMN_IDENTIFIER);
         }
         else {
             advance();
@@ -185,8 +188,6 @@ namespace sql {
         while (true) {
             advance_or_throw(); 
             std::unique_ptr<AstNode> expr = parse_binary(0);
-
-            std::cout << std::to_string((int)expr.get()->type) << '\n';
 
             if (!expr || expr->type != AstNodeType::BINARY_EXPR) {
                 throw std::runtime_error("Expected assignment expression (col = value)");

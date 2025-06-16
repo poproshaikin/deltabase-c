@@ -10,6 +10,7 @@ std::optional<AstOperator> to_ast_operator(SqlOperator type) {
         case SqlOperator::OR: return AstOperator::OR;
         case SqlOperator::AND: return AstOperator::AND;
         case SqlOperator::EQ: return AstOperator::EQ;
+        case SqlOperator::NEQ: return AstOperator::NEQ;
         case SqlOperator::NOT: return AstOperator::NOT;
         case SqlOperator::GR: return AstOperator::GR;
         case SqlOperator::GRE: return AstOperator::GRE;
@@ -25,7 +26,6 @@ std::unique_ptr<AstNode> SqlParser::parse_binary(int min_priority) {
 
     while (true) {
         const SqlToken& token = current();
-        std::cout << "\n\n" << token.value << "\n\n";
         if (token.type != SqlTokenType::OPERATOR) {
             break;
         }
@@ -57,7 +57,6 @@ std::unique_ptr<AstNode> SqlParser::parse_binary(int min_priority) {
 
 std::unique_ptr<AstNode> SqlParser::parse_primary() {
     const SqlToken& token = current();
-        std::cout << "\n\n" << token.value << "\n\n";
 
     if (match(SqlSymbol::LPAREN)) {
         advance();

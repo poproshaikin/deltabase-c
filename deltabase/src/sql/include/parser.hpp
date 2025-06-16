@@ -19,7 +19,7 @@ namespace sql {
         AND,
         NOT,
 
-        EQ,
+        EQ, NEQ,
 
         GR, 
         GRE,
@@ -35,6 +35,7 @@ namespace sql {
             { AstOperator::AND, 2 },
             { AstOperator::NOT, 3 },
             { AstOperator::EQ, 4 },
+            { AstOperator::NEQ, 4 },
             { AstOperator::GR, 4 },
             { AstOperator::GRE, 4 },
             { AstOperator::LT, 4 },

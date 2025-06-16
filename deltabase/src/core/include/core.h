@@ -7,9 +7,11 @@
 
 int create_database(const char *name);
 int drop_database(const char *name);
+bool exists_database(const char *db_name);
 
 int create_table(const char *db_name, const MetaTable *scheme);
 int drop_table(const char *db_name, const char *table_name);
+bool exists_table(const char *db_name, const char *table_name);
 
 int insert_row(const char *db_name, const char *table_name, DataRow *row);
 
@@ -20,7 +22,6 @@ typedef struct {
 } DataRowUpdate;
  
 int update_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, const DataRowUpdate *update);
-
 int delete_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter);
 
 int full_scan(const char *db_name, const char *table_name, DataTable *out);

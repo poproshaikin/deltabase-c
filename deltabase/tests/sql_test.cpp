@@ -1,9 +1,8 @@
-#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include "../src/sql/include/parser.hpp"
+#include "../src/executor/include/semantic_analyzer.hpp"
 
 using namespace sql;
 
@@ -90,19 +89,23 @@ void print_ast_node(const std::unique_ptr<AstNode>& node, int indent = 0) {
     }, node->value);
 }
 int main() {
-    std::string sql = "DELETE FROM users WHERE id = 5";
-
+    std::string db_name = "testdb";
+    std::string sql = "DELETE FROM users WHERE id == 5";
+    std::cout << sql << std::endl;
+    //
     sql::SqlTokenizer tokenizer;
     std::vector<sql::SqlToken> result = tokenizer.tokenize(sql);
 
-    for (const auto& token : result) {
-        std::cout << token.to_string();
-    }
-
     sql::SqlParser parser(result);
     std::unique_ptr<sql::AstNode> node = parser.parse();
+    if (!node) {
+        std::cerr << "parser.parse() вернул nullptr!\n";
+        return 1;
+    }
 
-    
+    // // print_ast_node(node);
 
-    print_ast_node(node);
+    exe::SemanticAnalyzer analyzer(db_name);
+    analyzer.analyze(node.get());
+    //
 }

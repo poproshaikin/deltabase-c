@@ -58,6 +58,14 @@ void free_col(MetaColumn *column) {
     free(column);
 }
 
+void free_meta_table(MetaTable *table) {
+    for (size_t i = 0; i < table->columns_count; i++) {
+        free_col(table->columns[i]);
+    }
+    free(table->name);
+    free(table);
+}
+
 ssize_t get_column_index_meta(const uuid_t column_id, const MetaTable *table) {
     for (size_t i = 0; i < table->columns_count; i++) {
         if (uuid_compare(table->columns[i]->column_id, column_id)) {
@@ -66,3 +74,4 @@ ssize_t get_column_index_meta(const uuid_t column_id, const MetaTable *table) {
     }
     return -1;
 }
+

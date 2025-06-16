@@ -340,7 +340,7 @@ using namespace test;
 //     //
 //     // cout << update_row_by_filter("testdb", "users", create_mock_filter(), create_mock_row_update()) << endl;
 //     //
-//     cout << delete_row_by_filter("testdb", "users", create_mock_filter()) << endl;
+//     // cout << delete_row_by_filter("testdb", "users", create_mock_filter()) << endl;
 //
 //     DataTable table;
 //     res = full_scan("testdb", "users", &table);
