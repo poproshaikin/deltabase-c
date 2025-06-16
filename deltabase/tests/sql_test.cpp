@@ -172,7 +172,6 @@ using namespace sql;
 
         auto end = std::chrono::high_resolution_clock::now();
         auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        std::cout << "Execution time: " << duration_ms << " ms" << std::endl;
 
         if (std::holds_alternative<std::unique_ptr<DataTable>>(result))
             print_data_table(std::get<std::unique_ptr<DataTable>>(result).get());
