@@ -1,6 +1,7 @@
 #pragma once
 
 #include "semantic_analyzer.hpp"
+#include <chrono>
 #include <string>
 
 extern "C" {

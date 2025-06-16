@@ -337,12 +337,12 @@ using namespace test;
 //
 //     // cout << insert_row("testdb", "users", create_mock_row()) << endl;
 //     //
-//     cout << update_row_by_filter("testdb", "users", create_mock_filter(), create_mock_row_update(), NULL) << endl;
+//     // cout << update_row_by_filter("testdb", "users", create_mock_filter(), create_mock_row_update(), NULL) << endl;
 //     //
 //     // cout << delete_row_by_filter("testdb", "users", create_mock_filter()) << endl;
 //
 //     DataTable table;
-//     res = full_scan("testdb", "users", NULL, 0, &table);
+//     res = full_scan("testdb", "users", NULL, 0, NULL, &table);
 //     if (res != 0) {
 //         cout << res << endl;
 //         return 1;

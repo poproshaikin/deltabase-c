@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <dirent.h>
 
 size_t fsize(int fd) {

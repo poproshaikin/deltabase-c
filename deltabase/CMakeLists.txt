@@ -41,6 +41,7 @@ function(add_cpp_module module_name)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/${module_name}/*.cc
     )
 
+    message(STATUS "${module_name} sources: ${MOD_SRCS}")
     add_library(${module_name} STATIC ${MOD_SRCS})
 
     target_include_directories(${module_name} PUBLIC
@@ -65,19 +66,21 @@ file(GLOB_RECURSE TESTS_SRC
 
 add_executable(test.exe ${TESTS_SRC})
 target_link_libraries(test.exe 
-    misc
-    executor
-    sql
-    server
     core
+    misc
+    sql
+    executor
+    server
+    cli
 )
 
 # --- main ---
 add_executable(main.exe main.cpp)
 target_link_libraries(main.exe 
-    server
+    core
+    misc
     sql
     executor
-    misc
-    core
+    server
+    cli
 )

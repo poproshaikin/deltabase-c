@@ -192,6 +192,9 @@ namespace exe {
         else if (std::holds_alternative<sql::UpdateStatement>(query.value)) {
             return execute_update(std::get<sql::UpdateStatement>(query.value));
         }
+        else if (std::holds_alternative<sql::DeleteStatement>(query.value)) {
+            return execute_delete(std::get<sql::DeleteStatement>(query.value));
+        }
 
         throw std::runtime_error("Unsupported query");
     }
@@ -214,8 +217,12 @@ namespace exe {
             column_names[i] = std::get<sql::SqlToken>(query.columns[i]->value).value.data();
         }
 
+        std::unique_ptr<DataFilter> filter;
+        if (query.where) 
+            filter = std::make_unique<DataFilter>(create_filter(std::get<sql::BinaryExpr>(query.where->value), schema));
+
         DataTable result;
-        if (full_scan(_db_name.data(), table.value.data(), (const char **)column_names, columns_count, &result) != 0) {
+        if (full_scan(_db_name.data(), table.value.data(), (const char **)column_names, columns_count, filter.get(), &result) != 0) {
             throw std::runtime_error("Failed to scan a table");
         }
         return std::make_unique<DataTable>(std::move(result)); 
@@ -254,6 +261,29 @@ namespace exe {
         size_t rows_affected = 0;
         if (update_row_by_filter(_db_name.data(), table.value.data(), (const DataFilter *)&filter, &update, &rows_affected) != 0) {
             throw std::runtime_error("Failed to update row");
+        }
+
+        return rows_affected;
+    }
+
+    int QueryExecutor::execute_delete(const sql::DeleteStatement& query) {
+        const sql::SqlToken table = std::get<sql::SqlToken>(query.table->value);
+
+        MetaTable schema;
+        if (get_table_schema(_db_name.data(), table.value.data(), &schema) != 0) {
+            throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
+        }
+
+        std::unique_ptr<DataFilter> filter = nullptr;
+        if (query.where) {
+            filter = std::make_unique<DataFilter>(create_filter(std::get<sql::BinaryExpr>(query.where->value), schema));
+        }
+
+        size_t rows_affected = 0;
+        int rc = delete_row_by_filter(_db_name.data(), table.value.data(), filter.get(), &rows_affected);
+
+        if (rc != 0) {
+            throw std::runtime_error("Failed to delete rows by filter");
         }
 
         return rows_affected;

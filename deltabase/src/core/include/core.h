@@ -24,7 +24,7 @@ typedef struct {
 int update_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, const DataRowUpdate *update, size_t *rows_affected);
 int delete_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, size_t *rows_affected);
 
-int full_scan(const char *db_name, const char *table_name, const char **column_names, size_t columns_count, DataTable *out);
+int full_scan(const char *db_name, const char *table_name, const char **column_names, size_t columns_count, const DataFilter *filter, DataTable *out);
 
 int get_table_schema(const char *db_name, const char *table_name, MetaTable *out);
 int list_tables(char ***out_table_names, size_t *count);
