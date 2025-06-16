@@ -255,13 +255,12 @@ namespace test {
 
     DataFilter *create_mock_filter() {
         uuid_t id_col;
-        uuid_parse("16f92ad1-d56f-4888-90c3-a92979aa424c", id_col);
+        uuid_parse("3b6996ac-1a82-4b7f-be5f-73808c9b76a8", id_col);
         uuid_t name_col;
-        uuid_parse("16f92ad1-d56f-4888-90c3-a92979aa424c", name_col);
+        uuid_parse("802035c1-7e4e-449a-a8cd-d87198c2e5d0", name_col);
 
         int *id_value = (int *)malloc(sizeof(int));
         *id_value = 2;
-        // Итоговый логический фильтр: id = 1 AND name = "hello"
         DataFilter *root_filter = (DataFilter *)malloc(sizeof(DataFilter));
         root_filter->is_node = false;
         root_filter->data.condition = (DataFilterCondition){
@@ -311,7 +310,7 @@ namespace test {
         DataRowUpdate *update = new DataRowUpdate;
         update->column_indices = (uuid_t*)malloc(sizeof(uuid_t*));
         update->count = 1;
-        uuid_parse("7adad1b1-6a51-4a68-8b69-d435ff4cf55d", update->column_indices[0]); // email column
+        uuid_parse("320b4406-9743-407b-8467-7b57a03b87f5", update->column_indices[0]); // email column
         update->values = (void **)malloc(sizeof (void*));
         char *value = (char *)malloc(15);
         strcpy(value, "hello");
@@ -329,21 +328,21 @@ using namespace test;
 // int main() {
 //     // cout << create_database("testdb") << endl << create_table("testdb", create_mock_table()) << endl;
 //     int res = 0;
-//     MetaTable metatable;
-//     if ((res = get_table_schema("testdb", "users", &metatable)) != 0) {
-//         cout << res << endl;
-//         return 1;
-//     }
-//     test::print_mt(&metatable);
+//     // MetaTable metatable;
+//     // if ((res = get_table_schema("testdb", "users", &metatable)) != 0) {
+//     //     cout << res << endl;
+//     //     return 1;
+//     // }
+//     // test::print_mt(&metatable);
 //
 //     // cout << insert_row("testdb", "users", create_mock_row()) << endl;
 //     //
-//     // cout << update_row_by_filter("testdb", "users", create_mock_filter(), create_mock_row_update()) << endl;
+//     cout << update_row_by_filter("testdb", "users", create_mock_filter(), create_mock_row_update(), NULL) << endl;
 //     //
 //     // cout << delete_row_by_filter("testdb", "users", create_mock_filter()) << endl;
 //
 //     DataTable table;
-//     res = full_scan("testdb", "users", &table);
+//     res = full_scan("testdb", "users", NULL, 0, &table);
 //     if (res != 0) {
 //         cout << res << endl;
 //         return 1;

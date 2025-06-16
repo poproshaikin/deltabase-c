@@ -1,8 +1,12 @@
+#include <algorithm>
+#include <iomanip>
 #include <iostream>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "../src/executor/include/semantic_analyzer.hpp"
+#include "../src/executor/include/query_executor.hpp"
 
 using namespace sql;
 
@@ -88,24 +92,91 @@ void print_ast_node(const std::unique_ptr<AstNode>& node, int indent = 0) {
         }
     }, node->value);
 }
-int main() {
-    std::string db_name = "testdb";
-    std::string sql = "DELETE FROM users WHERE id == 5";
-    std::cout << sql << std::endl;
-    //
-    sql::SqlTokenizer tokenizer;
-    std::vector<sql::SqlToken> result = tokenizer.tokenize(sql);
 
-    sql::SqlParser parser(result);
-    std::unique_ptr<sql::AstNode> node = parser.parse();
-    if (!node) {
-        std::cerr << "parser.parse() вернул nullptr!\n";
-        return 1;
+std::string token_to_string(const DataToken* token) {
+    if (!token || token->type == DT_NULL) {
+        return "NULL";
     }
 
-    // // print_ast_node(node);
+    switch (token->type) {
+        case DT_INTEGER: {
+            int32_t value;
+            memcpy(&value, token->bytes, sizeof(value));
+            return std::to_string(value);
+        }
+        case DT_REAL: {
+            double value;
+            memcpy(&value, token->bytes, sizeof(value));
+            return std::to_string(value);
+        }
+        case DT_BOOL: {
+            bool value;
+            memcpy(&value, token->bytes, sizeof(value));
+            return value ? "true" : "false";
+        }
+        case DT_CHAR: {
+            return std::string(1, *token->bytes);  // 1 символ
+        }
+        case DT_STRING: {
+            return std::string(token->bytes, token->size);
+        }
+        default:
+            return "<unknown>";
+    }
+}
+
+void print_data_table(const DataTable* table) {
+    if (!table || !table->scheme) {
+        std::cerr << "Invalid DataTable\n";
+        return;
+    }
+
+    const MetaTable* schema = table->scheme;
+
+    // Заголовки
+    for (size_t i = 0; i < schema->columns_count; ++i) {
+        std::cout << std::left << std::setw(15) << schema->columns[i]->name;
+    }
+    std::cout << "\n";
+
+    // Разделитель
+    for (size_t i = 0; i < schema->columns_count; ++i) {
+        std::cout << std::setw(15) << std::setfill('-') << "";
+    }
+    std::cout << std::setfill(' ') << "\n";
+
+    // Данные
+    for (size_t r = 0; r < table->rows_count; ++r) {
+        const DataRow* row = table->rows[r];
+        for (size_t c = 0; c < schema->columns_count; ++c) {
+            const DataToken* token = row->tokens[c];
+            std::cout << std::left << std::setw(15) << token_to_string(token);
+        }
+        std::cout << "\n";
+    }
+}
+
+int main() {
+    std::string db_name = "testdb";
+
+    // std::string sql = "INSERT INTO users(id, name) VALUES(5, 'hello')";
+    std::string sql = "SELECT * FROM users";
+    // std::string sql = "UPDATE users SET email = 'fukcking' WHERE id == 2";
+
+    std::cout << sql << std::endl;
+
+    sql::SqlTokenizer tokenizer;
+    std::vector<sql::SqlToken> tokens = tokenizer.tokenize(sql);
+
+    sql::SqlParser parser(tokens);
+    std::unique_ptr<sql::AstNode> node = parser.parse();
 
     exe::SemanticAnalyzer analyzer(db_name);
     analyzer.analyze(node.get());
-    //
+
+    exe::QueryExecutor executor(db_name);
+    const auto result = executor.execute(*node);
+
+    if (std::holds_alternative<std::unique_ptr<DataTable>>(result))
+        print_data_table(std::get<std::unique_ptr<DataTable>>(result).get());
 }

@@ -53,7 +53,7 @@ namespace exe {
         if (!insertStmt.table) {
             throw std::runtime_error("Insert statement missing target table");
         }
-        if (insertStmt.columns.size() != insertStmt.values.size()) {
+        if (insertStmt.columns.size() != 0 && insertStmt.columns.size() != insertStmt.values.size()) {
             throw std::runtime_error("Insert statement columns count does not match values count");
         }
 

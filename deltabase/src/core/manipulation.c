@@ -134,8 +134,10 @@ int insert_row(const char *db_name, const char *table_name, DataRow *row) {
 
         int result = write_row_update_state(db_name, row, &schema, file);
         if (result == 1) { // means that the page is out of space
+            fclose(file);
             continue;
         } else if (result > 1) { // something went wrong
+            fclose(file);
             return i + 4; 
         } 
 
@@ -156,12 +158,11 @@ bool apply_filter(DataFilterCondition condition, const void *db_value, const Dat
     char col_id[37];
     
     if (condition.type == DT_NULL || db_type == DT_NULL) {
-        printf("b\n");
         return false; 
     }
 
     if (condition.type != db_type) {
-        printf("a\n");
+        fprintf(stderr, "apply_filter: type in condition isn't the same as type in database\n");
         // TODO: implicit casting for compatible types (e.g. INT to REAL etc)
         return false;
     }
@@ -170,10 +171,7 @@ bool apply_filter(DataFilterCondition condition, const void *db_value, const Dat
         case DT_INTEGER: {
             int32_t a = *(const int32_t *)condition.value;
             int32_t b = *(const int32_t *)db_value;
-
             
-            printf("a: %i\nb: %i\n", a, b);
-
             switch (condition.op) {
                 case OP_EQ:  return a == b;
                 case OP_NEQ: return a != b;
@@ -328,7 +326,7 @@ int for_each_row(const char *db_name, const char *table_name, RowCallback callba
     return 0;
 }
 
-int for_each_row_matching_filter(const char *db_name, const char *table_name, const DataFilter *filter, RowCallback callback, const void *user_data) {
+int for_each_row_matching_filter(const char *db_name, const char *table_name, const DataFilter *filter, RowCallback callback, const void *user_data, size_t *rows_affected) {
     MetaTable schema;
     if (get_table_schema(db_name, table_name, &schema) != 0) {
         return 1;
@@ -362,7 +360,7 @@ int for_each_row_matching_filter(const char *db_name, const char *table_name, co
 
             size_t row_start_pos = lseek(fd, 0, SEEK_CUR);
 
-            if (read_dr(&schema, &row, fd) != 0) {
+            if (read_dr(&schema, NULL, 0, &row, fd) != 0) {
                 return -1 - j; // just some unique error code
             }
 
@@ -374,10 +372,10 @@ int for_each_row_matching_filter(const char *db_name, const char *table_name, co
                 continue;
             }
 
-            printf("row satisfied filter\n");
-
             // save position before callback
             ssize_t pos = lseek(fd, 0, SEEK_CUR);
+
+            const DataRowUpdate *update = user_data;
 
             int result = callback(db_name, table_name, &schema, &header, fd, row_start_pos, row.row_id, &row, user_data);
             if (result != 0) {
@@ -387,6 +385,8 @@ int for_each_row_matching_filter(const char *db_name, const char *table_name, co
             
             // restore position
             lseek(fd, pos, SEEK_SET);
+            if (rows_affected)
+                (*rows_affected)++;
         }   
 
         lseek(fd, 0, SEEK_SET);
@@ -432,8 +432,8 @@ int update_callback(ROW_CALLBACK_PARAMS) {
     return 0;
 }
 
-int update_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, const DataRowUpdate *update) {
-    return for_each_row_matching_filter(db_name, table_name, filter, update_callback, update);
+int update_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, const DataRowUpdate *update, size_t *rows_affected) {
+    return for_each_row_matching_filter(db_name, table_name, filter, update_callback, update, rows_affected);
 }
 
 int delete_callback(ROW_CALLBACK_PARAMS) {
@@ -448,11 +448,11 @@ int delete_callback(ROW_CALLBACK_PARAMS) {
     return 0;
 }
 
-int delete_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter) {
-    return for_each_row_matching_filter(db_name, table_name, filter, delete_callback, NULL);   
+int delete_row_by_filter(const char *db_name, const char *table_name, const DataFilter *filter, size_t *rows_affected) {
+    return for_each_row_matching_filter(db_name, table_name, filter, delete_callback, NULL, rows_affected);   
 }
 
-int full_scan(const char *db_name, const char *table_name, DataTable *out) {
+int full_scan(const char *db_name, const char *table_name, const char **column_names, size_t columns_count, DataTable *out) {
     char buffer[PATH_MAX];
     path_db_table_data(db_name, table_name, buffer, PATH_MAX);
 
@@ -504,13 +504,12 @@ int full_scan(const char *db_name, const char *table_name, DataTable *out) {
             }
 
             int res = 0;
-            if ((res = read_dr(schema, row, fd)) != 0) {
+            if ((res = read_dr(schema, column_names, columns_count, row, fd)) != 0) {
                 fprintf(stderr, "Failed to read data row in full_scan: %i\n", res);
                 free(row);
                 fclose(file);
                 goto fail_cleanup;
             }
-            printf("row flags: %i\n", row->flags);
 
             if (row->flags & RF_OBSOLETE) {
                 free_row(row);

@@ -25,7 +25,7 @@ int write_dr(const MetaTable *schema, const DataRow *row, int fd);
 int write_dr_v(const MetaTable *schema, const DataToken **tokens, uint64_t rid, uint64_t count, unsigned char flags, int fd);
 int write_dr_flags(DataRowFlags flags, int fd);
 
-int read_dr(const MetaTable *schema, DataRow *out, int fd);
+int read_dr(const MetaTable *schema, const char **column_names, size_t columns_count, DataRow *out, int fd);
 
 uint64_t dtype_size(DataType type);
 

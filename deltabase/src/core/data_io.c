@@ -1,3 +1,4 @@
+#include "include/data_page.h"
 #include "include/data_table.h"
 #include "include/data_token.h"
 #include "include/utils.h"
@@ -262,6 +263,10 @@ int read_ph(PageHeader *out, int fd) {
         return 4;
     }
 
+    size_t pos = lseek(fd, 0, SEEK_CUR);
+    out->file_size = lseek(fd, 0, SEEK_END) + 1;
+    lseek(fd, pos, SEEK_SET);
+
     return 0;
 }
 
@@ -410,7 +415,7 @@ int read_dr_flags(DataRowFlags *out, int fd) {
     return 0;
 }
 
-int read_dr(const MetaTable *schema, DataRow *out, int fd) {
+int read_dr(const MetaTable *schema, const char **column_names, size_t columns_count, DataRow *out, int fd) {
     uint64_t row_size;
     if (read(fd, &row_size, sizeof(row_size)) != sizeof(row_size)) {
         return 1;
@@ -434,13 +439,39 @@ int read_dr(const MetaTable *schema, DataRow *out, int fd) {
     int nb__size = nb_size(schema);
     int nulls = nulls_count(nb, nb__size);
 
-    DataToken **tokens = malloc(schema->columns_count * sizeof(DataToken *));
+    bool *need_read = NULL;
+    if (column_names && columns_count > 0) {
+        need_read = malloc(schema->columns_count * sizeof(bool));
+        if (!need_read) return -10000;
+
+        for (size_t i = 0; i < schema->columns_count; ++i) {
+            need_read[i] = false;
+            for (size_t j = 0; j < columns_count; ++j) {
+                if (strcmp(schema->columns[i]->name, column_names[j]) == 0) {
+                    need_read[i] = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    size_t final_columns_count = columns_count != 0 ? columns_count : schema->columns_count;
+
+    DataToken **tokens = malloc(final_columns_count * sizeof(DataToken *));
     if (!tokens) {
         return 5;
     }
 
     for (int i = 0; i < schema->columns_count; i++) {
         bool null = is_null(nb, nb__size, i);   
+        if (need_read && !need_read[i]) {
+            if (!null) {
+                DataToken tmp;
+                read_dt(&tmp, fd);
+            }
+            continue;
+        }
+
         if (null) {
             tokens[i] = make_token(DT_NULL, NULL, 0);
         }
@@ -457,8 +488,11 @@ int read_dr(const MetaTable *schema, DataRow *out, int fd) {
         }   
     }
 
+    if (need_read)
+        free(need_read);
+
     out->tokens = tokens;
-    out->count = schema->columns_count;
+    out->count = final_columns_count;
     out->row_id = rid;
     out->flags = flags;
     return 0;
@@ -590,7 +624,6 @@ int write_mt(const MetaTable *schema, int fd) {
 int read_mt(MetaTable *out, int fd) {
     int r = 0;
     if ((r = read(fd, out->table_id, sizeof(out->table_id))) != sizeof(out->table_id)) {
-        printf("%i\n", r);
         return 1;
     }
 
