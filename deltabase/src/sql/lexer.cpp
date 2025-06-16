@@ -74,8 +74,6 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
     while (i < sql.length()) {
         char c = sql[i];
 
-        std::cout << std::to_string(i) << std::endl;
-
         if (std::isspace((unsigned char) c)) {
             if (c == '\n') {
                 line++;
@@ -174,26 +172,40 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
     return result;
 }
 
-std::string SqlToken::to_string() const {
+std::string SqlToken::to_string(int indent) const {
+    auto indent_fn = [indent](){
+        for (int i = 0; i < indent; i++) {
+            std::cout << ' ';
+        }  
+    };
+
     std::ostringstream result;
     result << "Token:\n";
-    result << "    Type: " << utils::to_string(type) << "\n";
-    result << "    Value: " << value << "\n";
-    result << "    Line: " << line << "\n";
-    result << "    Pos: " << pos << "\n";
+    indent_fn();
+    result << "Type: " << utils::to_string(type) << "\n";
+    indent_fn();
+    result << "Value: " << value << "\n";
+    indent_fn();
+    result << "Line: " << line << "\n";
+    indent_fn();
+    result << "Pos: " << pos << "\n";
 
     switch (type) {
         case SqlTokenType::KEYWORD:
-            result << "    Keyword: " << utils::to_string(std::get<SqlKeyword>(detail)) << "\n";
+            indent_fn();
+            result << "Keyword: " << utils::to_string(std::get<SqlKeyword>(detail)) << "\n";
             break;
         case SqlTokenType::OPERATOR:
-            result << "    Operator: " << utils::to_string(std::get<SqlOperator>(detail)) << "\n";
+            indent_fn();
+            result << "Operator: " << utils::to_string(std::get<SqlOperator>(detail)) << "\n";
             break;
         case SqlTokenType::LITERAL:
-            result << "    Literal: " << utils::to_string(std::get<SqlLiteral>(detail), value) << "\n";
+            indent_fn();
+            result << "Literal: " << utils::to_string(std::get<SqlLiteral>(detail), value) << "\n";
             break;
         case SqlTokenType::SYMBOL:
-            result << "    Symbol: " << utils::to_string(std::get<SqlSymbol>(detail)) << "\n";
+            indent_fn();
+            result << "Symbol: " << utils::to_string(std::get<SqlSymbol>(detail)) << "\n";
             break;
         default:
             break;

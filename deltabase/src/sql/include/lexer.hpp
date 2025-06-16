@@ -18,7 +18,7 @@ namespace sql {
     enum class SqlKeyword {
         UNKNOWN = 0,
 
-        SELECT, FROM, INSERT, INTO, UPDATE, SET, DELETE, WHERE,
+        SELECT, FROM, INSERT, INTO, VALUES, UPDATE, SET, DELETE, WHERE,
         CREATE, DROP, DATABASE, TABLE,
         STRING, INTEGER, REAL, CHAR, BOOL, _NULL,
     };
@@ -56,6 +56,7 @@ namespace sql {
             { "FROM",     SqlKeyword::FROM },
             { "INSERT",   SqlKeyword::INSERT },
             { "INTO",     SqlKeyword::INTO },
+            { "VALUES",   SqlKeyword::VALUES },
             { "UPDATE",   SqlKeyword::UPDATE },
             { "SET",      SqlKeyword::SET },
             { "DELETE",   SqlKeyword::DELETE }, 
@@ -122,7 +123,7 @@ namespace sql {
         SqlToken() = default;
         SqlToken(SqlTokenType type, std::string value, size_t line, size_t position, SqlTokenDetail detail = std::monostate());
 
-        std::string to_string() const;
+        std::string to_string(int indent = 4) const;
     };
 
     class SqlTokenizer {

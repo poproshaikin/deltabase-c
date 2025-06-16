@@ -3,7 +3,7 @@
 
 namespace sql {
     enum class AstNodeType {
-        IDENTIFIER,
+        IDENTIFIER = 1,
         TABLE_IDENTIFIER,
         COLUMN_IDENTIFIER,
         LITERAL,
@@ -19,10 +19,14 @@ namespace sql {
         AND,
         NOT,
 
+        EQ,
+
         GR, 
         GRE,
         LT,
         LTE,
+
+        ASSIGN,
     };
 
     inline const std::unordered_map<AstOperator, int>& getAstOperatorsPriorities() {
@@ -30,10 +34,12 @@ namespace sql {
             { AstOperator::OR, 1 },
             { AstOperator::AND, 2 },
             { AstOperator::NOT, 3 },
+            { AstOperator::EQ, 4 },
             { AstOperator::GR, 4 },
             { AstOperator::GRE, 4 },
             { AstOperator::LT, 4 },
             { AstOperator::LTE, 4 },
+            { AstOperator::ASSIGN, 4 },
         };
 
         return map;
@@ -74,7 +80,9 @@ namespace sql {
         SqlToken,
         BinaryExpr,
         SelectStatement,
-        InsertStatement
+        InsertStatement,
+        UpdateStatement,
+        DeleteStatement
     >;
 
     struct AstNode {
@@ -91,24 +99,29 @@ namespace sql {
             std::unique_ptr<AstNode> parse();
 
         private: 
-            const std::vector<SqlToken> _tokens;
+            std::vector<SqlToken> _tokens;
             size_t _current;
             
             SelectStatement parse_select();
             InsertStatement parse_insert();
+            UpdateStatement parse_update();
+            DeleteStatement parse_delete();
 
             std::unique_ptr<AstNode> parse_binary(int min_priority);
 
-            bool match(SqlTokenType type) const noexcept;
-            bool match(SqlKeyword kw) const noexcept;
-            bool match(SqlOperator op) const noexcept;
-            bool match(SqlSymbol sym) const noexcept;
+            template<typename TEnum>
+            bool match(const TEnum&) const ;
+            template<typename TEnum>
+            bool match_or_throw(TEnum expected, std::string error_msg) const;
+
 
             bool advance() noexcept;
+            bool advance_or_throw(std::string error_msg = "Invalid statement syntax");
             const SqlToken& previous() const noexcept;
-            const SqlToken& current() const noexcept;
+            const SqlToken& current() const;
 
-            std::vector<std::unique_ptr<AstNode>> parse_columns();
             std::unique_ptr<AstNode> parse_primary();
+            std::vector<std::unique_ptr<AstNode>> parse_assignments();
+            std::vector<std::unique_ptr<AstNode>> parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType);
     };
 }
