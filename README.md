@@ -1,47 +1,47 @@
-# Dokumentace ***deltabase***
+# Documentation ***deltabase***
 
-## Přehled
+## Overview
 
-DeltaBase je vlastní databázový systém implementovaný v jazycích C a C++. Systém se skládá z několika modulů, které spolu komunikují a zajišťují správu dat, jejich ukládání, vyhledávání a manipulaci.
+DeltaBase is a custom database system implemented in C and C++. The system consists of several modules that communicate with each other and handle data management, storage, retrieval, and manipulation.
 
-## Architektura systému
+## System Architecture
 
-### 1. Jádro (Core)
+### 1. Core
 
-- Implementováno v jazyce C.
-- Převzalo veškerou zodpovědnost za práci se souborovým systémem.
-- Nabízí základní API, které využívá Executor.
+- Implemented in C.
+- Fully responsible for interacting with the file system.
+- Provides a low-level API used by the Executor.
 
-### 2. Moduly v C++
+### 2. C++ Modules
 
 #### 1. Sql
 
-- Modul odpovídající za parsování dotazů.
-- **Lexikální analýza**: rozbor dotazu na tokeny, vyhodnocování typu každého tokenu (např. identifikátor, literál, …).
-- **Syntaktická analýza**: sestavení abstraktního syntaktického stromu na základě rozparsovaných tokenů.
+- Responsible for parsing queries.
+- **Lexical Analysis**: breaks the query into tokens, evaluates the type of each token (e.g., identifier, literal, etc.).
+- **Syntactic Analysis**: builds an abstract syntax tree (AST) from the parsed tokens.
 
 #### 2. Executor
 
-- **Sémantická analýza**: kontrola existence tabulek, sloupců, kompatibilita typů.
-- **Vyhodnocování dotazů**:
-  - Executor dostává zanalyzovaný syntaktický strom a na jeho základě přesměrovává dotazy do jádra.
-  - *Do budoucna*: vytvořit planner a optimizer dotazů pro zrychlení exekuce, např. odstranění zbytečných podmínek (`1 == 1`).
+- **Semantic Analysis**: checks for the existence of tables, columns, and type compatibility.
+- **Query Evaluation**:
+  - The executor receives the analyzed syntax tree and routes the queries to the core accordingly.
+  - *Planned feature*: implement a query planner and optimizer to speed up execution, e.g., by removing redundant conditions like `1 == 1`.
 
-### 3. Průběh dotazu
+### 3. Query Flow
 
-- Klient odešle SQL příkaz serveru (přes CLI nebo síť) – *v realizaci*.
-- Server předá dotaz modulu Sql pro parsování.
-- Sql parser provede lexikální a syntaktickou analýzu, vytvoří AST.
-- Executor provede sémantickou analýzu, zkontroluje správnost.
-- Připraví se optimalizovaný plán exekuce – *v realizaci*.
-- Executor zavolá nízkoúrovňové API pro práci s daty.
-- Jádro načte/zapíše data ze souborového systému, aplikuje filtry.
-- Výsledek se naformátuje a odešle zpět klientovi.
+- The client sends an SQL command to the server (via CLI or network) – *in progress*.
+- The server passes the query to the Sql module for parsing.
+- The Sql parser performs lexical and syntactic analysis, producing an AST.
+- The Executor performs semantic analysis and validates the query.
+- An optimized execution plan is prepared – *in progress*.
+- The Executor calls the low-level API to access data.
+- The Core reads/writes data from/to the file system and applies filters.
+- The result is formatted and sent back to the client.
 
-### 4. Budoucí rozšíření
+### 4. Future Extensions
 
-- Optimalizace dotazů (planner, optimizer)
-- Podpora transakcí a rollbacku
+- Query optimization (planner, optimizer)
+- Transaction and rollback support
 - TCP server
-- Indexování
-- Rozšíření podporovaných datových typů
+- Indexing
+- Support for additional data types
