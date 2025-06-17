@@ -1,4 +1,4 @@
-# Dokumentace systému DeltaBase
+# Dokumentace ***deltabase***
 
 ## Přehled
 
