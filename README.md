@@ -1,5 +1,3 @@
-# Documentation ***deltabase***
-
 ## Overview
 
 DeltaBase is a custom database system implemented in C and C++. The system consists of several modules that communicate with each other and handle data management, storage, retrieval, and manipulation.
