@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 #include <uuid/uuid.h>
 
@@ -452,7 +453,7 @@ int delete_row_by_filter(const char *db_name, const char *table_name, const Data
     return for_each_row_matching_filter(db_name, table_name, filter, delete_callback, NULL, rows_affected);   
 }
 
-int full_scan(const char *db_name, const char *table_name, const char **column_names, size_t columns_count, const DataFilter *filter, DataTable *out) {
+int seq_scan(const char *db_name, const char *table_name, const char **column_names, size_t columns_count, const DataFilter *filter, DataTable *out) {
     char buffer[PATH_MAX];
     path_db_table_data(db_name, table_name, buffer, PATH_MAX);
 

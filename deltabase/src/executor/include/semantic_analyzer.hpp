@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SEMANTIC_ANALYZER_HPP
+#define SEMANTIC_ANALYZER_HPP
 
 #include "../../sql/include/parser.hpp"
 #include "../../core/include/data_table.h"
@@ -44,3 +45,5 @@ namespace exe {
             MetaColumn* ensure_column_exists(const MetaTable* table, std::string colname);
     };
 };
+
+#endif

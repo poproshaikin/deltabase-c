@@ -1,4 +1,4 @@
-#include "include/sql.hpp"
+#include "include/lexer.hpp"
 
 std::string sql::utils::to_string(sql::SqlTokenType type) {
     switch (type) {

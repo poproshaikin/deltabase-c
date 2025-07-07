@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.15)
 project(deltabase LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
@@ -30,25 +32,28 @@ target_include_directories(core PUBLIC ${UUID_INCLUDE_DIRS})
 target_link_libraries(core PUBLIC ${UUID_LIBRARIES})
 
 target_include_directories(core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/include
+        src/core/old/include
 )
 
 # --- modules ---
 function(add_cpp_module module_name)
     file(GLOB_RECURSE MOD_SRCS
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/${module_name}/*.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/${module_name}/*.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/${module_name}/*.cc
+            src/${module_name}/*.cpp
+            src/${module_name}/*.cxx
+            src/${module_name}/*.cc
     )
 
-    message(STATUS "${module_name} sources: ${MOD_SRCS}")
     add_library(${module_name} STATIC ${MOD_SRCS})
 
     target_include_directories(${module_name} PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/${module_name}/include
+            src/${module_name}/include
     )
 
-    target_link_libraries(${module_name} PRIVATE core)
+    target_link_libraries(${module_name} PUBLIC core)
+
+    if (${module_name} STREQUAL "cli")
+        target_link_libraries(${module_name} PUBLIC sql executor )
+    endif()
 endfunction()
 
 add_cpp_module(executor)
@@ -59,9 +64,9 @@ add_cpp_module(cli)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cxx   
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp
+    tests/*.cc
+    tests/*.cxx
+    tests/*.cpp
 )
 
 add_executable(test.exe ${TESTS_SRC})

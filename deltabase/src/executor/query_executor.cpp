@@ -1,13 +1,22 @@
 #include "include/query_executor.hpp"
 #include "include/literals.hpp"
+#include "../misc/include/utils.hpp"
+
 #include <iostream>
+#include <linux/limits.h>
 #include <memory>
 #include <stdexcept>
 #include <uuid/uuid.h>
 #include <variant>
 
+#define HANDLE_ERROR_IF_NOT(FN_CALL, ERR_CODE, RET_CODE) if ((FN_CALL) != (ERR_CODE)) return (RET_CODE);
+
 extern "C" {
     #include "../core/include/core.h"
+    #include "../core/include/path_service.h"
+    #include "../core/include/utils.h"
+    #include "../core/include/data_io.h"
+    #include "../core/include/data_filter.h"
 }
 
 const char* get_node_name(const sql::AstNode* node) {
@@ -179,6 +188,12 @@ DataFilter create_filter(const sql::BinaryExpr& where, const MetaTable &table) {
     return filter;
 }
 
+void file_deleter(FILE *f) { 
+    if (f) fclose(f); 
+}
+
+using unique_file = std::unique_ptr<FILE, void(*)(FILE *)>;
+
 namespace exe {
     QueryExecutor::QueryExecutor(std::string db_name) : _db_name(db_name) { }
 
@@ -222,7 +237,7 @@ namespace exe {
             filter = std::make_unique<DataFilter>(create_filter(std::get<sql::BinaryExpr>(query.where->value), schema));
 
         DataTable result;
-        if (full_scan(_db_name.data(), table.value.data(), (const char **)column_names, columns_count, filter.get(), &result) != 0) {
+        if (seq_scan(_db_name.data(), table.value.data(), (const char **)column_names, columns_count, filter.get(), &result) != 0) {
             throw std::runtime_error("Failed to scan a table");
         }
         return std::make_unique<DataTable>(std::move(result)); 
@@ -287,6 +302,76 @@ namespace exe {
         }
 
         return rows_affected;
+    }
+
+    int QueryExecutor::execute_seq_scan(
+        const std::string& db_name, 
+        const std::string& table_name, 
+        const std::vector<std::string>& column_names, 
+        size_t columns_count, 
+        const DataFilter& filter, 
+        DataTable &out
+    ) {
+        std::string buffer(PATH_MAX, '\0');
+        path_db_table_data(db_name.c_str(), table_name.c_str(), buffer.data(), PATH_MAX);
+
+        MetaTable *schema = new (std::nothrow) MetaTable;
+        if (!schema) {
+            std::cerr << "Failed to allocate memory for meta table in execute_seq_scan" << std::endl;
+            return 1;   
+        }
+
+        HANDLE_ERROR_IF_NOT(
+            get_table_schema(db_name.c_str(), table_name.c_str(), schema), 
+            0, 
+            2);
+
+        size_t pages_count;
+        char **pages = get_dir_files(buffer.c_str(), &pages_count);
+        if (!pages) {
+            return 3;
+        }
+
+        std::vector<std::vector<std::unique_ptr<DataRow>>> page;
+        page.reserve(pages_count);
+
+        for (size_t i = 0; i < pages_count; i++) {
+            unique_file file(fopen(pages[i], "r"), file_deleter);
+            if (!file) {
+                fprintf(stderr, "Failed to open file %s\n", pages[i]);
+                // TODO               
+            }
+
+            int fd = fileno(file.get());
+            PageHeader header;
+            if (read_ph(&header, fd) != 0) {
+                // TODO               
+            }
+
+            size_t count = 0;
+            std::vector<std::unique_ptr<DataRow>> page;
+            page.reserve(header.rows_count);
+
+            for (size_t j = 0; j < header.rows_count; j++) {
+                std::unique_ptr<DataRow> row = std::make_unique<DataRow>();
+
+                char **col_names_ptr = string_vector_to_ptrs(column_names); 
+ 
+                int res = 0;                
+                if ((res = read_dr((const MetaTable *)schema, (const char **)col_names_ptr, columns_count, row.get(), fd)) != 0) {
+                    fprintf(stderr, "Failed to read data row in full_scan: %i\n", res);
+                }
+
+                if (row->flags & RF_OBSOLETE) {
+                    free_row(row.release());
+                    continue;
+                }
+
+                if (filter && !row_satisfies_filter(schema, row.get(), filter)) {
+
+                }
+            }
+        }
     }
 }
 

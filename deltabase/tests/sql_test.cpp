@@ -13,6 +13,7 @@
 
 using namespace sql;
 
+namespace tests {
     void print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent) {
         if (!node) {
             std::cout << std::string(indent, ' ') << "(null)\n";
@@ -171,7 +172,8 @@ using namespace sql;
         const auto result = executor.execute(*node);
 
         auto end = std::chrono::high_resolution_clock::now();
-        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        auto duration = std::chrono::duration<double, std::milli>(end - start);
+        std::cout << "Time elapsed: " << duration.count() << " ms" << std::endl;
 
         if (std::holds_alternative<std::unique_ptr<DataTable>>(result))
             print_data_table(std::get<std::unique_ptr<DataTable>>(result).get());
@@ -200,7 +202,11 @@ using namespace sql;
 
         std::cout << "Exiting deltabase.\n";
     }
+}
+
 
     int main() {
-        run_query_console();
+        cli::SqlCli cli;
+        cli.run_query_console();
+        tests::run_query_console();
     }

@@ -1,3 +1,6 @@
+#ifndef SQL_PARSER_HPP
+#define SQL_PARSER_HPP
+
 #include "lexer.hpp"
 #include <memory>
 
@@ -126,3 +129,5 @@ namespace sql {
             std::vector<std::unique_ptr<AstNode>> parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType);
     };
 }
+
+#endif

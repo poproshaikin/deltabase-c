@@ -1,3 +1,6 @@
+#ifndef SQL_LEXER_HPP
+#define SQL_LEXER_HPP
+
 #include <cstddef>
 #include <string>
 #include <unordered_map>
@@ -52,25 +55,25 @@ namespace sql {
 
     inline const std::unordered_map<std::string, SqlKeyword>& getKeywordsMap() {
         static const std::unordered_map<std::string, SqlKeyword> dictionary = {
-            { "SELECT",   SqlKeyword::SELECT },
-            { "FROM",     SqlKeyword::FROM },
-            { "INSERT",   SqlKeyword::INSERT },
-            { "INTO",     SqlKeyword::INTO },
-            { "VALUES",   SqlKeyword::VALUES },
-            { "UPDATE",   SqlKeyword::UPDATE },
-            { "SET",      SqlKeyword::SET },
-            { "DELETE",   SqlKeyword::DELETE }, 
-            { "WHERE",    SqlKeyword::WHERE },
-            { "CREATE",   SqlKeyword::CREATE },
-            { "DROP",     SqlKeyword::DROP },
-            { "DATABASE", SqlKeyword::DATABASE },
-            { "TABLE",    SqlKeyword::TABLE },
-            { "STRING",   SqlKeyword::STRING },
-            { "INTEGER",  SqlKeyword::INTEGER },
-            { "REAL",     SqlKeyword::REAL },
-            { "CHAR",     SqlKeyword::CHAR },
-            { "BOOL",     SqlKeyword::BOOL },
-            { "NULL",     SqlKeyword::_NULL },
+            { "select",   SqlKeyword::SELECT },
+            { "from",     SqlKeyword::FROM },
+            { "insert",   SqlKeyword::INSERT },
+            { "into",     SqlKeyword::INTO },
+            { "values",   SqlKeyword::VALUES },
+            { "update",   SqlKeyword::UPDATE },
+            { "set",      SqlKeyword::SET },
+            { "delete",   SqlKeyword::DELETE }, 
+            { "where",    SqlKeyword::WHERE },
+            { "create",   SqlKeyword::CREATE },
+            { "drop",     SqlKeyword::DROP },
+            { "database", SqlKeyword::DATABASE },
+            { "table",    SqlKeyword::TABLE },
+            { "string",   SqlKeyword::STRING },
+            { "integer",  SqlKeyword::INTEGER },
+            { "real",     SqlKeyword::REAL },
+            { "char",     SqlKeyword::CHAR },
+            { "bool",     SqlKeyword::BOOL },
+            { "null",     SqlKeyword::_NULL },
         };
 
         return dictionary;
@@ -97,9 +100,9 @@ namespace sql {
             { "<",  SqlOperator::LT },
             { "<=", SqlOperator::LTE },
 
-            { "AND", SqlOperator::AND },
-            { "OR",  SqlOperator::OR  },
-            { "NOT", SqlOperator::NOT },
+            { "and", SqlOperator::AND },
+            { "or",  SqlOperator::OR  },
+            { "not", SqlOperator::NOT },
 
             { "+",  SqlOperator::PLUS },
             { "-",  SqlOperator::MINUS },
@@ -139,3 +142,5 @@ namespace sql {
         std::string to_string(sql::SqlLiteral type, const std::string& value);
     }
 }
+
+#endif

@@ -9,6 +9,14 @@ using namespace sql;
 SqlToken::SqlToken(SqlTokenType type, std::string value, size_t line, size_t pos, SqlTokenDetail detail)
     : type(type), line(line), value(std::move(value)), pos(pos), detail(detail) { }
 
+std::string to_lower(const std::string& str) {
+    std::stringstream sb;
+    for (char c : str) {
+        sb << (char)std::tolower(c);
+    }   
+    return sb.str();
+}
+
 size_t get_word_length(const char* str) {
     const char* p = str;
 
@@ -85,7 +93,7 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
             continue;
         } 
         else if (isalpha(c)) {
-            std::string word = read_next_word(sql, i);
+            std::string word = to_lower(read_next_word(sql, i));
             SqlToken token(SqlTokenType::IDENTIFIER, word, line, pos);
 
             auto it = keywords.find(word);
@@ -141,7 +149,7 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
 
             size_t max_len = 3;
             while (max_len > 0 && op_start + max_len <= sql.length()) {
-                std::string candidate = sql.substr(op_start, max_len);
+                std::string candidate = to_lower(sql.substr(op_start, max_len));
                 if (operators.find(candidate) != operators.end()) {
                     op = candidate;
                     break;

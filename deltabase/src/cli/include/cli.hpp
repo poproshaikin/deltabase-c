@@ -1,9 +1,7 @@
-#pragma once
+#ifndef CLI_CLI_HPP
+#define CLI_CLI_HPP
 
-#include <memory>
-#include <string>
-
-#include "../../executor/include/query_executor.hpp"
+#include "../../sql/include/parser.hpp"
 
 extern "C" {
     #include "../../core/include/data_table.h"
@@ -14,11 +12,12 @@ namespace cli {
     std::string token_to_string(const DataToken* token);
     void print_data_table(const DataTable& table);
     
-
     class SqlCli {
         public:
             void run_query_console();
         private:
             void process_input(const std::string& input);
     };
-}
+} 
+
+#endif

@@ -77,7 +77,6 @@ namespace sql {
     }
 
     std::unique_ptr<AstNode> SqlParser::parse() {
-        ;
 
         if (match(SqlKeyword::SELECT)) {
             AstNodeValue value = std::move(parse_select());
@@ -94,6 +93,9 @@ namespace sql {
         else if (match(SqlKeyword::DELETE)) {
             AstNodeValue value = std::move(parse_delete());
             return std::make_unique<AstNode>(AstNodeType::DELETE, AstNodeValue(std::move(value)));
+        }
+        else if (match(SqlKeyword::CREATE)) {
+            
         }
         else {
             throw std::runtime_error("Unsupported statement");
