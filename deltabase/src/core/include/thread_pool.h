@@ -1,31 +1,35 @@
-//
-// Created by poproshaikin on 8.7.25.
-//
-
 #ifndef THREAD_POOL_H
 #define THREAD_POOL_H
 
 #include <pthread.h>
 #include <stdatomic.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 
-typedef struct TaskHandle {
-    void (*task_function)(void *arg);
+typedef void (*task_func_t)(void *);
+
+typedef struct Task {
+    task_func_t func;
     void *arg;
-    int is_completed;
-    pthread_mutex_t is_completed_mutex;
-    pthread_t thread_id;
-} TaskHandle;
+    struct Task *next;
+} Task;
 
 typedef struct ThreadPool {
-    int recommended_thread_count;
-    int thread_count;
     pthread_t *threads;
-    TaskHandle **tasks;
-    int task_count;
+    int thread_count;
+
+    Task *task_head;
+    Task *task_tail;
+
+    pthread_mutex_t lock;
+    pthread_cond_t cond;
+    bool stop;
 } ThreadPool;
 
-ThreadPool *create_thread_pool();
+ThreadPool *thread_pool_create(int num_threads);
+int thread_pool_enqueue(ThreadPool *pool, task_func_t func, void *arg);
+void thread_pool_destroy(ThreadPool *pool);
 
-void *run_task(void (*task_function)(void *arg), void *arg, ThreadPool *pool);
-
-#endif //THREAD_POOL_H
+#endif 

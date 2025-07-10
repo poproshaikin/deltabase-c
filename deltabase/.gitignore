@@ -10,5 +10,9 @@ Makefile
 *.out
 
 build/
+build.ninja
 
 hello.txt
+
+.cmake
+.idea

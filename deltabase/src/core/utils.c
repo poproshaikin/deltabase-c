@@ -4,8 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <dirent.h>
+#include <limits.h>
 
 size_t fsize(int fd) {
     long currentPos = lseek(fd, 0, SEEK_CUR);
@@ -169,6 +169,7 @@ int rmdir_recursive(const char *path) {
         free(buf); 
     }
 
+    
     closedir(d);
 
     if (r == 0) {
@@ -217,7 +218,7 @@ char **get_dir_files(const char *dir_path, size_t *out_count) {
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
-    
+
         char full_path[PATH_MAX]; 
         int path_len = snprintf(full_path, PATH_MAX, "%s/%s", dir_path, entry->d_name);
         if (path_len >= PATH_MAX || path_len < 0) {
@@ -228,7 +229,7 @@ char **get_dir_files(const char *dir_path, size_t *out_count) {
         struct stat st;
         if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
             if (count >= allocated_size) {
-                allocated_size *= 2;
+                allocated_size *= 2; 
                 char **new_file_list = (char**)realloc(file_list, sizeof(char*) * allocated_size);
                 if (new_file_list == NULL) {
                     perror("Error reallocating memory for file list");
