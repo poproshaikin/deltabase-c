@@ -1,48 +1,45 @@
-# Dokumentace systemu DeltaBase
+## Overview
 
-## Prehled
+DeltaBase is a custom database system implemented in C and C++. The system consists of several modules that communicate with each other and handle data management, storage, retrieval, and manipulation.
 
-DeltaBase je vlastni databazovy system implementovany v jazycich C a C++. System se sklada z nekolika modulu, ktere spolu komunikuji a zajistuji spravu dat, jejich uklada­ni, vyhledavani a manipulaci.
+## System Architecture
 
-## Architektura systemu
+### 1. Core
 
-### 1. Jadro (Core)
+- Implemented in C.
+- Fully responsible for interacting with the file system.
+- Provides a low-level API used by the Executor.
 
-- Implementovano v jazyce C.
-- Bere vsechnu zodpovednost s praci s souborovym systemem.
-- Nabizi zakladni API, ktere vyuziva Executor.
+### 2. C++ Modules
 
-### 2. Moduly v C++
+#### 1. Sql
 
-- #### 1. Sql
-  - Modul, odpovidajici za parsovani dotazu
-  - Lexicka analyza: rozbor dotazu na tokeny, vyhodnocovani typu kazdeho tokenu (napr. identifikator, literal, ...)
-  - Syntakticka analyza: sestaveni abstraktniho syntaktickeho stromu na zaklade rozparsovanych tokenu
+- Responsible for parsing queries.
+- **Lexical Analysis**: breaks the query into tokens, evaluates the type of each token (e.g., identifier, literal, etc.).
+- **Syntactic Analysis**: builds an abstract syntax tree (AST) from the parsed tokens.
 
-- #### 2. Executor
-  - Semanticka analyza: kontrola existence tabulek, sloupcu, kompatibilita typu
-  - Vyhodnocovani dotazu:
-    - executor dostava zanalyzovany syntakticky strom a na jeho zaklade presmerovava dotazy do jadra
-    - V budoucnosti: vytvorit planner a optimizer dotazu pro zrychleni exekuce, napr. smazani zbytecnych podminek (1 == 1)
+#### 2. Executor
 
-### 3. Prubeh dotazu
-  - Klient odesle SQL prikaz serveru (pres CLI nebo sit) -- v realizaci
-  - Server preda dotaz modulu Sql pro parsovani
-  - Sql parser provede lexickou a syntaktickou analyzu, vytvori AST
-  - Executor provede semantickou analyzu, zkontroluje spravnost
-  - Pripravi se optimalizovany plan exekuce -- v realizaci
-  - Executor zavola nizkourovnove API pro praci s daty
-  - Jadro nacte/zapise data se souboroveho systemu, aplikuje filtry
-  - Vysledek se zformatuje a odesle se zpatky klientovi
+- **Semantic Analysis**: checks for the existence of tables, columns, and type compatibility.
+- **Query Evaluation**:
+  - The executor receives the analyzed syntax tree and routes the queries to the core accordingly.
+  - *Planned feature*: implement a query planner and optimizer to speed up execution, e.g., by removing redundant conditions like `1 == 1`.
 
-### 4. Budouci rozsireni
-  - Optimalizace dotazu (planner, optimizer)
-  - Podpora transakci a rollback
-  - TCP server
-  - Indexovani
-  - Rozsireni podporovanych datovych typu
+### 3. Query Flow
 
-### 5. Kompilace a build system
-  - Jadro se kompiluje pomoci GCC
-  - Moduly v C++ se kompiluji pomoci g++
-  - Jako build system se pouziva CMake
+- The client sends an SQL command to the server (via CLI or network) – *in progress*.
+- The server passes the query to the Sql module for parsing.
+- The Sql parser performs lexical and syntactic analysis, producing an AST.
+- The Executor performs semantic analysis and validates the query.
+- An optimized execution plan is prepared – *in progress*.
+- The Executor calls the low-level API to access data.
+- The Core reads/writes data from/to the file system and applies filters.
+- The result is formatted and sent back to the client.
+
+### 4. Future Extensions
+
+- Query optimization (planner, optimizer)
+- Transaction and rollback support
+- TCP server
+- Indexing
+- Support for additional data types
