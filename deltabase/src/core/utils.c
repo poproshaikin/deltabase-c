@@ -2,10 +2,14 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <limits.h>
+#include <time.h>
+#include <sys/time.h>
+#include <stdarg.h>
 
 size_t fsize(int fd) {
     long currentPos = lseek(fd, 0, SEEK_CUR);
@@ -264,4 +268,51 @@ char **get_dir_files(const char *dir_path, size_t *out_count) {
     }
 
     return file_list;
+}
+
+#define DEFAULT_COLOR_ESC_CODE "\033[0m"
+#define YELLOW_COLOR_ESC_CODE "\033[33m"
+#define RED_COLOR_ESC_CODE "\033[31m"
+
+void log(LogLevel level, const char *format, ...) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    time_t now = tv.tv_sec;
+    struct tm *now_tm = localtime(&now);
+    int ms = tv.tv_usec / 1000;
+
+    char tmbuf[64];
+    strftime(tmbuf, sizeof tmbuf, "%H:%M:%S", now_tm);
+
+    const char *label;
+    const char *color;
+
+    switch (level) {
+        case LL_LOG:
+            label = "LOG";
+            color = DEFAULT_COLOR_ESC_CODE;
+            break;
+        case LL_WARNING:
+            label = "WARN";
+            color = YELLOW_COLOR_ESC_CODE;
+            break;
+        case LL_ERROR:
+            label = "ERR";
+            color = RED_COLOR_ESC_CODE;
+            break;
+        default:
+            label = "UNK";
+            color = DEFAULT_COLOR_ESC_CODE;
+            break;
+    }
+
+    // Формируем сообщение с аргументами в буфер
+    char msgbuf[1024];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(msgbuf, sizeof(msgbuf), format, args);
+    va_end(args);
+
+    printf("%s[%s]%s [%s:%03d] - %s\n", color, label, DEFAULT_COLOR_ESC_CODE, tmbuf, ms, msgbuf);
 }

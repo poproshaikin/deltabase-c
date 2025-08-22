@@ -46,8 +46,11 @@ bool exists_database(const char *db_name, const CoreContext *ctx) {
     return dir_exists(db_path);
 }
 
-int create_table(const char *db_name, const MetaTable *table,
-                 const CoreContext *ctx) {
+int create_table(
+    const char *db_name, 
+    const MetaTable *table,
+    const CoreContext *ctx
+) {
     int op = 0;
 
     char buffer[PATH_MAX];
@@ -88,8 +91,11 @@ int create_table(const char *db_name, const MetaTable *table,
     return 0;
 }
 
-bool exists_table(const char *db_name, const char *table_name,
-                  const CoreContext *ctx) {
+bool exists_table(
+    const char *db_name, 
+    const char *table_name,
+    const CoreContext *ctx
+) {
     char table_path[PATH_MAX];
     path_db_table(db_name, table_name, table_path, sizeof(table_path));
 
@@ -119,8 +125,11 @@ int get_table(const char *db_name, const char *table_name, MetaTable *out,
     return 0;
 }
 
-int update_table(const char *db_name, const MetaTable *table,
-                 const CoreContext *ctx) {
+int update_table(
+    const char *db_name, 
+    const MetaTable *table,
+    const CoreContext *ctx
+) {
     char buffer[PATH_MAX];
     path_db_table_meta(db_name, table->name, buffer, PATH_MAX);
 
@@ -136,9 +145,13 @@ int update_table(const char *db_name, const MetaTable *table,
     return 0;
 }
 
-static int write_row_update_state(const char *db_name, DataRow *row,
-                                  MetaTable *schema, FILE *file,
-                                  const CoreContext *ctx) {
+static int write_row_update_state(
+    const char *db_name, 
+    DataRow *row,
+    MetaTable *schema, 
+    FILE *file,
+    const CoreContext *ctx
+) {
     int fd = fileno(file);
 
     PageHeader header;
@@ -170,8 +183,12 @@ static int write_row_update_state(const char *db_name, DataRow *row,
     return 0;
 }
 
-int insert_row(const char *db_name, const char *table_name, DataRow *row,
-               const CoreContext *ctx) {
+int insert_row(
+    const char *db_name, 
+    const char *table_name, 
+    DataRow *row,
+    const CoreContext *ctx
+) {
     char buffer[PATH_MAX];
     path_db_table_data(db_name, table_name, buffer, PATH_MAX);
 
@@ -234,17 +251,29 @@ int insert_row(const char *db_name, const char *table_name, DataRow *row,
     return 0;
 }
 
-#define ROW_CALLBACK_PARAMS                                                    \
-    const char *db_name, MetaTable *schema, PageHeader *header, int fd,        \
-        size_t row_pos, uint64_t rid, const DataRow *row,                      \
-        const void *user_data, const CoreContext *ctx
+#define ROW_CALLBACK_PARAMS \
+    const char *db_name, \
+    MetaTable *schema, \
+    PageHeader *header, \
+    int fd, \
+    size_t row_pos, \
+    uint64_t rid, \
+    const DataRow *row, \
+    const void *user_data, \
+    const CoreContext *ctx
 
 typedef int (*RowCallback)(ROW_CALLBACK_PARAMS);
 
-static int for_each_row_in_page(const char *db_name, const char *page_path,
-                                MetaTable *table, const DataFilter *filter,
-                                const CoreContext *ctx, size_t *rows_affected,
-                                RowCallback callback, const void *user_data) {
+static int for_each_row_in_page(
+    const char *db_name, 
+    const char *page_path,
+    MetaTable *table, 
+    const DataFilter *filter,
+    const CoreContext *ctx, 
+    size_t *rows_affected,
+    RowCallback callback, 
+    const void *user_data
+) {
     FILE *file = fopen(page_path, "r+");
     if (!file) {
         fprintf(stderr, "Failed to open page for reading\n");
@@ -278,8 +307,18 @@ static int for_each_row_in_page(const char *db_name, const char *page_path,
         // save position before callback
         ssize_t pos = lseek(fd, 0, SEEK_CUR);
 
-        int result = callback(db_name, table, &header, fd, row_start_pos,
-                              row.row_id, &row, user_data, ctx);
+        int result = callback(
+            db_name, 
+            table, 
+            &header, 
+            fd, 
+            row_start_pos,
+            row.row_id, 
+            &row, 
+            user_data, 
+            ctx
+        );
+
         if (result != 0) {
             fclose(file);
             return result;
@@ -300,39 +339,20 @@ static int for_each_row_in_page(const char *db_name, const char *page_path,
     return 0;
 }
 
-static int for_each_row_matching_filter_multithreaded(
-    const char *db_name, const char *table_name, const DataFilter *filter,
-    RowCallback callback, const void *user_data, size_t *rows_affected,
-    const CoreContext *ctx) {
-    MetaTable schema;
-    if (get_table(db_name, table_name, &schema, ctx) != 0) {
-        return 1;
-    }
+// Implementation moved to future/threading/ for later integration
+// typedef struct ForEachRowWorkerArg { ... };
+// static void *for_each_row_thread_worker(void *arg) { ... };
+// static int for_each_row_matching_filter_multithreaded(...) { ... };
 
-    char buffer[PATH_MAX];
-    path_db_table_data(db_name, table_name, buffer, PATH_MAX);
-
-    size_t pages_count;
-    char **pages = get_dir_files(buffer, &pages_count);
-    if (!pages) {
-        return 2;
-    }
-
-    ThreadPool *pool = ctx->thread_pool;
-    if (!pool) {
-        fprintf(stderr, "Thread pool is NULL in "
-                        "for_each_row_matching_filter_multithreaded\n");
-        return 3;
-    }
-
-    for (size_t i = 0; i < pages_count; i++) {
-    }
-}
-
-static int for_each_row_matching_filter_singlethreaded(
-    const char *db_name, const char *table_name, const DataFilter *filter,
-    RowCallback callback, const void *user_data, size_t *rows_affected,
-    const CoreContext *ctx) {
+static int for_each_row_matching_filter_impl(
+    const char *db_name, 
+    const char *table_name, 
+    const DataFilter *filter,
+    RowCallback callback, 
+    const void *user_data, 
+    size_t *rows_affected,
+    const CoreContext *ctx
+) {
     MetaTable schema;
     if (get_table(db_name, table_name, &schema, ctx) != 0) {
         return 1;
@@ -366,10 +386,15 @@ static int for_each_row_matching_filter_singlethreaded(
     return 0;
 }
 
-int for_each_row_matching_filter(const char *db_name, const char *table_name,
-                                 const DataFilter *filter, RowCallback callback,
-                                 const void *user_data, size_t *rows_affected,
-                                 const CoreContext *ctx) {
+int for_each_row_matching_filter(
+    const char *db_name, 
+    const char *table_name,
+    const DataFilter *filter, 
+    RowCallback callback,
+    void *user_data, 
+    size_t *rows_affected,
+    CoreContext *ctx
+) {
     if (!ctx) {
         fprintf(stderr,
                 "CoreContext is NULL in for_each_row_matching_filter\n");
@@ -381,19 +406,19 @@ int for_each_row_matching_filter(const char *db_name, const char *table_name,
         return 2;
     }
 
-    if (ctx->thread_pool && ctx->thread_pool->thread_count > 1) {
-        return for_each_row_matching_filter_multithreaded(
-            db_name, table_name, filter, callback, user_data, rows_affected,
-            ctx);
-    } else {
-        return for_each_row_matching_filter_singlethreaded(
-            db_name, table_name, filter, callback, user_data, rows_affected,
-            ctx);
-    }
+    // Use single-threaded implementation for now
+    // TODO: Add multithreading support in the future
+    return for_each_row_matching_filter_impl(
+        db_name, table_name, filter, callback, user_data, rows_affected,
+        ctx);
 }
 
-static int combine_row(DataRow *out, MetaTable *schema, const DataRow *old_row,
-                       const DataRowUpdate *update) {
+static int combine_row(
+    DataRow *out, 
+    MetaTable *schema, 
+    const DataRow *old_row,
+    const DataRowUpdate *update
+) {
     out->tokens = malloc(schema->columns_count * sizeof(DataToken *));
     if (!out->tokens) {
         fprintf(stderr, "Failed to allocate memory in combine_row\n");
@@ -458,7 +483,7 @@ int update_callback(ROW_CALLBACK_PARAMS) {
 
     header->rows_count++;
 
-    // need to save because of increasing last_rid in combine_row
+    // need to save because of incrementing the last_rid in combine_row
     update_table(db_name, schema, ctx);
     return 0;
 }

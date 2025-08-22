@@ -17,4 +17,7 @@ int rmdir_recursive(const char *path);
 
 char **get_dir_files(const char *dir_path, size_t *out_count);
 
+typedef enum LogLevel { LL_LOG = 1, LL_WARNING = 2, LL_ERROR = 3 } LogLevel;
+void log(LogLevel level, const char *format, ...);
+
 #endif

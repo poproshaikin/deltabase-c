@@ -5,7 +5,6 @@
 #ifndef CORE_H
 #define CORE_H
 
-#include "thread_pool.h"
 #include "data.h"
 #include "misc.h"
 #include "utils.h"
@@ -16,7 +15,9 @@
 #include <stdbool.h>
 
 typedef struct CoreContext {
-    ThreadPool *thread_pool;
+    // Future: Add threading support
+    // ThreadPool *thread_pool;
+    bool placeholder; // Temporary field to keep struct valid
 } CoreContext;
 
 int create_database(const char *db_name, const CoreContext *ctx);
