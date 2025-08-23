@@ -4,7 +4,7 @@
 #include "../../sql/include/parser.hpp"
 
 extern "C" {
-    #include "../../core/include/data_table.h"
+    #include "../../core/include/data.h"
 }
 
 namespace cli {

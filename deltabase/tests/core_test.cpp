@@ -8,7 +8,7 @@ using namespace std;
 
 extern "C" {
     #include "../src/core/include/core.h"
-    #include "../src/core/include/data_io.h"
+    #include "../src/core/include/ll_io.h"
 }
 
 namespace test {

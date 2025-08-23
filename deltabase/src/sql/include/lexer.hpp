@@ -24,6 +24,7 @@ namespace sql {
         SELECT, FROM, INSERT, INTO, VALUES, UPDATE, SET, DELETE, WHERE,
         CREATE, DROP, DATABASE, TABLE,
         STRING, INTEGER, REAL, CHAR, BOOL, _NULL,
+        PRIMARY, KEY, NOT, AUTOINCREMENT
     };
 
     enum class SqlSymbol {
@@ -55,25 +56,29 @@ namespace sql {
 
     inline const std::unordered_map<std::string, SqlKeyword>& getKeywordsMap() {
         static const std::unordered_map<std::string, SqlKeyword> dictionary = {
-            { "select",   SqlKeyword::SELECT },
-            { "from",     SqlKeyword::FROM },
-            { "insert",   SqlKeyword::INSERT },
-            { "into",     SqlKeyword::INTO },
-            { "values",   SqlKeyword::VALUES },
-            { "update",   SqlKeyword::UPDATE },
-            { "set",      SqlKeyword::SET },
-            { "delete",   SqlKeyword::DELETE }, 
-            { "where",    SqlKeyword::WHERE },
-            { "create",   SqlKeyword::CREATE },
-            { "drop",     SqlKeyword::DROP },
-            { "database", SqlKeyword::DATABASE },
-            { "table",    SqlKeyword::TABLE },
-            { "string",   SqlKeyword::STRING },
-            { "integer",  SqlKeyword::INTEGER },
-            { "real",     SqlKeyword::REAL },
-            { "char",     SqlKeyword::CHAR },
-            { "bool",     SqlKeyword::BOOL },
-            { "null",     SqlKeyword::_NULL },
+            { "select",       SqlKeyword::SELECT },
+            { "from",         SqlKeyword::FROM },
+            { "insert",       SqlKeyword::INSERT },
+            { "into",         SqlKeyword::INTO },
+            { "values",       SqlKeyword::VALUES },
+            { "update",       SqlKeyword::UPDATE },
+            { "set",          SqlKeyword::SET },
+            { "delete",       SqlKeyword::DELETE }, 
+            { "where",        SqlKeyword::WHERE },
+            { "create",       SqlKeyword::CREATE },
+            { "drop",         SqlKeyword::DROP },
+            { "database",     SqlKeyword::DATABASE },
+            { "table",        SqlKeyword::TABLE },
+            { "string",       SqlKeyword::STRING },
+            { "integer",      SqlKeyword::INTEGER },
+            { "real",         SqlKeyword::REAL },
+            { "char",         SqlKeyword::CHAR },
+            { "bool",         SqlKeyword::BOOL },
+            { "null",         SqlKeyword::_NULL },
+            {"primary",       SqlKeyword::PRIMARY},
+            {"key",           SqlKeyword::KEY},
+            {"not",           SqlKeyword::NOT },
+            {"autoincrement", SqlKeyword::AUTOINCREMENT }
         };
 
         return dictionary;

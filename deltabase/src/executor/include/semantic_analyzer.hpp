@@ -2,8 +2,11 @@
 #define SEMANTIC_ANALYZER_HPP
 
 #include "../../sql/include/parser.hpp"
-#include "../../core/include/data_table.h"
 #include <set>
+
+extern "C" {
+    #include "../../core/include/meta.h"
+}
 
 namespace exe {
     inline const std::set<std::pair<sql::SqlLiteral, DataType>>& getCompatibilityTable() {

@@ -1,5 +1,4 @@
 #include "include/parser.hpp"
-#include <iostream>
 #include <optional>
 #include <stdexcept>
 
@@ -22,7 +21,7 @@ std::optional<AstOperator> to_ast_operator(SqlOperator type) {
 }
 
 std::unique_ptr<AstNode> SqlParser::parse_binary(int min_priority) {
-    auto left = parse_primary();
+    std::unique_ptr<AstNode> left = parse_primary();
 
     while (true) {
         const SqlToken& token = current();

@@ -1,8 +1,6 @@
 #include "include/query_executor.hpp"
 #include "include/literals.hpp"
-#include "../misc/include/utils.hpp"
 
-#include <iostream>
 #include <linux/limits.h>
 #include <memory>
 #include <stdexcept>
@@ -13,18 +11,17 @@
 
 extern "C" {
     #include "../core/include/core.h"
-    #include "../core/include/path_service.h"
-    #include "../core/include/utils.h"
-    #include "../core/include/data_io.h"
-    #include "../core/include/data_filter.h"
+    #include "../core/include/meta.h"
+    #include "../core/include/data.h"
 }
 
-const char* get_node_name(const sql::AstNode* node) {
-    const sql::SqlToken& token = std::get<sql::SqlToken>(node->value);
-    return token.value.data();
-}
+namespace {
+    const char* get_node_name(const sql::AstNode* node) {
+        const sql::SqlToken& token = std::get<sql::SqlToken>(node->value);
+        return token.value.data();
+    }
 
-std::pair<void *, size_t> create_literal_value(const std::string& literal, DataType expected_type) {
+    std::pair<void *, size_t> create_literal_value(const std::string& literal, DataType expected_type) {
     void* data = nullptr;
     size_t size = 0;
 
@@ -87,7 +84,7 @@ DataRow* create_data_row_from_insert(const MetaTable* table, const sql::InsertSt
 
         int insert_idx = -1;
         for (size_t j = 0; j < insert.columns.size(); ++j) {
-            const char* ins_col_name = get_node_name(insert.columns[j].get());
+            const char* ins_col_name = insert.columns[j].value.data();
             if (strcmp(ins_col_name, col->name) == 0) {
                 insert_idx = (int)j;
                 break;
@@ -97,8 +94,9 @@ DataRow* create_data_row_from_insert(const MetaTable* table, const sql::InsertSt
         if (insert_idx == -1) {
             row->tokens[i] = make_token(DT_NULL, nullptr, 0);
         } else {
-            const sql::AstNode* value_node = insert.values[insert_idx].get();
-            row->tokens[i] = create_token_from_astnode(value_node, col->data_type);
+            const sql::SqlToken& value_token = insert.values[insert_idx];
+            const auto value = create_literal_value(value_token.value, col->data_type);
+            row->tokens[i] = make_token(col->data_type, value.first, value.second);
         }
     }
 
@@ -106,28 +104,23 @@ DataRow* create_data_row_from_insert(const MetaTable* table, const sql::InsertSt
 }
 
 DataRowUpdate create_row_update(const MetaTable& table, const sql::UpdateStatement& query) {
-    std::vector<DataRowUpdate> result;
-
     size_t assignments_count = query.assignments.size();
 
     uuid_t *indices = (uuid_t *)malloc(assignments_count * sizeof(uuid_t));
     void **values = (void **)malloc(assignments_count * sizeof(void *));
 
     for (size_t i = 0; i < assignments_count; i++) {
-        const sql::BinaryExpr& assignment = std::get<sql::BinaryExpr>(query.assignments[i]->value);
+        const sql::BinaryExpr& assignment = std::get<sql::BinaryExpr>(query.assignments[i].value);
         const sql::SqlToken& left = std::get<sql::SqlToken>(assignment.left->value);
         const sql::SqlToken& right = std::get<sql::SqlToken>(assignment.right->value);
 
         MetaColumn *column = find_column(left.value.data(), &table);
-        if (!column) { // should not happen
+        if (!column) {
             throw std::runtime_error("Column doesn't exist");
         }
 
         const auto value = create_literal_value(right.value, column->data_type);
     
-        char uuid[37];
-        uuid_unparse_lower((const unsigned char *)column->column_id, (char *)uuid);
-
         values[i] = malloc(value.second);
         memcpy(indices[i], column->column_id, sizeof(uuid_t));
         memcpy(values[i], value.first, value.second);
@@ -194,6 +187,8 @@ void file_deleter(FILE *f) {
 
 using unique_file = std::unique_ptr<FILE, void(*)(FILE *)>;
 
+} // anonymous namespace
+
 namespace exe {
     QueryExecutor::QueryExecutor(std::string db_name) : _db_name(db_name) { }
 
@@ -209,6 +204,8 @@ namespace exe {
         }
         else if (std::holds_alternative<sql::DeleteStatement>(query.value)) {
             return execute_delete(std::get<sql::DeleteStatement>(query.value));
+        } else if (std::holds_alternative<sql::CreateTableStatement>(query.value)) {
+            return execute_create_table(std::get<sql::CreateTableStatement>(query.value));
         }
 
         throw std::runtime_error("Unsupported query");
@@ -216,9 +213,9 @@ namespace exe {
 
     std::unique_ptr<DataTable> QueryExecutor::execute_select(const sql::SelectStatement& query) {
         MetaTable schema;
-        const sql::SqlToken table = std::get<sql::SqlToken>(query.table->value);
+        const sql::SqlToken& table = query.table;
 
-        if (get_table_schema(_db_name.data(), table.value.data(), &schema) != 0) {
+        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
         }
 
@@ -229,7 +226,7 @@ namespace exe {
             throw std::runtime_error("Failed to allocate memory in execute_query");
         }
         for (size_t i = 0; i < columns_count; i++) {
-            column_names[i] = std::get<sql::SqlToken>(query.columns[i]->value).value.data();
+            column_names[i] = const_cast<char*>(query.columns[i].value.data());
         }
 
         std::unique_ptr<DataFilter> filter;
@@ -245,9 +242,9 @@ namespace exe {
 
     int QueryExecutor::execute_insert(const sql::InsertStatement& query) {
         MetaTable schema;
-        const sql::SqlToken table = std::get<sql::SqlToken>(query.table->value);
+        const sql::SqlToken& table = query.table;
 
-        if (get_table_schema(_db_name.data(), table.value.data(), &schema) != 0) {
+        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
         }
 
@@ -264,9 +261,9 @@ namespace exe {
 
     int QueryExecutor::execute_update(const sql::UpdateStatement& query) {
         MetaTable schema;
-        const sql::SqlToken table = std::get<sql::SqlToken>(query.table->value);
+        const sql::SqlToken& table = query.table;
 
-        if (get_table_schema(_db_name.data(), table.value.data(), &schema) != 0) {
+        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
         }
 
@@ -274,7 +271,7 @@ namespace exe {
         DataFilter filter = create_filter(std::get<sql::BinaryExpr>(query.where->value), schema);
         
         size_t rows_affected = 0;
-        if (update_row_by_filter(_db_name.data(), table.value.data(), (const DataFilter *)&filter, &update, &rows_affected) != 0) {
+        if (update_rows_by_filter(_db_name.data(), table.value.data(), (const DataFilter *)&filter, &update, &rows_affected) != 0) {
             throw std::runtime_error("Failed to update row");
         }
 
@@ -282,10 +279,10 @@ namespace exe {
     }
 
     int QueryExecutor::execute_delete(const sql::DeleteStatement& query) {
-        const sql::SqlToken table = std::get<sql::SqlToken>(query.table->value);
+        const sql::SqlToken& table = query.table;
 
         MetaTable schema;
-        if (get_table_schema(_db_name.data(), table.value.data(), &schema) != 0) {
+        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
         }
 
@@ -295,7 +292,7 @@ namespace exe {
         }
 
         size_t rows_affected = 0;
-        int rc = delete_row_by_filter(_db_name.data(), table.value.data(), filter.get(), &rows_affected);
+        int rc = delete_rows_by_filter(_db_name.data(), table.value.data(), filter.get(), &rows_affected);
 
         if (rc != 0) {
             throw std::runtime_error("Failed to delete rows by filter");
@@ -304,74 +301,81 @@ namespace exe {
         return rows_affected;
     }
 
-    int QueryExecutor::execute_seq_scan(
-        const std::string& db_name, 
-        const std::string& table_name, 
-        const std::vector<std::string>& column_names, 
-        size_t columns_count, 
-        const DataFilter& filter, 
-        DataTable &out
-    ) {
-        std::string buffer(PATH_MAX, '\0');
-        path_db_table_data(db_name.c_str(), table_name.c_str(), buffer.data(), PATH_MAX);
-
-        MetaTable *schema = new (std::nothrow) MetaTable;
-        if (!schema) {
-            std::cerr << "Failed to allocate memory for meta table in execute_seq_scan" << std::endl;
-            return 1;   
-        }
-
-        HANDLE_ERROR_IF_NOT(
-            get_table_schema(db_name.c_str(), table_name.c_str(), schema), 
-            0, 
-            2);
-
-        size_t pages_count;
-        char **pages = get_dir_files(buffer.c_str(), &pages_count);
-        if (!pages) {
-            return 3;
-        }
-
-        std::vector<std::vector<std::unique_ptr<DataRow>>> page;
-        page.reserve(pages_count);
-
-        for (size_t i = 0; i < pages_count; i++) {
-            unique_file file(fopen(pages[i], "r"), file_deleter);
-            if (!file) {
-                fprintf(stderr, "Failed to open file %s\n", pages[i]);
-                // TODO               
-            }
-
-            int fd = fileno(file.get());
-            PageHeader header;
-            if (read_ph(&header, fd) != 0) {
-                // TODO               
-            }
-
-            size_t count = 0;
-            std::vector<std::unique_ptr<DataRow>> page;
-            page.reserve(header.rows_count);
-
-            for (size_t j = 0; j < header.rows_count; j++) {
-                std::unique_ptr<DataRow> row = std::make_unique<DataRow>();
-
-                char **col_names_ptr = string_vector_to_ptrs(column_names); 
- 
-                int res = 0;                
-                if ((res = read_dr((const MetaTable *)schema, (const char **)col_names_ptr, columns_count, row.get(), fd)) != 0) {
-                    fprintf(stderr, "Failed to read data row in full_scan: %i\n", res);
-                }
-
-                if (row->flags & RF_OBSOLETE) {
-                    free_row(row.release());
-                    continue;
-                }
-
-                if (filter && !row_satisfies_filter(schema, row.get(), filter)) {
-
-                }
-            }
-        }
+    int QueryExecutor::execute_create_table(const sql::CreateTableStatement& query) {
+        // TODO: Implementation will be added later
+        // The current implementation had a wrong function signature for create_table()
+        throw std::runtime_error("CREATE TABLE not implemented yet");
+        return 0;
     }
-}
+
+    // int QueryExecutor::execute_seq_scan(
+    //     const std::string& db_name, 
+    //     const std::string& table_name, 
+    //     const std::vector<std::string>& column_names, 
+    //     size_t columns_count, 
+    //     const DataFilter& filter, 
+    //     DataTable &out
+    // ) {
+    //     std::string buffer(PATH_MAX, '\0');
+    //     path_db_table_data(db_name.c_str(), table_name.c_str(), buffer.data(), PATH_MAX);
+
+    //     MetaTable *schema = new (std::nothrow) MetaTable;
+    //     if (!schema) {
+    //         std::cerr << "Failed to allocate memory for meta table in execute_seq_scan" << std::endl;
+    //         return 1;   
+    //     }
+
+    //     HANDLE_ERROR_IF_NOT(
+    //         get_table(db_name.c_str(), table_name.c_str(), schema), 
+    //         0, 
+    //         2);
+
+    //     size_t pages_count;
+    //     char **pages = get_dir_files(buffer.c_str(), &pages_count);
+    //     if (!pages) {
+    //         return 3;
+    //     }
+
+    //     std::vector<std::vector<std::unique_ptr<DataRow>>> page;
+    //     page.reserve(pages_count);
+
+    //     for (size_t i = 0; i < pages_count; i++) {
+    //         unique_file file(fopen(pages[i], "r"), file_deleter);
+    //         if (!file) {
+    //             fprintf(stderr, "Failed to open file %s\n", pages[i]);
+    //             // TODO               
+    //         }
+
+    //         int fd = fileno(file.get());
+    //         PageHeader header;
+    //         if (read_ph(&header, fd) != 0) {
+    //             // TODO               
+    //         }
+
+    //         size_t count = 0;
+    //         std::vector<std::unique_ptr<DataRow>> page;
+    //         page.reserve(header.rows_count);
+
+    //         for (size_t j = 0; j < header.rows_count; j++) {
+    //             std::unique_ptr<DataRow> row = std::make_unique<DataRow>();
+
+    //             char **col_names_ptr = string_vector_to_ptrs(column_names); 
+ 
+    //             int res = 0;                
+    //             if ((res = read_dr((const MetaTable *)schema, (const char **)col_names_ptr, columns_count, row.get(), fd)) != 0) {
+    //                 fprintf(stderr, "Failed to read data row in full_scan: %i\n", res);
+    //             }
+
+    //             if (row->flags & RF_OBSOLETE) {
+    //                 free_row(row.release());
+    //                 continue;
+    //             }
+
+    //             if (!row_satisfies_filter(schema, row.get(), &filter)) {
+
+    //             }
+    //         }
+    //     }
+    // }
+} // namespace exe
 

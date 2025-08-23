@@ -1,12 +1,11 @@
 #ifndef QUERY_EXECUTOR_HPP
 #define QUERY_EXECUTOR_HPP
 
-#include "semantic_analyzer.hpp"
 #include <string>
+#include "semantic_analyzer.hpp"
 
 extern "C" {
-    #include "../../core/include/data_table.h"
-    #include "../../core/include/data_filter.h"
+    #include "../../core/include/data.h"
 }
 
 namespace exe {
@@ -21,15 +20,7 @@ namespace exe {
             int execute_insert(const sql::InsertStatement& query);
             int execute_update(const sql::UpdateStatement& query);
             int execute_delete(const sql::DeleteStatement& query);
-
-            int execute_seq_scan(const std::string& db_name, 
-                const std::string& table_name, 
-                const std::vector<std::string>& column_names, 
-                size_t columns_count, 
-                const DataFilter& filter, 
-                DataTable &out
-            );
-
+            int execute_create_table(const sql::CreateTableStatement& query);
     };
 }
 

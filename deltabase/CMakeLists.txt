@@ -31,9 +31,9 @@ add_library(core STATIC ${CORE_SRCS})
 target_include_directories(core PUBLIC ${UUID_INCLUDE_DIRS})
 target_link_libraries(core PUBLIC ${UUID_LIBRARIES})
 
-target_include_directories(core PUBLIC
-        src/core/old/include
-)
+# target_include_directories(core PUBLIC
+#         src/core/old/include  # Removed - directory doesn't exist
+# )
 
 # --- modules ---
 function(add_cpp_module module_name)

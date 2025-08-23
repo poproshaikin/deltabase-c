@@ -5,7 +5,6 @@
 
 extern "C" {
     #include "../core/include/core.h"
-    #include "../core/include/data_table.h"
 }
 
 namespace exe {
@@ -31,18 +30,18 @@ namespace exe {
     }
 
     void SemanticAnalyzer::analyze_select(const sql::SelectStatement& selectStmt) { 
-        if (!selectStmt.table) {
+        if (selectStmt.table.value.empty()) {
             throw std::runtime_error("Select statement missing target table");
         }
 
         MetaTable schema;
-        const sql::SqlToken& table = std::get<sql::SqlToken>(selectStmt.table->value);
-        if (get_table_schema(_db_name.data(), table.value.data(), &schema) != 0) {
+        const sql::SqlToken& table = selectStmt.table;
+        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exists");
         }
 
-        for (const std::unique_ptr<sql::AstNode>& col : selectStmt.columns) {
-            const char *name = std::get<sql::SqlToken>(col->value).value.data();
+        for (const sql::SqlToken& col : selectStmt.columns) {
+            const char *name = col.value.data();
             ensure_column_exists(&schema, name);
         }
 
@@ -50,7 +49,7 @@ namespace exe {
     }
 
     void SemanticAnalyzer::analyze_insert(const sql::InsertStatement& insertStmt) {
-        if (!insertStmt.table) {
+        if (insertStmt.table.value.empty()) {
             throw std::runtime_error("Insert statement missing target table");
         }
         if (insertStmt.columns.size() != 0 && insertStmt.columns.size() != insertStmt.values.size()) {
@@ -58,16 +57,16 @@ namespace exe {
         }
 
         MetaTable schema;
-        const sql::SqlToken& table = std::get<sql::SqlToken>(insertStmt.table->value);
-        if (get_table_schema(_db_name.data(), table.value.data(), &schema) != 0) {
+        const sql::SqlToken& table = insertStmt.table;
+        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exists");
         }
 
         for (size_t i = 0; i < insertStmt.columns.size(); i++) {
-            const char *name = std::get<sql::SqlToken>(insertStmt.columns[i]->value).value.data();
+            const char *name = insertStmt.columns[i].value.data();
             ensure_column_exists(&schema, name);
 
-            const sql::SqlToken& value_token = std::get<sql::SqlToken>(insertStmt.values[i]->value);
+            const sql::SqlToken& value_token = insertStmt.values[i];
             const sql::SqlLiteral literal_type = std::get<sql::SqlLiteral>(value_token.detail);
             MetaColumn* column = find_column(name, &schema);
             if (!column) {
@@ -81,7 +80,7 @@ namespace exe {
     }
 
     void SemanticAnalyzer::analyze_update(const sql::UpdateStatement& updateStmt) {
-        if (!updateStmt.table) {
+        if (updateStmt.table.value.empty()) {
             throw std::runtime_error("Update statement missing target table");
         }
         if (updateStmt.assignments.empty()) {
@@ -89,26 +88,26 @@ namespace exe {
         }
 
         MetaTable schema;
-        const sql::SqlToken& table = std::get<sql::SqlToken>(updateStmt.table->value);
-        if (get_table_schema(_db_name.data(), table.value.data(), &schema) != 0) {
+        const sql::SqlToken& table = updateStmt.table;
+        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exists");
         }
 
         for (size_t i = 0; i < updateStmt.assignments.size(); i++) {
-            validate_column_assignment(updateStmt.assignments[i].get(), &schema);
+            validate_column_assignment(const_cast<sql::AstNode*>(&updateStmt.assignments[i]), &schema);
         }
 
         analyze_where(updateStmt.where, &schema);
     }
 
     void SemanticAnalyzer::analyze_delete(const sql::DeleteStatement& deleteStmt) {
-        if (!deleteStmt.table) {
+        if (deleteStmt.table.value.empty()) {
             throw std::runtime_error("Delete statement missing target table");
         }
 
         MetaTable schema;
-        const sql::SqlToken& table = std::get<sql::SqlToken>(deleteStmt.table->value);
-        if (get_table_schema(_db_name.data(), table.value.data(), &schema) != 0) {
+        const sql::SqlToken& table = deleteStmt.table;
+        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exist");
         }
 

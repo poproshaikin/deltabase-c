@@ -14,7 +14,8 @@ namespace sql {
         SELECT,
         INSERT,
         UPDATE,
-        DELETE
+        DELETE,
+        CREATE_TABLE,
     };
 
     enum class AstOperator {
@@ -50,34 +51,46 @@ namespace sql {
     }
 
     struct AstNode;
+    using AstNodePtr = std::unique_ptr<AstNode>;
 
     struct BinaryExpr {
         AstOperator op;
-        std::unique_ptr<AstNode> left;
-        std::unique_ptr<AstNode> right;
+        AstNodePtr left;
+        AstNodePtr right;
     };
 
     struct SelectStatement {
-        std::unique_ptr<AstNode> table;
-        std::vector<std::unique_ptr<AstNode>> columns;
-        std::unique_ptr<AstNode> where;
+        std::vector<SqlToken> columns;
+        SqlToken table;
+        AstNodePtr where;
     };
 
     struct InsertStatement {
-        std::unique_ptr<AstNode> table;
-        std::vector<std::unique_ptr<AstNode>> columns;
-        std::vector<std::unique_ptr<AstNode>> values;
+        SqlToken table;
+        std::vector<SqlToken> columns;
+        std::vector<SqlToken> values;
     };
 
     struct UpdateStatement {
-        std::unique_ptr<AstNode> table;
-        std::vector<std::unique_ptr<AstNode>> assignments;
-        std::unique_ptr<AstNode> where;
+        SqlToken table;
+        std::vector<AstNode> assignments;
+        AstNodePtr where;
     };
 
     struct DeleteStatement {
-        std::unique_ptr<AstNode> table;
-        std::unique_ptr<AstNode> where;
+        SqlToken table;
+        AstNodePtr where;
+    };
+
+    struct ColumnDefinition {
+        AstNodePtr name;
+        AstNodePtr type;
+        std::vector<AstNodePtr> constraints;
+    };
+
+    struct CreateTableStatement {
+        AstNodePtr name;
+        std::vector<AstNodePtr> columns;
     };
 
     using AstNodeValue = std::variant<
@@ -86,7 +99,9 @@ namespace sql {
         SelectStatement,
         InsertStatement,
         UpdateStatement,
-        DeleteStatement
+        DeleteStatement,
+        CreateTableStatement,
+        ColumnDefinition
     >;
 
     struct AstNode {
@@ -110,6 +125,7 @@ namespace sql {
             InsertStatement parse_insert();
             UpdateStatement parse_update();
             DeleteStatement parse_delete();
+            CreateTableStatement parse_create_table();
 
             std::unique_ptr<AstNode> parse_binary(int min_priority);
 

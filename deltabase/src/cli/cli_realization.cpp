@@ -9,43 +9,48 @@
 #include <memory>
 #include <vector>
 
-void print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent) {
-    if (!node) {
-        std::cout << std::string(indent, ' ') << "(null)\n";
-        return;
-    }
+// Forward declarations for print functions
+void print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent);
+void print_ast_node(const sql::AstNode& node, int indent);
+void print_sql_token(const sql::SqlToken& token, int indent);
 
+void print_sql_token(const sql::SqlToken& token, int indent) {
     std::string indent_str(indent, ' ');
-    std::cout << indent_str << "Node type: " << static_cast<int>(node->type) << "\n";
+    std::cout << indent_str << "SqlToken: " << token.to_string() << "\n";
+}
+
+void print_ast_node(const sql::AstNode& node, int indent) {
+    std::string indent_str(indent, ' ');
+    std::cout << indent_str << "Node type: " << static_cast<int>(node.type) << "\n";
 
     std::visit([&](auto&& value) {
             using T = std::decay_t<decltype(value)>;
 
             if constexpr (std::is_same_v<T, sql::SqlToken>) {
-            std::cout << indent_str << "  SqlToken: " << value.to_string(indent + 6) << "\n";
+                print_sql_token(value, indent + 2);
             } else if constexpr (std::is_same_v<T, sql::BinaryExpr>) {
-            std::cout << indent_str << "  BinaryExpr:\n";
-            std::cout << indent_str << "    Operator: " << static_cast<int>(value.op) << "\n";
-            std::cout << indent_str << "    Left:\n";
-            print_ast_node(value.left, indent + 6);
-            std::cout << indent_str << "    Right:\n";
-            print_ast_node(value.right, indent + 6);
+                std::cout << indent_str << "  BinaryExpr:\n";
+                std::cout << indent_str << "    Operator: " << static_cast<int>(value.op) << "\n";
+                std::cout << indent_str << "    Left:\n";
+                print_ast_node(value.left, indent + 6);
+                std::cout << indent_str << "    Right:\n";
+                print_ast_node(value.right, indent + 6);
             } else if constexpr (std::is_same_v<T, sql::SelectStatement>) {
-            std::cout << indent_str << "  SelectStatement:\n";
-            std::cout << indent_str << "    Table:\n";
-            print_ast_node(value.table, indent + 6);
-            std::cout << indent_str << "    Columns:\n";
-            for (const auto& col : value.columns) {
-            print_ast_node(col, indent + 6);
-            }
-            if (value.where) {
-                std::cout << indent_str << "    Where:\n";
-                print_ast_node(value.where, indent + 6);
-            }
+                std::cout << indent_str << "  SelectStatement:\n";
+                std::cout << indent_str << "    Table:\n";
+                print_sql_token(value.table, indent + 6);
+                std::cout << indent_str << "    Columns:\n";
+                for (const auto& col : value.columns) {
+                    print_sql_token(col, indent + 6);
+                }
+                if (value.where) {
+                    std::cout << indent_str << "    Where:\n";
+                    print_ast_node(value.where, indent + 6);
+                }
             } else if constexpr (std::is_same_v<T, sql::UpdateStatement>) {
                 std::cout << indent_str << "  UpdateStatement:\n";
                 std::cout << indent_str << "    Table:\n";
-                print_ast_node(value.table, indent + 6);
+                print_sql_token(value.table, indent + 6);
 
                 std::cout << indent_str << "    Assignments:\n";
                 for (const auto& assign : value.assignments) {
@@ -62,7 +67,7 @@ void print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent) {
             } else if constexpr (std::is_same_v<T, sql::DeleteStatement>) {
                 std::cout << indent_str << "  DeleteStatement:\n";
                 std::cout << indent_str << "    Table:\n";
-                print_ast_node(value.table, indent + 6);
+                print_sql_token(value.table, indent + 6);
 
                 std::cout << indent_str << "    Where:\n";
                 if (value.where) {
@@ -74,19 +79,47 @@ void print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent) {
             else if constexpr (std::is_same_v<T, sql::InsertStatement>) {
                 std::cout << indent_str << "  InsertStatement:\n";
                 std::cout << indent_str << "    Table:\n";
-                print_ast_node(value.table, indent + 6);
+                print_sql_token(value.table, indent + 6);
+                std::cout << indent_str << "    Columns:\n";
+                for (const auto& col : value.columns) {
+                    print_sql_token(col, indent + 6);
+                }
+                std::cout << indent_str << "    Values:\n";
+                for (const auto& val : value.values) {
+                    print_sql_token(val, indent + 6);
+                }
+            } else if constexpr (std::is_same_v<T, sql::CreateTableStatement>) {
+                std::cout << indent_str << "  CreateTableStatement:\n";
+                std::cout << indent_str << "    Table:\n";
+                print_ast_node(value.name, indent + 6);
                 std::cout << indent_str << "    Columns:\n";
                 for (const auto& col : value.columns) {
                     print_ast_node(col, indent + 6);
                 }
-                std::cout << indent_str << "    Values:\n";
-                for (const auto& val : value.values) {
-                    print_ast_node(val, indent + 6);
+            } else if constexpr (std::is_same_v<T, sql::ColumnDefinition>) {
+                std::cout << indent_str << "  ColumnDefinition:\n";
+                std::cout << indent_str << "    Name:\n";
+                print_ast_node(value.name, indent + 6);
+                std::cout << indent_str << "    Type:\n";
+                print_ast_node(value.type, indent + 6);
+                if (!value.constraints.empty()) {
+                    std::cout << indent_str << "    Constraints:\n";
+                    for (const auto& constraint : value.constraints) {
+                        print_ast_node(constraint, indent + 6);
+                    }
                 }
             } else {
                 std::cout << indent_str << "  (unknown node type)\n";
             }
-    }, node->value);
+    }, node.value);
+}
+
+void print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent) {
+    if (!node) {
+        std::cout << std::string(indent, ' ') << "(null)\n";
+        return;
+    }
+    print_ast_node(*node, indent);
 }
 
 std::string token_to_string(const DataToken* token) {

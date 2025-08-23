@@ -1,6 +1,6 @@
 #include "include/core.h"
 
-int create_database(const char *db_name, const CoreContext *ctx) {
+int create_database(const char *db_name) {
     char buffer[PATH_MAX];
     path_db(db_name, buffer, PATH_MAX);
 
@@ -19,7 +19,7 @@ int create_database(const char *db_name, const CoreContext *ctx) {
     return 0;
 }
 
-int drop_database(const char *db_name, const CoreContext *ctx) {
+int drop_database(const char *db_name) {
     char db_path[PATH_MAX];
     path_db(db_name, db_path, sizeof(db_path));
 
@@ -39,7 +39,7 @@ int drop_database(const char *db_name, const CoreContext *ctx) {
     }
 }
 
-bool exists_database(const char *db_name, const CoreContext *ctx) {
+bool exists_database(const char *db_name) {
     char db_path[PATH_MAX];
     path_db(db_name, db_path, sizeof(db_path));
 
@@ -48,8 +48,7 @@ bool exists_database(const char *db_name, const CoreContext *ctx) {
 
 int create_table(
     const char *db_name, 
-    const MetaTable *table,
-    const CoreContext *ctx
+    const MetaTable *table
 ) {
     int op = 0;
 
@@ -93,8 +92,7 @@ int create_table(
 
 bool exists_table(
     const char *db_name, 
-    const char *table_name,
-    const CoreContext *ctx
+    const char *table_name
 ) {
     char table_path[PATH_MAX];
     path_db_table(db_name, table_name, table_path, sizeof(table_path));
@@ -102,9 +100,8 @@ bool exists_table(
     return dir_exists(table_path);
 }
 
-int get_table(const char *db_name, const char *table_name, MetaTable *out,
-              const CoreContext *ctx) {
-    if (!exists_table(db_name, table_name, ctx)) {
+int get_table(const char *db_name, const char *table_name, MetaTable *out) {
+    if (!exists_table(db_name, table_name)) {
         return 1;
     }
 
@@ -127,8 +124,7 @@ int get_table(const char *db_name, const char *table_name, MetaTable *out,
 
 int update_table(
     const char *db_name, 
-    const MetaTable *table,
-    const CoreContext *ctx
+    const MetaTable *table
 ) {
     char buffer[PATH_MAX];
     path_db_table_meta(db_name, table->name, buffer, PATH_MAX);
@@ -149,13 +145,12 @@ static int write_row_update_state(
     const char *db_name, 
     DataRow *row,
     MetaTable *schema, 
-    FILE *file,
-    const CoreContext *ctx
+    FILE *file
 ) {
     int fd = fileno(file);
 
     PageHeader header;
-    read_page_header(file, &header);
+    read_ph(&header, fd);
     if (header.file_size >= MAX_PAGE_SIZE) {
         return 1;
     }
@@ -176,7 +171,7 @@ static int write_row_update_state(
         return 3;
     }
 
-    if (update_table(db_name, schema, ctx) != 0) {
+    if (update_table(db_name, schema) != 0) {
         return 4;
     }
 
@@ -186,14 +181,13 @@ static int write_row_update_state(
 int insert_row(
     const char *db_name, 
     const char *table_name, 
-    DataRow *row,
-    const CoreContext *ctx
+    DataRow *row
 ) {
     char buffer[PATH_MAX];
     path_db_table_data(db_name, table_name, buffer, PATH_MAX);
 
     MetaTable schema;
-    if (get_table(db_name, table_name, &schema, ctx) != 0) {
+    if (get_table(db_name, table_name, &schema) != 0) {
         return 1;
     }
 
@@ -229,7 +223,7 @@ int insert_row(
                       // collision with two previous error codes wouldn't happen
         }
 
-        int result = write_row_update_state(db_name, row, &schema, file, ctx);
+        int result = write_row_update_state(db_name, row, &schema, file);
         if (result == 1) { // means that the page is out of space
             fclose(file);
             continue;
@@ -259,8 +253,7 @@ int insert_row(
     size_t row_pos, \
     uint64_t rid, \
     const DataRow *row, \
-    const void *user_data, \
-    const CoreContext *ctx
+    const void *user_data
 
 typedef int (*RowCallback)(ROW_CALLBACK_PARAMS);
 
@@ -269,7 +262,6 @@ static int for_each_row_in_page(
     const char *page_path,
     MetaTable *table, 
     const DataFilter *filter,
-    const CoreContext *ctx, 
     size_t *rows_affected,
     RowCallback callback, 
     const void *user_data
@@ -315,8 +307,7 @@ static int for_each_row_in_page(
             row_start_pos,
             row.row_id, 
             &row, 
-            user_data, 
-            ctx
+            user_data
         );
 
         if (result != 0) {
@@ -350,11 +341,10 @@ static int for_each_row_matching_filter_impl(
     const DataFilter *filter,
     RowCallback callback, 
     const void *user_data, 
-    size_t *rows_affected,
-    const CoreContext *ctx
+    size_t *rows_affected
 ) {
     MetaTable schema;
-    if (get_table(db_name, table_name, &schema, ctx) != 0) {
+    if (get_table(db_name, table_name, &schema) != 0) {
         return 1;
     }
 
@@ -368,7 +358,7 @@ static int for_each_row_matching_filter_impl(
     }
 
     for (size_t i = 0; i < pages_count; i++) {
-        if (for_each_row_in_page(db_name, pages[i], &schema, filter, ctx,
+        if (for_each_row_in_page(db_name, pages[i], &schema, filter,
                                  rows_affected, callback, user_data) != 0) {
             fprintf(stderr, "Failed to process page %s\n", pages[i]);
             for (size_t j = 0; j < i; j++) {
@@ -392,15 +382,8 @@ int for_each_row_matching_filter(
     const DataFilter *filter, 
     RowCallback callback,
     void *user_data, 
-    size_t *rows_affected,
-    CoreContext *ctx
+    size_t *rows_affected
 ) {
-    if (!ctx) {
-        fprintf(stderr,
-                "CoreContext is NULL in for_each_row_matching_filter\n");
-        return 1;
-    }
-
     if (!db_name || !table_name || !filter || !callback) {
         fprintf(stderr, "Invalid parameters in for_each_row_matching_filter\n");
         return 2;
@@ -409,8 +392,7 @@ int for_each_row_matching_filter(
     // Use single-threaded implementation for now
     // TODO: Add multithreading support in the future
     return for_each_row_matching_filter_impl(
-        db_name, table_name, filter, callback, user_data, rows_affected,
-        ctx);
+        db_name, table_name, filter, callback, user_data, rows_affected);
 }
 
 static int combine_row(
@@ -484,16 +466,15 @@ int update_callback(ROW_CALLBACK_PARAMS) {
     header->rows_count++;
 
     // need to save because of incrementing the last_rid in combine_row
-    update_table(db_name, schema, ctx);
+    update_table(db_name, schema);
     return 0;
 }
 
 int update_rows_by_filter(const char *db_name, const char *table_name,
                           const DataFilter *filter, const DataRowUpdate *update,
-                          size_t *rows_affected, const CoreContext *ctx) {
+                          size_t *rows_affected) {
     return for_each_row_matching_filter(db_name, table_name, filter,
-                                        update_callback, update, rows_affected,
-                                        ctx);
+                                        update_callback, (void*)update, rows_affected);
 }
 
 int delete_callback(ROW_CALLBACK_PARAMS) {
@@ -508,16 +489,19 @@ int delete_callback(ROW_CALLBACK_PARAMS) {
     return 0;
 }
 
-int delete_row_by_filter(const char *db_name, const char *table_name,
-                         const DataFilter *filter, size_t *rows_affected,
-                         const CoreContext *ctx) {
+int delete_rows_by_filter(
+    const char *db_name, 
+    const char *table_name,
+    const DataFilter *filter, 
+    size_t *rows_affected
+) {
     return for_each_row_matching_filter(
-        db_name, table_name, filter, delete_callback, NULL, rows_affected, ctx);
+        db_name, table_name, filter, delete_callback, NULL, rows_affected);
 }
 
 int seq_scan(const char *db_name, const char *table_name,
              const char **column_names, size_t columns_count,
-             const DataFilter *filter, DataTable *out, const CoreContext *ctx) {
+             const DataFilter *filter, DataTable *out) {
     char buffer[PATH_MAX];
     path_db_table_data(db_name, table_name, buffer, PATH_MAX);
 
@@ -528,7 +512,7 @@ int seq_scan(const char *db_name, const char *table_name,
         return 1;
     }
 
-    if (get_table(db_name, table_name, schema, ctx) != 0) {
+    if (get_table(db_name, table_name, schema) != 0) {
         return 2;
     }
 
@@ -641,7 +625,3 @@ fail_cleanup:
 
     return 4;
 }
-
-int index_scan(const char *db_name, const char *index_name,
-               const DataFilter *filter, DataTable *out,
-               const CoreContext *ctx);
