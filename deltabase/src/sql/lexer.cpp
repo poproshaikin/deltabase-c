@@ -1,6 +1,7 @@
 #include "include/lexer.hpp"
 #include <cctype>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <sstream>
 
@@ -8,6 +9,41 @@ using namespace sql;
 
 SqlToken::SqlToken(SqlTokenType type, std::string value, size_t line, size_t pos, SqlTokenDetail detail)
     : type(type), line(line), value(std::move(value)), pos(pos), detail(detail) { }
+
+bool SqlToken::is_data_type() const {
+    if (std::holds_alternative<SqlKeyword>(this->detail)) {
+        return is_data_type_kw(std::get<SqlKeyword>(this->detail));
+    }
+
+    return false;
+}
+
+bool SqlToken::is_keyword() const {
+    return std::holds_alternative<SqlKeyword>(this->detail);
+}
+
+bool SqlToken::is_constraint() const {
+    if (this->is_keyword()) {
+        return is_constraint_kw(std::get<SqlKeyword>(this->detail));
+    }
+
+    return false;
+}
+
+template <typename TDetail> 
+TDetail SqlToken::get_detail() const {
+    if constexpr (std::is_same_v<TDetail, SqlKeyword> ||
+                  std::is_same_v<TDetail, SqlOperator> || 
+                  std::is_same_v<TDetail, SqlSymbol> || 
+                  std::is_same_v<TDetail, SqlLiteral>) {
+        if (std::holds_alternative<TDetail>(detail)) {
+            return std::get<TDetail>(detail);
+        }
+        return std::nullopt;
+    }
+
+    static_assert(false, "Unsupported type for SqlTokenDetail");
+}
 
 std::string to_lower(const std::string& str) {
     std::stringstream sb;
@@ -47,7 +83,7 @@ std::string read_next_word(const std::string& sql, size_t i) {
 }
 
 bool starts_as_operator(char c) {
-    auto& operators = getOperatorsMap();
+    auto& operators = operators_map();
 
     for (const auto& op : operators) {
         if (op.first[0] == c) {
@@ -69,9 +105,9 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
         return std::isspace((unsigned char)c);
     };
 
-    const auto& keywords = getKeywordsMap();
-    const auto& operators = getOperatorsMap();
-    const auto& symbols = getSymbolsMap();
+    const auto& keywords = keywords_map();
+    const auto& operators = operators_map();
+    const auto& symbols = symbols_map();
 
     size_t line = 1;
     size_t pos = 0;

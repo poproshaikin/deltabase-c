@@ -33,10 +33,11 @@ namespace exe {
         private:
             std::string _db_name;
 
-            void analyze_select(const sql::SelectStatement& selectStmt);
-            void analyze_insert(const sql::InsertStatement& insertStmt);
-            void analyze_update(const sql::UpdateStatement& updateStmt);
-            void analyze_delete(const sql::DeleteStatement& deleteStmt);
+            void analyze_select(const sql::SelectStatement& stmt);
+            void analyze_insert(const sql::InsertStatement& stmt);
+            void analyze_update(const sql::UpdateStatement& stmt);
+            void analyze_delete(const sql::DeleteStatement& stmt);
+            void analyze_create_table(const sql::CreateTableStatement& stmt);
             void analyze_where(const std::unique_ptr<sql::AstNode>& where, const MetaTable* table);
 
             void validate_column_comparison(

@@ -2,3 +2,10 @@ BasedOnStyle: LLVM
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
+BinPackParameters: false
+AlignAfterOpenBracket: Align
+ColumnLimit: 100
+ContinuationIndentWidth: 4
+NamespaceIndentation: All
+DerivePointerAlignment: false
+PointerAlignment: Right

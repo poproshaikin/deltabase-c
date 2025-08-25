@@ -31,9 +31,6 @@ add_library(core STATIC ${CORE_SRCS})
 target_include_directories(core PUBLIC ${UUID_INCLUDE_DIRS})
 target_link_libraries(core PUBLIC ${UUID_LIBRARIES})
 
-# target_include_directories(core PUBLIC
-#         src/core/old/include  # Removed - directory doesn't exist
-# )
 
 # --- modules ---
 function(add_cpp_module module_name)
@@ -61,6 +58,8 @@ add_cpp_module(sql)
 add_cpp_module(server)
 add_cpp_module(misc)
 add_cpp_module(cli)
+add_cpp_module(meta)
+add_cpp_module(converter)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
@@ -77,6 +76,8 @@ target_link_libraries(test.exe
     executor
     server
     cli
+    meta
+    converter
 )
 
 # --- main ---
@@ -88,4 +89,6 @@ target_link_libraries(main.exe
     executor
     server
     cli
+    meta
+    converter
 )

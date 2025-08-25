@@ -33,7 +33,7 @@ namespace sql {
         ASSIGN,
     };
 
-    inline const std::unordered_map<AstOperator, int>& getAstOperatorsPriorities() {
+    inline const std::unordered_map<AstOperator, int>& get_ast_operators_priorities() {
         static std::unordered_map<AstOperator, int> map = {
             { AstOperator::OR, 1 },
             { AstOperator::AND, 2 },
@@ -51,18 +51,17 @@ namespace sql {
     }
 
     struct AstNode;
-    using AstNodePtr = std::unique_ptr<AstNode>;
 
     struct BinaryExpr {
         AstOperator op;
-        AstNodePtr left;
-        AstNodePtr right;
+        std::unique_ptr<AstNode> left;
+        std::unique_ptr<AstNode> right;
     };
 
     struct SelectStatement {
         std::vector<SqlToken> columns;
         SqlToken table;
-        AstNodePtr where;
+        std::unique_ptr<AstNode> where;
     };
 
     struct InsertStatement {
@@ -74,23 +73,23 @@ namespace sql {
     struct UpdateStatement {
         SqlToken table;
         std::vector<AstNode> assignments;
-        AstNodePtr where;
+        std::unique_ptr<AstNode> where;
     };
 
     struct DeleteStatement {
         SqlToken table;
-        AstNodePtr where;
+        std::unique_ptr<AstNode> where;
     };
 
     struct ColumnDefinition {
-        AstNodePtr name;
-        AstNodePtr type;
-        std::vector<AstNodePtr> constraints;
+        SqlToken name;
+        SqlToken type;
+        std::vector<SqlToken> constraints;
     };
 
     struct CreateTableStatement {
-        AstNodePtr name;
-        std::vector<AstNodePtr> columns;
+        SqlToken name;
+        std::vector<ColumnDefinition> columns;
     };
 
     using AstNodeValue = std::variant<
@@ -143,6 +142,7 @@ namespace sql {
             std::unique_ptr<AstNode> parse_primary();
             std::vector<std::unique_ptr<AstNode>> parse_assignments();
             std::vector<std::unique_ptr<AstNode>> parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType);
+            ColumnDefinition parse_column_def();
     };
 }
 

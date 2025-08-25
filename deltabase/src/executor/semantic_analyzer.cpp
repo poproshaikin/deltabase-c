@@ -2,6 +2,7 @@
 #include <variant>
 #include <stdexcept>
 #include <string.h>
+#include "../misc/include/exceptions.hpp"
 
 extern "C" {
     #include "../core/include/core.h"
@@ -89,7 +90,7 @@ namespace exe {
 
         MetaTable schema;
         const sql::SqlToken& table = updateStmt.table;
-        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
+        if (get_table(_db_name.data(), table.value.c_str(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exists");
         }
 
@@ -107,54 +108,24 @@ namespace exe {
 
         MetaTable schema;
         const sql::SqlToken& table = deleteStmt.table;
-        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
+        if (get_table(_db_name.data(), table.value.c_str(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exist");
         }
 
         analyze_where(deleteStmt.where, &schema);
     }
 
-    void SemanticAnalyzer::analyze_where(const std::unique_ptr<sql::AstNode>& where, const MetaTable* table) {
-        if (!where) return;
-
-        using sql::AstNodeType;
-        using sql::AstOperator;
-
-        if (where->type == AstNodeType::BINARY_EXPR) {
-            const sql::BinaryExpr* expr = std::get_if<sql::BinaryExpr>(&where->value);
-            if (!expr) throw std::runtime_error("Invalid binary expression");
-
-            if (expr->op == AstOperator::ASSIGN) 
-                throw std::runtime_error("Invalid condition operator");
-
-            if (expr->op == AstOperator::EQ || expr->op == AstOperator::NEQ ||
-                    expr->op == AstOperator::GR || expr->op == AstOperator::LT ||
-                    expr->op == AstOperator::GRE || expr->op == AstOperator::LTE) {
-
-                if (!expr->left || !expr->right)
-                    throw std::runtime_error("Incomplete comparison expression");
-
-                validate_column_comparison(expr->left, expr->right, table);
-            }
-
-            if (expr->op == AstOperator::AND || expr->op == AstOperator::OR) {
-                analyze_where(expr->left, table);
-                analyze_where(expr->right, table);
-            }
-
-            if (expr->op == AstOperator::NOT) {
-                analyze_where(expr->right, table);
-            }
-        } else {
-            throw std::runtime_error("WHERE clause must be a logical or comparison expression");
-        }
+    void SemanticAnalyzer::analyze_create_table(const sql::CreateTableStatement& stmt) {
+        if (exists_table(_db_name.c_str(), stmt.name.value.c_str())) {
+            throw TableExists(stmt.name.value);
+        } 
     }
 
     void SemanticAnalyzer::validate_column_comparison(
             const std::unique_ptr<sql::AstNode>& left,
             const std::unique_ptr<sql::AstNode>& right,
             const MetaTable* table
-            ) {
+    ) {
         const sql::AstNode* column_node = nullptr;
         const sql::AstNode* value_node = nullptr;
 
@@ -215,7 +186,7 @@ namespace exe {
         const char *col_name = std::get<sql::SqlToken>(column_node->value).value.data();
         MetaColumn* column = find_column(col_name, table);
         if (!column) {
-            throw std::runtime_error("Column doesn't exist");
+            throw ColumnDoesntExists(std::string(column->name));
         }
 
         const sql::SqlToken& value_token = std::get<sql::SqlToken>(value_node->value);
@@ -236,7 +207,7 @@ namespace exe {
             }
         }
         if (!found) {
-            throw std::runtime_error("Column was not found");
+            throw ColumnDoesntExists(colname);
         }
         return col;
     }

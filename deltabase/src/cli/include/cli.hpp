@@ -15,8 +15,6 @@ namespace cli {
     class SqlCli {
         public:
             void run_query_console();
-        private:
-            void process_input(const std::string& input);
     };
 } 
 

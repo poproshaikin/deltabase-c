@@ -41,3 +41,11 @@ inline char **string_vector_to_ptrs(const std::vector<std::string>& v) {
 }
 
 #endif
+
+char *make_c_string(const std::string& str);
+
+template <typename T>
+T* make_c_arr(const std::vector<T>& vec);
+
+template <typename T>
+T** make_c_ptr_arr(const std::vector<T>& vec);

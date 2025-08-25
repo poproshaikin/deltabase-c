@@ -1,4 +1,6 @@
 #include "include/parser.hpp"
+#include "include/lexer.hpp"
+#include "../misc/include/exceptions.hpp"
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
@@ -75,6 +77,31 @@ namespace sql {
         return _tokens[_current];
     }
 
+    std::vector<std::unique_ptr<AstNode>> SqlParser::parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType) {
+        std::vector<std::unique_ptr<AstNode>> tokens;
+
+        while (true) {
+            if (!advance()) break;
+            if (_current >= _tokens.size()) break;
+            const SqlToken& token = current();
+
+            if (!match(tokenType)) {
+                break;
+            }
+
+            tokens.push_back(std::make_unique<AstNode>(nodeType, current()));
+
+            if (!advance()) break;
+
+            if (!match(SqlSymbol::COMMA)) {
+                _current--;
+                break;
+            }
+        }
+
+        return tokens;
+    }
+
     std::unique_ptr<AstNode> SqlParser::parse() {
         if (match(SqlKeyword::SELECT)) {
             return std::make_unique<AstNode>(AstNodeType::SELECT, parse_select());
@@ -90,7 +117,7 @@ namespace sql {
         }
         else if (match(SqlKeyword::CREATE)) {
             if (!advance()) {
-                throw std::runtime_error("Invalid statement syntax");
+                throw InvalidStatementSyntax();
             }
             if (match(SqlKeyword::TABLE)) {
                 return std::make_unique<AstNode>(AstNodeType::CREATE_TABLE, parse_create_table());
@@ -119,17 +146,17 @@ namespace sql {
             advance();
         }
 
-        advance_or_throw("Invalid statement syntax");
+        advance_or_throw();
         match_or_throw(SqlKeyword::FROM, "Expected 'FROM'");
 
-        advance_or_throw("Invalid statement syntax");
+        advance_or_throw();
         if (!match(SqlTokenType::IDENTIFIER)) {
             throw std::runtime_error("Expected name of the table");
         }
         stmt.table = current();
 
         if (advance() && match(SqlKeyword::WHERE)) {
-            advance_or_throw("Invalid statement syntax");
+            advance_or_throw();
             stmt.where = parse_binary(0);
         }
 
@@ -214,12 +241,12 @@ namespace sql {
                 throw std::runtime_error("Expected assignment expression (col = value)");
             }
 
-            BinaryExpr* assignment = std::get_if<BinaryExpr>(&expr->value);
-            if (!assignment || assignment->op != AstOperator::ASSIGN) {
+            BinaryExpr assignment = std::get<BinaryExpr>(std::move(expr->value));
+            if (assignment.op != AstOperator::ASSIGN) {
                 throw std::runtime_error("Expected '=' in assignment");
             }
 
-            stmt.assignments.emplace_back(AstNodeType::BINARY_EXPR, std::move(*assignment));
+            stmt.assignments.emplace_back(AstNodeType::BINARY_EXPR, std::move(assignment));
 
             if (!match(SqlSymbol::COMMA)) {
                 break;
@@ -263,33 +290,60 @@ namespace sql {
         advance_or_throw();
         match_or_throw(SqlTokenType::IDENTIFIER, "Expected name of the table");
 
-        stmt.name = std::make_unique<AstNode>(AstNodeType::TABLE_IDENTIFIER, current());
+        stmt.name = current();
+
+        advance_or_throw();
+        if (match(SqlSymbol::LPAREN)) {
+            bool stop = false;
+            while (!stop) {
+                stmt.columns.push_back(parse_column_def());
+
+                if (match(SqlSymbol::RPAREN)) {
+                    stop = true;
+                }
+                advance_or_throw();
+            }
+        }
         
         return stmt;
     }
 
-    std::vector<std::unique_ptr<AstNode>> SqlParser::parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType) {
-        std::vector<std::unique_ptr<AstNode>> tokens;
+    ColumnDefinition SqlParser::parse_column_def() {
+        ColumnDefinition def;
 
-        while (true) {
-            if (!advance()) break;
-            if (_current >= _tokens.size()) break;
-            const SqlToken& token = current();
+        match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier");
+        def.name = current();
 
-            if (!match(tokenType)) {
-                break;
-            }
+        advance_or_throw();
+        
+        def.type = current();
+        advance_or_throw();
 
-            tokens.push_back(std::make_unique<AstNode>(nodeType, current()));
-
-            if (!advance()) break;
-
-            if (!match(SqlSymbol::COMMA)) {
-                _current--;
-                break;
-            }
+        if (match(SqlSymbol::COMMA) || match(SqlSymbol::RPAREN)) {
+            return def;
         }
 
-        return tokens;
+        advance_or_throw();
+        
+        bool stop = false;
+        while (!stop) {
+            const SqlToken& cur = current();
+
+            if (match(SqlSymbol::COMMA) || match(SqlSymbol::RPAREN)) {
+                return def;
+            }
+
+            if (!std::holds_alternative<SqlKeyword>(cur.detail)) {
+                throw InvalidStatementSyntax();
+            }
+
+            if (!cur.is_constraint() || !cur.is_data_type()) {
+                throw InvalidStatementSyntax();
+            }
+
+            SqlToken copy = cur;
+            def.constraints.push_back(copy);
+            advance_or_throw();
+        }
     }
 }

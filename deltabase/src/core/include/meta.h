@@ -18,6 +18,7 @@ typedef enum {
 /* Data types */
 typedef enum {
     DT_NULL = -1, 
+    DT_UNDEFINED = 0,
     DT_INTEGER = 1,
     DT_REAL,
     DT_CHAR,

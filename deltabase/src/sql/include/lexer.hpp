@@ -24,7 +24,7 @@ namespace sql {
         SELECT, FROM, INSERT, INTO, VALUES, UPDATE, SET, DELETE, WHERE,
         CREATE, DROP, DATABASE, TABLE,
         STRING, INTEGER, REAL, CHAR, BOOL, _NULL,
-        PRIMARY, KEY, NOT, AUTOINCREMENT
+        PRIMARY, KEY, NOT, AUTOINCREMENT, UNIQUE
     };
 
     enum class SqlSymbol {
@@ -54,7 +54,7 @@ namespace sql {
         STRING, INTEGER, BOOL, CHAR, REAL
     };
 
-    inline const std::unordered_map<std::string, SqlKeyword>& getKeywordsMap() {
+    inline const std::unordered_map<std::string, SqlKeyword>& keywords_map() {
         static const std::unordered_map<std::string, SqlKeyword> dictionary = {
             { "select",       SqlKeyword::SELECT },
             { "from",         SqlKeyword::FROM },
@@ -78,13 +78,60 @@ namespace sql {
             {"primary",       SqlKeyword::PRIMARY},
             {"key",           SqlKeyword::KEY},
             {"not",           SqlKeyword::NOT },
-            {"autoincrement", SqlKeyword::AUTOINCREMENT }
+            {"autoincrement", SqlKeyword::AUTOINCREMENT },
+            {"unique",        SqlKeyword::UNIQUE }
         };
 
         return dictionary;
     }
 
-    inline const std::unordered_map<std::string, SqlSymbol>& getSymbolsMap() {
+    inline const std::unordered_map<std::string, SqlKeyword>& data_types_map() {
+        static const std::unordered_map<std::string, SqlKeyword> types_map = {
+            { "string",  SqlKeyword::STRING },
+            { "integer", SqlKeyword::INTEGER },
+            { "real",    SqlKeyword::REAL },
+            { "char",    SqlKeyword::CHAR },
+            { "bool",    SqlKeyword::BOOL },
+            { "null",    SqlKeyword::_NULL }
+        };
+        
+        return types_map;
+    }
+
+    inline const bool is_data_type_kw(const SqlKeyword& kw) {
+        const auto& types_map = data_types_map();
+        for (const auto& [key, value] : types_map) {
+            if (value == kw) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    inline const std::unordered_map<std::string, SqlKeyword>& constraints_map() {
+        static const std::unordered_map<std::string, SqlKeyword> constraints_map = {
+            { "not",          SqlKeyword::NOT },
+            { "null",         SqlKeyword::_NULL },
+            { "primary",      SqlKeyword::PRIMARY },
+            { "key",          SqlKeyword::KEY },
+            {"autoincrement", SqlKeyword::AUTOINCREMENT },
+            {"unique",        SqlKeyword::UNIQUE },
+        };
+
+        return constraints_map;
+    }
+
+    inline bool is_constraint_kw(const SqlKeyword& kw) {
+        const auto& constraints = constraints_map();
+        for (const auto& [key, value] : constraints) {
+            if (value == kw) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    inline const std::unordered_map<std::string, SqlSymbol>& symbols_map() {
         static const std::unordered_map<std::string, SqlSymbol> dictionary = {
             { "(", SqlSymbol::LPAREN },
             { ")", SqlSymbol::RPAREN },
@@ -95,7 +142,7 @@ namespace sql {
         return dictionary;
     }
 
-    inline const std::unordered_map<std::string, SqlOperator>& getOperatorsMap() {
+    inline const std::unordered_map<std::string, SqlOperator>& operators_map() {
         static const std::unordered_map<std::string, SqlOperator> dictionary = {
             { "==",  SqlOperator::EQ },
             { "!=", SqlOperator::NEQ },
@@ -130,6 +177,13 @@ namespace sql {
 
         SqlToken() = default;
         SqlToken(SqlTokenType type, std::string value, size_t line, size_t position, SqlTokenDetail detail = std::monostate());
+
+        bool is_data_type() const;
+        bool is_constraint() const;
+        bool is_keyword() const;
+
+        template<typename TDetail>
+        TDetail get_detail() const;
 
         std::string to_string(int indent = 4) const;
     };

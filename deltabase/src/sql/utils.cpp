@@ -11,7 +11,7 @@ std::string sql::utils::to_string(sql::SqlTokenType type) {
     }
 }
 std::string sql::utils::to_string(sql::SqlKeyword type) {
-    const auto& keywords = getKeywordsMap();
+    const auto& keywords = keywords_map();
     for (const auto& [key, value] : keywords) {
         if (value == type) {
             return key;
@@ -20,7 +20,7 @@ std::string sql::utils::to_string(sql::SqlKeyword type) {
     return {}; 
 }
 std::string sql::utils::to_string(sql::SqlOperator type) {
-    const auto& operators = getOperatorsMap();
+    const auto& operators = operators_map();
     for (const auto& [key, value] : operators) {
         if (value == type) {
             return key;
@@ -29,7 +29,7 @@ std::string sql::utils::to_string(sql::SqlOperator type) {
     return {}; 
 }
 std::string sql::utils::to_string(sql::SqlSymbol type) {
-    const auto& symbols = getSymbolsMap();
+    const auto& symbols = symbols_map();
     for (const auto& [key, value] : symbols) {
         if (value == type) {
             return key;

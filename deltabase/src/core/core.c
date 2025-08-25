@@ -55,7 +55,7 @@ int create_table(
     char buffer[PATH_MAX];
     path_db_table(db_name, table->name, buffer, PATH_MAX);
     if (dir_exists(buffer)) {
-        fprintf(stderr, "Failed to create a already existing table %s\n",
+        fprintf(stderr, "Table '%s' already exists \n",
                 table->name);
         return 1;
     }
@@ -74,7 +74,7 @@ int create_table(
     }
 
     if ((op = write_mt(table, fileno(meta_file))) != 0) {
-        printf("create_table:write_mt %i\n", op);
+        printf("error: create_table:write_mt %i\n", op);
         fclose(meta_file);
         return 4;
     }

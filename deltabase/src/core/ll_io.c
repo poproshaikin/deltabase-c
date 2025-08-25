@@ -118,9 +118,9 @@ uint64_t dtype_size(DataType type) {
             return 4;
         case DT_NULL:
             return 0;
+        default:
+            return -1;
     }
-
-    return -1;
 }
 
 int read_dt(DataToken *out, int fd) {

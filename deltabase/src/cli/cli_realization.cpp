@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include "../engine.hpp"
 
 // Forward declarations for print functions
 void print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent);
@@ -91,21 +92,21 @@ void print_ast_node(const sql::AstNode& node, int indent) {
             } else if constexpr (std::is_same_v<T, sql::CreateTableStatement>) {
                 std::cout << indent_str << "  CreateTableStatement:\n";
                 std::cout << indent_str << "    Table:\n";
-                print_ast_node(value.name, indent + 6);
+                print_sql_token(value.name, indent + 6);
                 std::cout << indent_str << "    Columns:\n";
                 for (const auto& col : value.columns) {
-                    print_ast_node(col, indent + 6);
+                    //print_ast_node(col, indent + 6);
                 }
             } else if constexpr (std::is_same_v<T, sql::ColumnDefinition>) {
                 std::cout << indent_str << "  ColumnDefinition:\n";
                 std::cout << indent_str << "    Name:\n";
-                print_ast_node(value.name, indent + 6);
+                print_sql_token(value.name, indent + 6);
                 std::cout << indent_str << "    Type:\n";
-                print_ast_node(value.type, indent + 6);
+                print_sql_token(value.type, indent + 6);
                 if (!value.constraints.empty()) {
                     std::cout << indent_str << "    Constraints:\n";
                     for (const auto& constraint : value.constraints) {
-                        print_ast_node(constraint, indent + 6);
+                        print_sql_token(constraint, indent + 6);
                     }
                 }
             } else {
@@ -185,6 +186,11 @@ void print_data_table(const DataTable* table) {
 void cli::SqlCli::run_query_console() {
     std::string input;
     std::cout << "Welcome to deltabase! Type 'exit' to quit.\n";
+    std::cout << "Enter database name: ";
+    std::cin >> input;
+    std::cout << std::endl;
+    
+    DltEngine engine(input);
 
     while (true) {
         std::cout << "> ";
@@ -194,35 +200,17 @@ void cli::SqlCli::run_query_console() {
         if (input == "exit") {
             break;
         }
-        process_input(input);
+
+        const ExecutionResult& result = engine.run(input);
+
+        std::cout << "Execution time: " << result.execution_time_ms << "ms" << std::endl;
+
+        if (std::holds_alternative<std::unique_ptr<DataTable>>(result.result))
+            print_data_table(std::get<std::unique_ptr<DataTable>>(result.result).get());
+        else
+            std::cout << "Rows affected: " << std::get<int>(result.result) << std::endl;
     }
 
     std::cout << "Exiting deltabase.\n";
 }
 
-void cli::SqlCli::process_input(const std::string& input) {
-    std::string db_name = "testdb";
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    sql::SqlTokenizer tokenizer;
-    std::vector<sql::SqlToken> tokens = tokenizer.tokenize(input);
-
-    sql::SqlParser parser(tokens);
-    std::unique_ptr<sql::AstNode> node = parser.parse();
-
-    exe::SemanticAnalyzer analyzer(db_name);
-    analyzer.analyze(node.get());
-
-    exe::QueryExecutor executor(db_name);
-    const auto result = executor.execute(*node);
-
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    std::cout << "Execution time: " << duration_ms << " ms" << std::endl;
-
-    if (std::holds_alternative<std::unique_ptr<DataTable>>(result))
-        print_data_table(std::get<std::unique_ptr<DataTable>>(result).get());
-    else 
-        std::cout << "Rows affected: " << std::get<int>(result) << std::endl;
-}
