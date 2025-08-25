@@ -196,6 +196,43 @@ namespace exe {
         }
     }
 
+
+    void SemanticAnalyzer::analyze_where(const std::unique_ptr<sql::AstNode>& where, const MetaTable* table) {
+        if (!where) return;
+
+        using sql::AstNodeType;
+        using sql::AstOperator;
+
+        if (where->type == AstNodeType::BINARY_EXPR) {
+            const sql::BinaryExpr* expr = std::get_if<sql::BinaryExpr>(&where->value);
+            if (!expr) throw std::runtime_error("Invalid binary expression");
+
+            if (expr->op == AstOperator::ASSIGN) 
+                throw std::runtime_error("Invalid condition operator");
+
+            if (expr->op == AstOperator::EQ || expr->op == AstOperator::NEQ ||
+                    expr->op == AstOperator::GR || expr->op == AstOperator::LT ||
+                    expr->op == AstOperator::GRE || expr->op == AstOperator::LTE) {
+
+                if (!expr->left || !expr->right)
+                    throw std::runtime_error("Incomplete comparison expression");
+
+                validate_column_comparison(expr->left, expr->right, table);
+            }
+
+            if (expr->op == AstOperator::AND || expr->op == AstOperator::OR) {
+                analyze_where(expr->left, table);
+                analyze_where(expr->right, table);
+            }
+
+            if (expr->op == AstOperator::NOT) {
+                analyze_where(expr->right, table);
+            }
+        } else {
+            throw std::runtime_error("WHERE clause must be a logical or comparison expression");
+        }
+    }
+
     MetaColumn* SemanticAnalyzer::ensure_column_exists(const MetaTable* table, std::string colname) {
         bool found = false;
         MetaColumn* col = nullptr;

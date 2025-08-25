@@ -42,6 +42,10 @@ namespace sql {
 
     template<typename TEnum>
     bool SqlParser::match(const TEnum& expected) const {
+        if (_current >= _tokens.size()) {
+            return false;
+        }
+        
         if constexpr (
             std::is_same_v<TEnum, SqlTokenType>
         ) {

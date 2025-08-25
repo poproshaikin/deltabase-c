@@ -51,6 +51,14 @@ function(add_cpp_module module_name)
     if (${module_name} STREQUAL "cli")
         target_link_libraries(${module_name} PUBLIC sql executor )
     endif()
+    
+    if (${module_name} STREQUAL "meta")
+        target_link_libraries(${module_name} PUBLIC misc )
+    endif()
+    
+    if (${module_name} STREQUAL "converter")
+        target_link_libraries(${module_name} PUBLIC misc )
+    endif()
 endfunction()
 
 add_cpp_module(executor)
@@ -81,7 +89,7 @@ target_link_libraries(test.exe
 )
 
 # --- main ---
-add_executable(main.exe main.cpp)
+add_executable(main.exe main.cpp src/engine.cpp)
 target_link_libraries(main.exe 
     core
     misc

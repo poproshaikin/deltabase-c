@@ -30,21 +30,6 @@ bool SqlToken::is_constraint() const {
     return false;
 }
 
-template <typename TDetail> 
-TDetail SqlToken::get_detail() const {
-    if constexpr (std::is_same_v<TDetail, SqlKeyword> ||
-                  std::is_same_v<TDetail, SqlOperator> || 
-                  std::is_same_v<TDetail, SqlSymbol> || 
-                  std::is_same_v<TDetail, SqlLiteral>) {
-        if (std::holds_alternative<TDetail>(detail)) {
-            return std::get<TDetail>(detail);
-        }
-        return std::nullopt;
-    }
-
-    static_assert(false, "Unsupported type for SqlTokenDetail");
-}
-
 std::string to_lower(const std::string& str) {
     std::stringstream sb;
     for (char c : str) {

@@ -14,7 +14,7 @@ namespace exe {
             QueryExecutor(std::string db_name);
             std::variant<std::unique_ptr<DataTable>, int> execute(const sql::AstNode& query);
         private:
-            std::string _db_name;
+            std::string db_name;
             std::unique_ptr<DataTable> execute_select(const sql::SelectStatement& query);
 
             int execute_insert(const sql::InsertStatement& query);

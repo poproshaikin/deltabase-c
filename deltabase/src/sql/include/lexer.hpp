@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
+#include <stdexcept>
 
 namespace sql {
     enum class SqlTokenType {
@@ -187,6 +188,22 @@ namespace sql {
 
         std::string to_string(int indent = 4) const;
     };
+
+    // Template definition must be in header
+    template<typename TDetail>
+    TDetail SqlToken::get_detail() const {
+        if constexpr (std::is_same_v<TDetail, SqlKeyword> ||
+                      std::is_same_v<TDetail, SqlOperator> || 
+                      std::is_same_v<TDetail, SqlSymbol> || 
+                      std::is_same_v<TDetail, SqlLiteral>) {
+            if (std::holds_alternative<TDetail>(detail)) {
+                return std::get<TDetail>(detail);
+            }
+            throw std::runtime_error("Invalid detail type requested");
+        } else {
+            static_assert(false, "Unsupported type for SqlTokenDetail");
+        }
+    }
 
     class SqlTokenizer {
         public:
