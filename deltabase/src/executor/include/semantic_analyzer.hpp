@@ -31,13 +31,14 @@ namespace exe {
             SemanticAnalyzer(std::string db_name);
             void analyze(const sql::AstNode* ast);
         private:
-            std::string _db_name;
+            std::string db_name;
 
             void analyze_select(const sql::SelectStatement& stmt);
             void analyze_insert(const sql::InsertStatement& stmt);
             void analyze_update(const sql::UpdateStatement& stmt);
             void analyze_delete(const sql::DeleteStatement& stmt);
             void analyze_create_table(const sql::CreateTableStatement& stmt);
+            void analyze_create_db(const sql::CreateDbStatement& stmt);
             void analyze_where(const std::unique_ptr<sql::AstNode>& where, const MetaTable* table);
 
             void validate_column_comparison(
@@ -47,6 +48,8 @@ namespace exe {
             );
             void validate_column_assignment(sql::AstNode* assignment, MetaTable *table);
             MetaColumn* ensure_column_exists(const MetaTable* table, std::string colname);
+            void ensure_db_exists();
+            void ensure_db_exists(const std::string& name);
     };
 };
 

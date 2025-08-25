@@ -21,4 +21,16 @@ class ColumnDoesntExists : public std::runtime_error {
             std::runtime_error("Column '" + col_name + "' doesn't exists") { }
 };
 
+class DbDoesntExists : public std::runtime_error {
+    public:
+        DbDoesntExists(const std::string& db_name) :
+            std::runtime_error("Database '" + db_name + "' doesn't exists") { }
+};
+
+class DbExists : public std::runtime_error {
+    public:
+        DbExists(const std::string& db_name) :
+            std::runtime_error("Database '" + db_name + "' already exists") { }
+};
+
 #endif

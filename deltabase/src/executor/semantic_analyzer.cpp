@@ -9,7 +9,9 @@ extern "C" {
 }
 
 namespace exe {
-    SemanticAnalyzer::SemanticAnalyzer(std::string db_name) : _db_name(db_name) { }
+    SemanticAnalyzer::SemanticAnalyzer(std::string db_name) : db_name(db_name) {
+        ensure_db_exists();
+    }
 
     void SemanticAnalyzer::analyze(const sql::AstNode* ast) {
         switch (ast->type) {
@@ -40,7 +42,7 @@ namespace exe {
 
         MetaTable schema;
         const sql::SqlToken& table = selectStmt.table;
-        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
+        if (get_table(db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exists");
         }
 
@@ -62,7 +64,7 @@ namespace exe {
 
         MetaTable schema;
         const sql::SqlToken& table = insertStmt.table;
-        if (get_table(_db_name.data(), table.value.data(), &schema) != 0) {
+        if (get_table(db_name.data(), table.value.data(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exists");
         }
 
@@ -93,7 +95,7 @@ namespace exe {
 
         MetaTable schema;
         const sql::SqlToken& table = updateStmt.table;
-        if (get_table(_db_name.data(), table.value.c_str(), &schema) != 0) {
+        if (get_table(db_name.data(), table.value.c_str(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exists");
         }
 
@@ -111,7 +113,7 @@ namespace exe {
 
         MetaTable schema;
         const sql::SqlToken& table = deleteStmt.table;
-        if (get_table(_db_name.data(), table.value.c_str(), &schema) != 0) {
+        if (get_table(db_name.data(), table.value.c_str(), &schema) != 0) {
             throw std::runtime_error("Table doesn't exist");
         }
 
@@ -119,7 +121,7 @@ namespace exe {
     }
 
     void SemanticAnalyzer::analyze_create_table(const sql::CreateTableStatement& stmt) {
-        if (exists_table(_db_name.c_str(), stmt.name.value.c_str())) {
+        if (exists_table(db_name.c_str(), stmt.name.value.c_str())) {
             throw TableExists(stmt.name.value);
         } 
     }
@@ -252,4 +254,19 @@ namespace exe {
         return col;
     }
 
+    void SemanticAnalyzer::ensure_db_exists(const std::string &name) {
+        if (!exists_database(name.c_str())) {
+            throw DbDoesntExists(name);
+        }
+    }
+
+    void SemanticAnalyzer::ensure_db_exists() {
+        ensure_db_exists(this->db_name);
+    }
+
+    void SemanticAnalyzer::analyze_create_db(const sql::CreateDbStatement &stmt) {
+        if (exists_database(stmt.name.value.c_str())) {
+            throw DbExists(stmt.name.value);
+        }
+    }
 }

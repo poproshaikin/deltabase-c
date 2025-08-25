@@ -16,6 +16,7 @@ namespace sql {
         UPDATE,
         DELETE,
         CREATE_TABLE,
+        CREATE_DATABASE
     };
 
     enum class AstOperator {
@@ -92,6 +93,10 @@ namespace sql {
         std::vector<ColumnDefinition> columns;
     };
 
+    struct CreateDbStatement {
+        SqlToken name;
+    };
+
     using AstNodeValue = std::variant<
         SqlToken,
         BinaryExpr,
@@ -100,6 +105,7 @@ namespace sql {
         UpdateStatement,
         DeleteStatement,
         CreateTableStatement,
+        CreateDbStatement,
         ColumnDefinition
     >;
 
@@ -125,13 +131,14 @@ namespace sql {
             UpdateStatement parse_update();
             DeleteStatement parse_delete();
             CreateTableStatement parse_create_table();
+            CreateDbStatement parse_create_db();
 
             std::unique_ptr<AstNode> parse_binary(int min_priority);
 
             template<typename TEnum>
             bool match(const TEnum&) const ;
             template<typename TEnum>
-            bool match_or_throw(TEnum expected, std::string error_msg) const;
+            bool match_or_throw(TEnum expected, std::string error_msg = "Invalid statement syntax") const;
 
 
             bool advance() noexcept;

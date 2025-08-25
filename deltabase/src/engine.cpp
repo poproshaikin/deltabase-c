@@ -40,7 +40,7 @@ ExecutionResult DltEngine::run(const std::string& sql) {
     std::variant<std::unique_ptr<DataTable>, int> result;
     try {
         exe::QueryExecutor executor(db_name);
-        result = executor.execute(*node);
+        auto result = executor.execute(*node);
     } catch (...) {
         std::cout << "Execution failed at the execution phase" << std::endl;
         throw;

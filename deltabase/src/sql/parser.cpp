@@ -82,31 +82,6 @@ namespace sql {
         return _tokens[_current];
     }
 
-    std::vector<std::unique_ptr<AstNode>> SqlParser::parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType) {
-        std::vector<std::unique_ptr<AstNode>> tokens;
-
-        while (true) {
-            if (!advance()) break;
-            if (_current >= _tokens.size()) break;
-            const SqlToken& token = current();
-
-            if (!match(tokenType)) {
-                break;
-            }
-
-            tokens.push_back(std::make_unique<AstNode>(nodeType, current()));
-
-            if (!advance()) break;
-
-            if (!match(SqlSymbol::COMMA)) {
-                _current--;
-                break;
-            }
-        }
-
-        return tokens;
-    }
-
     std::unique_ptr<AstNode> SqlParser::parse() {
         if (match(SqlKeyword::SELECT)) {
             return std::make_unique<AstNode>(AstNodeType::SELECT, parse_select());
@@ -126,6 +101,9 @@ namespace sql {
             }
             if (match(SqlKeyword::TABLE)) {
                 return std::make_unique<AstNode>(AstNodeType::CREATE_TABLE, parse_create_table());
+            }
+            if (match(SqlKeyword::DATABASE)) {
+                return std::make_unique<AstNode>(AstNodeType::CREATE_DATABASE, parse_create_db());
             }
         }
         
@@ -316,7 +294,6 @@ namespace sql {
     ColumnDefinition SqlParser::parse_column_def() {
         ColumnDefinition def;
 
-        std::cout << current().to_string() << "\n";
         match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier");
         def.name = current();
 
@@ -354,4 +331,41 @@ namespace sql {
 
         return def;
     }
+
+    std::vector<std::unique_ptr<AstNode>> SqlParser::parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType) {
+        std::vector<std::unique_ptr<AstNode>> tokens;
+
+        while (true) {
+            if (!advance()) break;
+            if (_current >= _tokens.size()) break;
+            const SqlToken& token = current();
+
+            if (!match(tokenType)) {
+                break;
+            }
+
+            tokens.push_back(std::make_unique<AstNode>(nodeType, current()));
+
+            if (!advance()) break;
+
+            if (!match(SqlSymbol::COMMA)) {
+                _current--;
+                break;
+            }
+        }
+
+        return tokens;
+    }
+
+    CreateDbStatement SqlParser::parse_create_db() {
+        CreateDbStatement stmt;
+
+        match_or_throw(SqlKeyword::DATABASE);
+        advance_or_throw("Expected database identifier");
+
+        stmt.name = current();
+
+        return stmt;
+    }
 }
+
