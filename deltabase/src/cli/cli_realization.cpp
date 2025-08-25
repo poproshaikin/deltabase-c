@@ -187,8 +187,7 @@ void cli::SqlCli::run_query_console() {
     std::string input;
     std::cout << "Welcome to deltabase! Type 'exit' to quit.\n";
     std::cout << "Enter database name: ";
-    std::cin >> input;
-    std::cout << std::endl;
+    std::getline(std::cin, input);
     
     DltEngine engine(input);
 
@@ -201,16 +200,23 @@ void cli::SqlCli::run_query_console() {
             break;
         }
 
-        const ExecutionResult& result = engine.run(input);
+        try {
+            const ExecutionResult &result = engine.run(input);
 
-        std::cout << "Execution time: " << result.execution_time_ms << "ms" << std::endl;
+            std::cout << "Execution time: " << result.execution_time_ms << "ms" << std::endl;
 
-        if (std::holds_alternative<std::unique_ptr<DataTable>>(result.result))
-            print_data_table(std::get<std::unique_ptr<DataTable>>(result.result).get());
-        else
-            std::cout << "Rows affected: " << std::get<int>(result.result) << std::endl;
+            if (std::holds_alternative<std::unique_ptr<DataTable>>(result.result))
+                print_data_table(std::get<std::unique_ptr<DataTable>>(result.result).get());
+            else
+                std::cout << "Rows affected: " << std::get<int>(result.result) << std::endl;
+        }
+        catch (std::runtime_error e) {
+            std::cout << "Failed to execute query: " << e.what() << std::endl;
+        }
     }
+    
 
     std::cout << "Exiting deltabase.\n";
 }
 
+// CREATE TABLE users(id INTEGER, name STRING, age REAL)

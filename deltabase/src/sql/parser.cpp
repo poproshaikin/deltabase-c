@@ -1,6 +1,7 @@
 #include "include/parser.hpp"
 #include "include/lexer.hpp"
 #include "../misc/include/exceptions.hpp"
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
@@ -11,7 +12,7 @@ namespace sql {
     AstNode::AstNode(AstNodeType type, AstNodeValue&& value) :
         type(type), value(std::move(value)) { }
 
-    SqlParser::SqlParser(std::vector<SqlToken> tokens) : _tokens(std::move(tokens)), _current(_tokens.size()) { }
+    SqlParser::SqlParser(std::vector<SqlToken> tokens) : _tokens(std::move(tokens)), _current(0) { }
 
     bool SqlParser::advance() noexcept {
         if (_current + 1 < _tokens.size()) {
@@ -288,7 +289,6 @@ namespace sql {
     CreateTableStatement SqlParser::parse_create_table() {
         CreateTableStatement stmt;
 
-        advance_or_throw();
         match_or_throw(SqlKeyword::TABLE, "Expected 'TABLE' after 'CREATE'");
 
         advance_or_throw();
@@ -298,6 +298,7 @@ namespace sql {
 
         advance_or_throw();
         if (match(SqlSymbol::LPAREN)) {
+            advance_or_throw();
             bool stop = false;
             while (!stop) {
                 stmt.columns.push_back(parse_column_def());
@@ -305,7 +306,7 @@ namespace sql {
                 if (match(SqlSymbol::RPAREN)) {
                     stop = true;
                 }
-                advance_or_throw();
+                advance();
             }
         }
         
@@ -315,6 +316,7 @@ namespace sql {
     ColumnDefinition SqlParser::parse_column_def() {
         ColumnDefinition def;
 
+        std::cout << current().to_string() << "\n";
         match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier");
         def.name = current();
 
@@ -349,5 +351,7 @@ namespace sql {
             def.constraints.push_back(copy);
             advance_or_throw();
         }
+
+        return def;
     }
 }

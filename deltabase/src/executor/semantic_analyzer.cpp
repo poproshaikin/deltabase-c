@@ -25,6 +25,9 @@ namespace exe {
             case sql::AstNodeType::DELETE:
                 analyze_delete(std::get<sql::DeleteStatement>(ast->value));
                 break;
+            case sql::AstNodeType::CREATE_TABLE:
+                analyze_create_table(std::get<sql::CreateTableStatement>(ast->value));
+                break;
             default:
                 throw std::runtime_error("Unsupported AST node type for semantic analysis");
         }
