@@ -1,14 +1,66 @@
 #include "engine.hpp"
-#include <chrono>
+#include "executor/include/query_executor.hpp"
+#include "executor/include/semantic_analyzer.hpp"
 #include "sql/include/lexer.hpp"
 #include "sql/include/parser.hpp"
-#include "executor/include/semantic_analyzer.hpp"
-#include "executor/include/query_executor.hpp"
+#include <chrono>
 #include <iostream>
 
-DltEngine::DltEngine(std::string db_name) : db_name(db_name) { }
+DltEngine::DltEngine() : semantic_analyzer(exe::SemanticAnalyzer(std::nullopt)) {
+    this->registry = meta::MetaRegistry();
+    this->executors.push_back(std::make_unique<exe::AdminExecutor>(this->registry, std::nullopt));
+}
 
-ExecutionResult DltEngine::run(const std::string& sql) {
+DltEngine::DltEngine(std::string db_name) : db_name(db_name), semantic_analyzer(db_name) {
+    this->registry = meta::MetaRegistry();
+    this->executors.push_back(std::make_unique<exe::AdminExecutor>(this->registry, db_name));
+    this->executors.push_back(std::make_unique<exe::DatabaseExecutor>(this->registry, db_name));
+}
+
+exe::IsSupportedType
+DltEngine::can_execute(const sql::AstNodeType& type) {
+    exe::IsSupportedType is_supported_last;
+    for (std::unique_ptr<exe::IQueryExecutor>& executor : this->executors) {
+        if ((is_supported_last = executor->supports(type)) == exe::IsSupportedType::SUPPORTS) {
+            return exe::IsSupportedType::SUPPORTS;
+        }
+    }
+    return is_supported_last;
+}
+
+exe::IntOrDataTable
+DltEngine::execute(const sql::AstNode& node) {
+    if (this->can_execute(node.type) != exe::IsSupportedType::SUPPORTS) {
+        throw std::runtime_error("Query type is not supported by any executor.");
+    }
+
+    try {
+        this->semantic_analyzer.analyze(node);
+    } catch (...) {
+        std::cout << "Execution failed at the analyzation phase" << std::endl;
+        throw;
+    }
+
+    try {
+        if (this->can_execute(node.type) != exe::IsSupportedType::SUPPORTS) {
+            throw std::runtime_error("Query type is not supported by any executor.");
+        }
+
+        for (std::unique_ptr<exe::IQueryExecutor>& executor : this->executors) {
+            if (executor->supports(node.type) == exe::IsSupportedType::SUPPORTS) {
+                return executor->execute(node);
+            }
+        }
+
+        throw std::runtime_error("як тобi це нахуй вдалося?");
+    } catch (...) {
+        std::cout << "Execution failed at the execution phase" << std::endl;
+        throw;
+    }
+}
+
+ExecutionResult
+DltEngine::run_query(const std::string& sql) {
     auto start = std::chrono::high_resolution_clock::now();
     std::vector<sql::SqlToken> tokens;
 
@@ -29,22 +81,7 @@ ExecutionResult DltEngine::run(const std::string& sql) {
         throw;
     }
 
-    try {
-        exe::SemanticAnalyzer analyzer(db_name);
-        analyzer.analyze(node.get());
-    } catch (...) {
-        std::cout << "Execution failed at the analyzation phase" << std::endl;
-        throw;
-    }
-
-    std::variant<std::unique_ptr<DataTable>, int> result;
-    try {
-        exe::QueryExecutor executor(db_name);
-        auto result = executor.execute(*node);
-    } catch (...) {
-        std::cout << "Execution failed at the execution phase" << std::endl;
-        throw;
-    }
+    exe::IntOrDataTable result = execute(*node);
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

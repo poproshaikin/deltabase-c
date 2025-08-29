@@ -8,12 +8,14 @@
 #include <unordered_map>
 #include <vector>
 
-std::vector<std::string> split(const std::string& s, char delimiter);
+std::vector<std::string>
+split(const std::string& s, char delimiter, int count = 0);
 
-template<typename Key, typename Value>
-std::vector<Value> get_values(std::unordered_map<Key, Value> map) {
+template <typename Key, typename Value>
+std::vector<Value>
+get_values(std::unordered_map<Key, Value> map) {
     std::vector<Value> result;
-    result.reserve(map.size()); 
+    result.reserve(map.size());
 
     for (const auto& pair : map) {
         result.push_back(pair.second);
@@ -22,16 +24,19 @@ std::vector<Value> get_values(std::unordered_map<Key, Value> map) {
     return result;
 }
 
-template<typename Type>
-inline Type *vector_to_c(const std::vector<Type>& v) {
-    Type *arr = new Type[v.size()];
+template <typename T>
+inline T*
+vector_to_c(const std::vector<T>& v) {
+    T* arr = new T[v.size()];
     std::copy(v.begin(), v.end(), arr);
     return arr;
 }
 
-inline char **string_vector_to_ptrs(const std::vector<std::string>& v) {
-    char **result = new (std::nothrow) char*[v.size()];
-    if (!result) return nullptr;
+inline char**
+string_vector_to_ptrs(const std::vector<std::string>& v) {
+    char** result = new (std::nothrow) char*[v.size()];
+    if (!result)
+        return nullptr;
 
     for (size_t i = 0; i < v.size(); i++) {
         size_t len = v[i].size();
@@ -50,24 +55,27 @@ inline char **string_vector_to_ptrs(const std::vector<std::string>& v) {
     return result;
 }
 
-char *make_c_string(const std::string& str);
+char*
+make_c_string(const std::string& str);
 
 template <typename T>
-T* make_c_arr(const std::vector<T>& vec) {
+inline T*
+make_c_arr(const std::vector<T>& vec) {
     T* arr = new T[vec.size()];
     std::copy(vec.begin(), vec.end(), arr);
     return arr;
 }
 
 template <typename T>
-T** make_c_ptr_arr(const std::vector<T>& vec) {
+inline T**
+make_c_ptr_arr(const std::vector<T>& vec) {
     T** arr = new T*[vec.size()];
 
     for (size_t i = 0; i < vec.size(); ++i) {
         arr[i] = new T(vec[i]);
     }
 
-    return arr; 
+    return arr;
 }
 
 #endif

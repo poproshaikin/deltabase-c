@@ -1,10 +1,10 @@
 #ifndef CORE_META_H
 #define CORE_META_H
 
-#include <string.h>
-#include <stdint.h>
-#include <uuid/uuid.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+#include <uuid/uuid.h>
 
 typedef enum {
     CF_NONE = 0,
@@ -17,7 +17,7 @@ typedef enum {
 
 /* Data types */
 typedef enum {
-    DT_NULL = -1, 
+    DT_NULL = -1,
     DT_UNDEFINED = 0,
     DT_INTEGER = 1,
     DT_REAL,
@@ -28,24 +28,26 @@ typedef enum {
 
 /* Column description */
 typedef struct {
-    uuid_t column_id;
-    char *name;
+    uuid_t id;
+    uuid_t table_id;
+    char* name;
 
     DataType data_type;
     DataColumnFlags flags;
 } MetaColumn;
 
-void free_col(MetaColumn *column);
+void
+free_col(MetaColumn* column);
 
 /* Table scheme */
 typedef struct {
-    uuid_t table_id;
-    char *name;
+    uuid_t id;
+    char* name;
 
     bool has_pk;
     uuid_t pk;
-    
-    MetaColumn **columns;
+
+    MetaColumn** columns;
     uint64_t columns_count;
 
     uint64_t last_rid;
@@ -57,8 +59,11 @@ typedef enum {
 } DataRowFlags;
 
 // gets index of the column COLUMN_ID in the TABLE
-ssize_t get_table_column_index(const uuid_t column_id, const MetaTable *table);
-MetaColumn *find_column(const char *name, const MetaTable *table);
+ssize_t
+get_table_column_index(const uuid_t column_id, const MetaTable* table);
+
+MetaColumn*
+find_column(const char* name, const MetaTable* table);
 
 #define MAX_PAGE_SIZE (8 * 1024)
 

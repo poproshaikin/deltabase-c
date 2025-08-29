@@ -3,6 +3,8 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 
+compile_commands.json
+
 *.o
 *.obj
 *.a
@@ -16,4 +18,4 @@ hello.txt
 
 .cmake
 .idea
-data
+.cache

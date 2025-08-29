@@ -29,7 +29,7 @@ namespace test {
 
     MetaColumn *create_mock_column(const char *name, DataType type, DataColumnFlags flags) {
         MetaColumn *col = (MetaColumn *)malloc(sizeof(MetaColumn));
-        uuid_generate(col->column_id);
+        uuid_generate(col->id);
         col->name = strdup(name);
         col->data_type = type;
         col->flags = flags;
@@ -38,7 +38,7 @@ namespace test {
 
     MetaTable *create_mock_table() {
         MetaTable *table = (MetaTable *)malloc(sizeof(MetaTable));
-        uuid_generate(table->table_id);
+        uuid_generate(table->id);
         table->name = strdup("users");
 
         table->columns_count = 4;
@@ -51,7 +51,7 @@ namespace test {
         table->columns[3] = create_mock_column("age", DT_INTEGER, CF_NONE);
 
         table->has_pk = true;
-        memcpy(table->pk, table->columns[0]->column_id, sizeof(uuid_t));
+        memcpy(table->pk, table->columns[0]->id, sizeof(uuid_t));
 
         table->last_rid = 0;
         return table;
@@ -80,7 +80,7 @@ namespace test {
     void print_mt(MetaTable *table) {
         std::cout << "Table: " << table->name << "\n";
         std::cout << "Table ID: ";
-        print_uuid(table->table_id);
+        print_uuid(table->id);
         std::cout << "\n";
         std::cout << "Has PK: " << (table->has_pk ? "Yes" : "No") << "\n";
 
@@ -123,7 +123,7 @@ namespace test {
             }
 
             std::cout << "| Id: ";
-            print_uuid(col->column_id);
+            print_uuid(col->id);
 
             std::cout << "\n";
         }
@@ -321,9 +321,9 @@ namespace test {
 }
 
 using namespace test;
-// int main () {
-//     cout << "here";
-// }
+int main () {
+    cout << "here";
+}
 //
 // int main() {
 //     // cout << create_database("testdb") << endl << create_table("testdb", create_mock_table()) << endl;

@@ -6,8 +6,8 @@
 
 typedef struct {
     size_t count;
-    uuid_t *column_indices;
-    void **values;
+    uuid_t* column_indices;
+    void** values;
 } DataRowUpdate;
- 
+
 #endif

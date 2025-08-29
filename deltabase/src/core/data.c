@@ -4,25 +4,29 @@
 #include "include/utils.h"
 #include <linux/limits.h>
 
-DataToken *make_token(DataType type, const void *data, size_t size) {
-    DataToken *token = malloc(sizeof(DataToken));
+DataToken*
+make_token(DataType type, const void* data, size_t size) {
+    DataToken* token = malloc(sizeof(DataToken));
     token->type = type;
     token->size = size;
-    token->bytes = (char *)malloc(size);
+    token->bytes = (char*)malloc(size);
     memcpy(token->bytes, data, size);
     return token;
 }
 
-void free_token(DataToken *token) {
+void
+free_token(DataToken* token) {
     if (token) {
         free(token->bytes);
         free(token);
     }
 }
 
-DataToken *copy_token(const DataToken *old) {
-    if (!old) return NULL;
-    DataToken *new_token = malloc(sizeof(DataToken));
+DataToken*
+copy_token(const DataToken* old) {
+    if (!old)
+        return NULL;
+    DataToken* new_token = malloc(sizeof(DataToken));
     new_token->type = old->type;
     new_token->size = old->size;
     new_token->bytes = malloc(old->size);
@@ -30,27 +34,35 @@ DataToken *copy_token(const DataToken *old) {
     return new_token;
 }
 
-void free_tokens(DataToken **tokens, size_t count) {
+void
+free_tokens(DataToken** tokens, size_t count) {
     for (size_t i = 0; i < count; i++) {
         free_token(tokens[i]);
     }
 }
 
-void free_row(DataRow *row) {
+void
+free_row(DataRow* row) {
     free_tokens(row->tokens, row->count);
     free(row);
 }
 
-void free_col(MetaColumn *column) {
+void
+free_col(MetaColumn* column) {
     free(column->name);
     free(column);
 }
 
-bool apply_filter(DataFilterCondition condition, const void *db_value,
-                  const DataType db_type) {
+bool
+apply_filter(DataFilterCondition condition, const void* db_value, const DataType db_type) {
+    if (db_type == DT_UNDEFINED || condition.type == DT_UNDEFINED) {
+        fprintf(stderr, "In apply_filter: one of passed comparing types was undefined\n");
+        return false;
+    }
+
     char col_id[37];
     if (condition.type == DT_NULL || db_type == DT_NULL) {
-        return false; 
+        return false;
     }
 
     if (condition.type != db_type) {
@@ -59,75 +71,104 @@ bool apply_filter(DataFilterCondition condition, const void *db_value,
         return false;
     }
 
-    switch(condition.type) {
-        case DT_INTEGER: {
-            int32_t a = *(const int32_t *)condition.value;
-            int32_t b = *(const int32_t *)db_value;
+    switch (condition.type) {
+    case DT_UNDEFINED:
+        return false;
+    case DT_INTEGER: {
+        int32_t a = *(const int32_t*)condition.value;
+        int32_t b = *(const int32_t*)db_value;
 
-            switch (condition.op) {
-                case OP_EQ:  return a == b;
-                case OP_NEQ: return a != b;
-                case OP_LT:  return a < b;
-                case OP_LTE: return a <= b;
-                case OP_GT:  return a > b;
-                case OP_GTE: return a >= b;
-            }
-            break;
+        switch (condition.op) {
+        case OP_EQ:
+            return a == b;
+        case OP_NEQ:
+            return a != b;
+        case OP_LT:
+            return a < b;
+        case OP_LTE:
+            return a <= b;
+        case OP_GT:
+            return a > b;
+        case OP_GTE:
+            return a >= b;
         }
-        case DT_REAL: {
-            double a = *(const double *)condition.value;
-            double b = *(const double *)db_value;
+        break;
+    }
+    case DT_REAL: {
+        double a = *(const double*)condition.value;
+        double b = *(const double*)db_value;
 
-            switch (condition.op) {
-                case OP_EQ:  return a == b;
-                case OP_NEQ: return a != b;
-                case OP_LT:  return a < b;
-                case OP_LTE: return a <= b;
-                case OP_GT:  return a > b;
-                case OP_GTE: return a >= b;
-            }
-            break;
+        switch (condition.op) {
+        case OP_EQ:
+            return a == b;
+        case OP_NEQ:
+            return a != b;
+        case OP_LT:
+            return a < b;
+        case OP_LTE:
+            return a <= b;
+        case OP_GT:
+            return a > b;
+        case OP_GTE:
+            return a >= b;
         }
-        case DT_STRING: {
-            const char *a = (const char *)condition.value;
-            const char *b = (const char *)db_value;
+        break;
+    }
+    case DT_STRING: {
+        const char* a = (const char*)condition.value;
+        const char* b = (const char*)db_value;
 
-            int cmp = strcmp(a, b);
-            switch (condition.op) {
-                case OP_EQ:  return cmp == 0;
-                case OP_NEQ: return cmp != 0;
-                case OP_LT:  return cmp < 0;
-                case OP_LTE: return cmp <= 0;
-                case OP_GT:  return cmp > 0;
-                case OP_GTE: return cmp >= 0;
-            }
-            break;
+        int cmp = strcmp(a, b);
+        switch (condition.op) {
+        case OP_EQ:
+            return cmp == 0;
+        case OP_NEQ:
+            return cmp != 0;
+        case OP_LT:
+            return cmp < 0;
+        case OP_LTE:
+            return cmp <= 0;
+        case OP_GT:
+            return cmp > 0;
+        case OP_GTE:
+            return cmp >= 0;
         }
-        case DT_CHAR: {
-            char a = *(const char *)condition.value;
-            char b = *(const char *)db_value;
-            switch (condition.op) {
-                case OP_EQ:  return a == b;
-                case OP_NEQ: return a != b;
-                case OP_LT:  return a < b;
-                case OP_LTE: return a <= b;
-                case OP_GT:  return a > b;
-                case OP_GTE: return a >= b;
-            }
-            break;
+        break;
+    }
+    case DT_CHAR: {
+        char a = *(const char*)condition.value;
+        char b = *(const char*)db_value;
+        switch (condition.op) {
+        case OP_EQ:
+            return a == b;
+        case OP_NEQ:
+            return a != b;
+        case OP_LT:
+            return a < b;
+        case OP_LTE:
+            return a <= b;
+        case OP_GT:
+            return a > b;
+        case OP_GTE:
+            return a >= b;
         }
-        case DT_BOOL: {
-            bool a = *(const bool *)condition.value;
-            bool b = *(const bool *)db_value;
-            
-            switch (condition.op) {
-                case OP_EQ:  return a == b;
-                case OP_NEQ: return a != b;
-                default:     return false;
-            }
+        break;
+    }
+    case DT_BOOL: {
+        bool a = *(const bool*)condition.value;
+        bool b = *(const bool*)db_value;
+
+        switch (condition.op) {
+        case OP_EQ:
+            return a == b;
+        case OP_NEQ:
+            return a != b;
+        default:
+            return false;
         }
-        case DT_NULL:
-            break;
+    }
+    case DT_NULL:
+        break;
     }
 
     fprintf(stderr, "Unsupported comparison: %i to %i\n", condition.type, db_type);
@@ -135,9 +176,12 @@ bool apply_filter(DataFilterCondition condition, const void *db_value,
     return false;
 }
 
-bool row_satisfies_filter(const MetaTable *schema, const DataRow *row, const DataFilter *filter) {
+bool
+row_satisfies_filter(const MetaTable* schema, const DataRow* row, const DataFilter* filter) {
     if (schema->columns_count != row->count) {
-        fprintf(stderr, "row_satisfies_filter: Count of columns in schema wasn't equal to count of tokens in row\n");
+        fprintf(stderr,
+                "row_satisfies_filter: Count of columns in schema wasn't equal to count of "
+                "tokens in row\n");
         return false;
     }
 
@@ -150,36 +194,34 @@ bool row_satisfies_filter(const MetaTable *schema, const DataRow *row, const Dat
         }
 
         return apply_filter(
-            filter->data.condition,
-            row->tokens[col_index]->bytes, 
-            row->tokens[col_index]->type
-        );
-    }
-    else {
+            filter->data.condition, row->tokens[col_index]->bytes, row->tokens[col_index]->type);
+    } else {
         switch (filter->data.node.op) {
-            case LOGIC_AND:
-                return 
-                    row_satisfies_filter(schema, row, filter->data.node.left) &&
-                    row_satisfies_filter(schema, row, filter->data.node.right);
-            case LOGIC_OR:
-                return 
-                    row_satisfies_filter(schema, row, filter->data.node.left) ||
-                    row_satisfies_filter(schema, row, filter->data.node.right);
-            default:
-                fprintf(stderr, "Unsupported logic operator: %i\n", filter->data.node.op);
-                return false;
+        case LOGIC_AND:
+            return row_satisfies_filter(schema, row, filter->data.node.left) &&
+                   row_satisfies_filter(schema, row, filter->data.node.right);
+        case LOGIC_OR:
+            return row_satisfies_filter(schema, row, filter->data.node.left) ||
+                   row_satisfies_filter(schema, row, filter->data.node.right);
+        default:
+            fprintf(stderr, "Unsupported logic operator: %i\n", filter->data.node.op);
+            return false;
         }
     }
 }
 
-int create_page(const char *db_name, const char *table_name, PageHeader *out_new_page, char **out_path) {
+int
+create_page(const char* db_name,
+            const char* table_name,
+            PageHeader* out_new_page,
+            char** out_path) {
     uuid_generate_time(out_new_page->page_id);
     out_new_page->rows_count = 0;
 
     char file_path[PATH_MAX];
     path_db_table_page(db_name, table_name, out_new_page->page_id, file_path, PATH_MAX);
 
-    FILE *file = fopen(file_path, "w+");
+    FILE* file = fopen(file_path, "w+");
     if (!file) {
         fprintf(stderr, "Failed to create page file %s\n", out_new_page->page_id);
         return 1;
@@ -190,23 +232,24 @@ int create_page(const char *db_name, const char *table_name, PageHeader *out_new
     }
 
     size_t len = strlen(file_path);
-    char *path = calloc(len + 1, sizeof(char)); 
+    char* path = calloc(len + 1, sizeof(char));
 
     if (!path) {
         fclose(file);
         return 3;
     }
 
-    memcpy(path, file_path, len); 
-    path[len] = '\0'; 
-    *out_path = path; 
+    memcpy(path, file_path, len);
+    path[len] = '\0';
+    *out_path = path;
 
     fclose(file);
     return 0;
 }
 
 // if success, returns count of paths. otherwise, -1
-ssize_t get_pages(const char *db_name, const char *table_name, char ***out_paths) {
+ssize_t
+get_pages(const char* db_name, const char* table_name, char*** out_paths) {
     if (!out_paths) {
         fprintf(stderr, "get_pages: out_paths cannot be null");
         return -1;

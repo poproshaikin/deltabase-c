@@ -1,24 +1,36 @@
 #include "include/utils.hpp"
 
-#include <string>
 #include <sstream>
+#include <string>
 #include <vector>
 
-std::vector<std::string> split(const std::string& s, char delimiter) {
+std::vector<std::string>
+split(const std::string& s, char delimiter, int count) {
     std::vector<std::string> result;
     std::stringstream ss(s);
     std::string item;
+    int counter = 0;
 
     while (std::getline(ss, item, delimiter)) {
+        if (count != 0 && counter == count) {
+            std::string rest;
+            std::getline(ss, rest, '\0');
+            if (!rest.empty()) {
+                item += delimiter + rest;
+            }
+            result.push_back(item);
+            return result;
+        }
         result.push_back(item);
+        ++counter;
     }
 
     return result;
 }
 
-char *make_c_string(const std::string& str) {
-    char *ptr = new char[str.size() + 1];
+char*
+make_c_string(const std::string& str) {
+    char* ptr = new char[str.size() + 1];
     std::memcpy(ptr, str.c_str(), str.size() + 1);
-    
     return ptr;
 }

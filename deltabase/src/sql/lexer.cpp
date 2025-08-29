@@ -1,16 +1,18 @@
 #include "include/lexer.hpp"
 #include <cctype>
 #include <iostream>
-#include <optional>
-#include <stdexcept>
 #include <sstream>
+#include <stdexcept>
 
 using namespace sql;
 
-SqlToken::SqlToken(SqlTokenType type, std::string value, size_t line, size_t pos, SqlTokenDetail detail)
-    : type(type), line(line), value(std::move(value)), pos(pos), detail(detail) { }
+SqlToken::SqlToken(
+    SqlTokenType type, std::string value, size_t line, size_t pos, SqlTokenDetail detail)
+    : type(type), line(line), value(std::move(value)), pos(pos), detail(detail) {
+}
 
-bool SqlToken::is_data_type() const {
+bool
+SqlToken::is_data_type() const {
     if (std::holds_alternative<SqlKeyword>(this->detail)) {
         return is_data_type_kw(std::get<SqlKeyword>(this->detail));
     }
@@ -18,11 +20,13 @@ bool SqlToken::is_data_type() const {
     return false;
 }
 
-bool SqlToken::is_keyword() const {
+bool
+SqlToken::is_keyword() const {
     return std::holds_alternative<SqlKeyword>(this->detail);
 }
 
-bool SqlToken::is_constraint() const {
+bool
+SqlToken::is_constraint() const {
     if (this->is_keyword()) {
         return is_constraint_kw(std::get<SqlKeyword>(this->detail));
     }
@@ -30,15 +34,17 @@ bool SqlToken::is_constraint() const {
     return false;
 }
 
-std::string to_lower(const std::string& str) {
+std::string
+to_lower(const std::string& str) {
     std::stringstream sb;
     for (char c : str) {
         sb << (char)std::tolower(c);
-    }   
+    }
     return sb.str();
 }
 
-size_t get_word_length(const char* str) {
+size_t
+get_word_length(const char* str) {
     const char* p = str;
 
     while (*p != '\0' && (isalnum(*p) || *p == '_')) {
@@ -48,26 +54,30 @@ size_t get_word_length(const char* str) {
     return p - str;
 }
 
-size_t get_number_length(const char* str) {
+size_t
+get_number_length(const char* str) {
     const char* p = str;
     bool dot_found = false;
 
     while (isdigit(*p) || (!dot_found && *p == '.')) {
-        if (*p == '.') dot_found = true;
+        if (*p == '.')
+            dot_found = true;
         ++p;
     }
 
     return p - str;
 }
 
-std::string read_next_word(const std::string& sql, size_t i) {
+std::string
+read_next_word(const std::string& sql, size_t i) {
     size_t word_start = i;
     size_t word_len = get_word_length(&sql[i]);
 
     return sql.substr(word_start, word_len);
 }
 
-bool starts_as_operator(char c) {
+bool
+starts_as_operator(char c) {
     auto& operators = operators_map();
 
     for (const auto& op : operators) {
@@ -79,16 +89,11 @@ bool starts_as_operator(char c) {
     return false;
 }
 
-std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
-    auto isalpha = [](char c){
-        return std::isalpha((unsigned char)c) || (unsigned char)c == '_';
-    };
-    auto isdigit = [](char c){
-        return std::isdigit((unsigned char)c);
-    };
-    auto isspace = [](char c){
-        return std::isspace((unsigned char)c);
-    };
+std::vector<SqlToken>
+SqlTokenizer::tokenize(const std::string& sql) {
+    auto isalpha = [](char c) { return std::isalpha((unsigned char)c) || (unsigned char)c == '_'; };
+    auto isdigit = [](char c) { return std::isdigit((unsigned char)c); };
+    auto isspace = [](char c) { return std::isspace((unsigned char)c); };
 
     const auto& keywords = keywords_map();
     const auto& operators = operators_map();
@@ -103,7 +108,7 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
     while (i < sql.length()) {
         char c = sql[i];
 
-        if (std::isspace((unsigned char) c)) {
+        if (std::isspace((unsigned char)c)) {
             if (c == '\n') {
                 line++;
                 pos = 0;
@@ -112,8 +117,7 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
             }
             i++;
             continue;
-        } 
-        else if (isalpha(c)) {
+        } else if (isalpha(c)) {
             std::string word = to_lower(read_next_word(sql, i));
             SqlToken token(SqlTokenType::IDENTIFIER, word, line, pos);
 
@@ -127,8 +131,7 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
 
             pos += word.length();
             i += word.length();
-        }
-        else if (c == '\'') {
+        } else if (c == '\'') {
             size_t word_start = i + 1;
             size_t word_end = sql.find('\'', word_start);
 
@@ -144,8 +147,7 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
             size_t consumed = (word_end + 1) - i;
             i += consumed;
             pos += consumed;
-        }
-        else if (isdigit(c)) {
+        } else if (isdigit(c)) {
             size_t word_start = i;
             size_t word_len = get_number_length(&sql[i]);
 
@@ -153,18 +155,18 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
 
             SqlToken token(SqlTokenType::LITERAL, word, line, pos);
 
-            if (word.find('.') != std::string::npos || word.find('e') != std::string::npos || word.find('E') != std::string::npos) {
+            if (word.find('.') != std::string::npos || word.find('e') != std::string::npos ||
+                word.find('E') != std::string::npos) {
                 token.detail = SqlLiteral::REAL;
             } else {
                 token.detail = SqlLiteral::INTEGER;
             }
-            
+
             result.push_back(token);
 
             i += word_len;
             pos += word_len;
-        }
-        else if (starts_as_operator(c)) {
+        } else if (starts_as_operator(c)) {
             std::string op;
             size_t op_start = i;
 
@@ -187,8 +189,7 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
 
             i += op.length();
             pos += op.length();
-        }
-        else if (symbols.find(std::string(1, c)) != symbols.end()) {
+        } else if (symbols.find(std::string(1, c)) != symbols.end()) {
             std::string sym_str(1, c);
             SqlToken token(SqlTokenType::SYMBOL, sym_str, line, pos, symbols.at(sym_str));
             result.push_back(token);
@@ -201,11 +202,12 @@ std::vector<SqlToken> SqlTokenizer::tokenize(const std::string& sql) {
     return result;
 }
 
-std::string SqlToken::to_string(int indent) const {
-    auto indent_fn = [indent](){
+std::string
+SqlToken::to_string(int indent) const {
+    auto indent_fn = [indent]() {
         for (int i = 0; i < indent; i++) {
             std::cout << ' ';
-        }  
+        }
     };
 
     std::ostringstream result;
@@ -220,24 +222,24 @@ std::string SqlToken::to_string(int indent) const {
     result << "Pos: " << pos << "\n";
 
     switch (type) {
-        case SqlTokenType::KEYWORD:
-            indent_fn();
-            result << "Keyword: " << utils::to_string(std::get<SqlKeyword>(detail)) << "\n";
-            break;
-        case SqlTokenType::OPERATOR:
-            indent_fn();
-            result << "Operator: " << utils::to_string(std::get<SqlOperator>(detail)) << "\n";
-            break;
-        case SqlTokenType::LITERAL:
-            indent_fn();
-            result << "Literal: " << utils::to_string(std::get<SqlLiteral>(detail), value) << "\n";
-            break;
-        case SqlTokenType::SYMBOL:
-            indent_fn();
-            result << "Symbol: " << utils::to_string(std::get<SqlSymbol>(detail)) << "\n";
-            break;
-        default:
-            break;
+    case SqlTokenType::KEYWORD:
+        indent_fn();
+        result << "Keyword: " << utils::to_string(std::get<SqlKeyword>(detail)) << "\n";
+        break;
+    case SqlTokenType::OPERATOR:
+        indent_fn();
+        result << "Operator: " << utils::to_string(std::get<SqlOperator>(detail)) << "\n";
+        break;
+    case SqlTokenType::LITERAL:
+        indent_fn();
+        result << "Literal: " << utils::to_string(std::get<SqlLiteral>(detail), value) << "\n";
+        break;
+    case SqlTokenType::SYMBOL:
+        indent_fn();
+        result << "Symbol: " << utils::to_string(std::get<SqlSymbol>(detail)) << "\n";
+        break;
+    default:
+        break;
     }
 
     return result.str();

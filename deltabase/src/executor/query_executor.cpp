@@ -1,9 +1,7 @@
 #include "include/query_executor.hpp"
 #include "../converter/include/converter.hpp"
 #include "../converter/include/statement_converter.hpp"
-
-#include "../misc/include/utils.hpp"
-#include "../meta/include/meta_factory.hpp"
+#include "../meta/include/meta_registry.hpp"
 
 #include <linux/limits.h>
 #include <memory>
@@ -25,40 +23,63 @@ namespace {
         return token.value.data();
     }
 
-
-
     void file_deleter(FILE *f) {
         if (f)
             fclose(f);
     }
 
     using unique_file = std::unique_ptr<FILE, void (*)(FILE *)>;
-
 } // anonymous namespace
 
 namespace exe {
-    QueryExecutor::QueryExecutor(std::string db_name) : db_name(db_name) { }
+    IQueryExecutor::~IQueryExecutor() { }
 
-    std::variant<std::unique_ptr<DataTable>, int> QueryExecutor::execute(const sql::AstNode& stmt) {
-        if (std::holds_alternative<sql::SelectStatement>(stmt.value)) {
-            return execute_select(std::get<sql::SelectStatement>(stmt.value));
+    void
+    DatabaseExecutor::set_db_name(std::string db_name) {
+        this->db_name = db_name;
+    }
+
+    IsSupportedType
+    DatabaseExecutor::supports(const sql::AstNodeType& type) const {
+        switch (type) {
+            case sql::AstNodeType::SELECT:
+            case sql::AstNodeType::INSERT:
+            case sql::AstNodeType::UPDATE:
+            case sql::AstNodeType::DELETE:
+            case sql::AstNodeType::CREATE_TABLE:
+                return IsSupportedType::SUPPORTS;
+            default:
+                return IsSupportedType::UNSUPPORTED_STATEMENT;
+        }
+    }
+
+    IntOrDataTable
+    DatabaseExecutor::execute(const sql::AstNode& node) {
+        if (std::holds_alternative<sql::SelectStatement>(node.value)) {
+            return execute_select(std::get<sql::SelectStatement>(node.value));
         } 
-        else if (std::holds_alternative<sql::InsertStatement>(stmt.value)) {
-            return execute_insert(std::get<sql::InsertStatement>(stmt.value));
+
+        else if (std::holds_alternative<sql::InsertStatement>(node.value)) {
+            return execute_insert(std::get<sql::InsertStatement>(node.value));
         }
-        else if (std::holds_alternative<sql::UpdateStatement>(stmt.value)) {
-            return execute_update(std::get<sql::UpdateStatement>(stmt.value));
+
+        else if (std::holds_alternative<sql::UpdateStatement>(node.value)) {
+            return execute_update(std::get<sql::UpdateStatement>(node.value));
         }
-        else if (std::holds_alternative<sql::DeleteStatement>(stmt.value)) {
-            return execute_delete(std::get<sql::DeleteStatement>(stmt.value));
-        } else if (std::holds_alternative<sql::CreateTableStatement>(stmt.value)) {
-            return execute_create_table(std::get<sql::CreateTableStatement>(stmt.value));
+
+        else if (std::holds_alternative<sql::DeleteStatement>(node.value)) {
+            return execute_delete(std::get<sql::DeleteStatement>(node.value));
+        } 
+
+        else if (std::holds_alternative<sql::CreateTableStatement>(node.value)) {
+            return execute_create_table(std::get<sql::CreateTableStatement>(node.value));
         }
 
         throw std::runtime_error("Unsupported query");
     }
 
-    std::unique_ptr<DataTable> QueryExecutor::execute_select(const sql::SelectStatement& stmt) {
+    std::unique_ptr<DataTable>
+    DatabaseExecutor::execute_select(const sql::SelectStatement& stmt) {
         MetaTable *schema = new MetaTable;
         const sql::SqlToken& table = stmt.table;
 
@@ -86,10 +107,11 @@ namespace exe {
         }
         result.scheme = schema;
 
-        return std::make_unique<DataTable>(std::move(result)); 
+        return std::make_unique<DataTable>(std::move(result));
     }
 
-    int QueryExecutor::execute_insert(const sql::InsertStatement& stmt) {
+    int
+    DatabaseExecutor::execute_insert(const sql::InsertStatement& stmt) {
         MetaTable schema;
         const sql::SqlToken& table = stmt.table;
 
@@ -107,7 +129,8 @@ namespace exe {
         return 1;
     }
 
-    int QueryExecutor::execute_update(const sql::UpdateStatement& stmt) {
+    int
+    DatabaseExecutor::execute_update(const sql::UpdateStatement& stmt) {
         MetaTable schema;
         const sql::SqlToken& table = stmt.table;
 
@@ -128,7 +151,7 @@ namespace exe {
         return rows_affected;
     }
 
-    int QueryExecutor::execute_delete(const sql::DeleteStatement& stmt) {
+    int DatabaseExecutor::execute_delete(const sql::DeleteStatement& stmt) {
         const sql::SqlToken& table = stmt.table;
 
         MetaTable schema;
@@ -153,7 +176,7 @@ namespace exe {
         return rows_affected;
     }
 
-    int QueryExecutor::execute_create_table(const sql::CreateTableStatement& stmt) {
+    int DatabaseExecutor::execute_create_table(const sql::CreateTableStatement& stmt) {
         MetaTable table = converter::convert_create_table_to_mt(stmt);
 
         if (create_table(this->db_name.data(), &table) != 0) {
@@ -165,7 +188,28 @@ namespace exe {
         return 0;
     }
 
-    int QueryExecutor::execute_create_database(const sql::CreateDbStatement &stmt) {
+    void AdminExecutor::set_db_name(std::string db_name) {
+        this->db_name = db_name;
+    }
+
+    IsSupportedType AdminExecutor::supports(const sql::AstNodeType& type) const {
+        switch (type) {
+            case sql::AstNodeType::CREATE_DATABASE:
+                return IsSupportedType::SUPPORTS;
+            default:
+                return IsSupportedType::UNSUPPORTED_STATEMENT;
+        }
+    }
+
+    IntOrDataTable AdminExecutor::execute(const sql::AstNode& node) {
+        if (std::holds_alternative<sql::CreateDbStatement>(node.value)) {
+            return execute_create_database(std::get<sql::CreateDbStatement>(node.value));
+        }
+
+        throw std::runtime_error("Unsupported query");
+    }
+
+    int AdminExecutor::execute_create_database(const sql::CreateDbStatement &stmt) {
         if (!create_database(stmt.name.value.c_str())) {
             throw std::runtime_error("Failed to create database " + stmt.name.value);
         }

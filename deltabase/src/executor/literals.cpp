@@ -3,7 +3,8 @@
 #include <stdexcept>
 
 namespace exe {
-    int literal_to_int(const std::string &literal) {
+    int
+    literal_to_int(const std::string& literal) {
         try {
             size_t pos;
             int val = std::stoi(literal, &pos);
@@ -16,7 +17,8 @@ namespace exe {
         }
     }
 
-    double literal_to_real(const std::string &literal) {
+    double
+    literal_to_real(const std::string& literal) {
         try {
             size_t pos;
             double val = std::stod(literal, &pos);
@@ -29,21 +31,25 @@ namespace exe {
         }
     }
 
-    bool literal_to_bool(const std::string &literal) {
+    bool
+    literal_to_bool(const std::string& literal) {
         std::string lower;
         lower.resize(literal.size());
         std::transform(literal.begin(), literal.end(), lower.begin(), ::tolower);
 
-        if (lower == "true" || lower == "1" || lower == "t") return true;
-        if (lower == "false" || lower == "0" || lower == "f") return false;
+        if (lower == "true" || lower == "1" || lower == "t")
+            return true;
+        if (lower == "false" || lower == "0" || lower == "f")
+            return false;
 
         throw std::runtime_error("Invalid boolean format: " + literal);
     }
 
-    char literal_to_char(const std::string &literal) {
+    char
+    literal_to_char(const std::string& literal) {
         if (literal.size() != 1) {
             throw std::runtime_error("Invalid char format (must be single character): " + literal);
         }
         return literal[0];
     }
-}
+} // namespace exe

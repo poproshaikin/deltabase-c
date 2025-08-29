@@ -1,11 +1,24 @@
 BasedOnStyle: LLVM
+
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
-BinPackParameters: false
-AlignAfterOpenBracket: Align
+
 ColumnLimit: 100
 ContinuationIndentWidth: 4
+AlignAfterOpenBracket: Align
 NamespaceIndentation: All
+AllowAllParametersOfDeclarationOnNextLine: true
+BinPackParameters: false
+BinPackArguments: false
+
 DerivePointerAlignment: false
-PointerAlignment: Right
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+
+AlwaysBreakAfterReturnType: All
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: None
+
+AccessModifierOffset: -4
