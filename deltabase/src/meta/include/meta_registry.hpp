@@ -42,6 +42,16 @@ namespace meta {
             return std::nullopt;
         }
 
+        std::shared_ptr<CppMetaTable>
+        get_table(const std::string& table) {
+            for (const auto& kvp : this->registry) {
+                if (kvp.second->get_name() == table) {
+                    return std::dynamic_pointer_cast<CppMetaTable>(kvp.second);
+                }
+            }
+            return nullptr;
+        }
+
         template<typename T>
         void add_schema(T&& schema) {
             static_assert(std::is_base_of_v<CppMetaSchemaWrapper, std::decay_t<T>>, 

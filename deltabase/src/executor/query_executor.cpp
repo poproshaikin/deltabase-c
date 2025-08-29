@@ -78,14 +78,46 @@ namespace exe {
         throw std::runtime_error("Unsupported query");
     }
 
+    // std::unique_ptr<DataTable>
+    // DatabaseExecutor::execute_select(const sql::SelectStatement& stmt) {
+    //     MetaTable *schema = new MetaTable;
+    //     const sql::SqlToken& table = stmt.table;
+
+    //     if (get_table(this->db_name.data(), table.value.data(), schema) != 0) {
+    //         throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
+    //     }
+
+    //     size_t columns_count = stmt.columns.size();
+
+    //     char **column_names = (char**)std::malloc(columns_count * sizeof(char *));
+    //     if (!column_names) {
+    //         throw std::runtime_error("Failed to allocate memory in execute_query");
+    //     }
+    //     for (size_t i = 0; i < columns_count; i++) {
+    //         column_names[i] = const_cast<char*>(stmt.columns[i].value.data());
+    //     }
+
+    //     std::unique_ptr<DataFilter> filter;
+    //     if (stmt.where) 
+    //         filter = std::make_unique<DataFilter>(converter::convert_binary_to_filter(std::get<sql::BinaryExpr>(stmt.where->value), *schema));
+
+    //     DataTable result;
+    //     if (seq_scan(this->db_name.data(), table.value.data(), (const char **)column_names, columns_count, filter.get(), &result) != 0) {
+    //         throw std::runtime_error("Failed to scan a table");
+    //     }
+    //     result.scheme = schema;
+
+
+    //     return std::make_unique<DataTable>(std::move(result));
+    // }
+
     std::unique_ptr<DataTable>
     DatabaseExecutor::execute_select(const sql::SelectStatement& stmt) {
-        MetaTable *schema = new MetaTable;
-        const sql::SqlToken& table = stmt.table;
+        auto cpp_table = this->registry.get_table(stmt.table.value);
+        MetaTable* c_table = new MetaTable; 
+        *c_table = cpp_table->create_meta_table();
 
-        if (get_table(this->db_name.data(), table.value.data(), schema) != 0) {
-            throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
-        }
+        const sql::SqlToken& table_name = stmt.table;
 
         size_t columns_count = stmt.columns.size();
 
@@ -99,80 +131,65 @@ namespace exe {
 
         std::unique_ptr<DataFilter> filter;
         if (stmt.where) 
-            filter = std::make_unique<DataFilter>(converter::convert_binary_to_filter(std::get<sql::BinaryExpr>(stmt.where->value), *schema));
+            filter = std::make_unique<DataFilter>(converter::convert_binary_to_filter(std::get<sql::BinaryExpr>(stmt.where->value), *c_table));
 
         DataTable result;
-        if (seq_scan(this->db_name.data(), table.value.data(), (const char **)column_names, columns_count, filter.get(), &result) != 0) {
+        if (seq_scan(this->db_name.data(), table_name.value.data(), (const char **)column_names, columns_count, filter.get(), &result) != 0) {
             throw std::runtime_error("Failed to scan a table");
         }
-        result.scheme = schema;
+        result.scheme = c_table;
 
         return std::make_unique<DataTable>(std::move(result));
     }
 
     int
     DatabaseExecutor::execute_insert(const sql::InsertStatement& stmt) {
-        MetaTable schema;
-        const sql::SqlToken& table = stmt.table;
+        auto table = this->registry.get_table(stmt.table.value);
+        auto c_table = table->create_meta_table();
 
-        if (get_table(this->db_name.data(), table.value.data(), &schema) != 0) {
-            throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
-        }
-
-        DataRow row = converter::convert_insert_to_data_row(schema, stmt);
-        if (insert_row(this->db_name.data(), table.value.data(), &row) != 0) {
+        DataRow row = converter::convert_insert_to_data_row(c_table, stmt);
+        if (insert_row(this->db_name.c_str(), table->get_name().c_str(), &row) != 0) {
             throw std::runtime_error("Failed to insert row");
         }
-
-        meta::cleanup_meta_table(schema);
 
         return 1;
     }
 
     int
     DatabaseExecutor::execute_update(const sql::UpdateStatement& stmt) {
-        MetaTable schema;
-        const sql::SqlToken& table = stmt.table;
+        auto table = this->registry.get_table(stmt.table.value);
+        auto c_table = table->create_meta_table();
 
-        if (get_table(this->db_name.data(), table.value.data(), &schema) != 0) {
-            throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
-        }
-
-        DataRowUpdate update = converter::create_row_update(schema, stmt);
-        DataFilter filter = converter::convert_binary_to_filter(std::get<sql::BinaryExpr>(stmt.where->value), schema);
+        DataRowUpdate update = converter::create_row_update(c_table, stmt);
+        DataFilter filter = converter::convert_binary_to_filter(std::get<sql::BinaryExpr>(stmt.where->value), c_table);
         
         size_t rows_affected = 0;
-        if (update_rows_by_filter(this->db_name.data(), table.value.data(), (const DataFilter *)&filter, &update, &rows_affected) != 0) {
+        if (update_rows_by_filter(this->db_name.data(), table->get_name().c_str(), (const DataFilter *)&filter, &update, &rows_affected) != 0) {
             throw std::runtime_error("Failed to update row");
         }
 
-        meta::cleanup_meta_table(schema);
+        meta::cleanup_meta_table(c_table);
 
         return rows_affected;
     }
 
     int DatabaseExecutor::execute_delete(const sql::DeleteStatement& stmt) {
-        const sql::SqlToken& table = stmt.table;
-
-        MetaTable schema;
-        if (get_table(this->db_name.data(), table.value.data(), &schema) != 0) {
-            throw std::runtime_error(std::string("Failed to get table schema: ") + table.value);
-        }
+        auto table = this->registry.get_table(stmt.table.value);
+        auto c_table = table->create_meta_table();
 
         std::unique_ptr<DataFilter> filter = nullptr;
         if (stmt.where) {
-            filter = std::make_unique<DataFilter>(converter::convert_binary_to_filter(std::get<sql::BinaryExpr>(stmt.where->value), schema));
+            filter = std::make_unique<DataFilter>(converter::convert_binary_to_filter(std::get<sql::BinaryExpr>(stmt.where->value), c_table));
         }
 
         size_t rows_affected = 0;
-        int rc = delete_rows_by_filter(this->db_name.data(), table.value.data(), filter.get(), &rows_affected);
+        int rc = delete_rows_by_filter(this->db_name.c_str(), table->get_name().c_str(), filter.get(), &rows_affected);
 
         if (rc != 0) {
             throw std::runtime_error("Failed to delete rows by filter");
         }
 
-        meta::cleanup_meta_table(schema);
-
+        meta::cleanup_meta_table(c_table);
         return rows_affected;
     }
 
@@ -210,7 +227,7 @@ namespace exe {
     }
 
     int AdminExecutor::execute_create_database(const sql::CreateDbStatement &stmt) {
-        if (!create_database(stmt.name.value.c_str())) {
+        if (create_database(stmt.name.value.c_str()) != 0) {
             throw std::runtime_error("Failed to create database " + stmt.name.value);
         }
 

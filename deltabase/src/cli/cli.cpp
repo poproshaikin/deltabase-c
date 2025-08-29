@@ -204,6 +204,7 @@ SqlCli::SqlCli() {
 void
 cli::SqlCli::run_query_console() {
     std::string input;
+    this->engine = std::make_unique<DltEngine>();
     std::cout << "Welcome to deltabase! Type '\\q' to quit." << std::endl;
 
     while (true) {
@@ -222,13 +223,14 @@ cli::SqlCli::run_query_console() {
             }
         } else {
             if (engine == nullptr) {
-                std::cout << "You are not connected to a database. Connect first using \\connect"
-                          << std::endl;
+                std::cout 
+                    << "You are not connected to a database. Connect first using \\connect"
+                    << std::endl;
             } else {
                 try {
-                    const ExecutionResult& result = engine->execute(input);
+                    const ExecutionResult& result = engine->run_query(input);
 
-                    std::cout << "Execution time: " << result.execution_time_ms << "ms"
+                    std::cout << "Execution time: " << result.execution_time_ns / 1000000.0 << " ms"
                               << std::endl;
 
                     if (std::holds_alternative<std::unique_ptr<DataTable>>(result.result))
@@ -257,7 +259,7 @@ cli::SqlCli::run_query_console() {
     //     try {
     //         const ExecutionResult &result = engine->run(input);
 
-    //         std::cout << "Execution time: " << result.execution_time_ms << "ms" << std::endl;
+    //         std::cout << "Execution time: " << result.execution_time_ns / 1000000.0 << " ms" << std::endl;
 
     //         if (std::holds_alternative<std::unique_ptr<DataTable>>(result.result))
     //             print_data_table(std::get<std::unique_ptr<DataTable>>(result.result).get());

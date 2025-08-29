@@ -1,5 +1,5 @@
-#include "../meta/include/meta_schema.hpp"
 #include "../sql/include/parser.hpp"
+#include "../meta/include/meta_registry.hpp"
 #include <cstdlib>
 #include <stdexcept>
 

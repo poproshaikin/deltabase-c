@@ -33,6 +33,9 @@ namespace exe {
         case sql::AstNodeType::CREATE_TABLE:
             analyze_create_table(std::get<sql::CreateTableStatement>(ast.value));
             break;
+        case sql::AstNodeType::CREATE_DATABASE:
+            analyze_create_db(std::get<sql::CreateDbStatement>(ast.value));
+            break;
         default:
             throw std::runtime_error("Unsupported AST node type for semantic analysis");
         }

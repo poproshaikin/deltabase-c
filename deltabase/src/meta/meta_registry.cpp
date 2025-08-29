@@ -2,6 +2,7 @@
 #include "../converter/include/converter.hpp"
 #include "../misc/include/utils.hpp"
 #include <linux/limits.h>
+#include <iostream>
 
 extern "C" {
 #include "../core/include/core.h"
@@ -15,7 +16,12 @@ namespace meta {
 
     void 
     MetaRegistry::init() {
+        if (ensure_fs_initialized() != 0) {
+            throw std::runtime_error("Failed to initialize fs");
+        }
+
         char buffer[PATH_MAX];       
+
         if (get_executable_dir(buffer, PATH_MAX) != 0) {
             throw std::runtime_error("Failed to get executable directory");
         }
@@ -23,37 +29,40 @@ namespace meta {
         size_t databases_count = 0;
         char** databases = get_databases(&databases_count);
 
-        if (!databases) {
-            throw std::runtime_error("Failed to get databases list");
+        if (!databases || databases_count == 0) {
+            // No databases exist yet, that's fine
+            std::cout << "No databases found - registry initialized empty." << std::endl;
+            return;
         }
 
         for (size_t i = 0; i < databases_count; i++) {
 
             size_t tables_count = 0;
             char** tables = get_tables(databases[i], &tables_count);
-            if (!tables) {
-                throw std::runtime_error("Failed to get tables list");
+            if (!tables || tables_count == 0) {
+                // Database exists but has no tables, that's fine
+                continue;
             }
 
             for (size_t j = 0; j < tables_count; j++) {
                 MetaTable raw_table;
-                if (get_table(databases[i], tables[j], &raw_table) != 0) {
+                if (::get_table(databases[i], tables[j], &raw_table) != 0) {
                     throw std::runtime_error("Failed to get meta table");
                 }      
 
                 CppMetaTable table(raw_table);
                 this->add_schema(std::move(table));
 
-                delete tables[i];
+                free(tables[j]);
             }
 
-            delete tables;
+            free(tables);
         }
 
         for (size_t i = 0; i < databases_count; i++) {
-            delete databases[i];
+            free(databases[i]);
         }
-        delete databases;
+        free(databases);
     }
 
     MetaColumn
@@ -86,15 +95,15 @@ namespace meta {
     void
     cleanup_meta_table(MetaTable& table) {
         if (table.name) {
-            delete table.name;
+            free(table.name);
         }
         if (table.columns) {
             for (uint64_t i = 0; i < table.columns_count; i++) {
                 if (table.columns[i]) {
-                    delete table.columns[i];
+                    free_col(table.columns[i]);
                 }
             }
-            delete table.columns;
+            free(table.columns);
         }
 
     }
@@ -102,7 +111,7 @@ namespace meta {
     void
     cleanup_meta_column(MetaColumn& column) {
         if (column.name) {
-            delete column.name;
+            free(column.name);
         }
     }
 
@@ -112,7 +121,7 @@ namespace meta {
             return;
 
         cleanup_meta_table(*table);
-        delete table;
+        free(table);
 
     }
 
@@ -122,6 +131,6 @@ namespace meta {
             return;
 
         cleanup_meta_column(*column);
-        delete column;
+        free(column);
     }
 } // namespace meta

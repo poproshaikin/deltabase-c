@@ -6,13 +6,11 @@
 #include <chrono>
 #include <iostream>
 
-DltEngine::DltEngine() : semantic_analyzer(exe::SemanticAnalyzer(std::nullopt)) {
-    this->registry = meta::MetaRegistry();
+DltEngine::DltEngine() : semantic_analyzer(exe::SemanticAnalyzer(std::nullopt)), registry() {
     this->executors.push_back(std::make_unique<exe::AdminExecutor>(this->registry, std::nullopt));
 }
 
-DltEngine::DltEngine(std::string db_name) : db_name(db_name), semantic_analyzer(db_name) {
-    this->registry = meta::MetaRegistry();
+DltEngine::DltEngine(std::string db_name) : db_name(db_name), semantic_analyzer(db_name), registry() {
     this->executors.push_back(std::make_unique<exe::AdminExecutor>(this->registry, db_name));
     this->executors.push_back(std::make_unique<exe::DatabaseExecutor>(this->registry, db_name));
 }
@@ -84,7 +82,7 @@ DltEngine::run_query(const std::string& sql) {
     exe::IntOrDataTable result = execute(*node);
 
     auto end = std::chrono::high_resolution_clock::now();
-    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    auto duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    return ExecutionResult(std::move(result), duration_ms);
+    return ExecutionResult(std::move(result), duration_ns);
 }

@@ -9,10 +9,10 @@
 
 struct ExecutionResult {
     exe::IntOrDataTable result;
-    long execution_time_ms;
+    long execution_time_ns;
 
-    ExecutionResult(exe::IntOrDataTable&& result, long execution_time_ms)
-        : result(std::move(result)), execution_time_ms(execution_time_ms) {
+    ExecutionResult(exe::IntOrDataTable&& result, long execution_time_ns)
+        : result(std::move(result)), execution_time_ns(execution_time_ns) {
     }
 };
 

@@ -158,7 +158,6 @@ read_dt(DataToken* out, int fd) {
         }
     }
 
-    printf("filan size: %lu\n", finalSize);
     char* buffer = malloc(finalSize);
     if (!buffer) {
         fprintf(stderr, "Failed to allocate memory\n");

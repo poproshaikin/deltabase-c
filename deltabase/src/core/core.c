@@ -4,21 +4,48 @@
 #include "include/ll_io.h"
 #include <stdio.h>
 
-int
-create_database(const char* db_name) {
+int 
+ensure_fs_initialized() {
     char buffer[PATH_MAX];
-    path_db(db_name, buffer, PATH_MAX);
 
-    printf("%s\n", buffer);
-
-    if (dir_exists(buffer)) {
+    if (path_data(buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In ensure_fs_initialized: path_data returned error\n");
         return 1;
     }
 
-    int created_base = mkdir_recursive(buffer, 0755);
-    printf("%i\n", created_base);
-    if (created_base != 0) {
+    if (!dir_exists(buffer)) {
+        mkdir_recursive(buffer, 0755);
+    }
+
+    return 0;
+}
+
+int
+create_database(const char* db_name) {
+    char buffer[PATH_MAX];
+    if (path_db(db_name, buffer, PATH_MAX) != 0) {
+        fprintf(stderr,"In create_database: failed to get database path\n");
+        return 1;
+    }
+
+    if (dir_exists(buffer)) {
+        fprintf(stderr, "In create_database: database already exists\n");
         return 2;
+    }
+
+    if (mkdir_recursive(buffer, 0755) != 0) {
+        fprintf(stderr, "in create_database: failed to make directories recursively\n");
+        return 3;
+    }
+
+    if (path_db_meta(db_name, buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In create_database: failed to get database meta path\n");
+        return 4;
+    }
+
+    if (mkdir_recursive(buffer, 0755) != 0) {
+        fprintf(stderr, "in create_database: failed to make directories recursively\n");
+        return 3;
     }
 
     return 0;
@@ -48,7 +75,10 @@ drop_database(const char* db_name) {
 bool
 exists_database(const char* db_name) {
     char db_path[PATH_MAX];
-    path_db(db_name, db_path, sizeof(db_path));
+    if (path_db(db_name, db_path, sizeof(db_path)) != 0) {
+        fprintf(stderr, "In exists_database: to get database path\n");
+        return false;
+    }
 
     return dir_exists(db_path);
 }

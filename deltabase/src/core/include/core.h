@@ -10,6 +10,9 @@
 #include <linux/limits.h>
 #include <stdbool.h>
 
+int 
+ensure_fs_initialized();
+
 int
 create_database(const char* db_name);
 
@@ -63,8 +66,5 @@ seq_scan(const char* db_name,
          size_t columns_count,
          const DataFilter* filter,
          DataTable* out);
-
-int
-index_scan(const char* db_name, const char* index_name, const DataFilter* filter, DataTable* out);
 
 #endif // CORE_H
