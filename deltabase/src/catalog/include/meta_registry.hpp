@@ -14,14 +14,7 @@ extern "C" {
 #include "../../core/include/meta.h"
 }
 
-// сделать что то типа большого реестра мета-сущностей, типа таблиц, колонок, всякой хуйни
-// при инициализации движка будет подгружать всю мета информацию.
-// schema catalog
-// нет обращений к fs при каждом запросе
-// единый источник метаданных
-// пизда круто
-
-namespace meta {
+namespace catalog { 
 
     class MetaRegistry {
 
@@ -77,4 +70,4 @@ namespace meta {
 
     void
     cleanup_meta_column(MetaColumn* column);
-} // namespace meta
+} // namespace catalog

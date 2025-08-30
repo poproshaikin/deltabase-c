@@ -1,26 +1,26 @@
 #include "include/meta_registry.hpp"
 #include "../converter/include/converter.hpp"
 #include "../misc/include/utils.hpp"
-#include <linux/limits.h>
 #include <iostream>
+#include <linux/limits.h>
 
 extern "C" {
 #include "../core/include/core.h"
 #include "../core/include/utils.h"
 }
 
-namespace meta {
+namespace catalog {
     MetaRegistry::MetaRegistry() {
         init();
     }
 
-    void 
+    void
     MetaRegistry::init() {
         if (ensure_fs_initialized() != 0) {
             throw std::runtime_error("Failed to initialize fs");
         }
 
-        char buffer[PATH_MAX];       
+        char buffer[PATH_MAX];
 
         if (get_executable_dir(buffer, PATH_MAX) != 0) {
             throw std::runtime_error("Failed to get executable directory");
@@ -48,7 +48,7 @@ namespace meta {
                 MetaTable raw_table;
                 if (::get_table(databases[i], tables[j], &raw_table) != 0) {
                     throw std::runtime_error("Failed to get meta table");
-                }      
+                }
 
                 CppMetaTable table(raw_table);
                 this->add_schema(std::move(table));
@@ -78,8 +78,7 @@ namespace meta {
     }
 
     MetaTable
-    create_meta_table(const std::string& name,
-                                    const std::vector<sql::ColumnDefinition> col_defs) {
+    create_meta_table(const std::string& name, const std::vector<sql::ColumnDefinition> col_defs) {
         MetaTable table;
 
         table.name = make_c_string(name);
@@ -105,7 +104,6 @@ namespace meta {
             }
             free(table.columns);
         }
-
     }
 
     void
@@ -122,7 +120,6 @@ namespace meta {
 
         cleanup_meta_table(*table);
         free(table);
-
     }
 
     void
@@ -133,4 +130,4 @@ namespace meta {
         cleanup_meta_column(*column);
         free(column);
     }
-} // namespace meta
+} // namespace catalog

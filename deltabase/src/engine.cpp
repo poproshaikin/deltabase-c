@@ -10,7 +10,8 @@ DltEngine::DltEngine() : semantic_analyzer(exe::SemanticAnalyzer(std::nullopt)),
     this->executors.push_back(std::make_unique<exe::AdminExecutor>(this->registry, std::nullopt));
 }
 
-DltEngine::DltEngine(std::string db_name) : db_name(db_name), semantic_analyzer(db_name), registry() {
+DltEngine::DltEngine(std::string db_name)
+    : db_name(db_name), semantic_analyzer(db_name), registry() {
     this->executors.push_back(std::make_unique<exe::AdminExecutor>(this->registry, db_name));
     this->executors.push_back(std::make_unique<exe::DatabaseExecutor>(this->registry, db_name));
 }
@@ -40,17 +41,13 @@ DltEngine::execute(const sql::AstNode& node) {
     }
 
     try {
-        if (this->can_execute(node.type) != exe::IsSupportedType::SUPPORTS) {
-            throw std::runtime_error("Query type is not supported by any executor.");
-        }
-
         for (std::unique_ptr<exe::IQueryExecutor>& executor : this->executors) {
             if (executor->supports(node.type) == exe::IsSupportedType::SUPPORTS) {
                 return executor->execute(node);
             }
         }
 
-        throw std::runtime_error("як тобi це нахуй вдалося?");
+        throw std::runtime_error("Query type is not supported by any executor.");
     } catch (...) {
         std::cout << "Execution failed at the execution phase" << std::endl;
         throw;

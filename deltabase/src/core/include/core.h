@@ -10,7 +10,7 @@
 #include <linux/limits.h>
 #include <stdbool.h>
 
-int 
+int
 ensure_fs_initialized();
 
 int
@@ -22,9 +22,8 @@ drop_database(const char* db_name);
 bool
 exists_database(const char* db_name);
 
-char** 
+char**
 get_databases(size_t* out_count);
-
 
 int
 create_table(const char* db_name, const MetaTable* table);
@@ -39,8 +38,7 @@ int
 update_table(const char* db_name, const MetaTable* table);
 
 char**
-get_tables(const char *db_name, size_t *out_count);
-
+get_tables(const char* db_name, size_t* out_count);
 
 int
 insert_row(const char* db_name, const char* table_name, DataRow* row);
@@ -57,7 +55,6 @@ delete_rows_by_filter(const char* db_name,
                       const char* table_name,
                       const DataFilter* filter,
                       size_t* rows_affected);
-
 
 int
 seq_scan(const char* db_name,

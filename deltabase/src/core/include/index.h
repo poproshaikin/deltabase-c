@@ -1,8 +1,8 @@
 #ifndef CORE_INDEX_H
 #define CORE_INDEX_H
 
-#include <stdbool.h>
 #include "meta.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 #define MAX_KEYS 3

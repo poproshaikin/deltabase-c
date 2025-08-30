@@ -37,7 +37,6 @@ get_directory_names(const char* dir_path, size_t* out_count);
 int
 get_executable_dir(char* buffer, size_t buffer_size);
 
-
 typedef enum LogLevel { LL_LOG = 1, LL_WARNING = 2, LL_ERROR = 3 } LogLevel;
 
 void

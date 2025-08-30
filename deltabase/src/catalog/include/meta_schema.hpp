@@ -7,7 +7,7 @@ extern "C" {
 #include "../../core/include/meta.h"
 }
 
-namespace meta {
+namespace catalog {
 
     struct CppMetaSchemaWrapper
     {

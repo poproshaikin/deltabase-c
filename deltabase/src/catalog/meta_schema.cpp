@@ -1,11 +1,11 @@
 #include "include/meta_schema.hpp"
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <cstring>
-#include <cstdlib>
 
-namespace meta {
+namespace catalog {
     CppMetaSchemaWrapper::~CppMetaSchemaWrapper() {
     }
 
@@ -123,4 +123,4 @@ namespace meta {
 
         return table;
     }
-} // namespace meta
+} // namespace catalog

@@ -2,7 +2,7 @@
 #define QUERY_EXECUTOR_HPP
 
 #include "../../sql/include/parser.hpp"
-#include "../../meta/include/meta_registry.hpp"
+#include "../../catalog/include/meta_registry.hpp"
 #include <memory>
 #include <optional>
 #include <string>
@@ -19,8 +19,8 @@ namespace exe {
 
     class IQueryExecutor {
       protected:
-        meta::MetaRegistry& registry;
-        IQueryExecutor(meta::MetaRegistry& registry) : registry(registry) {
+        catalog::MetaRegistry& registry;
+        IQueryExecutor(catalog::MetaRegistry& registry) : registry(registry) {
         }
 
       public:
@@ -41,17 +41,21 @@ namespace exe {
 
         std::unique_ptr<DataTable>
         execute_select(const sql::SelectStatement& stmt);
+
         int
         execute_insert(const sql::InsertStatement& stmt);
+
         int
         execute_update(const sql::UpdateStatement& stmt);
+
         int
         execute_delete(const sql::DeleteStatement& stmt);
+
         int
         execute_create_table(const sql::CreateTableStatement& stmt);
 
       public:
-        DatabaseExecutor(meta::MetaRegistry& registry, std::string db_name)
+        DatabaseExecutor(catalog::MetaRegistry& registry, std::string db_name)
             : db_name(db_name), IQueryExecutor(registry) {
         }
 
@@ -71,7 +75,7 @@ namespace exe {
         int
         execute_create_database(const sql::CreateDbStatement& stmt);
       public:
-        AdminExecutor(meta::MetaRegistry& registry, std::optional<std::string> db_name)
+        AdminExecutor(catalog::MetaRegistry& registry, std::optional<std::string> db_name)
             : db_name(db_name), IQueryExecutor(registry) {
         }
 
@@ -83,6 +87,15 @@ namespace exe {
 
         void
         set_db_name(std::string db_name) override;
+    };
+
+    class VirtualExecutor : public IQueryExecutor {
+
+        std::string db_name;
+
+        public:
+
+        
     };
 } // namespace exe
 

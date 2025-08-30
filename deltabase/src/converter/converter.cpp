@@ -1,9 +1,9 @@
 #include "include/converter.hpp"
 #include "../executor/include/literals.hpp"
+#include "../catalog/include/meta_registry.hpp"
 #include "../misc/include/exceptions.hpp"
 #include "../sql/include/lexer.hpp"
 #include "../sql/include/parser.hpp"
-#include "../meta/include/meta_registry.hpp"
 #include <cstring>
 #include <stdexcept>
 
@@ -115,7 +115,7 @@ namespace converter {
 
     MetaColumn
     convert_def_to_mc(const sql::ColumnDefinition& definition) {
-        return meta::create_meta_column(
+        return catalog::create_meta_column(
             definition.name.value,
             convert_kw_to_dt(definition.type.get_detail<sql::SqlKeyword>()),
             convert_tokens_to_cfs(definition.constraints));

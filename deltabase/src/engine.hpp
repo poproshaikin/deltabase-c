@@ -8,6 +8,7 @@
 #include <vector>
 
 struct ExecutionResult {
+
     exe::IntOrDataTable result;
     long execution_time_ns;
 
@@ -22,13 +23,14 @@ class DltEngine {
 
     exe::SemanticAnalyzer semantic_analyzer;
 
-    meta::MetaRegistry registry;
+    catalog::MetaRegistry registry;
 
     exe::IsSupportedType
     can_execute(const sql::AstNodeType& type);
 
     exe::IntOrDataTable
     execute(const sql::AstNode& node);
+
   public:
 
     std::string db_name;

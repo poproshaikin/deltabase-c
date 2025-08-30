@@ -31,15 +31,9 @@ int
 path_db_table(const char* db_name, const char* table_name, char* out_result, size_t buf_size);
 
 int
-path_db_table_meta(const char* db_name,
-                   const char* table_name,
-                   char* out_result,
-                   size_t buf_size);
+path_db_table_meta(const char* db_name, const char* table_name, char* out_result, size_t buf_size);
 int
-path_db_table_data(const char* db_name,
-                   const char* table_name,
-                   char* out_result,
-                   size_t buf_size);
+path_db_table_data(const char* db_name, const char* table_name, char* out_result, size_t buf_size);
 
 int
 path_db_table_page(
