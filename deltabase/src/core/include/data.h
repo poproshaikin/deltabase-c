@@ -19,10 +19,13 @@ typedef struct DataToken {
 
 DataToken*
 make_token(DataType type, const void* data, size_t size);
+
 DataToken*
 copy_token(const DataToken* old);
+
 void
 free_token(DataToken* token);
+
 void
 free_tokens(DataToken** tokens, size_t count);
 
@@ -36,8 +39,10 @@ typedef struct {
 
 uint64_t
 dr_size(const MetaTable* schema, const DataRow* row);
+
 uint64_t
 dr_size_v(const MetaTable* schema, const DataToken** tokens, int tokens_count);
+
 void
 free_row(DataRow* row);
 
@@ -88,15 +93,19 @@ struct DataFilter {
 
 bool
 row_satisfies_filter(const MetaTable* schema, const DataRow* row, const DataFilter* filter);
+
 DataFilter*
 create_filter_condition(uuid_t column_id, FilterOp op, DataType type, const void* value);
+
 DataFilter*
 create_filter_node(DataFilter* left, LogicOp op, DataFilter* right);
+
 void
 free_filter(DataFilter* filter);
 
 int
 create_page(const char* db_name, const char* table_name, PageHeader* out_new_page, char** out_path);
+
 ssize_t
 get_pages(const char* db_name, const char* table_name, char*** out_paths);
 

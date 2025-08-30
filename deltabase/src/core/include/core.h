@@ -41,7 +41,7 @@ char**
 get_tables(const char* db_name, size_t* out_count);
 
 int
-insert_row(const char* db_name, const char* table_name, DataRow* row);
+insert_row(const char* db_name, MetaTable* table, DataRow* row);
 
 int
 update_rows_by_filter(const char* db_name,

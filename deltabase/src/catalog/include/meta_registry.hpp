@@ -45,6 +45,11 @@ namespace catalog {
             return nullptr;
         }
 
+        std::shared_ptr<CppMetaTable>
+        get_table(const sql::SqlToken& table) {
+            return this->get_table(table.value);
+        }
+
         template<typename T>
         void add_schema(T&& schema) {
             static_assert(std::is_base_of_v<CppMetaSchemaWrapper, std::decay_t<T>>, 

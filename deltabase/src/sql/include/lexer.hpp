@@ -235,6 +235,10 @@ namespace sql {
 
         std::string
         to_string(int indent = 4) const;
+
+        operator std::string() {
+            return this->value;
+        }
     };
 
     // Template definition must be in header

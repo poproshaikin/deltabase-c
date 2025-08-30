@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include "../../misc/include/exceptions.hpp"
 
 extern "C" {
 #include "../../core/include/meta.h"
@@ -54,12 +55,17 @@ namespace catalog {
 
         std::string
         get_id() const override {
-            return std::string(reinterpret_cast<const char*>(column_id));
+            return std::string(reinterpret_cast<const char*>(this->column_id));
         }
 
         std::string
         get_name() const override {
-            return name_copy;
+            return this->name_copy;
+        }
+
+        DataType
+        get_data_type() const {
+            return this->data_type;
         }
 
         MetaColumn
@@ -129,12 +135,38 @@ namespace catalog {
         
         std::string
         get_name() const override {
-            return name_copy;
+            return this->name_copy;
+        }
+
+        uint64_t 
+        get_columns_count() const {
+            return this->columns_count;
+        }
+
+        const CppMetaColumn& get_column(const std::string& name) const {
+            for (const CppMetaColumn& col : this->columns) {
+                if (col.get_name() == name) {
+                    return col;
+                }
+            }
+
+            throw ColumnDoesntExists(name);
         }
 
         const std::vector<CppMetaColumn>&
         get_columns() const {
             return this->columns;
+        }
+
+        bool
+        has_column(const std::string& col_name) const {
+            for (const auto& col : this->columns) {
+                if (col.get_name() == col_name) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         MetaTable

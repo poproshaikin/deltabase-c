@@ -7,6 +7,7 @@
 #include <memory>
 
 using namespace cli;
+using namespace engine;
 
 // Forward declarations for print functions
 void
@@ -188,6 +189,8 @@ print_data_table(const DataTable* table) {
         }
         std::cout << "\n";
     }
+
+    std::cout << "Rows: " << table->rows_count << std::endl;
 }
 
 SqlCli::SqlCli() {
@@ -201,16 +204,7 @@ SqlCli::SqlCli() {
     });
 }
 
-void
-cli::SqlCli::run_query_console() {
-    std::string input;
-    this->engine = std::make_unique<DltEngine>();
-    std::cout << "Welcome to deltabase! Type '\\q' to quit." << std::endl;
-
-    while (true) {
-        std::cout << "> ";
-        std::getline(std::cin, input);
-
+void SqlCli::run_cmd(const std::string& input) {
         if (input[0] == '\\') {
             std::string cmd = input.substr(1);
             auto splitted = split(cmd, ' ', 1);
@@ -223,7 +217,7 @@ cli::SqlCli::run_query_console() {
             }
         } else {
             if (engine == nullptr) {
-                std::cout << "You are not connected to a database. Connect first using \\connect"
+                std::cout << "You are not connected to a database. Connect first using \\c"
                           << std::endl;
             } else {
                 try {
@@ -241,37 +235,19 @@ cli::SqlCli::run_query_console() {
                 }
             }
         }
+}
+
+void
+SqlCli::run_query_console() {
+    std::string input;
+    this->engine = std::make_unique<DltEngine>();
+    std::cout << "Welcome to deltabase! Type '\\q' to quit." << std::endl;
+
+    while (true) {
+        std::cout << "> ";
+        std::getline(std::cin, input);
+        run_cmd(input);
     }
-
-    // std::string input;
-    // std::cout << "Welcome to deltabase! Type 'exit' to quit.\n";
-
-    // while (true) {
-    //     std::cout << "> ";
-    //     if (!std::getline(std::cin, input)) {
-    //         break;
-    //     }
-    //     if (input == "exit") {
-    //         break;
-    //     }
-
-    //     try {
-    //         const ExecutionResult &result = engine->run(input);
-
-    //         std::cout << "Execution time: " << result.execution_time_ns / 1000000.0 << " ms" <<
-    //         std::endl;
-
-    //         if (std::holds_alternative<std::unique_ptr<DataTable>>(result.result))
-    //             print_data_table(std::get<std::unique_ptr<DataTable>>(result.result).get());
-    //         else
-    //             std::cout << "Rows affected: " << std::get<int>(result.result) << std::endl;
-    //     }
-    //     catch (std::runtime_error e) {
-    //         std::cout << "Failed to execute query: " << e.what() << std::endl;
-    //     }
-    // }
-
-    // std::cout << "Exiting deltabase.\n";
 }
 
 void

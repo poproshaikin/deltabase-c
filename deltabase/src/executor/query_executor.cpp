@@ -122,9 +122,11 @@ namespace exe {
         auto c_table = table->create_meta_table();
 
         DataRow row = converter::convert_insert_to_data_row(c_table, stmt);
-        if (insert_row(this->db_name.c_str(), table->get_name().c_str(), &row) != 0) {
+        if (insert_row(this->db_name.c_str(), &c_table, &row) != 0) {
             throw std::runtime_error("Failed to insert row");
         }
+
+        catalog::cleanup_meta_table(c_table);
 
         return 1;
     }

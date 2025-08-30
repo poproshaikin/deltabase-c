@@ -18,6 +18,13 @@ class TableExists : public std::runtime_error {
     }
 };
 
+class TableDoesntExist : public std::runtime_error {
+  public:
+    TableDoesntExist(const std::string& table_name)
+        : std::runtime_error("Table '" + table_name + "' doesnt exist") {
+    }
+};
+
 class ColumnDoesntExists : public std::runtime_error {
   public:
     ColumnDoesntExists(const std::string& col_name)

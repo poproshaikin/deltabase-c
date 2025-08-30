@@ -45,7 +45,7 @@ typedef struct {
     char* name;
 
     bool has_pk;
-    uuid_t pk;
+    MetaColumn* pk;
 
     MetaColumn** columns;
     uint64_t columns_count;

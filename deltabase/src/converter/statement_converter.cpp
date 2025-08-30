@@ -1,4 +1,4 @@
-#include "../meta/include/meta_registry.hpp"
+#include "../catalog/include/meta_registry.hpp"
 #include "../sql/include/parser.hpp"
 #include <cstdlib>
 #include <stdexcept>

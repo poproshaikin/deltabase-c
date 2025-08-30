@@ -9,140 +9,141 @@ extern "C" {
 }
 
 namespace exe {
-    SemanticAnalyzer::SemanticAnalyzer(std::optional<std::string> db_name) : db_name(db_name) {
-        if (db_name != std::nullopt) {
-            ensure_db_exists();
-        }
-    }
 
-    void
+    AnalysisResult
     SemanticAnalyzer::analyze(const sql::AstNode& ast) {
         switch (ast.type) {
         case sql::AstNodeType::SELECT:
-            analyze_select(std::get<sql::SelectStatement>(ast.value));
-            break;
+            return analyze_select(std::get<sql::SelectStatement>(ast.value));
+
         case sql::AstNodeType::INSERT:
-            analyze_insert(std::get<sql::InsertStatement>(ast.value));
-            break;
+            return analyze_insert(std::get<sql::InsertStatement>(ast.value));
+
         case sql::AstNodeType::UPDATE:
-            analyze_update(std::get<sql::UpdateStatement>(ast.value));
-            break;
+            return analyze_update(std::get<sql::UpdateStatement>(ast.value));
+
         case sql::AstNodeType::DELETE:
-            analyze_delete(std::get<sql::DeleteStatement>(ast.value));
-            break;
+            return analyze_delete(std::get<sql::DeleteStatement>(ast.value));
+
         case sql::AstNodeType::CREATE_TABLE:
-            analyze_create_table(std::get<sql::CreateTableStatement>(ast.value));
-            break;
+            return analyze_create_table(std::get<sql::CreateTableStatement>(ast.value));
+
         case sql::AstNodeType::CREATE_DATABASE:
-            analyze_create_db(std::get<sql::CreateDbStatement>(ast.value));
-            break;
+            return analyze_create_db(std::get<sql::CreateDbStatement>(ast.value));
+
         default:
-            throw std::runtime_error("Unsupported AST node type for semantic analysis");
+            return std::runtime_error("Unsupported AST node type for semantic analysis");
         }
     }
 
-    void
+    AnalysisResult
     SemanticAnalyzer::analyze_select(const sql::SelectStatement& selectStmt) {
         if (selectStmt.table.value.empty()) {
-            throw std::runtime_error("Select statement missing target table");
+            return std::runtime_error("Select statement missing target table");
         }
 
-        MetaTable schema;
-        const sql::SqlToken& table = selectStmt.table;
-        if (get_table((*db_name).c_str(), table.value.c_str(), &schema) != 0) {
-            throw std::runtime_error("Table doesn't exists");
+        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(selectStmt.table.value);
+        if (!table) {
+            return TableDoesntExist(selectStmt.table.value);
         }
 
         for (const sql::SqlToken& col : selectStmt.columns) {
-            const char* name = col.value.c_str();
-            ensure_column_exists(&schema, name);
+            if (!table->has_column(col.value)) {
+                return ColumnDoesntExists(col.value);
+            }
         }
 
-        analyze_where(selectStmt.where, &schema);
+        auto where_result = analyze_where(selectStmt.where, *table);
+        if (!where_result.is_valid) {
+            return where_result.err.value();
+        }
+
+        return true;
     }
 
-    void
+    AnalysisResult
     SemanticAnalyzer::analyze_insert(const sql::InsertStatement& insertStmt) {
         if (insertStmt.table.value.empty()) {
-            throw std::runtime_error("Insert statement missing target table");
+            return std::runtime_error("Insert statement missing target table");
         }
         if (insertStmt.columns.size() != 0 &&
             insertStmt.columns.size() != insertStmt.values.size()) {
-            throw std::runtime_error("Insert statement columns count does not match values count");
+            return std::runtime_error("Insert statement columns count does not match values count");
         }
 
-        MetaTable schema;
-        const sql::SqlToken& table = insertStmt.table;
-        if (get_table((*db_name).c_str(), table.value.c_str(), &schema) != 0) {
-            throw std::runtime_error("Table doesn't exists");
+        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(insertStmt.table);
+
+        if (!table) {
+            return TableDoesntExist(table->get_name());
         }
 
         for (size_t i = 0; i < insertStmt.columns.size(); i++) {
-            const char* name = insertStmt.columns[i].value.c_str();
-            ensure_column_exists(&schema, name);
+            if (!table->has_column(insertStmt.columns[i].value)) {
+                return std::runtime_error("Column doesn't exist");
+            }
 
             const sql::SqlToken& value_token = insertStmt.values[i];
             const sql::SqlLiteral literal_type = std::get<sql::SqlLiteral>(value_token.detail);
-            MetaColumn* column = find_column(name, &schema);
-            if (!column) {
-                throw std::runtime_error("Column doesn't exist");
-            }
+            const catalog::CppMetaColumn& column = table->get_column(insertStmt.columns[i].value);            
 
-            if (!is_literal_assignable_to(literal_type, column->data_type)) {
-                throw std::runtime_error("Incompatible types conversion");
+            if (!is_literal_assignable_to(literal_type, column.get_data_type())) {
+                return std::runtime_error("Incompatible types conversion");
             }
         }
+
+        return true;
     }
 
-    void
+    AnalysisResult
     SemanticAnalyzer::analyze_update(const sql::UpdateStatement& updateStmt) {
         if (updateStmt.table.value.empty()) {
-            throw std::runtime_error("Update statement missing target table");
+            return std::runtime_error("Update statement missing target table");
         }
         if (updateStmt.assignments.empty()) {
-            throw std::runtime_error("Update statement missing assignments");
+            return std::runtime_error("Update statement missing assignments");
         }
-
-        MetaTable schema;
-        const sql::SqlToken& table = updateStmt.table;
-        if (get_table((*db_name).c_str(), table.value.c_str(), &schema) != 0) {
-            throw std::runtime_error("Table doesn't exists");
-        }
+        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(updateStmt.table);
 
         for (size_t i = 0; i < updateStmt.assignments.size(); i++) {
-            validate_column_assignment(const_cast<sql::AstNode*>(&updateStmt.assignments[i]),
-                                       &schema);
+            validate_column_assignment(updateStmt.assignments[i], *table);
         }
 
-        analyze_where(updateStmt.where, &schema);
+        auto where_result = analyze_where(updateStmt.where, *table);
+        if (!where_result.is_valid) {
+            return where_result.err.value();
+        }
+
+        return true;
     }
 
-    void
+    AnalysisResult
     SemanticAnalyzer::analyze_delete(const sql::DeleteStatement& deleteStmt) {
         if (deleteStmt.table.value.empty()) {
-            throw std::runtime_error("Delete statement missing target table");
+            return std::runtime_error("Delete statement missing target table");
         }
 
-        MetaTable schema;
-        const sql::SqlToken& table = deleteStmt.table;
-        if (get_table((*db_name).c_str(), table.value.c_str(), &schema) != 0) {
-            throw std::runtime_error("Table doesn't exist");
-        }
+        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(deleteStmt.table);
 
-        analyze_where(deleteStmt.where, &schema);
+        auto where_result = analyze_where(deleteStmt.where, *table);
+        if (!where_result.is_valid) {
+            return where_result.err.value();
+        }
+        
+        return true;
     }
 
-    void
+    AnalysisResult
     SemanticAnalyzer::analyze_create_table(const sql::CreateTableStatement& stmt) {
         if (exists_table((*db_name).c_str(), stmt.name.value.c_str())) {
-            throw TableExists(stmt.name.value);
+            return TableExists(stmt.name.value);
         }
+        return true;
     }
 
-    void
+    AnalysisResult
     SemanticAnalyzer::validate_column_comparison(const std::unique_ptr<sql::AstNode>& left,
                                                  const std::unique_ptr<sql::AstNode>& right,
-                                                 const MetaTable* table) {
+                                                 const catalog::CppMetaTable& table) {
         const sql::AstNode* column_node = nullptr;
         const sql::AstNode* value_node = nullptr;
 
@@ -155,7 +156,7 @@ namespace exe {
             column_node = right.get();
             value_node = left.get();
         } else {
-            throw std::runtime_error(
+            return std::runtime_error(
                 "Invalid WHERE expression: comparison must be between column and literal");
         }
 
@@ -163,66 +164,58 @@ namespace exe {
         const sql::SqlToken& value_token = std::get<sql::SqlToken>(value_node->value);
 
         sql::SqlLiteral literal_type = std::get<sql::SqlLiteral>(value_token.detail);
-        MetaColumn* column = find_column(column_token.value.data(), table);
-        if (!column) {
-            throw std::runtime_error("Column was not found");
+        if (!table.has_column(column_token.value)) {
+            return ColumnDoesntExists(column_token.value);
         }
 
-        if (!is_literal_assignable_to(literal_type, column->data_type)) {
-            throw std::runtime_error("Incompatible types conversion");
+        const catalog::CppMetaColumn& column = table.get_column(column_token.value);
+
+        if (!is_literal_assignable_to(literal_type, column.get_data_type())) {
+            return std::runtime_error("Incompatible types conversion");
         }
 
-        bool found = false;
-
-        for (uint64_t i = 0; i < table->columns_count; ++i) {
-            MetaColumn* col = table->columns[i];
-            if (column_token.value == col->name) {
-                found = true;
-                break;
-            }
-        }
-
-        if (!found) {
-            throw std::runtime_error("Unknown column in WHERE clause: " + column_token.value);
-        }
+        return true;
     }
 
-    void
-    SemanticAnalyzer::validate_column_assignment(sql::AstNode* assignment, MetaTable* table) {
-        sql::BinaryExpr* expr = std::get_if<sql::BinaryExpr>(&assignment->value);
-        if (!expr) {
-            throw std::runtime_error("Invalid assignment");
-        }
-        if (expr->op != sql::AstOperator::ASSIGN) {
-            throw std::runtime_error("Invalid assignment: expected '='");
+    AnalysisResult
+    SemanticAnalyzer::validate_column_assignment(const sql::AstNode& assignment, const catalog::CppMetaTable& table) {
+        if (!std::holds_alternative<sql::BinaryExpr>(assignment.value)) {
+            return std::runtime_error("Invalid assignment");
         }
 
-        if (expr->left->type != sql::AstNodeType::IDENTIFIER ||
-            expr->right->type != sql::AstNodeType::LITERAL)
-            throw std::runtime_error(
+        const sql::BinaryExpr& expr = std::get<sql::BinaryExpr>(assignment.value);
+        if (expr.op != sql::AstOperator::ASSIGN) {
+            return std::runtime_error("Invalid assignment: expected '='");
+        }
+
+        if (expr.left->type != sql::AstNodeType::IDENTIFIER ||
+            expr.right->type != sql::AstNodeType::LITERAL)
+            return std::runtime_error(
                 "Invalid assignment: you can assign only literal to a identifier");
 
-        const sql::AstNode* column_node = expr->left.get();
-        const sql::AstNode* value_node = expr->right.get();
+        const sql::AstNode* column_node = expr.left.get();
+        const sql::AstNode* value_node = expr.right.get();
 
-        const char* col_name = std::get<sql::SqlToken>(column_node->value).value.c_str();
-        MetaColumn* column = find_column(col_name, table);
-        if (!column) {
-            throw ColumnDoesntExists(std::string(column->name));
+        const std::string& col_name = std::get<sql::SqlToken>(column_node->value).value;
+        if (!table.has_column(col_name)) {
+            return ColumnDoesntExists(std::string(col_name));
         }
+        const catalog::CppMetaColumn& column = table.get_column(col_name);
 
         const sql::SqlToken& value_token = std::get<sql::SqlToken>(value_node->value);
         sql::SqlLiteral literal_type = std::get<sql::SqlLiteral>(value_token.detail);
-        if (!is_literal_assignable_to(literal_type, column->data_type)) {
-            throw std::runtime_error("Incompatible types conversion in assignment");
+        if (!is_literal_assignable_to(literal_type, column.get_data_type())) {
+            return std::runtime_error("Incompatible types conversion in assignment");
         }
+
+        return true;
     }
 
-    void
+    AnalysisResult
     SemanticAnalyzer::analyze_where(const std::unique_ptr<sql::AstNode>& where,
-                                    const MetaTable* table) {
+                                    const catalog::CppMetaTable& table) {
         if (!where)
-            return;
+            return AnalysisResult(true);
 
         using sql::AstNodeType;
         using sql::AstOperator;
@@ -230,17 +223,17 @@ namespace exe {
         if (where->type == AstNodeType::BINARY_EXPR) {
             const sql::BinaryExpr* expr = std::get_if<sql::BinaryExpr>(&where->value);
             if (!expr)
-                throw std::runtime_error("Invalid binary expression");
+                return AnalysisResult(std::runtime_error("Invalid binary expression"));
 
             if (expr->op == AstOperator::ASSIGN)
-                throw std::runtime_error("Invalid condition operator");
+                return AnalysisResult(std::runtime_error("Invalid condition operator"));
 
             if (expr->op == AstOperator::EQ || expr->op == AstOperator::NEQ ||
                 expr->op == AstOperator::GR || expr->op == AstOperator::LT ||
                 expr->op == AstOperator::GRE || expr->op == AstOperator::LTE) {
 
                 if (!expr->left || !expr->right)
-                    throw std::runtime_error("Incomplete comparison expression");
+                    return std::runtime_error("Incomplete comparison expression");
 
                 validate_column_comparison(expr->left, expr->right, table);
             }
@@ -254,25 +247,10 @@ namespace exe {
                 analyze_where(expr->right, table);
             }
         } else {
-            throw std::runtime_error("WHERE clause must be a logical or comparison expression");
+            return std::runtime_error("WHERE clause must be a logical or comparison expression");
         }
-    }
 
-    MetaColumn*
-    SemanticAnalyzer::ensure_column_exists(const MetaTable* table, std::string colname) {
-        bool found = false;
-        MetaColumn* col = nullptr;
-        for (size_t i = 0; i < table->columns_count; i++) {
-            if (table->columns[i]->name == colname) {
-                found = true;
-                col = table->columns[i];
-                break;
-            }
-        }
-        if (!found) {
-            throw ColumnDoesntExists(colname);
-        }
-        return col;
+        return true;
     }
 
     void
@@ -287,10 +265,11 @@ namespace exe {
         ensure_db_exists(*this->db_name);
     }
 
-    void
+    AnalysisResult
     SemanticAnalyzer::analyze_create_db(const sql::CreateDbStatement& stmt) {
         if (exists_database(stmt.name.value.c_str())) {
-            throw DbExists(stmt.name.value);
+            return DbExists(stmt.name.value);
         }
+        return true;
     }
 } // namespace exe

@@ -215,37 +215,41 @@ ph_size(const PageHeader* header) {
 
 int
 write_ph(const PageHeader* header, int fd) {
+    if (!header) {
+        return 1;
+    }
+
     uint64_t size = ph_size(header);
     size_t w = 0;
 
     w = write(fd, &size, sizeof(size));
     if (w != sizeof(size)) {
         fprintf(stderr, "Failed to write data in write_ph\n");
-        return 1;
+        return 2;
     }
 
     w = write(fd, &header->page_id, sizeof(header->page_id));
     if (w != sizeof(header->page_id)) {
         fprintf(stderr, "Failed to write data in write_ph\n");
-        return 2;
+        return 3;
     }
 
     w = write(fd, &header->rows_count, sizeof(header->rows_count));
     if (w != sizeof(header->rows_count)) {
         fprintf(stderr, "Failed to write data in write_ph\n");
-        return 3;
+        return 4;
     }
 
     w = write(fd, &header->min_rid, sizeof(header->min_rid));
     if (w != sizeof(header->min_rid)) {
         fprintf(stderr, "Failed to write data in write_ph\n");
-        return 4;
+        return 5;
     }
 
     w = write(fd, &header->max_rid, sizeof(header->max_rid));
     if (w != sizeof(header->max_rid)) {
         fprintf(stderr, "Failed to write data in write_ph\n");
-        return 5;
+        return 6;
     }
 
     return 0;
@@ -651,8 +655,8 @@ write_mt(const MetaTable* schema, int fd) {
         return 5;
 
     if (schema->has_pk) {
-        w = write(fd, schema->pk, sizeof(schema->pk));
-        if (w != sizeof(schema->pk))
+        w = write(fd, schema->pk, sizeof(schema->pk->id));
+        if (w != sizeof(schema->pk->id))
             return 6;
     }
 
@@ -706,7 +710,7 @@ read_mt(MetaTable* out, int fd) {
     }
 
     if (out->has_pk) {
-        if (read(fd, out->pk, sizeof(out->pk)) != sizeof(out->pk)) {
+        if (read(fd, out->pk, sizeof(out->pk->id)) != sizeof(out->pk->id)) {
             free(out->name);
             return 7;
         }

@@ -213,21 +213,29 @@ row_satisfies_filter(const MetaTable* schema, const DataRow* row, const DataFilt
 int
 create_page(const char* db_name,
             const char* table_name,
-            PageHeader* out_new_page,
+            PageHeader* out_page,
             char** out_path) {
-    uuid_generate_time(out_new_page->page_id);
-    out_new_page->rows_count = 0;
+    if (!out_path) {
+        fprintf(stderr, "Passed NULL to OUT_PAGE \n");
+        return 4;
+    }
+
+    PageHeader local_header;
+    PageHeader* header = out_page ? out_page : &local_header;
+
+    uuid_generate_time(header->page_id);
+    header->rows_count = 0;
 
     char file_path[PATH_MAX];
-    path_db_table_page(db_name, table_name, out_new_page->page_id, file_path, PATH_MAX);
+    path_db_table_page(db_name, table_name, header->page_id, file_path, PATH_MAX);
 
     FILE* file = fopen(file_path, "w+");
     if (!file) {
-        fprintf(stderr, "Failed to create page file %s\n", out_new_page->page_id);
+        fprintf(stderr, "Failed to create page file %s\n", header->page_id);
         return 1;
     }
 
-    if (write_ph(out_new_page, fileno(file)) != 0) {
+    if (write_ph(header, fileno(file)) != 0) {
         return 2;
     }
 
@@ -241,7 +249,10 @@ create_page(const char* db_name,
 
     memcpy(path, file_path, len);
     path[len] = '\0';
-    *out_path = path;
+
+    if (out_path) {
+        *out_path = path;
+    }
 
     fclose(file);
     return 0;

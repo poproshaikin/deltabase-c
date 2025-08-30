@@ -204,14 +204,9 @@ write_row_update_state(const char* db_name, DataRow* row, MetaTable* schema, FIL
 }
 
 int
-insert_row(const char* db_name, const char* table_name, DataRow* row) {
+insert_row(const char* db_name, MetaTable* table, DataRow* row) {
     char buffer[PATH_MAX];
-    path_db_table_data(db_name, table_name, buffer, PATH_MAX);
-
-    MetaTable schema;
-    if (get_table(db_name, table_name, &schema) != 0) {
-        return 1;
-    }
+    path_db_table_data(db_name, table->name, buffer, PATH_MAX);
 
     size_t pages_count = 0;
     char** pages = get_dir_files(buffer, &pages_count);
@@ -220,9 +215,8 @@ insert_row(const char* db_name, const char* table_name, DataRow* row) {
     }
 
     if (pages_count == 0) {
-        PageHeader header;
         char* new_page_path = NULL;
-        if (create_page(db_name, table_name, &header, &new_page_path) != 0) {
+        if (create_page(db_name, table->name, NULL, &new_page_path) != 0) {
             return 3;
         }
 
@@ -244,11 +238,31 @@ insert_row(const char* db_name, const char* table_name, DataRow* row) {
                           // collision with two previous error codes wouldn't happen
         }
 
-        int result = write_row_update_state(db_name, row, &schema, file);
+        int result = write_row_update_state(db_name, row, table, file);
         if (result == 1) { // means that the page is out of space
+            char* ptr;
+            if (create_page(db_name, table->name, NULL, &ptr) != 0) {
+                fprintf(stderr, "Failed to create new page while insertion\n");
+                return -1 - i;
+            }
+
+            pages = realloc(pages, (pages_count + 1) * sizeof(char*));
+            if (!pages) {
+                for (size_t i = 0; i < pages_count; i++) {
+                    free(pages[i]);
+                }
+                free(pages);
+                fprintf(stderr, "Failed to allocate memory\n");
+                return -1 - i;
+            }
+
+            pages[pages_count++] = ptr;
+
             fclose(file);
             continue;
-        } else if (result > 1) { // something went wrong
+        }
+        
+        if (result > 1) { // something went wrong
             fclose(file);
             return i + 4;
         }

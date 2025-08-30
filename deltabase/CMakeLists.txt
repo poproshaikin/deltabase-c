@@ -49,15 +49,23 @@ function(add_cpp_module module_name)
     target_link_libraries(${module_name} PUBLIC core)
 
     if (${module_name} STREQUAL "cli")
-        target_link_libraries(${module_name} PUBLIC sql executor )
+        target_link_libraries(${module_name} PUBLIC sql executor engine )
     endif()
     
-    if (${module_name} STREQUAL "meta")
+    if (${module_name} STREQUAL "catalog")
         target_link_libraries(${module_name} PUBLIC misc )
     endif()
     
     if (${module_name} STREQUAL "converter")
-        target_link_libraries(${module_name} PUBLIC misc )
+        target_link_libraries(${module_name} PUBLIC misc executor )
+    endif()
+
+    if (${module_name} STREQUAL "engine")
+        target_link_libraries(${module_name} PUBLIC misc catalog executor sql )
+    endif()
+
+    if (${module_name} STREQUAL "executor")
+        target_link_libraries(${module_name} PUBLIC converter )
     endif()
 endfunction()
 
@@ -66,8 +74,9 @@ add_cpp_module(sql)
 add_cpp_module(server)
 add_cpp_module(misc)
 add_cpp_module(cli)
-add_cpp_module(meta)
+add_cpp_module(catalog)
 add_cpp_module(converter)
+add_cpp_module(engine)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
@@ -84,12 +93,12 @@ target_link_libraries(test.exe
     executor
     server
     cli
-    meta
+    catalog
     converter
 )
 
 # --- main ---
-add_executable(main.exe main.cpp src/engine.cpp)
+add_executable(main.exe main.cpp)
 target_link_libraries(main.exe 
     core
     misc
@@ -97,6 +106,6 @@ target_link_libraries(main.exe
     executor
     server
     cli
-    meta
+    catalog
     converter
 )
