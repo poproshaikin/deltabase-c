@@ -402,7 +402,7 @@ for_each_row_matching_filter(const char* db_name,
                              RowCallback callback,
                              void* user_data,
                              size_t* rows_affected) {
-    if (!db_name || !table_name || !filter || !callback) {
+    if (!db_name || !table_name || !callback) {
         fprintf(stderr, "Invalid parameters in for_each_row_matching_filter\n");
         return 2;
     }

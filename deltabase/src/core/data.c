@@ -175,6 +175,11 @@ apply_filter(DataFilterCondition condition, const void* db_value, const DataType
 
 bool
 row_satisfies_filter(const MetaTable* schema, const DataRow* row, const DataFilter* filter) {
+    // If no filter is provided, all rows satisfy the condition
+    if (!filter) {
+        return true;
+    }
+
     if (schema->columns_count != row->count) {
         fprintf(stderr,
                 "row_satisfies_filter: Count of columns in schema wasn't equal to count of "
