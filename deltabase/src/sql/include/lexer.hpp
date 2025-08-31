@@ -8,6 +8,10 @@
 #include <variant>
 #include <vector>
 
+extern "C" {
+#include "../../core/include/meta.h"
+}
+
 namespace sql {
     enum class SqlTokenType {
         UNKNOWN = 0,
@@ -273,7 +277,11 @@ namespace sql {
         to_string(sql::SqlSymbol type);
         std::string
         to_string(sql::SqlLiteral type, const std::string& value);
-    } // namespace utils
+
+        std::string
+        get_data_type_str(DataType dt);
+
+        } // namespace utils
 } // namespace sql
 
 #endif

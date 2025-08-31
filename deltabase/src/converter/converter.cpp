@@ -189,4 +189,18 @@ namespace converter {
 
         return flags;
     }
+
+    sql::SqlKeyword
+    get_data_type_kw(DataType dt) {
+        switch (dt) {
+        case DT_INTEGER: return sql::SqlKeyword::INTEGER; 
+        case DT_STRING:  return sql::SqlKeyword::STRING;  
+        case DT_BOOL:    return sql::SqlKeyword::BOOL;    
+        case DT_REAL:    return sql::SqlKeyword::REAL;    
+        case DT_CHAR:    return sql::SqlKeyword::CHAR;    
+        case DT_NULL:    return sql::SqlKeyword::_NULL;   
+
+        default:         throw std::runtime_error("This data type isn't supported");
+        }
+    }
 } // namespace converter

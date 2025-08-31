@@ -58,7 +58,7 @@ delete_rows_by_filter(const char* db_name,
 
 int
 seq_scan(const char* db_name,
-         const char* table_name,
+         const MetaTable* table,
          const char** column_names,
          size_t columns_count,
          const DataFilter* filter,

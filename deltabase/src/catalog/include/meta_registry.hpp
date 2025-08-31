@@ -4,7 +4,6 @@
 #include <string>
 #include <unordered_map>
 #include <memory>
-#include <type_traits>
 
 #include "../../sql/include/lexer.hpp"
 #include "../../sql/include/parser.hpp"
@@ -23,37 +22,40 @@ namespace catalog {
         MetaRegistry();
 
         std::optional<std::shared_ptr<CppMetaSchemaWrapper>>
-        get_schema(const std::string& id) {
-            auto it = this->registry.find(id);
-            if (it != this->registry.end()) {
-                return it->second;
-            }
-            return std::nullopt;
-        }
+        get_schema(const std::string& id) const;
 
-        std::shared_ptr<CppMetaTable>
-        get_table(const std::string& table) {
-            for (const auto& kvp : this->registry) {
-                if (kvp.second->get_name() == table) {
-                    return std::dynamic_pointer_cast<CppMetaTable>(kvp.second);
-                }
-            }
-            return nullptr;
-        }
 
-        std::shared_ptr<CppMetaTable>
-        get_table(const sql::SqlToken& table) {
-            return this->get_table(table.value);
-        }
+        bool 
+        has_table(const std::string& table) const;
+
+        bool
+        has_table(const sql::TableIdentifier& identifier) const;
+
+        bool
+        has_virtual_table(const sql::TableIdentifier& identifier) const;
+
+
+        CppMetaTable
+        get_table(const std::string& table) const;
+
+        CppMetaTable
+        get_table(const sql::SqlToken& table) const;
+
+        CppMetaTable
+        get_table(const sql::TableIdentifier& identifier) const;
+        
+        CppMetaTable
+        get_virtual_table(const sql::TableIdentifier& identifier) const;
+
+        std::vector<CppMetaTable>
+        get_tables() const;
+
+        std::vector<CppMetaColumn>
+        get_columns() const;
 
         template<typename T>
-        void add_schema(T&& schema) {
-            static_assert(std::is_base_of_v<CppMetaSchemaWrapper, std::decay_t<T>>, 
-                          "T must derive from CppMetaSchemaWrapper");
-            registry[schema.get_id()] = std::make_unique<std::decay_t<T>>(std::forward<T>(schema));
-        }
+        void add_schema(T&& schema);
     };
-
 
     bool
     is_table_virtual(const sql::TableIdentifier& table);

@@ -52,7 +52,7 @@ typedef struct {
 } DataRowSet;
 
 typedef struct {
-    MetaTable* scheme;
+    MetaTable schema;
     DataRow* rows;
     size_t rows_count;
 } DataTable;

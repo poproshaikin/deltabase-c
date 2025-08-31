@@ -21,7 +21,7 @@ namespace engine {
         exe::AnalysisResult analysis_result = this->semantic_analyzer.analyze(node);
         if (!analysis_result.is_valid) {
             std::cerr << "Execution failed at the analyzation phase" << std::endl;
-            throw analysis_result.err;
+            throw analysis_result.err.value();
         }
 
         try {

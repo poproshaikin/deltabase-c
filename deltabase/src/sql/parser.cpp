@@ -370,7 +370,7 @@ namespace sql {
             match_or_throw(SqlTokenType::IDENTIFIER, "Expected table identifier after schema name");
             const SqlToken& second_token = current();
             advance();
-            return TableIdentifier(first_token, second_token);   
+            return TableIdentifier(second_token, first_token);   
         }
 
         return TableIdentifier(first_token, std::nullopt);

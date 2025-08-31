@@ -1,4 +1,5 @@
 #include "include/meta_schema.hpp"
+#include "../misc/include/exceptions.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -47,6 +48,24 @@ namespace catalog {
         return ss.str();
     }
 
+    MetaColumn
+    CppMetaColumn::create_meta_column() const {
+        MetaColumn column;
+
+        memcpy(column.id, this-> id, sizeof(column.id));
+        memcpy(column.table_id, this->table_id, sizeof(column.id));
+
+        column.name = static_cast<char*>(malloc(this->name.length() + 1));
+        if (column.name) {
+            strcpy(column.name, this->name.c_str());
+        }
+
+        column.data_type = data_type;
+        column.flags = flags;
+
+        return column;
+    }
+
     void
     CppMetaTable::cleanup_original_table(const MetaTable& table) const {
         if (table.name) {
@@ -62,26 +81,6 @@ namespace catalog {
         }
     }
 
-    MetaColumn
-    CppMetaColumn::create_meta_column() const {
-        MetaColumn column;
-
-        // Copy UUID
-        memcpy(column.id, column_id, sizeof(column.id));
-
-        // Allocate and copy name
-        column.name = static_cast<char*>(malloc(name_copy.length() + 1));
-        if (column.name) {
-            strcpy(column.name, name_copy.c_str());
-        }
-
-        // Copy other fields
-        column.data_type = data_type;
-        column.flags = flags;
-
-        return column;
-    }
-
     MetaTable
     CppMetaTable::create_meta_table() const {
         MetaTable table;
@@ -90,9 +89,9 @@ namespace catalog {
         memcpy(table.id, table_id, sizeof(table.id));
 
         // Allocate and copy name
-        table.name = static_cast<char*>(malloc(name_copy.length() + 1));
+        table.name = static_cast<char*>(malloc(this->table_name.length() + 1));
         if (table.name) {
-            strcpy(table.name, name_copy.c_str());
+            strcpy(table.name, this->table_name.c_str());
         }
 
         // Copy other fields
@@ -116,5 +115,40 @@ namespace catalog {
         }
 
         return table;
+    }
+
+    CppMetaTable::CppMetaTable(MetaTable table)
+        : table_id(), table_name(table.name ? table.name : ""), has_pk(table.has_pk),
+          last_rid(table.last_rid),
+          columns(parse_columns(table)) {
+        memcpy(table_id, table.id, sizeof(table_id));
+        if (table.has_pk) {
+            memcpy(pk, table.pk, sizeof(pk));
+        }
+
+        // Now we can safely free the original C struct
+        cleanup_original_table(table);
+    }
+
+    const CppMetaColumn&
+    CppMetaTable::get_column(const std::string& name) const {
+        for (const CppMetaColumn& col : this->columns) {
+            if (col.get_name() == name) {
+                return col;
+            }
+        }
+
+        throw ColumnDoesntExists(name);
+    }
+
+    bool
+    CppMetaTable::has_column(const std::string& col_name) const {
+        for (const auto& col : this->columns) {
+            if (col.get_name() == col_name) {
+                return true;
+            }
+        }
+
+        return false;
     }
 } // namespace catalog

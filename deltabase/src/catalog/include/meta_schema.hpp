@@ -1,8 +1,8 @@
 #pragma once 
 
+#include <optional>
 #include <string>
 #include <vector>
-#include "../../misc/include/exceptions.hpp"
 
 extern "C" {
 #include "../../core/include/meta.h"
@@ -26,41 +26,35 @@ namespace catalog {
 
     struct CppMetaColumn : public CppMetaSchemaWrapper {
 
-        CppMetaColumn(MetaColumn column) : column_id(), name_copy(column.name ? column.name : ""), 
-                                           data_type(column.data_type), flags(column.flags) {
-            memcpy(column_id, column.id, sizeof(column_id));
+        CppMetaColumn() = default;
+
+        CppMetaColumn(std::string name, DataType type, DataColumnFlags flags)
+            : name(name), data_type(type), flags(flags) {
+            uuid_generate_time(this->id);
         }
 
-        ~CppMetaColumn() = default; // No manual cleanup needed now
-
-        // Delete copy constructor and assignment to prevent issues
-        CppMetaColumn(const CppMetaColumn&) = delete;
-        CppMetaColumn& operator=(const CppMetaColumn&) = delete;
-
-        // Enable move semantics
-        CppMetaColumn(CppMetaColumn&& other) noexcept 
-            : name_copy(std::move(other.name_copy)), data_type(other.data_type), flags(other.flags) {
-            memcpy(column_id, other.column_id, sizeof(column_id));
-        }
-
-        CppMetaColumn& operator=(CppMetaColumn&& other) noexcept {
-            if (this != &other) {
-                memcpy(column_id, other.column_id, sizeof(column_id));
-                name_copy = std::move(other.name_copy);
-                data_type = other.data_type;
-                flags = other.flags;
+        CppMetaColumn(std::string name, DataType type, DataColumnFlags flags, const uuid_t& table_id)
+            : CppMetaColumn(name, type, flags) {
+                memcpy(this->table_id, table_id, sizeof(uuid_t));
             }
-            return *this;
+
+        CppMetaColumn(MetaColumn column)
+            : id(), name(column.name ? column.name : ""), 
+              data_type(column.data_type), flags(column.flags) {
+            memcpy(this->id, column.id, sizeof(uuid_t));
+            memcpy(this->table_id, column.table_id, sizeof(uuid_t));
         }
+
+        ~CppMetaColumn() = default;
 
         std::string
         get_id() const override {
-            return std::string(reinterpret_cast<const char*>(this->column_id));
+            return std::string(reinterpret_cast<const char*>(this->id));
         }
 
         std::string
         get_name() const override {
-            return this->name_copy;
+            return this->name;
         }
 
         DataType
@@ -75,99 +69,58 @@ namespace catalog {
         to_string() const override;
 
         operator MetaColumn() const { return this->create_meta_column(); }
-    private:
 
-        uuid_t column_id;
-        std::string name_copy;
+    private:
+        uuid_t id;
+        uuid_t table_id;
+        std::string name;
         DataType data_type;
         DataColumnFlags flags;
     };
 
     struct CppMetaTable : public CppMetaSchemaWrapper {
 
-        CppMetaTable(MetaTable table) : table_id(), name_copy(table.name ? table.name : ""),
-                                        has_pk(table.has_pk), last_rid(table.last_rid),
-                                        columns_count(table.columns_count), columns(parse_columns(table)) {
-            memcpy(table_id, table.id, sizeof(table_id));
-            if (table.has_pk) {
-                memcpy(pk, table.pk, sizeof(pk));
-            }
-            
-            // Now we can safely free the original C struct
-            cleanup_original_table(table);
+        CppMetaTable() = default;
+
+        CppMetaTable(std::string name, std::optional<std::string> schema_name = std::nullopt)
+            : table_name(name), schema_name(schema_name), has_pk(false), last_rid(0) {
+            uuid_generate_time(this->table_id);
         }
 
+        CppMetaTable(MetaTable table);
         ~CppMetaTable() = default; // No manual cleanup needed
 
-        // Delete copy constructor and assignment  
-        CppMetaTable(const CppMetaTable&) = delete;
-        CppMetaTable& operator=(const CppMetaTable&) = delete;
-
-        // Enable move semantics
-        CppMetaTable(CppMetaTable&& other) noexcept 
-            : name_copy(std::move(other.name_copy)), has_pk(other.has_pk), last_rid(other.last_rid),
-              columns_count(other.columns_count), columns(std::move(other.columns)) {
-            memcpy(table_id, other.table_id, sizeof(table_id));
-            if (has_pk) {
-                memcpy(pk, other.pk, sizeof(pk));
-            }
-        }
-
-        CppMetaTable& operator=(CppMetaTable&& other) noexcept {
-            if (this != &other) {
-                memcpy(table_id, other.table_id, sizeof(table_id));
-                name_copy = std::move(other.name_copy);
-                has_pk = other.has_pk;
-                last_rid = other.last_rid;
-                columns_count = other.columns_count;
-                columns = std::move(other.columns);
-                if (has_pk) {
-                    memcpy(pk, other.pk, sizeof(pk));
-                }
-            }
-            return *this;
-        }
-
         std::string
-        get_id() const override {
+        get_id() 
+        const override {
             return std::string(reinterpret_cast<const char*>(table_id));
         }
         
         std::string
         get_name() const override {
-            return this->name_copy;
+            return this->table_name;
         }
 
         uint64_t 
         get_columns_count() const {
-            return this->columns_count;
+            return this->columns.size();
         }
 
-        const CppMetaColumn& get_column(const std::string& name) const {
-            for (const CppMetaColumn& col : this->columns) {
-                if (col.get_name() == name) {
-                    return col;
-                }
-            }
-
-            throw ColumnDoesntExists(name);
-        }
+        const CppMetaColumn&
+        get_column(const std::string& name) const;
 
         const std::vector<CppMetaColumn>&
         get_columns() const {
             return this->columns;
         }
 
-        bool
-        has_column(const std::string& col_name) const {
-            for (const auto& col : this->columns) {
-                if (col.get_name() == col_name) {
-                    return true;
-                }
-            }
-
-            return false;
+        void
+        add_column(const CppMetaColumn& col) {
+            this->columns.push_back(col);
         }
+
+        bool
+        has_column(const std::string& col_name) const;
 
         MetaTable
         create_meta_table() const;
@@ -180,16 +133,20 @@ namespace catalog {
     private:
 
         uuid_t table_id;
-        std::string name_copy;
+        uint64_t last_rid;
+
+        std::optional<std::string> schema_name;
+        std::string table_name;
+
         bool has_pk;
         uuid_t pk;
-        uint64_t columns_count;
-        uint64_t last_rid;
+
         std::vector<CppMetaColumn> columns;
 
         std::vector<CppMetaColumn>
         parse_columns(const MetaTable& table) const;
-        
-        void cleanup_original_table(const MetaTable& table) const;
+
+        void
+        cleanup_original_table(const MetaTable& table) const;
     };
 }

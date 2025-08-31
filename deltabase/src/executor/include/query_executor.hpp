@@ -3,17 +3,14 @@
 
 #include "../../sql/include/parser.hpp"
 #include "../../catalog/include/meta_registry.hpp"
+#include "../../catalog/include/data_object.hpp"
 #include <memory>
 #include <optional>
 #include <string>
 #include <variant>
 
-extern "C" {
-#include "../../core/include/data.h"
-}
-
 namespace exe {
-    using IntOrDataTable = std::variant<int, std::unique_ptr<DataTable>>;
+    using IntOrDataTable = std::variant<int, std::unique_ptr<catalog::CppDataTable>>;
 
     class IQueryExecutor {
     protected:
@@ -34,7 +31,7 @@ namespace exe {
     class DatabaseExecutor : public IQueryExecutor {
         std::string db_name;
 
-        std::unique_ptr<DataTable>
+        std::unique_ptr<catalog::CppDataTable>
         execute_select(const sql::SelectStatement& stmt);
 
         int
@@ -88,10 +85,10 @@ namespace exe {
     };
 
     class VirtualExecutor : public IQueryExecutor {
-        int 
+        std::unique_ptr<catalog::CppDataTable>
         execute_information_schema_tables();
 
-        int
+        std::unique_ptr<catalog::CppDataTable>
         execute_information_schema_columns();
 
     public:

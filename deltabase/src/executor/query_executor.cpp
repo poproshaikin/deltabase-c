@@ -2,13 +2,14 @@
 #include "../converter/include/converter.hpp"
 #include "../converter/include/statement_converter.hpp"
 #include "../catalog/include/meta_registry.hpp"
+#include "../catalog/include/data_object.hpp"
 #include "../catalog/include/models.hpp"
+#include "../catalog/include/information_schema.hpp"
 
 #include <linux/limits.h>
 #include <memory>
 #include <stdexcept>
 #include <uuid/uuid.h>
-#include <variant>
 
 extern "C" {
 #include "../core/include/core.h"
@@ -66,11 +67,10 @@ namespace exe {
         throw std::runtime_error("Unsupported query");
     }
 
-    std::unique_ptr<DataTable>
+    std::unique_ptr<catalog::CppDataTable>
     DatabaseExecutor::execute_select(const sql::SelectStatement& stmt) {
         auto cpp_table = this->registry.get_table(stmt.table.table_name);
-        MetaTable* c_table = new MetaTable;
-        *c_table = cpp_table->create_meta_table();
+        MetaTable c_table = cpp_table.create_meta_table();
 
         const sql::SqlToken& table_name = stmt.table.table_name;
 
@@ -87,26 +87,28 @@ namespace exe {
         std::unique_ptr<DataFilter> filter;
         if (stmt.where)
             filter = std::make_unique<DataFilter>(converter::convert_binary_to_filter(
-                std::get<sql::BinaryExpr>(stmt.where->value), *c_table));
+                std::get<sql::BinaryExpr>(stmt.where->value), c_table));
+
 
         DataTable result;
         if (seq_scan(this->db_name.data(),
-                     table_name.value.data(),
+                     &c_table,
                      (const char**)column_names,
                      columns_count,
                      filter.get(),
                      &result) != 0) {
             throw std::runtime_error("Failed to scan a table");
         }
-        result.scheme = c_table;
 
-        return std::make_unique<DataTable>(std::move(result));
+        result.schema = c_table;
+
+        return std::make_unique<catalog::CppDataTable>(std::move(result));
     }
 
     int
     DatabaseExecutor::execute_insert(const sql::InsertStatement& stmt) {
         auto table = this->registry.get_table(stmt.table.table_name.value);
-        auto c_table = table->create_meta_table();
+        auto c_table = table.create_meta_table();
 
         DataRow row = converter::convert_insert_to_data_row(c_table, stmt);
         if (insert_row(this->db_name.c_str(), &c_table, &row) != 0) {
@@ -121,7 +123,7 @@ namespace exe {
     int
     DatabaseExecutor::execute_update(const sql::UpdateStatement& stmt) {
         auto table = this->registry.get_table(stmt.table.table_name.value);
-        auto c_table = table->create_meta_table();
+        auto c_table = table.create_meta_table();
 
         DataRowUpdate update = converter::create_row_update(c_table, stmt);
         DataFilter filter = converter::convert_binary_to_filter(
@@ -129,7 +131,7 @@ namespace exe {
 
         size_t rows_affected = 0;
         if (update_rows_by_filter(this->db_name.data(),
-                                  table->get_name().c_str(),
+                                  table.get_name().c_str(),
                                   (const DataFilter*)&filter,
                                   &update,
                                   &rows_affected) != 0) {
@@ -144,7 +146,7 @@ namespace exe {
     int
     DatabaseExecutor::execute_delete(const sql::DeleteStatement& stmt) {
         auto table = this->registry.get_table(stmt.table.table_name.value);
-        auto c_table = table->create_meta_table();
+        auto c_table = table.create_meta_table();
 
         std::unique_ptr<DataFilter> filter = nullptr;
         if (stmt.where) {
@@ -154,7 +156,7 @@ namespace exe {
 
         size_t rows_affected = 0;
         int rc = delete_rows_by_filter(
-            this->db_name.c_str(), table->get_name().c_str(), filter.get(), &rows_affected);
+            this->db_name.c_str(), table.get_name().c_str(), filter.get(), &rows_affected);
 
         if (rc != 0) {
             throw std::runtime_error("Failed to delete rows by filter");
@@ -216,15 +218,22 @@ namespace exe {
         throw std::runtime_error("Unsupported query for VirtualExecutor");
     }
 
-    int
+    std::unique_ptr<catalog::CppDataTable>
     VirtualExecutor::execute_information_schema_tables() {
         // каждая CppMetaTable это одна строка DataTable
         // надо наверное сделать враппер и для Data
-        
-    }
 
-    int
+        catalog::CppDataTable table =
+            catalog::information_schema::get_tables_data(this->registry.get_tables());
+
+        return std::make_unique<catalog::CppDataTable>(std::move(table));
+    }   
+
+    std::unique_ptr<catalog::CppDataTable>
     VirtualExecutor::execute_information_schema_columns() {
+        catalog::CppDataTable table =
+            catalog::information_schema::get_columns_data(this->registry.get_columns());
 
+        return std::make_unique<catalog::CppDataTable>(std::move(table));
     }
 } // namespace exe

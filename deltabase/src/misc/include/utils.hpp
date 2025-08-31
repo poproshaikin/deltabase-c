@@ -78,4 +78,7 @@ make_c_ptr_arr(const std::vector<T>& vec) {
     return arr;
 }
 
+void
+print_ram_usage();
+
 #endif

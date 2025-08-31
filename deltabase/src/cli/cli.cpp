@@ -168,34 +168,27 @@ token_to_string(const DataToken* token) {
 }
 
 void
-print_data_table(const DataTable* table) {
-    if (!table || !table->scheme) {
-        std::cerr << "Invalid DataTable\n";
-        return;
-    }
-
-    const MetaTable* schema = table->scheme;
-
-    for (size_t i = 0; i < schema->columns_count; ++i) {
-        std::cout << std::left << std::setw(15) << schema->columns[i].name;
+print_data_table(const DataTable& table) {
+    for (size_t i = 0; i < table.schema.columns_count; ++i) {
+        std::cout << std::left << std::setw(15) << table.schema.columns[i].name;
     }
     std::cout << "\n";
 
-    for (size_t i = 0; i < schema->columns_count; ++i) {
+    for (size_t i = 0; i < table.schema.columns_count; ++i) {
         std::cout << std::setw(15) << std::setfill('-') << "";
     }
     std::cout << std::setfill(' ') << "\n";
 
-    for (size_t r = 0; r < table->rows_count; ++r) {
-        const DataRow& row = table->rows[r];
-        for (size_t c = 0; c < schema->columns_count; ++c) {
+    for (size_t r = 0; r < table.rows_count; ++r) {
+        const DataRow& row = table.rows[r];
+        for (size_t c = 0; c < table.schema.columns_count; ++c) {
             const DataToken& token = row.tokens[c];
             std::cout << std::left << std::setw(15) << ::token_to_string(&token);
         }
         std::cout << "\n";
     }
 
-    std::cout << "Rows: " << table->rows_count << std::endl;
+    std::cout << "Rows: " << table.rows_count << std::endl;
 }
 
 SqlCli::SqlCli() {
@@ -231,8 +224,8 @@ void SqlCli::run_cmd(const std::string& input) {
                     std::cout << "Execution time: " << result.execution_time_ns / 1000000.0 << " ms"
                               << std::endl;
 
-                    if (std::holds_alternative<std::unique_ptr<DataTable>>(result.result))
-                        print_data_table(std::get<std::unique_ptr<DataTable>>(result.result).get());
+                    if (std::holds_alternative<std::unique_ptr<catalog::CppDataTable>>(result.result))
+                        ::print_data_table(std::get<std::unique_ptr<catalog::CppDataTable>>(result.result).get()->to_data_table());
                     else
                         std::cout << "Rows affected: " << std::get<int>(result.result) << std::endl;
                 } catch (std::runtime_error e) {

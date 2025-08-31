@@ -1,5 +1,6 @@
 #include "include/semantic_analyzer.hpp"
 #include "../misc/include/exceptions.hpp"
+#include <iostream>
 #include <stdexcept>
 #include <string.h>
 #include <variant>
@@ -42,9 +43,23 @@ namespace exe {
             return std::runtime_error("Select statement missing target table");
         }
 
-        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(selectStmt.table.table_name.value);
-        if (!table) {
+        if (!this->registry.has_table(selectStmt.table) &&
+            !this->registry.has_virtual_table(selectStmt.table)) {
+            std::cout << "chujevo\n";
             return TableDoesntExist(selectStmt.table.table_name.value);
+        }
+
+        std::unique_ptr<catalog::CppMetaTable> table;
+        if (catalog::is_table_virtual(selectStmt.table)) {
+            table = std::make_unique<catalog::CppMetaTable>(this->registry.get_virtual_table(selectStmt.table));
+            std::cout << "blyat\n";
+        } else {
+            table = std::make_unique<catalog::CppMetaTable>(this->registry.get_table(selectStmt.table.table_name.value));
+            std::cout << "nachuj\n";
+        }
+
+        if (!table) {
+            throw std::runtime_error("Registry inconsistency: table exists check passed but retrieval failed - possible race condition or registry corruption");
         }
 
         for (const sql::SqlToken& col : selectStmt.columns) {
@@ -62,29 +77,29 @@ namespace exe {
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_insert(const sql::InsertStatement& insertStmt) {
-        if (insertStmt.table.table_name.value.empty()) {
+    SemanticAnalyzer::analyze_insert(const sql::InsertStatement& stmt) {
+        if (stmt.table.table_name.value.empty()) {
             return std::runtime_error("Insert statement missing target table");
         }
-        if (insertStmt.columns.size() != 0 &&
-            insertStmt.columns.size() != insertStmt.values.size()) {
+        if (stmt.columns.size() != 0 &&
+            stmt.columns.size() != stmt.values.size()) {
             return std::runtime_error("Insert statement columns count does not match values count");
         }
 
-        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(insertStmt.table.table_name);
-
-        if (!table) {
-            return TableDoesntExist(table->get_name());
+        if (!this->registry.has_table(stmt.table)) {
+            return TableDoesntExist(stmt.table.table_name.value);
         }
 
-        for (size_t i = 0; i < insertStmt.columns.size(); i++) {
-            if (!table->has_column(insertStmt.columns[i].value)) {
+        catalog::CppMetaTable table = this->registry.get_table(stmt.table.table_name);
+
+        for (size_t i = 0; i < stmt.columns.size(); i++) {
+            if (!table.has_column(stmt.columns[i].value)) {
                 return std::runtime_error("Column doesn't exist");
             }
 
-            const sql::SqlToken& value_token = insertStmt.values[i];
+            const sql::SqlToken& value_token = stmt.values[i];
             const sql::SqlLiteral literal_type = std::get<sql::SqlLiteral>(value_token.detail);
-            const catalog::CppMetaColumn& column = table->get_column(insertStmt.columns[i].value);            
+            const catalog::CppMetaColumn& column = table.get_column(stmt.columns[i].value);            
 
             if (!is_literal_assignable_to(literal_type, column.get_data_type())) {
                 return std::runtime_error("Incompatible types conversion");
@@ -95,20 +110,25 @@ namespace exe {
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_update(const sql::UpdateStatement& updateStmt) {
-        if (updateStmt.table.table_name.value.empty()) {
+    SemanticAnalyzer::analyze_update(const sql::UpdateStatement& stmt) {
+        if (stmt.table.table_name.value.empty()) {
             return std::runtime_error("Update statement missing target table");
         }
-        if (updateStmt.assignments.empty()) {
+        if (stmt.assignments.empty()) {
             return std::runtime_error("Update statement missing assignments");
         }
-        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(updateStmt.table.table_name);
 
-        for (size_t i = 0; i < updateStmt.assignments.size(); i++) {
-            validate_column_assignment(updateStmt.assignments[i], *table);
+        if (!this->registry.has_table(stmt.table)) {
+            return TableDoesntExist(stmt.table.table_name.value);
         }
 
-        auto where_result = analyze_where(updateStmt.where, *table);
+        catalog::CppMetaTable table = this->registry.get_table(stmt.table.table_name);
+
+        for (size_t i = 0; i < stmt.assignments.size(); i++) {
+            validate_column_assignment(stmt.assignments[i], table);
+        }
+
+        auto where_result = analyze_where(stmt.where, table);
         if (!where_result.is_valid) {
             return where_result.err.value();
         }
@@ -117,14 +137,18 @@ namespace exe {
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_delete(const sql::DeleteStatement& deleteStmt) {
-        if (deleteStmt.table.table_name.value.empty()) {
+    SemanticAnalyzer::analyze_delete(const sql::DeleteStatement& stmt) {
+        if (stmt.table.table_name.value.empty()) {
             return std::runtime_error("Delete statement missing target table");
         }
 
-        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(deleteStmt.table.table_name);
+        if (!this->registry.has_table(stmt.table)) {
+            return TableDoesntExist(stmt.table.table_name.value);
+        }
 
-        auto where_result = analyze_where(deleteStmt.where, *table);
+        catalog::CppMetaTable table = this->registry.get_table(stmt.table.table_name);
+
+        auto where_result = analyze_where(stmt.where, table);
         if (!where_result.is_valid) {
             return where_result.err.value();
         }

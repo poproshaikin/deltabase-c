@@ -34,4 +34,7 @@ namespace converter {
 
     DataColumnFlags
     convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints);
+
+    sql::SqlKeyword
+    get_data_type_kw(DataType dt);
 } // namespace converter

@@ -518,31 +518,20 @@ delete_rows_by_filter(const char* db_name,
 
 int
 seq_scan(const char* db_name,
-         const char* table_name,
+         const MetaTable* table,
          const char** column_names,
          size_t columns_count,
          const DataFilter* filter,
          DataTable* out) {
+
     char buffer[PATH_MAX];
-    path_db_table_data(db_name, table_name, buffer, PATH_MAX);
-
-    MetaTable* schema = malloc(sizeof(MetaTable));
-    if (!schema) {
-        fprintf(stderr, "Failed to allocate memory for meta table while full scan\n");
-        return 1;
-    }
-
-    if (get_table(db_name, table_name, schema) != 0) {
-        return 2;
-    }
+    path_db_table_data(db_name, table->name, buffer, PATH_MAX);
 
     size_t pages_count;
     char** pages = get_dir_files(buffer, &pages_count);
     if (!pages)
         return 3;
 
-    // create an array of pointers to pointers to datarow corresponding for each
-    // page
     DataRow** page_rows = calloc(pages_count, sizeof(DataRow*));
     size_t* rows_per_page = calloc(pages_count, sizeof(size_t));
     size_t total_rows = 0;
@@ -571,7 +560,7 @@ seq_scan(const char* db_name,
             DataRow row;
 
             int res = 0;
-            if ((res = read_dr(schema, column_names, columns_count, &row, fd)) != 0) {
+            if ((res = read_dr(table, column_names, columns_count, &row, fd)) != 0) {
                 fprintf(stderr, "Failed to read data row in full_scan: %i\n", res);
                 fclose(file);
                 goto fail_cleanup;
@@ -582,7 +571,7 @@ seq_scan(const char* db_name,
                 continue;
             }
 
-            if (filter && !row_satisfies_filter(schema, &row, filter)) {
+            if (filter && !row_satisfies_filter(table, &row, filter)) {
                 free_row(&row);
                 continue;
             }
@@ -606,7 +595,7 @@ seq_scan(const char* db_name,
         free(page_rows[i]);
     }
 
-    out->scheme = schema;
+    out->schema = *table;
     out->rows = all_rows;
     out->rows_count = total_rows;
 

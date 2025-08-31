@@ -1,6 +1,8 @@
 #include "include/utils.hpp"
 
 #include <sstream>
+#include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -33,4 +35,15 @@ make_c_string(const std::string& str) {
     char* ptr = new char[str.size() + 1];
     std::memcpy(ptr, str.c_str(), str.size() + 1);
     return ptr;
+}
+
+void
+print_ram_usage() {
+    std::ifstream statm("/proc/self/status");
+    std::string line;
+    while (std::getline(statm, line)) {
+        if (line.rfind("VmRSS:", 0) == 0) { 
+            std::cout << line << std::endl;
+        }
+    }
 }
