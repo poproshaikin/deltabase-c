@@ -54,7 +54,7 @@ namespace sql {
         LPAREN,
         RPAREN,
         COMMA,
-        POINT,
+        PERIOD,
         SEMICOLON
     };
 
@@ -175,7 +175,7 @@ namespace sql {
             {"(", SqlSymbol::LPAREN},
             {")", SqlSymbol::RPAREN},
             {",", SqlSymbol::COMMA},
-            {".", SqlSymbol::POINT},
+            {".", SqlSymbol::PERIOD},
             {";", SqlSymbol::SEMICOLON}};
         return dictionary;
     }

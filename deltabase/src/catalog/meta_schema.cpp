@@ -101,7 +101,7 @@ namespace catalog {
         // Copy other fields
         table.has_pk = has_pk;
         if (has_pk) {
-            memcpy(table.pk, pk, sizeof(table.pk));
+            memcpy(table.pk, pk, sizeof(table.pk->id));
         }
         table.columns_count = columns.size();
         table.last_rid = last_rid;

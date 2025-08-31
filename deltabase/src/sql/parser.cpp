@@ -128,10 +128,7 @@ namespace sql {
         match_or_throw(SqlKeyword::FROM, "Expected 'FROM'");
 
         advance_or_throw();
-        if (!match(SqlTokenType::IDENTIFIER)) {
-            throw std::runtime_error("Expected name of the table");
-        }
-        stmt.table = current();
+        stmt.table = parse_table_identifier();
 
         if (advance() && match(SqlKeyword::WHERE)) {
             advance_or_throw();
@@ -149,11 +146,8 @@ namespace sql {
         match_or_throw(SqlKeyword::INTO, "Expected 'INTO' keyword");
 
         advance_or_throw();
-        match_or_throw(SqlTokenType::IDENTIFIER, "Expected table identifier");
+        stmt.table = parse_table_identifier();
 
-        stmt.table = current();
-
-        advance_or_throw();
         match_or_throw(SqlSymbol::LPAREN, "Expected left parenthesis");
 
         if (!match(SqlOperator::MUL)) {
@@ -206,11 +200,8 @@ namespace sql {
         UpdateStatement stmt;
 
         advance_or_throw();
-        match_or_throw(SqlTokenType::IDENTIFIER, "Expected table identifier after UPDATE");
+        stmt.table = parse_table_identifier();
 
-        stmt.table = current();
-
-        advance_or_throw();
         match_or_throw(SqlKeyword::SET, "Expected 'SET' keyword");
 
         while (true) {
@@ -249,11 +240,8 @@ namespace sql {
         match_or_throw(SqlKeyword::FROM, "Expected 'FROM' keyword after DELETE");
 
         advance_or_throw();
-        match_or_throw(SqlTokenType::IDENTIFIER, "Expected table identifier after FROM");
+        stmt.table = parse_table_identifier();
 
-        stmt.table = current();
-
-        advance();
         if (match(SqlKeyword::WHERE)) {
             advance();
             stmt.where = parse_binary(0);
@@ -269,11 +257,8 @@ namespace sql {
         match_or_throw(SqlKeyword::TABLE, "Expected 'TABLE' after 'CREATE'");
 
         advance_or_throw();
-        match_or_throw(SqlTokenType::IDENTIFIER, "Expected name of the table");
+        stmt.table = parse_table_identifier();
 
-        stmt.name = current();
-
-        advance_or_throw();
         if (match(SqlSymbol::LPAREN)) {
             advance_or_throw();
             bool stop = false;
@@ -372,4 +357,23 @@ namespace sql {
 
         return stmt;
     }
+
+    TableIdentifier
+    SqlParser::parse_table_identifier() {
+        match_or_throw(SqlTokenType::IDENTIFIER);
+        const SqlToken& first_token = current();
+
+        advance();
+        
+        if (match(SqlSymbol::PERIOD)) {
+            advance_or_throw("Expected table name after schema");
+            match_or_throw(SqlTokenType::IDENTIFIER, "Expected table identifier after schema name");
+            const SqlToken& second_token = current();
+            advance();
+            return TableIdentifier(first_token, second_token);   
+        }
+
+        return TableIdentifier(first_token, std::nullopt);
+    }
+
 } // namespace sql

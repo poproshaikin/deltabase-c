@@ -192,6 +192,4 @@ namespace catalog {
         
         void cleanup_original_table(const MetaTable& table) const;
     };
-
-    
 }

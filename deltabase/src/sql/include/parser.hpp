@@ -1,7 +1,7 @@
-#ifndef SQL_PARSER_HPP
-#define SQL_PARSER_HPP
+#pragma once
 
 #include "lexer.hpp"
+#include <optional>
 #include <memory>
 
 namespace sql {
@@ -61,26 +61,38 @@ namespace sql {
         std::unique_ptr<AstNode> right;
     };
 
+    struct TableIdentifier {
+        SqlToken table_name;
+        std::optional<SqlToken> schema_name;
+
+        TableIdentifier() = default;
+
+        TableIdentifier(SqlToken table_name,
+                        std::optional<SqlToken> schema_name = std::nullopt)
+            : table_name(table_name), schema_name(schema_name) {
+        }
+    };
+
     struct SelectStatement {
+        TableIdentifier table;
         std::vector<SqlToken> columns;
-        SqlToken table;
         std::unique_ptr<AstNode> where;
     };
 
     struct InsertStatement {
-        SqlToken table;
+        TableIdentifier table;
         std::vector<SqlToken> columns;
         std::vector<SqlToken> values;
     };
 
     struct UpdateStatement {
-        SqlToken table;
+        TableIdentifier table;
         std::vector<AstNode> assignments;
         std::unique_ptr<AstNode> where;
     };
 
     struct DeleteStatement {
-        SqlToken table;
+        TableIdentifier table;
         std::unique_ptr<AstNode> where;
     };
 
@@ -91,7 +103,7 @@ namespace sql {
     };
 
     struct CreateTableStatement {
-        SqlToken name;
+        TableIdentifier table;
         std::vector<ColumnDefinition> columns;
     };
 
@@ -120,6 +132,7 @@ namespace sql {
     class SqlParser {
       public:
         SqlParser(std::vector<SqlToken> tokens);
+
         std::unique_ptr<AstNode>
         parse();
 
@@ -129,14 +142,19 @@ namespace sql {
 
         SelectStatement
         parse_select();
+
         InsertStatement
         parse_insert();
+
         UpdateStatement
         parse_update();
+
         DeleteStatement
         parse_delete();
+
         CreateTableStatement
         parse_create_table();
+
         CreateDbStatement
         parse_create_db();
 
@@ -146,28 +164,36 @@ namespace sql {
         template <typename TEnum>
         bool
         match(const TEnum&) const;
+
         template <typename TEnum>
         bool
         match_or_throw(TEnum expected, std::string error_msg = "Invalid statement syntax") const;
 
         bool
         advance() noexcept;
+
         bool
         advance_or_throw(std::string error_msg = "Invalid statement syntax");
+
         const SqlToken&
         previous() const noexcept;
+
         const SqlToken&
         current() const;
 
         std::unique_ptr<AstNode>
         parse_primary();
+
         std::vector<std::unique_ptr<AstNode>>
         parse_assignments();
+
         std::vector<std::unique_ptr<AstNode>>
         parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType);
+
         ColumnDefinition
         parse_column_def();
+
+        TableIdentifier
+        parse_table_identifier();
     };
 } // namespace sql
-
-#endif

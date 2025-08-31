@@ -9,6 +9,7 @@
 using namespace cli;
 using namespace engine;
 
+
 // Forward declarations for print functions
 void
 print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent);
@@ -16,6 +17,10 @@ void
 print_ast_node(const sql::AstNode& node, int indent);
 void
 print_sql_token(const sql::SqlToken& token, int indent);
+void
+print_column_definition(const sql::ColumnDefinition& col, int indent);
+void
+print_table_identifier(const sql::TableIdentifier& table, int indent);
 
 void
 print_sql_token(const sql::SqlToken& token, int indent) {
@@ -44,7 +49,7 @@ print_ast_node(const sql::AstNode& node, int indent) {
             } else if constexpr (std::is_same_v<T, sql::SelectStatement>) {
                 std::cout << indent_str << "  SelectStatement:\n";
                 std::cout << indent_str << "    Table:\n";
-                print_sql_token(value.table, indent + 6);
+                print_table_identifier(value.table, indent + 6);
                 std::cout << indent_str << "    Columns:\n";
                 for (const auto& col : value.columns) {
                     print_sql_token(col, indent + 6);
@@ -56,7 +61,7 @@ print_ast_node(const sql::AstNode& node, int indent) {
             } else if constexpr (std::is_same_v<T, sql::UpdateStatement>) {
                 std::cout << indent_str << "  UpdateStatement:\n";
                 std::cout << indent_str << "    Table:\n";
-                print_sql_token(value.table, indent + 6);
+                print_table_identifier(value.table, indent + 6);
 
                 std::cout << indent_str << "    Assignments:\n";
                 for (const auto& assign : value.assignments) {
@@ -73,7 +78,7 @@ print_ast_node(const sql::AstNode& node, int indent) {
             } else if constexpr (std::is_same_v<T, sql::DeleteStatement>) {
                 std::cout << indent_str << "  DeleteStatement:\n";
                 std::cout << indent_str << "    Table:\n";
-                print_sql_token(value.table, indent + 6);
+                print_table_identifier(value.table, indent + 6);
 
                 std::cout << indent_str << "    Where:\n";
                 if (value.where) {
@@ -84,7 +89,7 @@ print_ast_node(const sql::AstNode& node, int indent) {
             } else if constexpr (std::is_same_v<T, sql::InsertStatement>) {
                 std::cout << indent_str << "  InsertStatement:\n";
                 std::cout << indent_str << "    Table:\n";
-                print_sql_token(value.table, indent + 6);
+                print_table_identifier(value.table, indent + 6);
                 std::cout << indent_str << "    Columns:\n";
                 for (const auto& col : value.columns) {
                     print_sql_token(col, indent + 6);
@@ -96,10 +101,10 @@ print_ast_node(const sql::AstNode& node, int indent) {
             } else if constexpr (std::is_same_v<T, sql::CreateTableStatement>) {
                 std::cout << indent_str << "  CreateTableStatement:\n";
                 std::cout << indent_str << "    Table:\n";
-                print_sql_token(value.name, indent + 6);
+                print_table_identifier(value.table, indent + 6);
                 std::cout << indent_str << "    Columns:\n";
                 for (const auto& col : value.columns) {
-                    // print_ast_node(col, indent + 6);
+                    print_column_definition(col, indent + 6);
                 }
             } else if constexpr (std::is_same_v<T, sql::ColumnDefinition>) {
                 std::cout << indent_str << "  ColumnDefinition:\n";
@@ -253,6 +258,29 @@ SqlCli::run_query_console() {
 void
 SqlCli::add_cmd_handler(std::string cmd, std::function<void(std::string arg)> func) {
     this->handlers[cmd] = func;
+}
+
+void
+print_table_identifier(const sql::TableIdentifier& table, int indent) {
+    std::string indent_str(indent, ' ');
+    if (table.schema_name) {
+        std::cout << indent_str << "Schema: " << table.schema_name->value << "\n";
+    }
+    std::cout << indent_str << "Table: " << table.table_name.value << "\n";
+}
+
+void
+print_column_definition(const sql::ColumnDefinition& col, int indent) {
+    std::string indent_str(indent, ' ');
+    std::cout << indent_str << "ColumnDefinition:\n";
+    std::cout << indent_str << "  Name: " << col.name.value << "\n";
+    std::cout << indent_str << "  Type: " << col.type.value << "\n";
+    if (!col.constraints.empty()) {
+        std::cout << indent_str << "  Constraints:\n";
+        for (const auto& constraint : col.constraints) {
+            std::cout << indent_str << "    " << constraint.value << "\n";
+        }
+    }
 }
 
 // CREATE TABLE users(id INTEGER, name STRING, age REAL)

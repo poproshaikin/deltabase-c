@@ -38,13 +38,13 @@ namespace exe {
 
     AnalysisResult
     SemanticAnalyzer::analyze_select(const sql::SelectStatement& selectStmt) {
-        if (selectStmt.table.value.empty()) {
+        if (selectStmt.table.table_name.value.empty()) {
             return std::runtime_error("Select statement missing target table");
         }
 
-        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(selectStmt.table.value);
+        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(selectStmt.table.table_name.value);
         if (!table) {
-            return TableDoesntExist(selectStmt.table.value);
+            return TableDoesntExist(selectStmt.table.table_name.value);
         }
 
         for (const sql::SqlToken& col : selectStmt.columns) {
@@ -63,7 +63,7 @@ namespace exe {
 
     AnalysisResult
     SemanticAnalyzer::analyze_insert(const sql::InsertStatement& insertStmt) {
-        if (insertStmt.table.value.empty()) {
+        if (insertStmt.table.table_name.value.empty()) {
             return std::runtime_error("Insert statement missing target table");
         }
         if (insertStmt.columns.size() != 0 &&
@@ -71,7 +71,7 @@ namespace exe {
             return std::runtime_error("Insert statement columns count does not match values count");
         }
 
-        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(insertStmt.table);
+        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(insertStmt.table.table_name);
 
         if (!table) {
             return TableDoesntExist(table->get_name());
@@ -96,13 +96,13 @@ namespace exe {
 
     AnalysisResult
     SemanticAnalyzer::analyze_update(const sql::UpdateStatement& updateStmt) {
-        if (updateStmt.table.value.empty()) {
+        if (updateStmt.table.table_name.value.empty()) {
             return std::runtime_error("Update statement missing target table");
         }
         if (updateStmt.assignments.empty()) {
             return std::runtime_error("Update statement missing assignments");
         }
-        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(updateStmt.table);
+        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(updateStmt.table.table_name);
 
         for (size_t i = 0; i < updateStmt.assignments.size(); i++) {
             validate_column_assignment(updateStmt.assignments[i], *table);
@@ -118,11 +118,11 @@ namespace exe {
 
     AnalysisResult
     SemanticAnalyzer::analyze_delete(const sql::DeleteStatement& deleteStmt) {
-        if (deleteStmt.table.value.empty()) {
+        if (deleteStmt.table.table_name.value.empty()) {
             return std::runtime_error("Delete statement missing target table");
         }
 
-        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(deleteStmt.table);
+        std::shared_ptr<catalog::CppMetaTable> table = this->registry.get_table(deleteStmt.table.table_name);
 
         auto where_result = analyze_where(deleteStmt.where, *table);
         if (!where_result.is_valid) {
@@ -134,8 +134,8 @@ namespace exe {
 
     AnalysisResult
     SemanticAnalyzer::analyze_create_table(const sql::CreateTableStatement& stmt) {
-        if (exists_table((*db_name).c_str(), stmt.name.value.c_str())) {
-            return TableExists(stmt.name.value);
+        if (exists_table((*db_name).c_str(), stmt.table.table_name.value.c_str())) {
+            return TableExists(stmt.table.table_name.value);
         }
         return true;
     }

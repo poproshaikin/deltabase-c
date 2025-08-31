@@ -3,9 +3,8 @@
 
 #include "../../executor/include/query_executor.hpp"
 #include "../../executor/include/semantic_analyzer.hpp"
-#include <memory>
+#include "query_router.hpp"
 #include <string>
-#include <vector>
 
 namespace engine {
 
@@ -20,15 +19,9 @@ namespace engine {
     };
 
     class DltEngine {
-
-        std::vector<std::unique_ptr<exe::IQueryExecutor>> executors;
-
+        QueryRouter router;
         exe::SemanticAnalyzer semantic_analyzer;
-
         catalog::MetaRegistry registry;
-
-        exe::IsSupportedType
-        can_execute(const sql::AstNodeType& type);
 
         exe::IntOrDataTable
         execute(const sql::AstNode& node);

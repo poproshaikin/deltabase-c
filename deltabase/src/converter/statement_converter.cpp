@@ -1,5 +1,5 @@
-#include "../catalog/include/meta_registry.hpp"
 #include "../sql/include/parser.hpp"
+#include "../catalog/include/models.hpp"
 #include <cstdlib>
 #include <stdexcept>
 
@@ -80,6 +80,6 @@ namespace converter {
 
     MetaTable
     convert_create_table_to_mt(const sql::CreateTableStatement& stmt) {
-        return catalog::create_meta_table(stmt.name.value, stmt.columns);
+        return catalog::models::create_meta_table(stmt.table.table_name.value, stmt.columns);
     }
 } // namespace converter

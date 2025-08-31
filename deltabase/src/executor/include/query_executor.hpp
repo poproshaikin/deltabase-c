@@ -15,19 +15,14 @@ extern "C" {
 namespace exe {
     using IntOrDataTable = std::variant<int, std::unique_ptr<DataTable>>;
 
-    enum class IsSupportedType { SUPPORTS = 0, DB_NAME_REQUIRED, UNSUPPORTED_STATEMENT };
-
     class IQueryExecutor {
-      protected:
+    protected:
         catalog::MetaRegistry& registry;
         IQueryExecutor(catalog::MetaRegistry& registry) : registry(registry) {
         }
 
-      public:
+    public:
         virtual ~IQueryExecutor() = 0;
-
-        virtual IsSupportedType
-        supports(const sql::AstNodeType& type) const = 0;
 
         virtual IntOrDataTable
         execute(const sql::AstNode& node) = 0;
@@ -54,13 +49,14 @@ namespace exe {
         int
         execute_create_table(const sql::CreateTableStatement& stmt);
 
-      public:
+    public:
         DatabaseExecutor(catalog::MetaRegistry& registry, std::string db_name)
             : db_name(db_name), IQueryExecutor(registry) {
         }
 
-        IsSupportedType
-        supports(const sql::AstNodeType& type) const override;
+        DatabaseExecutor(DatabaseExecutor&& other)
+            : IQueryExecutor(other.registry), db_name(std::move(other.db_name)) {
+        }
 
         IntOrDataTable
         execute(const sql::AstNode& node) override;
@@ -74,13 +70,15 @@ namespace exe {
 
         int
         execute_create_database(const sql::CreateDbStatement& stmt);
-      public:
+
+    public:
         AdminExecutor(catalog::MetaRegistry& registry, std::optional<std::string> db_name)
             : db_name(db_name), IQueryExecutor(registry) {
         }
 
-        IsSupportedType
-        supports(const sql::AstNodeType& type) const override;
+        AdminExecutor(AdminExecutor&& other)
+            : IQueryExecutor(other.registry), db_name(std::move(other.db_name)) {
+        }
 
         IntOrDataTable
         execute(const sql::AstNode& node) override;
@@ -90,12 +88,21 @@ namespace exe {
     };
 
     class VirtualExecutor : public IQueryExecutor {
+        int 
+        execute_information_schema_tables();
 
-        std::string db_name;
+        int
+        execute_information_schema_columns();
 
     public:
+        VirtualExecutor(catalog::MetaRegistry& registry) : IQueryExecutor(registry) {
+        }
 
-        
+        VirtualExecutor(VirtualExecutor&& other) : IQueryExecutor(other.registry) {
+        }
+
+        IntOrDataTable
+        execute(const sql::AstNode& node) override;
     };
 } // namespace exe
 

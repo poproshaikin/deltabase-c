@@ -95,6 +95,7 @@ target_link_libraries(test.exe
     cli
     catalog
     converter
+    engine
 )
 
 # --- main ---
@@ -108,4 +109,5 @@ target_link_libraries(main.exe
     cli
     catalog
     converter
+    engine
 )

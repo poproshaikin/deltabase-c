@@ -8,34 +8,16 @@
 
 namespace engine {
 
-    DltEngine::DltEngine() : registry(), semantic_analyzer(this->registry) {
-        this->executors.push_back(
-            std::make_unique<exe::AdminExecutor>(this->registry, std::nullopt));
+    DltEngine::DltEngine() : registry(), router(this->registry), semantic_analyzer(this->registry) {
     }
 
     DltEngine::DltEngine(std::string db_name)
-        : db_name(db_name), registry(), semantic_analyzer(this->registry, db_name) {
-        this->executors.push_back(std::make_unique<exe::AdminExecutor>(this->registry, db_name));
-        this->executors.push_back(std::make_unique<exe::DatabaseExecutor>(this->registry, db_name));
-    }
-
-    exe::IsSupportedType
-    DltEngine::can_execute(const sql::AstNodeType& type) {
-        exe::IsSupportedType is_supported_last;
-        for (std::unique_ptr<exe::IQueryExecutor>& executor : this->executors) {
-            if ((is_supported_last = executor->supports(type)) == exe::IsSupportedType::SUPPORTS) {
-                return exe::IsSupportedType::SUPPORTS;
-            }
-        }
-        return is_supported_last;
+        : db_name(db_name), registry(), router(this->registry, db_name),
+          semantic_analyzer(this->registry, db_name) {
     }
 
     exe::IntOrDataTable
     DltEngine::execute(const sql::AstNode& node) {
-        if (this->can_execute(node.type) != exe::IsSupportedType::SUPPORTS) {
-            throw std::runtime_error("Query type is not supported by any executor.");
-        }
-
         exe::AnalysisResult analysis_result = this->semantic_analyzer.analyze(node);
         if (!analysis_result.is_valid) {
             std::cerr << "Execution failed at the analyzation phase" << std::endl;
@@ -43,13 +25,7 @@ namespace engine {
         }
 
         try {
-            for (std::unique_ptr<exe::IQueryExecutor>& executor : this->executors) {
-                if (executor->supports(node.type) == exe::IsSupportedType::SUPPORTS) {
-                    return executor->execute(node);
-                }
-            }
-
-            throw std::runtime_error("Query type is not supported by any executor.");
+            return this->router.route_and_execute(node, analysis_result);
         } catch (...) {
             std::cerr << "Execution failed at the execution phase" << std::endl;
             throw;

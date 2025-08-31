@@ -2,6 +2,7 @@
 #include "../converter/include/converter.hpp"
 #include "../converter/include/statement_converter.hpp"
 #include "../catalog/include/meta_registry.hpp"
+#include "../catalog/include/models.hpp"
 
 #include <linux/limits.h>
 #include <memory>
@@ -40,20 +41,6 @@ namespace exe {
         this->db_name = db_name;
     }
 
-    IsSupportedType
-    DatabaseExecutor::supports(const sql::AstNodeType& type) const {
-        switch (type) {
-        case sql::AstNodeType::SELECT:
-        case sql::AstNodeType::INSERT:
-        case sql::AstNodeType::UPDATE:
-        case sql::AstNodeType::DELETE:
-        case sql::AstNodeType::CREATE_TABLE:
-            return IsSupportedType::SUPPORTS;
-        default:
-            return IsSupportedType::UNSUPPORTED_STATEMENT;
-        }
-    }
-
     IntOrDataTable
     DatabaseExecutor::execute(const sql::AstNode& node) {
         if (std::holds_alternative<sql::SelectStatement>(node.value)) {
@@ -81,11 +68,11 @@ namespace exe {
 
     std::unique_ptr<DataTable>
     DatabaseExecutor::execute_select(const sql::SelectStatement& stmt) {
-        auto cpp_table = this->registry.get_table(stmt.table.value);
+        auto cpp_table = this->registry.get_table(stmt.table.table_name);
         MetaTable* c_table = new MetaTable;
         *c_table = cpp_table->create_meta_table();
 
-        const sql::SqlToken& table_name = stmt.table;
+        const sql::SqlToken& table_name = stmt.table.table_name;
 
         size_t columns_count = stmt.columns.size();
 
@@ -118,7 +105,7 @@ namespace exe {
 
     int
     DatabaseExecutor::execute_insert(const sql::InsertStatement& stmt) {
-        auto table = this->registry.get_table(stmt.table.value);
+        auto table = this->registry.get_table(stmt.table.table_name.value);
         auto c_table = table->create_meta_table();
 
         DataRow row = converter::convert_insert_to_data_row(c_table, stmt);
@@ -126,14 +113,14 @@ namespace exe {
             throw std::runtime_error("Failed to insert row");
         }
 
-        catalog::cleanup_meta_table(c_table);
+        catalog::models::cleanup_meta_table(c_table);
 
         return 1;
     }
 
     int
     DatabaseExecutor::execute_update(const sql::UpdateStatement& stmt) {
-        auto table = this->registry.get_table(stmt.table.value);
+        auto table = this->registry.get_table(stmt.table.table_name.value);
         auto c_table = table->create_meta_table();
 
         DataRowUpdate update = converter::create_row_update(c_table, stmt);
@@ -149,14 +136,14 @@ namespace exe {
             throw std::runtime_error("Failed to update row");
         }
 
-        catalog::cleanup_meta_table(c_table);
+        catalog::models::cleanup_meta_table(c_table);
 
         return rows_affected;
     }
 
     int
     DatabaseExecutor::execute_delete(const sql::DeleteStatement& stmt) {
-        auto table = this->registry.get_table(stmt.table.value);
+        auto table = this->registry.get_table(stmt.table.table_name.value);
         auto c_table = table->create_meta_table();
 
         std::unique_ptr<DataFilter> filter = nullptr;
@@ -173,7 +160,7 @@ namespace exe {
             throw std::runtime_error("Failed to delete rows by filter");
         }
 
-        catalog::cleanup_meta_table(c_table);
+        catalog::models::cleanup_meta_table(c_table);
         return rows_affected;
     }
 
@@ -185,7 +172,7 @@ namespace exe {
             throw std::runtime_error("Failed to create table");
         }
 
-        catalog::cleanup_meta_table(table);
+        catalog::models::cleanup_meta_table(table);
 
         return 0;
     }
@@ -193,16 +180,6 @@ namespace exe {
     void
     AdminExecutor::set_db_name(std::string db_name) {
         this->db_name = db_name;
-    }
-
-    IsSupportedType
-    AdminExecutor::supports(const sql::AstNodeType& type) const {
-        switch (type) {
-        case sql::AstNodeType::CREATE_DATABASE:
-            return IsSupportedType::SUPPORTS;
-        default:
-            return IsSupportedType::UNSUPPORTED_STATEMENT;
-        }
     }
 
     IntOrDataTable
@@ -220,6 +197,11 @@ namespace exe {
             throw std::runtime_error("Failed to create database " + stmt.name.value);
         }
 
+        return 0;
+    }
+
+    IntOrDataTable
+    VirtualExecutor::execute(const sql::AstNode& node) {
         return 0;
     }
 } // namespace exe

@@ -1,6 +1,4 @@
 #include "include/meta_registry.hpp"
-#include "../converter/include/converter.hpp"
-#include "../misc/include/utils.hpp"
 #include <iostream>
 #include <linux/limits.h>
 
@@ -64,70 +62,21 @@ namespace catalog {
         }
         free(databases);
     }
-
-    MetaColumn
-    create_meta_column(const std::string& name, DataType type, DataColumnFlags flags) {
-        MetaColumn column;
-
-        column.name = make_c_string(name);
-        column.data_type = type;
-        column.flags = flags;
-        uuid_generate_time(column.id);
-
-        return column;
-    }
-
-    MetaTable
-    create_meta_table(const std::string& name, const std::vector<sql::ColumnDefinition> col_defs) {
-        MetaTable table;
-
-        table.name = make_c_string(name);
-        table.columns = make_c_ptr_arr(converter::convert_defs_to_mcs(col_defs));
-        table.columns_count = col_defs.size();
-        table.has_pk = false;
-        table.last_rid = 0;
-        uuid_generate_time(table.id);
-
-        return table;
-    }
-
-    void
-    cleanup_meta_table(MetaTable& table) {
-        if (table.name) {
-            free(table.name);
-        }
-        if (table.columns) {
-            for (uint64_t i = 0; i < table.columns_count; i++) {
-                if (table.columns[i]) {
-                    free_col(table.columns[i]);
-                }
+    
+    bool
+    is_table_virtual(const sql::TableIdentifier& table) {
+        if (table.schema_name.has_value()) {
+            const std::string& schema_name = table.schema_name.value().value;
+            if (schema_name == "information_schema") {
+                return true;
             }
-            free(table.columns);
         }
-    }
 
-    void
-    cleanup_meta_column(MetaColumn& column) {
-        if (column.name) {
-            free(column.name);
+        const std::string& table_name = table.table_name.value;
+        if (table_name == "tables" || table_name == "columns") {
+            return true;
         }
-    }
-
-    void
-    cleanup_meta_table(MetaTable* table) {
-        if (!table)
-            return;
-
-        cleanup_meta_table(*table);
-        free(table);
-    }
-
-    void
-    cleanup_meta_column(MetaColumn* column) {
-        if (!column)
-            return;
-
-        cleanup_meta_column(*column);
-        free(column);
+        
+        return false;
     }
 } // namespace catalog
