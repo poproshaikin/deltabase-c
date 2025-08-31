@@ -48,7 +48,7 @@ namespace catalog::information_schema {
 
     CppDataTable
     get_columns_data(const std::vector<CppMetaColumn>& columns) {
-        catalog::CppMetaTable schema = catalog::information_schema::get_tables_schema();
+        catalog::CppMetaTable schema = catalog::information_schema::get_columns_schema();
         catalog::CppDataTable result(schema);
 
         for (uint64_t i = 0; i < columns.size(); i++) {

@@ -185,10 +185,13 @@ namespace catalog {
     MetaRegistry::get_columns() const {
         std::vector<CppMetaColumn> result;
 
-        for (const auto& kvp : this->registry) {
-            auto column_ptr = std::dynamic_pointer_cast<CppMetaColumn>(kvp.second);
-            if (column_ptr) {
-                result.push_back(*column_ptr);
+        auto tables = this->get_tables();
+
+        for (const auto& table : tables) {
+            result.reserve(result.size() + table.get_columns_count());
+
+            for (const auto& col : table.get_columns()) {
+                result.push_back(col);
             }
         }
 

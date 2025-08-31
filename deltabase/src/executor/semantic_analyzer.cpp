@@ -45,17 +45,14 @@ namespace exe {
 
         if (!this->registry.has_table(selectStmt.table) &&
             !this->registry.has_virtual_table(selectStmt.table)) {
-            std::cout << "chujevo\n";
             return TableDoesntExist(selectStmt.table.table_name.value);
         }
 
         std::unique_ptr<catalog::CppMetaTable> table;
         if (catalog::is_table_virtual(selectStmt.table)) {
             table = std::make_unique<catalog::CppMetaTable>(this->registry.get_virtual_table(selectStmt.table));
-            std::cout << "blyat\n";
         } else {
             table = std::make_unique<catalog::CppMetaTable>(this->registry.get_table(selectStmt.table.table_name.value));
-            std::cout << "nachuj\n";
         }
 
         if (!table) {

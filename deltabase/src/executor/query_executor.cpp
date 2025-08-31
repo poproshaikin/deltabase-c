@@ -220,9 +220,6 @@ namespace exe {
 
     std::unique_ptr<catalog::CppDataTable>
     VirtualExecutor::execute_information_schema_tables() {
-        // каждая CppMetaTable это одна строка DataTable
-        // надо наверное сделать враппер и для Data
-
         catalog::CppDataTable table =
             catalog::information_schema::get_tables_data(this->registry.get_tables());
 
