@@ -17,23 +17,23 @@ typedef struct DataToken {
     DataType type;
 } DataToken;
 
-DataToken*
+DataToken
 make_token(DataType type, const void* data, size_t size);
 
-DataToken*
-copy_token(const DataToken* old);
+DataToken
+copy_token(const DataToken old);
 
 void
 free_token(DataToken* token);
 
 void
-free_tokens(DataToken** tokens, size_t count);
+free_tokens(DataToken* tokens, size_t count);
 
 /* Data row */
 typedef struct {
     uint64_t row_id;
     DataRowFlags flags;
-    DataToken** tokens;
+    DataToken* tokens;
     uint64_t count;
 } DataRow;
 
@@ -41,19 +41,19 @@ uint64_t
 dr_size(const MetaTable* schema, const DataRow* row);
 
 uint64_t
-dr_size_v(const MetaTable* schema, const DataToken** tokens, int tokens_count);
+dr_size_v(const MetaTable* schema, const DataToken* tokens, int tokens_count);
 
 void
 free_row(DataRow* row);
 
 typedef struct {
-    DataRow** rows;
+    DataRow* rows;
     size_t count;
 } DataRowSet;
 
 typedef struct {
     MetaTable* scheme;
-    DataRow** rows;
+    DataRow* rows;
     size_t rows_count;
 } DataTable;
 
@@ -106,7 +106,12 @@ free_filter(DataFilter* filter);
 int
 create_page(const char* db_name, const char* table_name, PageHeader* out_new_page, char** out_path);
 
-ssize_t
-get_pages(const char* db_name, const char* table_name, char*** out_paths);
+typedef struct {
+    char** paths;
+    size_t count;
+} PagePaths;
+
+PagePaths
+get_pages(const char* db_name, const char* table_name);
 
 #endif // CORE_DATA_H

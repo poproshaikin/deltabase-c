@@ -15,7 +15,7 @@ namespace catalog {
         columns.reserve(table.columns_count);
 
         for (size_t i = 0; i < table.columns_count; i++) {
-            columns.emplace_back(*table.columns[i]);
+            columns.emplace_back(table.columns[i]);
         }
 
         return columns;
@@ -54,11 +54,8 @@ namespace catalog {
         }
         if (table.columns) {
             for (uint64_t i = 0; i < table.columns_count; i++) {
-                if (table.columns[i]) {
-                    if (table.columns[i]->name) {
-                        free(table.columns[i]->name);
-                    }
-                    free(table.columns[i]);
+                if (table.columns[i].name) {
+                    free(table.columns[i].name);
                 }
             }
             free(table.columns);
@@ -108,13 +105,10 @@ namespace catalog {
 
         // Allocate and copy columns array
         if (columns.size() > 0) {
-            table.columns = static_cast<MetaColumn**>(malloc(columns.size() * sizeof(MetaColumn*)));
+            table.columns = static_cast<MetaColumn*>(malloc(columns.size() * sizeof(MetaColumn)));
             if (table.columns) {
                 for (size_t i = 0; i < columns.size(); i++) {
-                    table.columns[i] = static_cast<MetaColumn*>(malloc(sizeof(MetaColumn)));
-                    if (table.columns[i]) {
-                        *table.columns[i] = columns[i].create_meta_column();
-                    }
+                    table.columns[i] = columns[i].create_meta_column();
                 }
             }
         } else {

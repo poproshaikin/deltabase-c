@@ -21,7 +21,7 @@ namespace catalog::models {
         MetaTable table;
 
         table.name = make_c_string(name);
-        table.columns = make_c_ptr_arr(converter::convert_defs_to_mcs(col_defs));
+        table.columns = make_c_arr(converter::convert_defs_to_mcs(col_defs));
         table.columns_count = col_defs.size();
         table.has_pk = false;
         table.last_rid = 0;
@@ -37,9 +37,7 @@ namespace catalog::models {
         }
         if (table.columns) {
             for (uint64_t i = 0; i < table.columns_count; i++) {
-                if (table.columns[i]) {
-                    free_col(table.columns[i]);
-                }
+                free_col(&table.columns[i]);
             }
             free(table.columns);
         }

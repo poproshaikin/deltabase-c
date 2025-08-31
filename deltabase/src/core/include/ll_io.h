@@ -40,7 +40,7 @@ int
 write_dr(const MetaTable* schema, const DataRow* row, int fd);
 int
 write_dr_v(const MetaTable* schema,
-           const DataToken** tokens,
+           const DataToken* tokens,
            uint64_t rid,
            uint64_t count,
            unsigned char flags,

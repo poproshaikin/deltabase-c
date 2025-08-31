@@ -47,7 +47,7 @@ typedef struct {
     bool has_pk;
     MetaColumn* pk;
 
-    MetaColumn** columns;
+    MetaColumn* columns;
     uint64_t columns_count;
 
     uint64_t last_rid;
@@ -62,8 +62,8 @@ typedef enum {
 ssize_t
 get_table_column_index(const uuid_t column_id, const MetaTable* table);
 
-MetaColumn*
-find_column(const char* name, const MetaTable* table);
+int
+find_column(const char* name, const MetaTable* table, MetaColumn* out);
 
 #define MAX_PAGE_SIZE (8 * 1024)
 

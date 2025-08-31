@@ -47,7 +47,7 @@ namespace converter {
         return {data, size};
     }
 
-    DataToken*
+    DataToken
     convert_astnode_to_token(const sql::AstNode* node, DataType expected_type) {
         const sql::SqlToken& token = std::get<sql::SqlToken>(node->value);
         std::string literal = token.value;
@@ -98,17 +98,17 @@ namespace converter {
         const auto& right = std::get<sql::SqlToken>(where.right->value);
         const char* column_name = left.value.data();
 
-        MetaColumn* column = find_column(column_name, &table);
-        if (!column) {
+        MetaColumn column;
+        if (find_column(column_name, &table, &column) != 0) {
             throw std::runtime_error("Column doesn't exist");
         }
 
-        const auto value = convert_str_to_literal(right.value, column->data_type);
+        const auto value = convert_str_to_literal(right.value, column.data_type);
 
         filter.is_node = false;
-        memcpy(filter.data.condition.column_id, column->id, sizeof(uuid_t));
+        memcpy(filter.data.condition.column_id, column.id, sizeof(uuid_t));
         filter.data.condition.op = parse_filter_op(where.op);
-        filter.data.condition.type = column->data_type;
+        filter.data.condition.type = column.data_type;
         filter.data.condition.value = value.first;
         return filter;
     }

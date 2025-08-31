@@ -323,14 +323,14 @@ nulls_count(unsigned char* nb, int len) {
 }
 
 static unsigned char*
-build_nb(const MetaTable* schema, const DataToken** tokens) {
+build_nb(const MetaTable* schema, const DataToken* tokens) {
     unsigned char* bitmap = calloc(nb_size(schema), sizeof(char));
     if (!bitmap) {
         return NULL;
     }
 
     for (int i = 0; i < schema->columns_count; i++) {
-        if (tokens[i]->type == DT_NULL) {
+        if (tokens[i].type == DT_NULL) {
             int byteIndex = i / CHAR_BIT;
             int bitIndex = i % CHAR_BIT;
             bitmap[byteIndex] |= (1 << bitIndex);
@@ -341,7 +341,7 @@ build_nb(const MetaTable* schema, const DataToken** tokens) {
 }
 
 static inline int
-write_nb(const MetaTable* schema, const DataToken** tokens, int fd) {
+write_nb(const MetaTable* schema, const DataToken* tokens, int fd) {
     unsigned char* nb = build_nb(schema, tokens);
     int nbSize = nb_size(schema);
 
@@ -361,18 +361,18 @@ is_null(const unsigned char* nb, uint64_t size, size_t bit) {
 }
 
 uint64_t
-dr_size_v(const MetaTable* schema, const DataToken** tokens, int tokens_count) {
+dr_size_v(const MetaTable* schema, const DataToken* tokens, int tokens_count) {
     int nbSize = nb_size(schema);
     uint64_t totalSize = nbSize;
     for (int i = 0; i < tokens_count; i++) {
-        totalSize += dt_size(&*tokens[i]);
+        totalSize += dt_size(&tokens[i]);
     }
     return totalSize;
 }
 
 uint64_t
 dr_size(const MetaTable* schema, const DataRow* row) {
-    return dr_size_v(schema, (const DataToken**)row->tokens, row->count);
+    return dr_size_v(schema, row->tokens, row->count);
 }
 
 static inline unsigned char*
@@ -404,7 +404,7 @@ write_dr_flags(DataRowFlags flags, int fd) {
 
 int
 write_dr_v(const MetaTable* schema,
-           const DataToken** tokens,
+           const DataToken* tokens,
            uint64_t rid,
            uint64_t count,
            unsigned char flags,
@@ -429,7 +429,7 @@ write_dr_v(const MetaTable* schema,
     }
 
     for (int i = 0; i < count; i++) {
-        if (write_dt(tokens[i], fd) != 0) {
+        if (write_dt(&tokens[i], fd) != 0) {
             return i + 5;
         }
     }
@@ -440,7 +440,7 @@ write_dr_v(const MetaTable* schema,
 int
 write_dr(const MetaTable* schema, const DataRow* row, int fd) {
     return write_dr_v(
-        schema, (const DataToken**)row->tokens, row->row_id, row->count, row->flags, fd);
+        schema, row->tokens, row->row_id, row->count, row->flags, fd);
 }
 
 int
@@ -489,7 +489,7 @@ read_dr(const MetaTable* schema,
         for (size_t i = 0; i < schema->columns_count; ++i) {
             need_read[i] = false;
             for (size_t j = 0; j < columns_count; ++j) {
-                if (strcmp(schema->columns[i]->name, column_names[j]) == 0) {
+                if (strcmp(schema->columns[i].name, column_names[j]) == 0) {
                     need_read[i] = true;
                     break;
                 }
@@ -499,7 +499,7 @@ read_dr(const MetaTable* schema,
 
     size_t final_columns_count = columns_count != 0 ? columns_count : schema->columns_count;
 
-    DataToken** tokens = malloc(final_columns_count * sizeof(DataToken*));
+    DataToken* tokens = malloc(final_columns_count * sizeof(DataToken));
     if (!tokens) {
         return 5;
     }
@@ -517,13 +517,8 @@ read_dr(const MetaTable* schema,
         if (null) {
             tokens[i] = make_token(DT_NULL, NULL, 0);
         } else {
-            tokens[i] = malloc(sizeof(DataToken));
-            if (!tokens[i]) {
-                return -i - 6 - 1000;
-            }
-
             int res;
-            if ((res = read_dt(tokens[i], fd)) != 0) {
+            if ((res = read_dt(&tokens[i], fd)) != 0) {
                 return -i - 6;
             }
         }
@@ -665,7 +660,7 @@ write_mt(const MetaTable* schema, int fd) {
         return 7;
 
     for (size_t i = 0; i < schema->columns_count; i++) {
-        if (write_mc(schema->columns[i], fd) != 0) {
+        if (write_mc(&schema->columns[i], fd) != 0) {
             return i + 8;
         }
     }
@@ -721,7 +716,7 @@ read_mt(MetaTable* out, int fd) {
         return 8;
     }
 
-    out->columns = malloc(out->columns_count * sizeof(MetaColumn*));
+    out->columns = malloc(out->columns_count * sizeof(MetaColumn));
     if (!out->columns) {
         free(out->name);
         fprintf(stderr, "Failed to allocate memory for columns array in read_mt\n");
@@ -729,15 +724,9 @@ read_mt(MetaTable* out, int fd) {
     }
 
     for (size_t i = 0; i < out->columns_count; i++) {
-        out->columns[i] = malloc(sizeof(MetaColumn));
-        if (!out->columns[i]) {
-            fprintf(stderr, "Failed to allocate memory for columns array in read_mt\n");
-            return i + 9;
-        }
-
-        if (read_mc(out->columns[i], &out->id, fd) != 0) {
+        if (read_mc(&out->columns[i], &out->id, fd) != 0) {
             for (size_t j = 0; j < i; j++) {
-                free_col(out->columns[j]);
+                free_col(&out->columns[j]);
             }
 
             free(out->columns);

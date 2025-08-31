@@ -428,12 +428,12 @@ combine_row(DataRow* out, MetaTable* schema, const DataRow* old_row, const DataR
     for (size_t i = 0; i < schema->columns_count; i++) {
         // if column indices are equal
         if (j < update->count &&
-            uuid_compare(schema->columns[i]->id, update->column_indices[j]) == 0) {
+            uuid_compare(schema->columns[i].id, update->column_indices[j]) == 0) {
             // count size
-            size_t size = dtype_size(schema->columns[i]->data_type);
+            size_t size = dtype_size(schema->columns[i].data_type);
 
             if (size == 0) {
-                switch (schema->columns[i]->data_type) {
+                switch (schema->columns[i].data_type) {
                 case DT_STRING:
                     size = strlen(update->values[j]);
                     break;
@@ -443,7 +443,7 @@ combine_row(DataRow* out, MetaTable* schema, const DataRow* old_row, const DataR
             }
 
             // create a token
-            out->tokens[i] = make_token(schema->columns[i]->data_type, update->values[j], size);
+            out->tokens[i] = make_token(schema->columns[i].data_type, update->values[j], size);
 
             j++;
         } else {
@@ -543,7 +543,7 @@ seq_scan(const char* db_name,
 
     // create an array of pointers to pointers to datarow corresponding for each
     // page
-    DataRow*** page_rows = calloc(pages_count, sizeof(DataRow**));
+    DataRow** page_rows = calloc(pages_count, sizeof(DataRow*));
     size_t* rows_per_page = calloc(pages_count, sizeof(size_t));
     size_t total_rows = 0;
 
@@ -562,34 +562,28 @@ seq_scan(const char* db_name,
         }
 
         size_t count = 0;
-        DataRow** page = calloc(header.rows_count, sizeof(DataRow*));
+        DataRow* page = calloc(header.rows_count, sizeof(DataRow));
         if (!page) {
             fprintf(stderr, "Failed to allocate memory in full_scan\n");
             goto fail_cleanup;
         }
         for (size_t j = 0; j < header.rows_count; j++) {
-            DataRow* row = malloc(sizeof(DataRow));
-            if (!row) {
-                fprintf(stderr, "Failed to allocate memory in full_scan\n");
-                fclose(file);
-                goto fail_cleanup;
-            }
+            DataRow row;
 
             int res = 0;
-            if ((res = read_dr(schema, column_names, columns_count, row, fd)) != 0) {
+            if ((res = read_dr(schema, column_names, columns_count, &row, fd)) != 0) {
                 fprintf(stderr, "Failed to read data row in full_scan: %i\n", res);
-                free(row);
                 fclose(file);
                 goto fail_cleanup;
             }
 
-            if (row->flags & RF_OBSOLETE) {
-                free_row(row);
+            if (row.flags & RF_OBSOLETE) {
+                free_row(&row);
                 continue;
             }
 
-            if (filter && !row_satisfies_filter(schema, row, filter)) {
-                free_row(row);
+            if (filter && !row_satisfies_filter(schema, &row, filter)) {
+                free_row(&row);
                 continue;
             }
 
@@ -603,7 +597,7 @@ seq_scan(const char* db_name,
     }
 
     // unite all rows in the one array of pointers
-    DataRow** all_rows = calloc(total_rows, sizeof(DataRow*));
+    DataRow* all_rows = malloc(total_rows * sizeof(DataRow));
     size_t pos = 0;
     for (size_t i = 0; i < pages_count; i++) {
         for (size_t j = 0; j < rows_per_page[i]; j++) {
@@ -630,7 +624,7 @@ fail_cleanup:
         if (!page_rows[i])
             continue;
         for (size_t j = 0; j < rows_per_page[i]; j++) {
-            free_row(page_rows[i][j]);
+            free_row(&page_rows[i][j]);
         }
         free(page_rows[i]);
     }

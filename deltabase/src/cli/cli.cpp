@@ -177,7 +177,7 @@ print_data_table(const DataTable* table) {
     const MetaTable* schema = table->scheme;
 
     for (size_t i = 0; i < schema->columns_count; ++i) {
-        std::cout << std::left << std::setw(15) << schema->columns[i]->name;
+        std::cout << std::left << std::setw(15) << schema->columns[i].name;
     }
     std::cout << "\n";
 
@@ -187,10 +187,10 @@ print_data_table(const DataTable* table) {
     std::cout << std::setfill(' ') << "\n";
 
     for (size_t r = 0; r < table->rows_count; ++r) {
-        const DataRow* row = table->rows[r];
+        const DataRow& row = table->rows[r];
         for (size_t c = 0; c < schema->columns_count; ++c) {
-            const DataToken* token = row->tokens[c];
-            std::cout << std::left << std::setw(15) << ::token_to_string(token);
+            const DataToken& token = row.tokens[c];
+            std::cout << std::left << std::setw(15) << ::token_to_string(&token);
         }
         std::cout << "\n";
     }

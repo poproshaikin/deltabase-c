@@ -4,13 +4,14 @@
 #include "include/utils.h"
 #include <linux/limits.h>
 
-DataToken*
+DataToken
 make_token(DataType type, const void* data, size_t size) {
-    DataToken* token = malloc(sizeof(DataToken));
-    token->type = type;
-    token->size = size;
-    token->bytes = (char*)malloc(size);
-    memcpy(token->bytes, data, size);
+    DataToken token = {
+        .type = type,
+        .size = size,
+        .bytes = (char*)malloc(size)
+    };
+    memcpy(token.bytes, data, size);
     return token;
 }
 
@@ -18,39 +19,35 @@ void
 free_token(DataToken* token) {
     if (token) {
         free(token->bytes);
-        free(token);
     }
 }
 
-DataToken*
-copy_token(const DataToken* old) {
-    if (!old)
-        return NULL;
-    DataToken* new_token = malloc(sizeof(DataToken));
-    new_token->type = old->type;
-    new_token->size = old->size;
-    new_token->bytes = malloc(old->size);
-    memcpy(new_token->bytes, old->bytes, old->size);
+DataToken
+copy_token(DataToken old) {
+    DataToken new_token = {
+        .type = old.type,
+        .size = old.size,
+        .bytes = malloc(old.size)
+    };
+    memcpy(new_token.bytes, old.bytes, old.size);
     return new_token;
 }
 
 void
-free_tokens(DataToken** tokens, size_t count) {
+free_tokens(DataToken* tokens, size_t count) {
     for (size_t i = 0; i < count; i++) {
-        free_token(tokens[i]);
+        free_token(&tokens[i]);
     }
 }
 
 void
 free_row(DataRow* row) {
-    free_tokens(row->tokens, row->count);
-    free(row);
+    free(row->tokens);
 }
 
 void
 free_col(MetaColumn* column) {
     free(column->name);
-    free(column);
 }
 
 bool
@@ -194,7 +191,7 @@ row_satisfies_filter(const MetaTable* schema, const DataRow* row, const DataFilt
         }
 
         return apply_filter(
-            filter->data.condition, row->tokens[col_index]->bytes, row->tokens[col_index]->type);
+            filter->data.condition, row->tokens[col_index].bytes, row->tokens[col_index].type);
     } else {
         switch (filter->data.node.op) {
         case LOGIC_AND:
@@ -258,18 +255,14 @@ create_page(const char* db_name,
     return 0;
 }
 
-// if success, returns count of paths. otherwise, -1
-ssize_t
-get_pages(const char* db_name, const char* table_name, char*** out_paths) {
-    if (!out_paths) {
-        fprintf(stderr, "get_pages: out_paths cannot be null");
-        return -1;
-    }
+PagePaths
+get_pages(const char* db_name, const char* table_name) {
+    PagePaths result = {0};
+    
     char dir_path[PATH_MAX];
     path_db_table_data(db_name, table_name, dir_path, PATH_MAX);
 
-    size_t files_count = 0;
-    *out_paths = get_dir_files(dir_path, &files_count);
-
-    return files_count;
+    result.paths = get_dir_files(dir_path, &result.count);
+    
+    return result;
 }

@@ -43,23 +43,23 @@ namespace exe {
 
     IntOrDataTable
     DatabaseExecutor::execute(const sql::AstNode& node) {
-        if (std::holds_alternative<sql::SelectStatement>(node.value)) {
+        if (node.type == sql::AstNodeType::SELECT) {
             return execute_select(std::get<sql::SelectStatement>(node.value));
         }
 
-        else if (std::holds_alternative<sql::InsertStatement>(node.value)) {
+        if (node.type == sql::AstNodeType::INSERT) {
             return execute_insert(std::get<sql::InsertStatement>(node.value));
         }
 
-        else if (std::holds_alternative<sql::UpdateStatement>(node.value)) {
+        if (node.type == sql::AstNodeType::UPDATE) {
             return execute_update(std::get<sql::UpdateStatement>(node.value));
         }
 
-        else if (std::holds_alternative<sql::DeleteStatement>(node.value)) {
+        if (node.type == sql::AstNodeType::DELETE) {
             return execute_delete(std::get<sql::DeleteStatement>(node.value));
         }
 
-        else if (std::holds_alternative<sql::CreateTableStatement>(node.value)) {
+        if (node.type == sql::AstNodeType::CREATE_TABLE) {
             return execute_create_table(std::get<sql::CreateTableStatement>(node.value));
         }
 
@@ -184,8 +184,8 @@ namespace exe {
 
     IntOrDataTable
     AdminExecutor::execute(const sql::AstNode& node) {
-        if (std::holds_alternative<sql::CreateDbStatement>(node.value)) {
-            return execute_create_database(std::get<sql::CreateDbStatement>(node.value));
+        if (node.type == sql::AstNodeType::CREATE_DATABASE) {
+            return this->execute_create_database(std::get<sql::CreateDbStatement>(node.value));
         }
 
         throw std::runtime_error("Unsupported query");
@@ -202,6 +202,29 @@ namespace exe {
 
     IntOrDataTable
     VirtualExecutor::execute(const sql::AstNode& node) {
-        return 0;
+        if (node.type == sql::AstNodeType::SELECT) {
+            const sql::SelectStatement& stmt = std::get<sql::SelectStatement>(node.value);
+
+            if (stmt.table.table_name.value == "tables") {
+                return this->execute_information_schema_tables();
+            }
+            if (stmt.table.table_name.value == "columns") {
+                return this->execute_information_schema_columns();
+            }
+        }
+
+        throw std::runtime_error("Unsupported query for VirtualExecutor");
+    }
+
+    int
+    VirtualExecutor::execute_information_schema_tables() {
+        // каждая CppMetaTable это одна строка DataTable
+        // надо наверное сделать враппер и для Data
+        
+    }
+
+    int
+    VirtualExecutor::execute_information_schema_columns() {
+
     }
 } // namespace exe

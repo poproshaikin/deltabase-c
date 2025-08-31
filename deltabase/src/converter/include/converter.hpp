@@ -14,7 +14,7 @@ namespace converter {
     std::pair<void*, std::size_t>
     convert_str_to_literal(const std::string& literal, DataType expected_type);
 
-    DataToken*
+    DataToken
     convert_astnode_to_token(const sql::AstNode* node, DataType expected_type);
 
     FilterOp

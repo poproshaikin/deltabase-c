@@ -91,9 +91,6 @@ namespace exe {
         void
         ensure_db_exists(const std::string& name);
 
-        bool
-        is_table_virtual(const sql::TableIdentifier& table);
-
       public:
         SemanticAnalyzer(catalog::MetaRegistry& registry) : registry(registry) {
         }
