@@ -415,7 +415,7 @@ for_each_row_matching_filter(const char* db_name,
 
 static int
 combine_row(DataRow* out, MetaTable* schema, const DataRow* old_row, const DataRowUpdate* update) {
-    out->tokens = malloc(schema->columns_count * sizeof(DataToken*));
+    out->tokens = malloc(schema->columns_count * sizeof(DataToken));
     if (!out->tokens) {
         fprintf(stderr, "Failed to allocate memory in combine_row\n");
         return 1;
