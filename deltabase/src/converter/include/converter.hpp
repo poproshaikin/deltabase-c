@@ -11,30 +11,30 @@ extern "C" {
 }
 
 namespace converter {
-    std::pair<void*, std::size_t>
-    convert_str_to_literal(const std::string& literal, DataType expected_type);
+    auto
+    convert_str_to_literal(const std::string& literal, DataType expected_type) -> std::pair<void*, std::size_t>;
 
-    DataToken
-    convert_astnode_to_token(const sql::AstNode* node, DataType expected_type);
+    auto
+    convert_astnode_to_token(const sql::AstNode* node, DataType expected_type) -> DataToken;
 
-    FilterOp
-    parse_filter_op(sql::AstOperator op);
+    auto
+    parse_filter_op(sql::AstOperator op) -> FilterOp;
 
-    DataFilter
-    convert_binary_to_filter(const sql::BinaryExpr& where, const MetaTable& table);
+    auto
+    convert_binary_to_filter(const sql::BinaryExpr& where, const MetaTable& table) -> DataFilter;
 
-    MetaColumn
-    convert_def_to_mc(const sql::ColumnDefinition& def);
+    auto
+    convert_def_to_mc(const sql::ColumnDefinition& def) -> MetaColumn;
 
-    std::vector<MetaColumn>
-    convert_defs_to_mcs(std::vector<sql::ColumnDefinition> defs);
+    auto
+    convert_defs_to_mcs(std::vector<sql::ColumnDefinition> defs) -> std::vector<MetaColumn>;
 
-    DataType
-    convert_kw_to_dt(const sql::SqlKeyword& kw);
+    auto
+    convert_kw_to_dt(const sql::SqlKeyword& kw) -> DataType;
 
-    DataColumnFlags
-    convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints);
+    auto
+    convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints) -> DataColumnFlags;
 
-    sql::SqlKeyword
-    get_data_type_kw(DataType dt);
+    auto
+    get_data_type_kw(DataType dt) -> sql::SqlKeyword;
 } // namespace converter

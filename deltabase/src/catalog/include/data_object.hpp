@@ -1,6 +1,6 @@
 #pragma once
 
-#include "meta_schema.hpp"
+#include "meta_object.hpp"
 #include <cstring>
 #include <memory>
 
@@ -26,13 +26,13 @@ namespace catalog {
         CppDataToken(CppDataToken&& other) noexcept = default;
         
         // Copy assignment
-        CppDataToken& operator=(const CppDataToken& other);
+        auto operator=(const CppDataToken& other) -> CppDataToken&;
         
         // Move assignment
-        CppDataToken& operator=(CppDataToken&& other) noexcept = default;
+        auto operator=(CppDataToken&& other) noexcept -> CppDataToken& = default;
         
         // Convert back to C DataToken
-        DataToken to_data_token() const;
+        [[nodiscard]] auto to_data_token() const -> DataToken;
     };
 
     struct CppDataRow {
@@ -48,7 +48,7 @@ namespace catalog {
         
         ~CppDataRow() = default;
         
-        DataRow to_data_row() const;
+        [[nodiscard]] auto to_data_row() const -> DataRow;
     };
 
     struct CppDataTable {
@@ -58,16 +58,16 @@ namespace catalog {
         
         ~CppDataTable() = default;
 
-        DataTable to_data_table() const;
+        [[nodiscard]] auto to_data_table() const -> DataTable;
         
-        const std::vector<CppDataRow>& get_rows();
+        auto get_rows() -> const std::vector<CppDataRow>&;
         
         void add_row(const CppDataRow& row);
 
     private:
-        CppMetaTable schema;
-        std::vector<CppDataRow> rows;
+        CppMetaTable schema_;
+        std::vector<CppDataRow> rows_;
 
-        std::vector<CppDataRow> parse_rows(const DataTable& table);
+        auto parse_rows(const DataTable& table) -> std::vector<CppDataRow>;
     };
 }

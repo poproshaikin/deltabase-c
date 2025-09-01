@@ -12,8 +12,8 @@ extern "C" {
 }
 
 namespace converter {
-    std::pair<void*, size_t>
-    convert_str_to_literal(const std::string& literal, DataType expected_type) {
+    auto
+    convert_str_to_literal(const std::string& literal, DataType expected_type) -> std::pair<void*, size_t> {
         void* data = nullptr;
         size_t size = 0;
 
@@ -47,9 +47,9 @@ namespace converter {
         return {data, size};
     }
 
-    DataToken
-    convert_astnode_to_token(const sql::AstNode* node, DataType expected_type) {
-        const sql::SqlToken& token = std::get<sql::SqlToken>(node->value);
+    auto
+    convert_astnode_to_token(const sql::AstNode* node, DataType expected_type) -> DataToken {
+        const auto& token = std::get<sql::SqlToken>(node->value);
         std::string literal = token.value;
 
         const auto value = convert_str_to_literal(literal, expected_type);
@@ -59,8 +59,8 @@ namespace converter {
         return make_token(expected_type, value.first, value.second);
     }
 
-    FilterOp
-    parse_filter_op(sql::AstOperator op) {
+    auto
+    parse_filter_op(sql::AstOperator op) -> FilterOp {
         if (op == sql::AstOperator::EQ)
             return OP_EQ;
         if (op == sql::AstOperator::NEQ)
@@ -76,16 +76,16 @@ namespace converter {
         throw std::runtime_error("Unknown filter operator");
     }
 
-    DataFilter
-    convert_binary_to_filter(const sql::BinaryExpr& where, const MetaTable& table) {
+    auto
+    convert_binary_to_filter(const sql::BinaryExpr& where, const MetaTable& table) -> DataFilter {
         DataFilter filter = {};
 
         if (where.op == sql::AstOperator::AND || where.op == sql::AstOperator::OR) {
             const auto& left_expr = std::get<sql::BinaryExpr>(where.left->value);
             const auto& right_expr = std::get<sql::BinaryExpr>(where.right->value);
 
-            DataFilter* left_filter = new DataFilter(convert_binary_to_filter(left_expr, table));
-            DataFilter* right_filter = new DataFilter(convert_binary_to_filter(right_expr, table));
+            auto* left_filter = new DataFilter(convert_binary_to_filter(left_expr, table));
+            auto* right_filter = new DataFilter(convert_binary_to_filter(right_expr, table));
 
             filter.is_node = true;
             filter.data.node.left = left_filter;
@@ -113,28 +113,28 @@ namespace converter {
         return filter;
     }
 
-    MetaColumn
-    convert_def_to_mc(const sql::ColumnDefinition& definition) {
+    auto
+    convert_def_to_mc(const sql::ColumnDefinition& definition) -> MetaColumn {
         return catalog::models::create_meta_column(
             definition.name.value,
             convert_kw_to_dt(definition.type.get_detail<sql::SqlKeyword>()),
             convert_tokens_to_cfs(definition.constraints));
     }
 
-    std::vector<MetaColumn>
-    convert_defs_to_mcs(std::vector<sql::ColumnDefinition> defs) {
+    auto
+    convert_defs_to_mcs(std::vector<sql::ColumnDefinition> defs) -> std::vector<MetaColumn> {
         std::vector<MetaColumn> mcs;
         mcs.reserve(defs.size());
 
-        for (int i = 0; i < defs.size(); i++) {
-            mcs.push_back(convert_def_to_mc(defs[i]));
+        for (const auto & def : defs) {
+            mcs.push_back(convert_def_to_mc(def));
         }
 
         return mcs;
     }
 
-    DataType
-    convert_kw_to_dt(const sql::SqlKeyword& kw) {
+    auto
+    convert_kw_to_dt(const sql::SqlKeyword& kw) -> DataType {
         switch (kw) {
         case sql::SqlKeyword::_NULL:
             return DT_NULL;
@@ -153,8 +153,8 @@ namespace converter {
         }
     }
 
-    DataColumnFlags
-    convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints) {
+    auto
+    convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints) -> DataColumnFlags {
         DataColumnFlags flags = CF_NONE;
 
         for (int i = 0; i < constraints.size(); i++) {
@@ -190,8 +190,8 @@ namespace converter {
         return flags;
     }
 
-    sql::SqlKeyword
-    get_data_type_kw(DataType dt) {
+    auto
+    get_data_type_kw(DataType dt) -> sql::SqlKeyword {
         switch (dt) {
         case DT_INTEGER: return sql::SqlKeyword::INTEGER; 
         case DT_STRING:  return sql::SqlKeyword::STRING;  

@@ -4,8 +4,8 @@
 
 using namespace sql;
 
-std::optional<AstOperator>
-to_ast_operator(SqlOperator type) {
+auto
+to_ast_operator(SqlOperator type) -> std::optional<AstOperator> {
     switch (type) {
     case SqlOperator::OR:
         return AstOperator::OR;
@@ -32,8 +32,8 @@ to_ast_operator(SqlOperator type) {
     }
 }
 
-std::unique_ptr<AstNode>
-SqlParser::parse_binary(int min_priority) {
+auto
+SqlParser::parse_binary(int min_priority) -> std::unique_ptr<AstNode> {
     std::unique_ptr<AstNode> left = parse_primary();
 
     while (true) {
@@ -62,8 +62,8 @@ SqlParser::parse_binary(int min_priority) {
     return left;
 }
 
-std::unique_ptr<AstNode>
-SqlParser::parse_primary() {
+auto
+SqlParser::parse_primary() -> std::unique_ptr<AstNode> {
     const SqlToken& token = current();
 
     if (match(SqlSymbol::LPAREN)) {

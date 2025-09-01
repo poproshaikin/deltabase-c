@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-std::vector<std::string>
-split(const std::string& s, char delimiter, int count) {
+auto
+split(const std::string& s, char delimiter, int count) -> std::vector<std::string> {
     std::vector<std::string> result;
     std::stringstream ss(s);
     std::string item;
@@ -30,8 +30,8 @@ split(const std::string& s, char delimiter, int count) {
     return result;
 }
 
-char*
-make_c_string(const std::string& str) {
+auto
+make_c_string(const std::string& str) -> char* {
     char* ptr = new char[str.size() + 1];
     std::memcpy(ptr, str.c_str(), str.size() + 1);
     return ptr;
@@ -42,7 +42,7 @@ print_ram_usage() {
     std::ifstream statm("/proc/self/status");
     std::string line;
     while (std::getline(statm, line)) {
-        if (line.rfind("VmRSS:", 0) == 0) { 
+        if (line.starts_with("VmRSS:")) { 
             std::cout << line << std::endl;
         }
     }

@@ -14,8 +14,8 @@ namespace sql {
     SqlParser::SqlParser(std::vector<SqlToken> tokens) : _tokens(std::move(tokens)), _current(0) {
     }
 
-    bool
-    SqlParser::advance() noexcept {
+    auto
+    SqlParser::advance() noexcept -> bool {
         if (_current + 1 < _tokens.size()) {
             _current++;
             return true;
@@ -24,8 +24,8 @@ namespace sql {
         return false;
     }
 
-    bool
-    SqlParser::advance_or_throw(std::string error_msg) {
+    auto
+    SqlParser::advance_or_throw(std::string error_msg) -> bool {
         if (!advance()) {
             throw std::runtime_error(error_msg);
         }
@@ -42,8 +42,8 @@ namespace sql {
     constexpr bool is_in_variant_v = is_in_variant<T, Variant>::value;
 
     template <typename TEnum>
-    bool
-    SqlParser::match(const TEnum& expected) const {
+    auto
+    SqlParser::match(const TEnum& expected) const -> bool {
         if (_current >= _tokens.size()) {
             return false;
         }
@@ -63,24 +63,24 @@ namespace sql {
     }
 
     template <typename TEnum>
-    bool
-    SqlParser::match_or_throw(TEnum expected, std::string error_msg) const {
+    auto
+    SqlParser::match_or_throw(TEnum expected, std::string error_msg) const -> bool {
         if (!match<TEnum>(expected)) {
             throw std::runtime_error(error_msg);
         }
         return true;
     }
 
-    const SqlToken&
-    SqlParser::current() const {
+    auto
+    SqlParser::current() const -> const SqlToken& {
         if (_current >= _tokens.size()) {
             throw std::out_of_range("Parser: current() out of bounds");
         }
         return _tokens[_current];
     }
 
-    std::unique_ptr<AstNode>
-    SqlParser::parse() {
+    auto
+    SqlParser::parse() -> std::unique_ptr<AstNode> {
         if (match(SqlKeyword::SELECT)) {
             return std::make_unique<AstNode>(AstNodeType::SELECT, parse_select());
         } else if (match(SqlKeyword::INSERT)) {
@@ -104,8 +104,8 @@ namespace sql {
         throw std::runtime_error("Unsupported statement");
     }
 
-    SelectStatement
-    SqlParser::parse_select() {
+    auto
+    SqlParser::parse_select() -> SelectStatement {
         SelectStatement stmt;
 
         if (!match(SqlOperator::MUL)) {
@@ -138,8 +138,8 @@ namespace sql {
         return stmt;
     }
 
-    InsertStatement
-    SqlParser::parse_insert() {
+    auto
+    SqlParser::parse_insert() -> InsertStatement {
         InsertStatement stmt;
 
         advance_or_throw();
@@ -195,8 +195,8 @@ namespace sql {
         return stmt;
     }
 
-    UpdateStatement
-    SqlParser::parse_update() {
+    auto
+    SqlParser::parse_update() -> UpdateStatement {
         UpdateStatement stmt;
 
         advance_or_throw();
@@ -232,8 +232,8 @@ namespace sql {
         return stmt;
     }
 
-    DeleteStatement
-    SqlParser::parse_delete() {
+    auto
+    SqlParser::parse_delete() -> DeleteStatement {
         DeleteStatement stmt;
 
         advance_or_throw();
@@ -250,8 +250,8 @@ namespace sql {
         return stmt;
     }
 
-    CreateTableStatement
-    SqlParser::parse_create_table() {
+    auto
+    SqlParser::parse_create_table() -> CreateTableStatement {
         CreateTableStatement stmt;
 
         match_or_throw(SqlKeyword::TABLE, "Expected 'TABLE' after 'CREATE'");
@@ -275,8 +275,8 @@ namespace sql {
         return stmt;
     }
 
-    ColumnDefinition
-    SqlParser::parse_column_def() {
+    auto
+    SqlParser::parse_column_def() -> ColumnDefinition {
         ColumnDefinition def;
 
         match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier");
@@ -317,8 +317,8 @@ namespace sql {
         return def;
     }
 
-    std::vector<std::unique_ptr<AstNode>>
-    SqlParser::parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType) {
+    auto
+    SqlParser::parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType) -> std::vector<std::unique_ptr<AstNode>> {
         std::vector<std::unique_ptr<AstNode>> tokens;
 
         while (true) {
@@ -346,8 +346,8 @@ namespace sql {
         return tokens;
     }
 
-    CreateDbStatement
-    SqlParser::parse_create_db() {
+    auto
+    SqlParser::parse_create_db() -> CreateDbStatement {
         CreateDbStatement stmt;
 
         match_or_throw(SqlKeyword::DATABASE);
@@ -358,8 +358,8 @@ namespace sql {
         return stmt;
     }
 
-    TableIdentifier
-    SqlParser::parse_table_identifier() {
+    auto
+    SqlParser::parse_table_identifier() -> TableIdentifier {
         match_or_throw(SqlTokenType::IDENTIFIER);
         const SqlToken& first_token = current();
 
@@ -370,10 +370,10 @@ namespace sql {
             match_or_throw(SqlTokenType::IDENTIFIER, "Expected table identifier after schema name");
             const SqlToken& second_token = current();
             advance();
-            return TableIdentifier(second_token, first_token);   
+            return {second_token, first_token};   
         }
 
-        return TableIdentifier(first_token, std::nullopt);
+        return {first_token, std::nullopt};
     }
 
 } // namespace sql

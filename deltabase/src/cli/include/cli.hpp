@@ -13,15 +13,15 @@ namespace cli {
     void
     print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent = 0);
 
-    std::string
-    token_to_string(const DataToken* token);
+    auto
+    token_to_string(const DataToken* token) -> std::string;
     
     void
     print_data_table(const DataTable& table);
 
     class SqlCli {
-        std::unique_ptr<engine::DltEngine> engine;
-        std::unordered_map<std::string, std::function<void(std::string arg)>> handlers;
+        std::unique_ptr<engine::DltEngine> engine_;
+        std::unordered_map<std::string, std::function<void(std::string arg)>> handlers_;
 
         void
         proccess_input(std::string cmd);

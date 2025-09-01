@@ -3,6 +3,7 @@
 #include "lexer.hpp"
 #include <optional>
 #include <memory>
+#include <utility>
 
 namespace sql {
     enum class AstNodeType {
@@ -35,8 +36,8 @@ namespace sql {
         ASSIGN,
     };
 
-    inline const std::unordered_map<AstOperator, int>&
-    get_ast_operators_priorities() {
+    inline auto
+    get_ast_operators_priorities() -> const std::unordered_map<AstOperator, int>& {
         static std::unordered_map<AstOperator, int> map = {
             {AstOperator::OR, 1},
             {AstOperator::AND, 2},
@@ -69,7 +70,7 @@ namespace sql {
 
         TableIdentifier(SqlToken table_name,
                         std::optional<SqlToken> schema_name = std::nullopt)
-            : table_name(table_name), schema_name(schema_name) {
+            : table_name(std::move(table_name)), schema_name(std::move(schema_name)) {
         }
     };
 
@@ -133,67 +134,67 @@ namespace sql {
       public:
         SqlParser(std::vector<SqlToken> tokens);
 
-        std::unique_ptr<AstNode>
-        parse();
+        auto
+        parse() -> std::unique_ptr<AstNode>;
 
       private:
-        std::vector<SqlToken> _tokens;
-        size_t _current;
+        std::vector<SqlToken> tokens_;
+        size_t current_;
 
-        SelectStatement
-        parse_select();
+        auto
+        parse_select() -> SelectStatement;
 
-        InsertStatement
-        parse_insert();
+        auto
+        parse_insert() -> InsertStatement;
 
-        UpdateStatement
-        parse_update();
+        auto
+        parse_update() -> UpdateStatement;
 
-        DeleteStatement
-        parse_delete();
+        auto
+        parse_delete() -> DeleteStatement;
 
-        CreateTableStatement
-        parse_create_table();
+        auto
+        parse_create_table() -> CreateTableStatement;
 
-        CreateDbStatement
-        parse_create_db();
+        auto
+        parse_create_db() -> CreateDbStatement;
 
-        std::unique_ptr<AstNode>
-        parse_binary(int min_priority);
-
-        template <typename TEnum>
-        bool
-        match(const TEnum&) const;
+        auto
+        parse_binary(int min_priority) -> std::unique_ptr<AstNode>;
 
         template <typename TEnum>
-        bool
-        match_or_throw(TEnum expected, std::string error_msg = "Invalid statement syntax") const;
+        auto
+        match(const TEnum&) const -> bool;
 
-        bool
-        advance() noexcept;
+        template <typename TEnum>
+        auto
+        match_or_throw(TEnum expected, std::string error_msg = "Invalid statement syntax") const -> bool;
 
-        bool
-        advance_or_throw(std::string error_msg = "Invalid statement syntax");
+        auto
+        advance() noexcept -> bool;
 
-        const SqlToken&
-        previous() const noexcept;
+        auto
+        advance_or_throw(std::string error_msg = "Invalid statement syntax") -> bool;
 
-        const SqlToken&
-        current() const;
+        [[nodiscard]] auto
+        previous() const noexcept -> const SqlToken&;
 
-        std::unique_ptr<AstNode>
-        parse_primary();
+        [[nodiscard]] auto
+        current() const -> const SqlToken&;
 
-        std::vector<std::unique_ptr<AstNode>>
-        parse_assignments();
+        auto
+        parse_primary() -> std::unique_ptr<AstNode>;
 
-        std::vector<std::unique_ptr<AstNode>>
-        parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType);
+        auto
+        parse_assignments() -> std::vector<std::unique_ptr<AstNode>>;
 
-        ColumnDefinition
-        parse_column_def();
+        auto
+        parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType) -> std::vector<std::unique_ptr<AstNode>>;
 
-        TableIdentifier
-        parse_table_identifier();
+        auto
+        parse_column_def() -> ColumnDefinition;
+
+        auto
+        parse_table_identifier() -> TableIdentifier;
     };
 } // namespace sql

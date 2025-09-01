@@ -3,8 +3,8 @@
 #include <stdexcept>
 
 namespace exe {
-    int
-    literal_to_int(const std::string& literal) {
+    auto
+    literal_to_int(const std::string& literal) -> int {
         try {
             size_t pos;
             int val = std::stoi(literal, &pos);
@@ -17,8 +17,8 @@ namespace exe {
         }
     }
 
-    double
-    literal_to_real(const std::string& literal) {
+    auto
+    literal_to_real(const std::string& literal) -> double {
         try {
             size_t pos;
             double val = std::stod(literal, &pos);
@@ -31,11 +31,11 @@ namespace exe {
         }
     }
 
-    bool
-    literal_to_bool(const std::string& literal) {
+    auto
+    literal_to_bool(const std::string& literal) -> bool {
         std::string lower;
         lower.resize(literal.size());
-        std::transform(literal.begin(), literal.end(), lower.begin(), ::tolower);
+        std::ranges::transform(literal, lower.begin(), ::tolower);
 
         if (lower == "true" || lower == "1" || lower == "t")
             return true;
@@ -45,8 +45,8 @@ namespace exe {
         throw std::runtime_error("Invalid boolean format: " + literal);
     }
 
-    char
-    literal_to_char(const std::string& literal) {
+    auto
+    literal_to_char(const std::string& literal) -> char {
         if (literal.size() != 1) {
             throw std::runtime_error("Invalid char format (must be single character): " + literal);
         }

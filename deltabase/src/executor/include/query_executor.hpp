@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 
 namespace exe {
@@ -21,75 +22,75 @@ namespace exe {
     public:
         virtual ~IQueryExecutor() = 0;
 
-        virtual IntOrDataTable
-        execute(const sql::AstNode& node) = 0;
+        virtual auto
+        execute(const sql::AstNode& node) -> IntOrDataTable = 0;
 
         virtual void
         set_db_name(std::string db_name) {};
     };
 
     class DatabaseExecutor : public IQueryExecutor {
-        std::string db_name;
+        std::string db_name_;
 
-        std::unique_ptr<catalog::CppDataTable>
-        execute_select(const sql::SelectStatement& stmt);
+        auto
+        execute_select(const sql::SelectStatement& stmt) -> std::unique_ptr<catalog::CppDataTable>;
 
-        int
-        execute_insert(const sql::InsertStatement& stmt);
+        auto
+        execute_insert(const sql::InsertStatement& stmt) -> int;
 
-        int
-        execute_update(const sql::UpdateStatement& stmt);
+        auto
+        execute_update(const sql::UpdateStatement& stmt) -> int;
 
-        int
-        execute_delete(const sql::DeleteStatement& stmt);
+        auto
+        execute_delete(const sql::DeleteStatement& stmt) -> int;
 
-        int
-        execute_create_table(const sql::CreateTableStatement& stmt);
+        auto
+        execute_create_table(const sql::CreateTableStatement& stmt) -> int;
 
     public:
         DatabaseExecutor(catalog::MetaRegistry& registry, std::string db_name)
-            : db_name(db_name), IQueryExecutor(registry) {
+            : db_name_(std::move(db_name)), IQueryExecutor(registry) {
         }
 
         DatabaseExecutor(DatabaseExecutor&& other)
-            : IQueryExecutor(other.registry), db_name(std::move(other.db_name)) {
+            : IQueryExecutor(other.registry), db_name_(std::move(other.db_name_)) {
         }
 
-        IntOrDataTable
-        execute(const sql::AstNode& node) override;
+        auto
+        execute(const sql::AstNode& node) -> IntOrDataTable override;
         
         void
         set_db_name(std::string db_name) override;
     };
 
     class AdminExecutor : public IQueryExecutor {
-        std::optional<std::string> db_name;
+        std::optional<std::string> db_name_;
 
-        int
-        execute_create_database(const sql::CreateDbStatement& stmt);
+        auto
+        execute_create_database(const sql::CreateDbStatement& stmt) -> int;
 
     public:
         AdminExecutor(catalog::MetaRegistry& registry, std::optional<std::string> db_name)
-            : db_name(db_name), IQueryExecutor(registry) {
+            : db_name_(std::move(db_name)), IQueryExecutor(registry) {
         }
 
         AdminExecutor(AdminExecutor&& other)
-            : IQueryExecutor(other.registry), db_name(std::move(other.db_name)) {
+            : IQueryExecutor(other.registry), db_name_(std::move(other.db_name_)) {
         }
 
-        IntOrDataTable
-        execute(const sql::AstNode& node) override;
+        auto
+        execute(const sql::AstNode& node) -> IntOrDataTable override;
 
         void
         set_db_name(std::string db_name) override;
     };
 
     class VirtualExecutor : public IQueryExecutor {
-        std::unique_ptr<catalog::CppDataTable>
-        execute_information_schema_tables();
+        auto
+        execute_information_schema_tables() -> std::unique_ptr<catalog::CppDataTable>;
 
-        std::unique_ptr<catalog::CppDataTable>
-        execute_information_schema_columns();
+        auto
+        execute_information_schema_columns() -> std::unique_ptr<catalog::CppDataTable>;
 
     public:
         VirtualExecutor(catalog::MetaRegistry& registry) : IQueryExecutor(registry) {
@@ -98,8 +99,8 @@ namespace exe {
         VirtualExecutor(VirtualExecutor&& other) : IQueryExecutor(other.registry) {
         }
 
-        IntOrDataTable
-        execute(const sql::AstNode& node) override;
+        auto
+        execute(const sql::AstNode& node) -> IntOrDataTable override;
     };
 } // namespace exe
 

@@ -30,6 +30,12 @@ get_databases(size_t* out_count);
 int
 create_schema(const char* db_name, const MetaSchema* schema);
 
+int 
+get_schema(const char *db_name, const char *schema_name, MetaSchema* out);
+
+char**
+get_schemas(const char* db_name, size_t* out_count);
+
 
 int
 create_table(const char* db_name, const MetaSchema* schema, const MetaTable* table);
@@ -44,7 +50,7 @@ int
 update_table(const char* db_name, const char* schema_name, const MetaTable* table);
 
 char**
-get_tables(const char* db_name, size_t* out_count);
+get_tables(const char* db_name, const char* schema_name, size_t* out_count);
 
 int
 insert_row(const char* db_name, const MetaSchema* schema, MetaTable* table, DataRow* row);

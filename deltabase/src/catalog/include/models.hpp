@@ -8,11 +8,14 @@ extern "C" {
 
 namespace catalog::models {
 
-    MetaColumn
-    create_meta_column(const std::string& name, DataType type, DataColumnFlags flags);
+    auto
+    create_meta_column(const std::string& name, DataType type, DataColumnFlags flags) -> MetaColumn;
 
-    MetaTable
-    create_meta_table(const std::string& name, const std::vector<sql::ColumnDefinition> col_defs);
+    auto
+    create_meta_table(const std::string& name, const std::vector<sql::ColumnDefinition> col_defs) -> MetaTable;
+
+    void 
+    cleanup_meta_schema(MetaSchema& schema);
 
     void
     cleanup_meta_table(MetaTable& table);

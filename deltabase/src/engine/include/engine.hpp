@@ -19,12 +19,12 @@ namespace engine {
     };
 
     class DltEngine {
-        QueryRouter router;
-        exe::SemanticAnalyzer semantic_analyzer;
-        catalog::MetaRegistry registry;
+        QueryRouter router_;
+        exe::SemanticAnalyzer semantic_analyzer_;
+        catalog::MetaRegistry registry_;
 
-        exe::IntOrDataTable
-        execute(const sql::AstNode& node);
+        auto
+        execute(const sql::AstNode& node) -> exe::IntOrDataTable;
 
     public:
         std::string db_name;
@@ -32,8 +32,8 @@ namespace engine {
         DltEngine();
         DltEngine(std::string db_name);
 
-        ExecutionResult
-        run_query(const std::string& sql);
+        auto
+        run_query(const std::string& sql) -> ExecutionResult;
     };
 } // namespace engine
 

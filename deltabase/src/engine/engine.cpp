@@ -16,8 +16,8 @@ namespace engine {
           semantic_analyzer(this->registry, db_name) {
     }
 
-    exe::IntOrDataTable
-    DltEngine::execute(const sql::AstNode& node) {
+    auto
+    DltEngine::execute(const sql::AstNode& node) -> exe::IntOrDataTable {
         exe::AnalysisResult analysis_result = this->semantic_analyzer.analyze(node);
         if (!analysis_result.is_valid) {
             std::cerr << "Execution failed at the analyzation phase" << std::endl;
@@ -32,8 +32,8 @@ namespace engine {
         }
     }
 
-    ExecutionResult
-    DltEngine::run_query(const std::string& sql) {
+    auto
+    DltEngine::run_query(const std::string& sql) -> ExecutionResult {
         auto start = std::chrono::high_resolution_clock::now();
         std::vector<sql::SqlToken> tokens;
 

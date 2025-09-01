@@ -1,19 +1,19 @@
 #pragma once 
 
 #include "data_object.hpp"
-#include "meta_schema.hpp"
+#include "meta_object.hpp"
 
 namespace catalog::information_schema {
 
-    CppMetaTable
-    get_tables_schema();
+    auto
+    get_tables_schema() -> CppMetaTable;
 
-    CppDataTable
-    get_tables_data(const std::vector<CppMetaTable>& tables);
+    auto
+    get_tables_data(const std::vector<CppMetaTable>& tables) -> CppDataTable;
 
-    CppMetaTable 
-    get_columns_schema();
+    auto 
+    get_columns_schema() -> CppMetaTable;
 
-    CppDataTable
-    get_columns_data(const std::vector<CppMetaColumn>& columns);
+    auto
+    get_columns_data(const std::vector<CppMetaColumn>& columns) -> CppDataTable;
 }

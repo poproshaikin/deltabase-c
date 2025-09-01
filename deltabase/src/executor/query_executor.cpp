@@ -39,7 +39,7 @@ namespace exe {
 
     void
     DatabaseExecutor::set_db_name(std::string db_name) {
-        this->db_name = db_name;
+        db_name_ = db_name;
     }
 
     IntOrDataTable
@@ -91,12 +91,15 @@ namespace exe {
 
 
         DataTable result;
-        if (seq_scan(this->db_name.data(),
-                     &c_table,
-                     (const char**)column_names,
-                     columns_count,
-                     filter.get(),
-                     &result) != 0) {
+        if (seq_scan(
+                db_name_.data(),
+                stmt.table.schema_name.value().value.c_str(),
+                &c_table,
+                (const char**)column_names,
+                columns_count,
+                filter.get(),
+                &result
+            ) != 0) {
             throw std::runtime_error("Failed to scan a table");
         }
 
@@ -108,10 +111,13 @@ namespace exe {
     int
     DatabaseExecutor::execute_insert(const sql::InsertStatement& stmt) {
         auto table = this->registry.get_table(stmt.table.table_name.value);
+        auto schema = this->registry.get_object();
         auto c_table = table.create_meta_table();
 
         DataRow row = converter::convert_insert_to_data_row(c_table, stmt);
-        if (insert_row(this->db_name.c_str(), &c_table, &row) != 0) {
+        if (insert_row(
+                db_name_.c_str(), , &c_table, &row
+            ) != 0) {
             throw std::runtime_error("Failed to insert row");
         }
 

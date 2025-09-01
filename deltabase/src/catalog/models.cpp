@@ -4,8 +4,8 @@
 
 namespace catalog::models {
 
-    MetaColumn
-    create_meta_column(const std::string& name, DataType type, DataColumnFlags flags) {
+    auto
+    create_meta_column(const std::string& name, DataType type, DataColumnFlags flags) -> MetaColumn {
         MetaColumn column;
 
         column.name = make_c_string(name);
@@ -16,8 +16,8 @@ namespace catalog::models {
         return column;
     }
 
-    MetaTable
-    create_meta_table(const std::string& name, const std::vector<sql::ColumnDefinition> col_defs) {
+    auto
+    create_meta_table(const std::string& name, const std::vector<sql::ColumnDefinition> col_defs) -> MetaTable {
         MetaTable table;
 
         table.name = make_c_string(name);
@@ -66,5 +66,10 @@ namespace catalog::models {
 
         cleanup_meta_column(*column);
         free(column);
+    }
+
+    void 
+    cleanup_meta_schema(MetaSchema& schema) {
+        free(schema.name);
     }
 }

@@ -705,11 +705,85 @@ get_databases(size_t* out_count) {
     return get_directory_names(buffer, out_count);
 }
 
+int
+get_schema(const char *db_name, const char *schema_name, MetaSchema *out) {
+    char buffer[PATH_MAX];
+
+    if (path_db_schema(db_name, schema_name, buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In get_schema: failed to get path for schema %s\n", buffer);
+        return 1;
+    }
+
+    if (!dir_exists(buffer)) {
+        fprintf(stderr, "In get_schema: schema %s doesnt exist\n", schema_name);
+        return 2;
+    }
+
+    if (path_db_schema_meta(db_name, schema_name, buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In get_schema: failed to retrieve the meta file of the schema %s\n", schema_name);
+        return 3;
+    }
+
+    FILE* file = fopen(buffer, "w+");
+    if (!file) {
+        fprintf(stderr, "In get_schema: failed to open the meta file of the schema %s\n", schema_name);
+        return 4;
+    }
+
+    if (read_ms(out, fileno(file)) != 0) {
+        fprintf(stderr, "In get_schema: failed to read meta schema in the page %s\n", buffer);
+    }
+
+    fclose(file);
+
+    return 0;
+}
+
 char**
-get_tables(const char* db_name, size_t* out_count) { 
+get_schemas(const char* db_name, size_t* out_count) {
     char buffer[PATH_MAX];
 
     if (path_db(db_name, buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In get_tables: path_db returned error\n");
+        return NULL;
+    }
+
+    size_t dirs_count = 0;
+    char **dirs = get_directory_names(buffer, &dirs_count);
+    if (!dirs) {
+        fprintf(stderr, "In get_tables: get_directory_names returned NULL\n");
+        return NULL;
+    }
+
+    char **schema_names = malloc((dirs_count - 1) * sizeof(char*));
+    if (!schema_names) {
+        fprintf(stderr, "In get_tables: failed to allocate memory for SCHEMA_NAMES (%lu bytes)\n", (dirs_count - 1) * sizeof(char*));
+        return NULL;
+    }
+
+    size_t counter = 0;
+    for (size_t i = 0; i < dirs_count; i++) {
+        if (strcmp(dirs[i], META) == 0) {
+            free(dirs[i]);
+            continue;
+        }
+
+        schema_names[counter++] = dirs[i];
+    }
+
+    free(dirs);
+    if (out_count) {
+        *out_count = counter;
+    }
+
+    return schema_names;
+}
+
+char**
+get_tables(const char* db_name, const char* schema_name, size_t* out_count) { 
+    char buffer[PATH_MAX];
+
+    if (path_db_schema(db_name, schema_name, buffer, PATH_MAX) != 0) {
         fprintf(stderr, "In get_tables: path_db returned error\n");
         return NULL;
     }

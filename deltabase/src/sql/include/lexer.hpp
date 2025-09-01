@@ -93,8 +93,8 @@ namespace sql {
         REAL
     };
 
-    inline const std::unordered_map<std::string, SqlKeyword>&
-    keywords_map() {
+    inline auto
+    keywords_map() -> const std::unordered_map<std::string, SqlKeyword>& {
         static const std::unordered_map<std::string, SqlKeyword> dictionary = {
             {"select", SqlKeyword::SELECT},
             {"from", SqlKeyword::FROM},
@@ -124,8 +124,8 @@ namespace sql {
         return dictionary;
     }
 
-    inline const std::unordered_map<std::string, SqlKeyword>&
-    data_types_map() {
+    inline auto
+    data_types_map() -> const std::unordered_map<std::string, SqlKeyword>& {
         static const std::unordered_map<std::string, SqlKeyword> types_map = {
             {"string", SqlKeyword::STRING},
             {"integer", SqlKeyword::INTEGER},
@@ -137,8 +137,8 @@ namespace sql {
         return types_map;
     }
 
-    inline const bool
-    is_data_type_kw(const SqlKeyword& kw) {
+    inline auto
+    is_data_type_kw(const SqlKeyword& kw) -> const bool {
         const auto& types_map = data_types_map();
         for (const auto& [key, value] : types_map) {
             if (value == kw) {
@@ -148,8 +148,8 @@ namespace sql {
         return false;
     }
 
-    inline const std::unordered_map<std::string, SqlKeyword>&
-    constraints_map() {
+    inline auto
+    constraints_map() -> const std::unordered_map<std::string, SqlKeyword>& {
         static const std::unordered_map<std::string, SqlKeyword> constraints_map = {
             {"not", SqlKeyword::NOT},
             {"null", SqlKeyword::_NULL},
@@ -162,8 +162,8 @@ namespace sql {
         return constraints_map;
     }
 
-    inline bool
-    is_constraint_kw(const SqlKeyword& kw) {
+    inline auto
+    is_constraint_kw(const SqlKeyword& kw) -> bool {
         const auto& constraints = constraints_map();
         for (const auto& [key, value] : constraints) {
             if (value == kw) {
@@ -173,8 +173,8 @@ namespace sql {
         return false;
     }
 
-    inline const std::unordered_map<std::string, SqlSymbol>&
-    symbols_map() {
+    inline auto
+    symbols_map() -> const std::unordered_map<std::string, SqlSymbol>& {
         static const std::unordered_map<std::string, SqlSymbol> dictionary = {
             {"(", SqlSymbol::LPAREN},
             {")", SqlSymbol::RPAREN},
@@ -184,8 +184,8 @@ namespace sql {
         return dictionary;
     }
 
-    inline const std::unordered_map<std::string, SqlOperator>&
-    operators_map() {
+    inline auto
+    operators_map() -> const std::unordered_map<std::string, SqlOperator>& {
         static const std::unordered_map<std::string, SqlOperator> dictionary = {
             {"==", SqlOperator::EQ},
             {"!=", SqlOperator::NEQ},
@@ -226,19 +226,19 @@ namespace sql {
                  size_t position,
                  SqlTokenDetail detail = std::monostate());
 
-        bool
-        is_data_type() const;
-        bool
-        is_constraint() const;
-        bool
-        is_keyword() const;
+        [[nodiscard]] auto
+        is_data_type() const -> bool;
+        [[nodiscard]] auto
+        is_constraint() const -> bool;
+        [[nodiscard]] auto
+        is_keyword() const -> bool;
 
         template <typename TDetail>
-        TDetail
-        get_detail() const;
+        auto
+        get_detail() const -> TDetail;
 
-        std::string
-        to_string(int indent = 4) const;
+        [[nodiscard]] auto
+        to_string(int indent = 4) const -> std::string;
 
         operator std::string() {
             return this->value;
@@ -247,8 +247,8 @@ namespace sql {
 
     // Template definition must be in header
     template <typename TDetail>
-    TDetail
-    SqlToken::get_detail() const {
+    auto
+    SqlToken::get_detail() const -> TDetail {
         if constexpr (std::is_same_v<TDetail, SqlKeyword> || std::is_same_v<TDetail, SqlOperator> ||
                       std::is_same_v<TDetail, SqlSymbol> || std::is_same_v<TDetail, SqlLiteral>) {
             if (std::holds_alternative<TDetail>(detail)) {
@@ -262,24 +262,24 @@ namespace sql {
 
     class SqlTokenizer {
       public:
-        std::vector<SqlToken>
-        tokenize(const std::string& raw_sql);
+        auto
+        tokenize(const std::string& raw_sql) -> std::vector<SqlToken>;
     };
 
     namespace utils {
-        std::string
-        to_string(sql::SqlTokenType type);
-        std::string
-        to_string(sql::SqlKeyword type);
-        std::string
-        to_string(sql::SqlOperator type);
-        std::string
-        to_string(sql::SqlSymbol type);
-        std::string
-        to_string(sql::SqlLiteral type, const std::string& value);
+        auto
+        to_string(sql::SqlTokenType type) -> std::string;
+        auto
+        to_string(sql::SqlKeyword type) -> std::string;
+        auto
+        to_string(sql::SqlOperator type) -> std::string;
+        auto
+        to_string(sql::SqlSymbol type) -> std::string;
+        auto
+        to_string(sql::SqlLiteral type, const std::string& value) -> std::string;
 
-        std::string
-        get_data_type_str(DataType dt);
+        auto
+        get_data_type_str(DataType dt) -> std::string;
 
         } // namespace utils
 } // namespace sql

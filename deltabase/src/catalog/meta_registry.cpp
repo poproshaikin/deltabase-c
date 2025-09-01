@@ -36,65 +36,90 @@ namespace catalog {
         }
 
         for (size_t i = 0; i < databases_count; i++) {
-
-            size_t tables_count = 0;
-            char** tables = ::get_tables(databases[i], &tables_count);
-            if (!tables || tables_count == 0) {
-                // Database exists but has no tables, that's fine
+            size_t schemas_count = 0;
+            char** schemas = ::get_schemas(databases[i], &schemas_count);
+            if (!schemas || schemas_count == 0) {
+                // Database exists but has no schemas, that's suspicious but fine
                 continue;
             }
 
-            for (size_t j = 0; j < tables_count; j++) {
-                MetaTable raw_table;
-                if (::get_table(databases[i], tables[j], &raw_table) != 0) {
-                    throw std::runtime_error("Failed to get meta table");
+            for (size_t j = 0; j < schemas_count; j++) {
+                MetaSchema c_schema;
+                if (::get_schema(databases[i], schemas[j], &c_schema) != 0) {
+                    throw std::runtime_error("Failed to get meta schema");
+                }
+                CppMetaSchema schema(c_schema);
+                this->add_schema(schema);
+
+                size_t tables_count = 0;
+                char** tables = ::get_tables(databases[i], schemas[j], &tables_count);
+                if (!tables || tables_count == 0) {
+                    continue;
                 }
 
-                CppMetaTable table(raw_table);
-                this->add_schema(std::move(table));
+                for (size_t k = 0; k < tables_count; k++) {
+                    MetaTable raw_table;
+                    if (::get_table(databases[i], schemas[j], tables[k], &raw_table) != 0) {
+                        throw std::runtime_error("Failed to get meta table");
+                    }
 
-                free(tables[j]);
+                    CppMetaTable table(raw_table);
+                    this->add_schema(std::move(table));
+                    free(tables[k]);
+                }
+                free(tables);
+                free(schemas[j]);
             }
-
-            free(tables);
-        }
-
-        for (size_t i = 0; i < databases_count; i++) {
+            free(schemas);
             free(databases[i]);
         }
         free(databases);
     }
 
-    std::optional<std::shared_ptr<CppMetaSchemaWrapper>>
-    MetaRegistry::get_schema(const std::string& id) const {
-        auto it = this->registry.find(id);
-        if (it != this->registry.end()) {
-            return it->second;
-        }
-        return std::nullopt;
-    }
+    template <typename T>
+    auto
+    MetaRegistry::has_object(const std::string& name) const -> bool {
+        static_assert(std::is_base_of_v<CppMetaObjectWrapper, T>);
 
-
-    bool
-    MetaRegistry::has_table(const std::string& name) const {
-        for (const auto& kvp : this->registry) {
-            if (kvp.first == name) {
-                auto table = std::dynamic_pointer_cast<CppMetaTable>(kvp.second);
-                if (table) {
-                    return true;
-                }
+        for (const auto& kvp : registry_) {
+            if (kvp.second->get_name() == name) {
+                return true;
             }
         }
+
         return false;
     }
 
-    bool
-    MetaRegistry::has_table(const sql::TableIdentifier& identifier) const {
+    template <typename T>
+    auto
+    MetaRegistry::get_object(const std::string& name) const -> const T& {
+        static_assert(std::is_base_of_v<CppMetaObjectWrapper, T>);
+        
+        for (const auto& kvp : registry_) {
+            if (kvp.second->get_name() == name) {
+                std::shared_ptr<T> needed_type = std::dynamic_pointer_cast<T>(kvp.second);
+                if (needed_type) {
+                    return *needed_type;
+                }
+            }
+        }
+
+        throw std::runtime_error("Failed to get meta object with name " + name);
+    }
+
+
+    auto
+    MetaRegistry::has_table(const std::string& name) const -> bool {
+        return has_object<CppMetaTable>(name);
+    }
+
+    auto
+    MetaRegistry::has_table(const sql::TableIdentifier& identifier) const -> bool {
         return this->has_table(identifier.table_name.value);
     }
 
-    bool
-    MetaRegistry::has_virtual_table(const sql::TableIdentifier& identifier) const {
+    auto
+    MetaRegistry::has_virtual_table(const sql::TableIdentifier& identifier) const -> bool {
         if (identifier.schema_name.has_value() &&
             identifier.schema_name.value().value == "information_schema") {
             
@@ -109,9 +134,9 @@ namespace catalog {
     }
 
 
-    CppMetaTable
-    MetaRegistry::get_table(const std::string& table_name) const {
-        for (const auto& kvp : this->registry) {
+    auto
+    MetaRegistry::get_table(const std::string& table_name) const -> CppMetaTable {
+        for (const auto& kvp : registry_) {
             if (kvp.second->get_name() == table_name) {
                 std::shared_ptr<CppMetaTable> table = std::dynamic_pointer_cast<CppMetaTable>(kvp.second);
                 if (table) {
@@ -123,14 +148,14 @@ namespace catalog {
         throw TableDoesntExist(table_name);
     }
 
-    CppMetaTable
-    MetaRegistry::get_table(const sql::SqlToken& table) const {
+    auto
+    MetaRegistry::get_table(const sql::SqlToken& table) const -> CppMetaTable {
         return this->get_table(table.value);
     }
 
-    CppMetaTable
-    MetaRegistry::get_table(const sql::TableIdentifier& identifier) const {
-        for (const auto& kvp : this->registry) {
+    auto
+    MetaRegistry::get_table(const sql::TableIdentifier& identifier) const -> CppMetaTable {
+        for (const auto& kvp : registry_) {
             if (kvp.second->get_name() == identifier.table_name.value) {
                 std::shared_ptr<CppMetaTable> table = std::dynamic_pointer_cast<CppMetaTable>(kvp.second);
                 if (table) {
@@ -142,8 +167,8 @@ namespace catalog {
         throw TableDoesntExist(identifier.table_name.value);
     }
 
-    CppMetaTable
-    MetaRegistry::get_virtual_table(const sql::TableIdentifier& identifier) const {
+    auto
+    MetaRegistry::get_virtual_table(const sql::TableIdentifier& identifier) const -> CppMetaTable {
         if (identifier.schema_name.has_value() && 
             identifier.schema_name.value().value == "information_schema") {
             const auto& table_name = identifier.table_name.value;
@@ -162,16 +187,16 @@ namespace catalog {
     template <typename T>
     void
     MetaRegistry::add_schema(T&& schema) {
-        static_assert(std::is_base_of_v<CppMetaSchemaWrapper, std::decay_t<T>>,
+        static_assert(std::is_base_of_v<CppMetaObjectWrapper, std::decay_t<T>>,
                       "T must derive from CppMetaSchemaWrapper");
-        registry[schema.get_id()] = std::make_unique<std::decay_t<T>>(std::forward<T>(schema));
+        registry_[schema.get_id()] = std::make_unique<std::decay_t<T>>(std::forward<T>(schema));
     }
 
-    std::vector<CppMetaTable>
-    MetaRegistry::get_tables() const {
+    auto
+    MetaRegistry::get_tables() const -> std::vector<CppMetaTable> {
         std::vector<CppMetaTable> result;
 
-        for (const auto& kvp : this->registry) {
+        for (const auto& kvp : registry_) {
             auto table_ptr = std::dynamic_pointer_cast<CppMetaTable>(kvp.second);
             if (table_ptr) {
                 result.push_back(*table_ptr);
@@ -181,8 +206,8 @@ namespace catalog {
         return result;
     }
 
-    std::vector<CppMetaColumn>
-    MetaRegistry::get_columns() const {
+    auto
+    MetaRegistry::get_columns() const -> std::vector<CppMetaColumn> {
         std::vector<CppMetaColumn> result;
 
         auto tables = this->get_tables();
@@ -198,8 +223,8 @@ namespace catalog {
         return result;
     }
 
-    bool
-    is_table_virtual(const sql::TableIdentifier& table) {
+    auto
+    is_table_virtual(const sql::TableIdentifier& table) -> bool {
         if (table.schema_name.has_value()) {
             const std::string& schema_name = table.schema_name.value().value;
             if (schema_name == "information_schema") {
@@ -213,5 +238,15 @@ namespace catalog {
         }
         
         return false;
+    }
+
+    auto
+    MetaRegistry::has_schema(const std::string& name) const -> bool {
+        return has_object<CppMetaSchema>(name);
+    }
+
+    auto
+    MetaRegistry::get_schema(const std::string& name) const -> const CppMetaSchema& {
+        return get_object<CppMetaSchema>(name);
     }
 } // namespace catalog

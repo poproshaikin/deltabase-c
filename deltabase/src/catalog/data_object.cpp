@@ -27,7 +27,7 @@ namespace catalog {
         }
     }
 
-    CppDataToken& CppDataToken::operator=(const CppDataToken& other) {
+    auto CppDataToken::operator=(const CppDataToken& other) -> CppDataToken& {
         if (this != &other) {
             size = other.size;
             type = other.type;
@@ -41,7 +41,7 @@ namespace catalog {
         return *this;
     }
 
-    DataToken CppDataToken::to_data_token() const {
+    auto CppDataToken::to_data_token() const -> DataToken {
         DataToken token;
         token.size = size;
         token.type = type;
@@ -71,7 +71,7 @@ namespace catalog {
         }
     }
 
-    DataRow CppDataRow::to_data_row() const {
+    auto CppDataRow::to_data_row() const -> DataRow {
         DataRow row;
         row.row_id = row_id;
         row.flags = flags;
@@ -92,22 +92,22 @@ namespace catalog {
     // CppDataTable implementations
     CppDataTable::CppDataTable() = default;
 
-    CppDataTable::CppDataTable(const CppMetaTable& schema) : schema(schema) {
+    CppDataTable::CppDataTable(const CppMetaTable& schema) : schema_(schema) {
     }
 
     CppDataTable::CppDataTable(const DataTable& other) 
-        : schema(other.schema), rows(this->parse_rows(other)) {
+        : schema_(other.schema), rows_(this->parse_rows(other)) {
     }
 
-    DataTable CppDataTable::to_data_table() const {
+    auto CppDataTable::to_data_table() const -> DataTable {
         DataTable table;
-        table.schema = schema.create_meta_table();
-        table.rows_count = rows.size();
+        table.schema = schema_.create_meta_table();
+        table.rows_count = rows_.size();
         
-        if (rows.size() > 0) {
-            table.rows = static_cast<DataRow*>(std::malloc(rows.size() * sizeof(DataRow)));
-            for (size_t i = 0; i < rows.size(); i++) {
-                table.rows[i] = rows[i].to_data_row();
+        if (rows_.size() > 0) {
+            table.rows = static_cast<DataRow*>(std::malloc(rows_.size() * sizeof(DataRow)));
+            for (size_t i = 0; i < rows_.size(); i++) {
+                table.rows[i] = rows_[i].to_data_row();
             }
         } else {
             table.rows = nullptr;
@@ -116,15 +116,15 @@ namespace catalog {
         return table;
     }
 
-    const std::vector<CppDataRow>& CppDataTable::get_rows() {
-        return rows;
+    auto CppDataTable::get_rows() -> const std::vector<CppDataRow>& {
+        return rows_;
     }
 
     void CppDataTable::add_row(const CppDataRow& row) {
-        rows.push_back(row);
+        rows_.push_back(row);
     }
 
-    std::vector<CppDataRow> CppDataTable::parse_rows(const DataTable& table) {
+    auto CppDataTable::parse_rows(const DataTable& table) -> std::vector<CppDataRow> {
         std::vector<CppDataRow> result;
         result.reserve(table.rows_count);
         
@@ -134,5 +134,6 @@ namespace catalog {
         
         return result;
     }
+
 
 } // namespace catalog

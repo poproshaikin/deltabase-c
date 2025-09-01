@@ -12,15 +12,15 @@ extern "C" {
 }
 
 namespace converter {
-    DataRowUpdate
-    create_row_update(const MetaTable& table, const sql::UpdateStatement& query) {
+    auto
+    create_row_update(const MetaTable& table, const sql::UpdateStatement& query) -> DataRowUpdate {
         size_t assignments_count = query.assignments.size();
 
-        uuid_t* indices = (uuid_t*)std::malloc(assignments_count * sizeof(uuid_t));
+        auto* indices = (uuid_t*)std::malloc(assignments_count * sizeof(uuid_t));
         void** values = (void**)std::malloc(assignments_count * sizeof(void*));
 
         for (size_t i = 0; i < assignments_count; i++) {
-            const sql::BinaryExpr& assignment =
+            const auto& assignment =
                 std::get<sql::BinaryExpr>(query.assignments[i].value);
             const sql::SqlToken& left = std::get<sql::SqlToken>(assignment.left->value);
             const sql::SqlToken& right = std::get<sql::SqlToken>(assignment.right->value);
@@ -43,8 +43,8 @@ namespace converter {
         return update;
     }
 
-    DataRow
-    convert_insert_to_data_row(const MetaTable& table, const sql::InsertStatement& insert) {
+    auto
+    convert_insert_to_data_row(const MetaTable& table, const sql::InsertStatement& insert) -> DataRow {
         DataRow row;
         row.flags = RF_NONE;
         row.count = table.columns_count;
@@ -79,8 +79,8 @@ namespace converter {
         return row;
     }
 
-    MetaTable
-    convert_create_table_to_mt(const sql::CreateTableStatement& stmt) {
+    auto
+    convert_create_table_to_mt(const sql::CreateTableStatement& stmt) -> MetaTable {
         return catalog::models::create_meta_table(stmt.table.table_name.value, stmt.columns);
     }
 } // namespace converter

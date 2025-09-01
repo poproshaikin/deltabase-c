@@ -3,8 +3,8 @@
 
 namespace catalog::information_schema {
 
-    CppMetaTable
-    get_tables_schema() {
+    auto
+    get_tables_schema() -> CppMetaTable {
         CppMetaTable result("tables", "information_schema");
 
         result.add_column(CppMetaColumn("id", DT_STRING, CF_NONE));
@@ -14,8 +14,8 @@ namespace catalog::information_schema {
         return result;
     }
 
-    CppDataTable
-    get_tables_data(const std::vector<CppMetaTable>& tables) {
+    auto
+    get_tables_data(const std::vector<CppMetaTable>& tables) -> CppDataTable {
         catalog::CppMetaTable schema = catalog::information_schema::get_tables_schema();
         catalog::CppDataTable result(schema);
 
@@ -35,8 +35,8 @@ namespace catalog::information_schema {
         return result;
     }
 
-    CppMetaTable 
-    get_columns_schema() {
+    auto 
+    get_columns_schema() -> CppMetaTable {
         CppMetaTable result("columns", "information_schema");
 
         result.add_column(CppMetaColumn("id", DT_STRING, CF_NONE));
@@ -46,8 +46,8 @@ namespace catalog::information_schema {
         return result;
     }
 
-    CppDataTable
-    get_columns_data(const std::vector<CppMetaColumn>& columns) {
+    auto
+    get_columns_data(const std::vector<CppMetaColumn>& columns) -> CppDataTable {
         catalog::CppMetaTable schema = catalog::information_schema::get_columns_schema();
         catalog::CppDataTable result(schema);
 

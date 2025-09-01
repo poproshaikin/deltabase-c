@@ -11,8 +11,8 @@ SqlToken::SqlToken(
     : type(type), line(line), value(std::move(value)), pos(pos), detail(detail) {
 }
 
-bool
-SqlToken::is_data_type() const {
+auto
+SqlToken::is_data_type() const -> bool {
     if (std::holds_alternative<SqlKeyword>(this->detail)) {
         return is_data_type_kw(std::get<SqlKeyword>(this->detail));
     }
@@ -20,13 +20,13 @@ SqlToken::is_data_type() const {
     return false;
 }
 
-bool
-SqlToken::is_keyword() const {
+auto
+SqlToken::is_keyword() const -> bool {
     return std::holds_alternative<SqlKeyword>(this->detail);
 }
 
-bool
-SqlToken::is_constraint() const {
+auto
+SqlToken::is_constraint() const -> bool {
     if (this->is_keyword()) {
         return is_constraint_kw(std::get<SqlKeyword>(this->detail));
     }
@@ -34,8 +34,8 @@ SqlToken::is_constraint() const {
     return false;
 }
 
-std::string
-to_lower(const std::string& str) {
+auto
+to_lower(const std::string& str) -> std::string {
     std::stringstream sb;
     for (char c : str) {
         sb << (char)std::tolower(c);
@@ -43,8 +43,8 @@ to_lower(const std::string& str) {
     return sb.str();
 }
 
-size_t
-get_word_length(const char* str) {
+auto
+get_word_length(const char* str) -> size_t {
     const char* p = str;
 
     while (*p != '\0' && (isalnum(*p) || *p == '_')) {
@@ -54,8 +54,8 @@ get_word_length(const char* str) {
     return p - str;
 }
 
-size_t
-get_number_length(const char* str) {
+auto
+get_number_length(const char* str) -> size_t {
     const char* p = str;
     bool dot_found = false;
 
@@ -68,16 +68,16 @@ get_number_length(const char* str) {
     return p - str;
 }
 
-std::string
-read_next_word(const std::string& sql, size_t i) {
+auto
+read_next_word(const std::string& sql, size_t i) -> std::string {
     size_t word_start = i;
     size_t word_len = get_word_length(&sql[i]);
 
     return sql.substr(word_start, word_len);
 }
 
-bool
-starts_as_operator(char c) {
+auto
+starts_as_operator(char c) -> bool {
     auto& operators = operators_map();
 
     for (const auto& op : operators) {
@@ -89,8 +89,8 @@ starts_as_operator(char c) {
     return false;
 }
 
-std::vector<SqlToken>
-SqlTokenizer::tokenize(const std::string& sql) {
+auto
+SqlTokenizer::tokenize(const std::string& sql) -> std::vector<SqlToken> {
     auto isalpha = [](char c) { return std::isalpha((unsigned char)c) || (unsigned char)c == '_'; };
     auto isdigit = [](char c) { return std::isdigit((unsigned char)c); };
     auto isspace = [](char c) { return std::isspace((unsigned char)c); };
@@ -202,8 +202,8 @@ SqlTokenizer::tokenize(const std::string& sql) {
     return result;
 }
 
-std::string
-SqlToken::to_string(int indent) const {
+auto
+SqlToken::to_string(int indent) const -> std::string {
     auto indent_fn = [indent]() {
         for (int i = 0; i < indent; i++) {
             std::cout << ' ';

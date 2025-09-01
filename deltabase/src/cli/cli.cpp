@@ -134,8 +134,8 @@ print_ast_node(const std::unique_ptr<sql::AstNode>& node, int indent) {
     print_ast_node(*node, indent);
 }
 
-std::string
-token_to_string(const DataToken* token) {
+auto
+token_to_string(const DataToken* token) -> std::string {
     if (!token || token->type == DT_NULL) {
         return "NULL";
     }
@@ -197,7 +197,7 @@ SqlCli::SqlCli() {
         std::exit(0);
     });
     this->add_cmd_handler("c", [this](std::string arg) {
-        this->engine = std::make_unique<DltEngine>(arg);
+        engine_ = std::make_unique<DltEngine>(arg);
         std::cout << "Connected successfuly to the '" << arg << "'" << std::endl;
     });
 }
@@ -210,16 +210,16 @@ void SqlCli::run_cmd(const std::string& input) {
             std::string command = splitted[0];
             std::string argument = (splitted.size() > 1) ? splitted[1] : "";
 
-            if (this->handlers.count(command) != 0) {
-                handlers[command](argument);
+            if (handlers_.count(command) != 0) {
+                handlers_[command](argument);
             }
         } else {
-            if (engine == nullptr) {
+            if (engine_ == nullptr) {
                 std::cout << "You are not connected to a database. Connect first using \\c"
                           << std::endl;
             } else {
                 try {
-                    const ExecutionResult& result = engine->run_query(input);
+                    const ExecutionResult& result = engine_->run_query(input);
 
                     std::cout << "Execution time: " << result.execution_time_ns / 1000000.0 << " ms"
                               << std::endl;
@@ -238,7 +238,7 @@ void SqlCli::run_cmd(const std::string& input) {
 void
 SqlCli::run_query_console() {
     std::string input;
-    this->engine = std::make_unique<DltEngine>();
+    engine_ = std::make_unique<DltEngine>();
     std::cout << "Welcome to deltabase! Type '\\q' to quit." << std::endl;
 
     while (true) {
@@ -250,7 +250,7 @@ SqlCli::run_query_console() {
 
 void
 SqlCli::add_cmd_handler(std::string cmd, std::function<void(std::string arg)> func) {
-    this->handlers[cmd] = func;
+    handlers_[cmd] = func;
 }
 
 void

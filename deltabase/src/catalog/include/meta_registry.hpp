@@ -1,62 +1,75 @@
 #pragma once
 
-#include <optional>
 #include <string>
 #include <unordered_map>
 #include <memory>
 
 #include "../../sql/include/lexer.hpp"
 #include "../../sql/include/parser.hpp"
-#include "meta_schema.hpp"
+#include "meta_object.hpp"
 
 namespace catalog { 
 
     class MetaRegistry {
 
-        std::unordered_map<std::string, std::shared_ptr<CppMetaSchemaWrapper>> registry;
+        std::unordered_map<std::string, std::shared_ptr<CppMetaObjectWrapper>> registry_;
 
         void
         init();
 
-      public:
+        template<typename T>
+        auto
+        has_object(const std::string& name) const -> bool;
+
+        template <typename T>
+        auto
+        get_object(const std::string& name) const -> const T&;
+
+    public:
         MetaRegistry();
 
-        std::optional<std::shared_ptr<CppMetaSchemaWrapper>>
-        get_schema(const std::string& id) const;
+
+        auto
+        has_schema(const std::string& name) const -> bool;
+
+        auto
+        get_schema(const std::string& name) const -> const CppMetaSchema&;
 
 
-        bool 
-        has_table(const std::string& table) const;
+        auto
+        has_table(const std::string& name) const -> bool;
 
-        bool
-        has_table(const sql::TableIdentifier& identifier) const;
+        auto
+        has_table(const sql::TableIdentifier& identifier) const -> bool;
 
-        bool
-        has_virtual_table(const sql::TableIdentifier& identifier) const;
+        auto
+        has_virtual_table(const sql::TableIdentifier& identifier) const -> bool;
 
 
-        CppMetaTable
-        get_table(const std::string& table) const;
+        auto
+        get_table(const std::string& table) const -> CppMetaTable;
 
-        CppMetaTable
-        get_table(const sql::SqlToken& table) const;
+        auto
+        get_table(const sql::SqlToken& table) const -> CppMetaTable;
 
-        CppMetaTable
-        get_table(const sql::TableIdentifier& identifier) const;
-        
-        CppMetaTable
-        get_virtual_table(const sql::TableIdentifier& identifier) const;
+        auto
+        get_table(const sql::TableIdentifier& identifier) const -> CppMetaTable;
 
-        std::vector<CppMetaTable>
-        get_tables() const;
+        auto
+        get_virtual_table(const sql::TableIdentifier& identifier) const -> CppMetaTable;
 
-        std::vector<CppMetaColumn>
-        get_columns() const;
+        auto
+        get_tables() const -> std::vector<CppMetaTable>;
 
-        template<typename T>
-        void add_schema(T&& schema);
+
+        auto
+        get_columns() const -> std::vector<CppMetaColumn>;
+
+        template <typename T>
+        void
+        add_schema(T&& schema);
     };
 
-    bool
-    is_table_virtual(const sql::TableIdentifier& table);
+    auto
+    is_table_virtual(const sql::TableIdentifier& table) -> bool;
 } // namespace catalog

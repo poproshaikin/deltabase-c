@@ -5,14 +5,15 @@
 #include "../../catalog/include/meta_registry.hpp"
 #include <optional>
 #include <set>
+#include <utility>
 
 extern "C" {
 #include "../../core/include/meta.h"
 }
 
 namespace exe {
-    inline const std::set<std::pair<sql::SqlLiteral, DataType>>&
-    get_compatibility_table() {
+    inline auto
+    get_compatibility_table() -> const std::set<std::pair<sql::SqlLiteral, DataType>>& {
         static std::set<std::pair<sql::SqlLiteral, DataType>> map = {
             {sql::SqlLiteral::STRING, DT_STRING},
             {sql::SqlLiteral::INTEGER, DT_INTEGER},
@@ -25,8 +26,8 @@ namespace exe {
         return map;
     }
 
-    inline bool
-    is_literal_assignable_to(sql::SqlLiteral literal_type, DataType column_type) {
+    inline auto
+    is_literal_assignable_to(sql::SqlLiteral literal_type, DataType column_type) -> bool {
         return get_compatibility_table().count(std::make_pair(literal_type, column_type)) > 0;
     }
 
@@ -49,41 +50,41 @@ namespace exe {
         AnalysisResult(bool is_valid,
                        std::optional<std::runtime_error> err,
                        std::optional<bool> is_system_query)
-            : is_valid(is_valid), err(err), is_system_query(is_system_query) {
+            : is_valid(is_valid), err(std::move(err)), is_system_query(is_system_query) {
         }
     };
 
     class SemanticAnalyzer {
-        catalog::MetaRegistry& registry;
-        std::optional<std::string> db_name;
+        catalog::MetaRegistry& registry_;
+        std::optional<std::string> db_name_;
 
-        AnalysisResult
-        analyze_select(const sql::SelectStatement& stmt);
+        auto
+        analyze_select(const sql::SelectStatement& stmt) -> AnalysisResult;
 
-        AnalysisResult
-        analyze_insert(const sql::InsertStatement& stmt);
+        auto
+        analyze_insert(const sql::InsertStatement& stmt) -> AnalysisResult;
 
-        AnalysisResult
-        analyze_update(const sql::UpdateStatement& stmt);
+        auto
+        analyze_update(const sql::UpdateStatement& stmt) -> AnalysisResult;
 
-        AnalysisResult
-        analyze_delete(const sql::DeleteStatement& stmt);
+        auto
+        analyze_delete(const sql::DeleteStatement& stmt) -> AnalysisResult;
 
-        AnalysisResult
-        analyze_create_table(const sql::CreateTableStatement& stmt);
+        auto
+        analyze_create_table(const sql::CreateTableStatement& stmt) -> AnalysisResult;
 
-        AnalysisResult
-        analyze_create_db(const sql::CreateDbStatement& stmt);
+        auto
+        analyze_create_db(const sql::CreateDbStatement& stmt) -> AnalysisResult;
 
-        AnalysisResult
-        analyze_where(const std::unique_ptr<sql::AstNode>& where, const catalog::CppMetaTable& table);
+        auto
+        analyze_where(const std::unique_ptr<sql::AstNode>& where, const catalog::CppMetaTable& table) -> AnalysisResult;
 
-        AnalysisResult
+        auto
         validate_column_comparison(const std::unique_ptr<sql::AstNode>& left,
                                    const std::unique_ptr<sql::AstNode>& right,
-                                   const catalog::CppMetaTable& table);
-        AnalysisResult
-        validate_column_assignment(const sql::AstNode& assignment, const catalog::CppMetaTable& table);
+                                   const catalog::CppMetaTable& table) -> AnalysisResult;
+        auto
+        validate_column_assignment(const sql::AstNode& assignment, const catalog::CppMetaTable& table) -> AnalysisResult;
 
         void
         ensure_db_exists();
@@ -92,16 +93,16 @@ namespace exe {
         ensure_db_exists(const std::string& name);
 
       public:
-        SemanticAnalyzer(catalog::MetaRegistry& registry) : registry(registry) {
+        SemanticAnalyzer(catalog::MetaRegistry& registry) : registry_(registry) {
         }
 
         SemanticAnalyzer(catalog::MetaRegistry& registry, std::string db_name)
-            : registry(registry), db_name(db_name) {
+            : registry_(registry), db_name_(db_name) {
                 this->ensure_db_exists(db_name);
         }
 
-        AnalysisResult
-        analyze(const sql::AstNode& ast);
+        auto
+        analyze(const sql::AstNode& ast) -> AnalysisResult;
     };
 }; // namespace exe
 
