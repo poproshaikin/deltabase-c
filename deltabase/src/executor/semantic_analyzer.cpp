@@ -1,6 +1,5 @@
 #include "include/semantic_analyzer.hpp"
 #include "../misc/include/exceptions.hpp"
-#include <iostream>
 #include <stdexcept>
 #include <string.h>
 #include <variant>

@@ -3,7 +3,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 #include <uuid/uuid.h>
 
 typedef enum {
@@ -39,9 +38,19 @@ typedef struct {
 void
 free_col(MetaColumn* column);
 
+/* Schema description */
+typedef struct {
+    uuid_t id;
+    char* name;
+} MetaSchema;
+
+void
+free_schema(MetaSchema* schema);
+
 /* Table scheme */
 typedef struct {
     uuid_t id;
+    uuid_t schema_id;
     char* name;
 
     bool has_pk;

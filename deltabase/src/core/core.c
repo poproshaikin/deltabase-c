@@ -1,7 +1,7 @@
 #include "include/core.h"
 #include "include/paths.h"
 #include "include/utils.h"
-#include "include/ll_io.h"
+#include "include/binary_io.h"
 #include <stdio.h>
 
 int 
@@ -72,6 +72,50 @@ drop_database(const char* db_name) {
     }
 }
 
+int
+create_schema(const char* db_name, const MetaSchema* schema) {
+    char path_buffer[PATH_MAX];
+        
+    // get path for schema dir
+    if (path_db_schema(db_name, schema->name, path_buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In create_schema: failed to get path for schema %s\n", schema->name);
+        return 1;
+    }
+
+    // check if schema exists
+    if (dir_exists(path_buffer)) {
+        fprintf(stderr, "In create_schema: schema %s already exists\n", db_name);
+        return 2;
+    }
+
+    // create dir for schema
+    if (mkdir_recursive(path_buffer, 0755) != 0) {
+        fprintf(stderr, "In create_schema: failed to create dir for schema %s\n", schema->name);
+        return 3;
+    }
+
+    // get path for schema meta file
+    if (path_db_schema_meta(db_name, schema->name, path_buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In create_schema: failed to get path for schema %s\n", schema->name);
+        return 4;
+    }
+
+    FILE* meta_file = fopen(path_buffer, "w+");
+    if (!meta_file) {
+        fprintf(stderr, "In create_schema: failed to create meta file\n");
+        return 5;
+    }
+
+    if (write_ms(schema, fileno(meta_file)) != 0) {
+        fprintf(stderr, "in create_schema: failed to write ms\n");
+        return 6;
+    }
+
+    fclose(meta_file);
+
+    return 0;
+}
+
 bool
 exists_database(const char* db_name) {
     char db_path[PATH_MAX];
@@ -84,11 +128,15 @@ exists_database(const char* db_name) {
 }
 
 int
-create_table(const char* db_name, const MetaTable* table) {
+create_table(const char* db_name, const MetaSchema* schema, const MetaTable* table) {
+    if (!db_name || !schema || !table) {
+        fprintf(stderr, "In create_table: SCHEMA or TABLE were NULL\n");
+    }
+
     int op = 0;
 
     char buffer[PATH_MAX];
-    path_db_table(db_name, table->name, buffer, PATH_MAX);
+    path_db_schema_table(db_name, schema->name, table->name, buffer, PATH_MAX);
     if (dir_exists(buffer)) {
         fprintf(stderr, "Table '%s' already exists \n", table->name);
         return 1;
@@ -99,7 +147,7 @@ create_table(const char* db_name, const MetaTable* table) {
         return 2;
     }
 
-    path_db_table_meta(db_name, table->name, buffer, PATH_MAX);
+    path_db_schema_table_meta(db_name, schema->name, table->name, buffer, PATH_MAX);
 
     FILE* meta_file = fopen(buffer, "w+");
     if (!meta_file) {
@@ -107,13 +155,13 @@ create_table(const char* db_name, const MetaTable* table) {
     }
 
     if ((op = write_mt(table, fileno(meta_file))) != 0) {
-        printf("error: create_table:write_mt %i\n", op);
+        printf("In create_table: write_mt returned %i\n", op);
         fclose(meta_file);
         return 4;
     }
     fclose(meta_file);
 
-    path_db_table_data(db_name, table->name, buffer, PATH_MAX);
+    path_db_schema_table_data(db_name, schema->name, table->name, buffer, PATH_MAX);
     if (mkdir_recursive(buffer, 0755) != 0) {
         fprintf(stderr, "Failed to create a directory for table %s\n", table->name);
         return 5;
@@ -123,23 +171,23 @@ create_table(const char* db_name, const MetaTable* table) {
 }
 
 bool
-exists_table(const char* db_name, const char* table_name) {
+exists_table(const char* db_name, const char* schema_name, const char* table_name) {
     char table_path[PATH_MAX];
-    path_db_table(db_name, table_name, table_path, sizeof(table_path));
+    path_db_schema_table(db_name, schema_name, table_name, table_path, sizeof(table_path));
 
     return dir_exists(table_path);
 }
 
 int
-get_table(const char* db_name, const char* table_name, MetaTable* out) {
-    if (!exists_table(db_name, table_name)) {
+get_table(const char* db_name, const char* schema_name, const char* table_name, MetaTable* out) {
+    if (!exists_table(db_name, schema_name, table_name)) {
         return 1;
     }
 
     int res = 0;
     char buffer[PATH_MAX];
 
-    path_db_table_meta(db_name, table_name, buffer, PATH_MAX);
+    path_db_schema_table_meta(db_name, schema_name, table_name, buffer, PATH_MAX);
 
     FILE* file = fopen(buffer, "r");
     int fd = fileno(file);
@@ -154,9 +202,9 @@ get_table(const char* db_name, const char* table_name, MetaTable* out) {
 }
 
 int
-update_table(const char* db_name, const MetaTable* table) {
+update_table(const char* db_name, const char* schema_name, const MetaTable* table) {
     char buffer[PATH_MAX];
-    path_db_table_meta(db_name, table->name, buffer, PATH_MAX);
+    path_db_schema_table_meta(db_name, schema_name, table->name, buffer, PATH_MAX);
 
     FILE* file = fopen(buffer, "w+");
     int fd = fileno(file);
@@ -171,7 +219,9 @@ update_table(const char* db_name, const MetaTable* table) {
 }
 
 static int
-write_row_update_state(const char* db_name, DataRow* row, MetaTable* schema, FILE* file) {
+write_row_update_state(
+    const char* db_name, const char* schema_name, DataRow* row, MetaTable* table, FILE* file
+) {
     int fd = fileno(file);
 
     PageHeader header;
@@ -181,10 +231,10 @@ write_row_update_state(const char* db_name, DataRow* row, MetaTable* schema, FIL
     }
 
     header.rows_count++;
-    header.file_size += dr_size(schema, row);
-    header.max_rid = schema->last_rid;
-    row->row_id = schema->last_rid;
-    schema->last_rid++;
+    header.file_size += dr_size(table, row);
+    header.max_rid = table->last_rid;
+    row->row_id = table->last_rid;
+    table->last_rid++;
 
     lseek(fd, 0, SEEK_SET);
     if (write_ph(&header, fd) != 0) {
@@ -192,11 +242,11 @@ write_row_update_state(const char* db_name, DataRow* row, MetaTable* schema, FIL
     }
 
     lseek(fd, 0, SEEK_END);
-    if (write_dr(schema, row, fd) != 0) {
+    if (write_dr(table, row, fd) != 0) {
         return 3;
     }
 
-    if (update_table(db_name, schema) != 0) {
+    if (update_table(db_name, schema_name, table) != 0) {
         return 4;
     }
 
@@ -204,9 +254,9 @@ write_row_update_state(const char* db_name, DataRow* row, MetaTable* schema, FIL
 }
 
 int
-insert_row(const char* db_name, MetaTable* table, DataRow* row) {
+insert_row(const char* db_name, const MetaSchema* schema, MetaTable* table, DataRow* row) {
     char buffer[PATH_MAX];
-    path_db_table_data(db_name, table->name, buffer, PATH_MAX);
+    path_db_schema_table_data(db_name, schema->name, table->name, buffer, PATH_MAX);
 
     size_t pages_count = 0;
     char** pages = get_dir_files(buffer, &pages_count);
@@ -216,7 +266,7 @@ insert_row(const char* db_name, MetaTable* table, DataRow* row) {
 
     if (pages_count == 0) {
         char* new_page_path = NULL;
-        if (create_page(db_name, table->name, NULL, &new_page_path) != 0) {
+        if (create_page(db_name, schema->name, table->name, NULL, &new_page_path) != 0) {
             return 3;
         }
 
@@ -238,10 +288,10 @@ insert_row(const char* db_name, MetaTable* table, DataRow* row) {
                           // collision with two previous error codes wouldn't happen
         }
 
-        int result = write_row_update_state(db_name, row, table, file);
+        int result = write_row_update_state(db_name, schema->name, row, table, file);
         if (result == 1) { // means that the page is out of space
             char* ptr;
-            if (create_page(db_name, table->name, NULL, &ptr) != 0) {
+            if (create_page(db_name, schema->name, table->name, NULL, &ptr) != 0) {
                 fprintf(stderr, "Failed to create new page while insertion\n");
                 return -1 - i;
             }
@@ -281,19 +331,22 @@ insert_row(const char* db_name, MetaTable* table, DataRow* row) {
 }
 
 #define ROW_CALLBACK_PARAMS                                                                        \
-    const char *db_name, MetaTable *schema, PageHeader *header, int fd, size_t row_pos,            \
+    const char *db_name, const char* schema_name, MetaTable *table, PageHeader *header, int fd, size_t row_pos,            \
         uint64_t rid, const DataRow *row, const void *user_data
 
 typedef int (*RowCallback)(ROW_CALLBACK_PARAMS);
 
 static int
-for_each_row_in_page(const char* db_name,
-                     const char* page_path,
-                     MetaTable* table,
-                     const DataFilter* filter,
-                     size_t* rows_affected,
-                     RowCallback callback,
-                     const void* user_data) {
+for_each_row_in_page(
+    const char* db_name,
+    const char* schema_name,
+    const char* page_path,
+    MetaTable* table,
+    const DataFilter* filter,
+    size_t* rows_affected,
+    RowCallback callback,
+    const void* user_data
+) {
     FILE* file = fopen(page_path, "r+");
     if (!file) {
         fprintf(stderr, "Failed to open page for reading\n");
@@ -328,7 +381,7 @@ for_each_row_in_page(const char* db_name,
         ssize_t pos = lseek(fd, 0, SEEK_CUR);
 
         int result =
-            callback(db_name, table, &header, fd, row_start_pos, row.row_id, &row, user_data);
+            callback(db_name, schema_name, table, &header, fd, row_start_pos, row.row_id, &row, user_data);
 
         if (result != 0) {
             fclose(file);
@@ -350,25 +403,23 @@ for_each_row_in_page(const char* db_name,
     return 0;
 }
 
-// Implementation moved to future/threading/ for later integration
-// typedef struct ForEachRowWorkerArg { ... };
-// static void *for_each_row_thread_worker(void *arg) { ... };
-// static int for_each_row_matching_filter_multithreaded(...) { ... };
-
 static int
-for_each_row_matching_filter_impl(const char* db_name,
-                                  const char* table_name,
-                                  const DataFilter* filter,
-                                  RowCallback callback,
-                                  const void* user_data,
-                                  size_t* rows_affected) {
+for_each_row_matching_filter_impl(
+    const char* db_name,
+    const char* schema_name,
+    const MetaTable* table,
+    const DataFilter* filter,
+    RowCallback callback,
+    const void* user_data,
+    size_t* rows_affected
+) {
     MetaTable schema;
-    if (get_table(db_name, table_name, &schema) != 0) {
+    if (get_table(db_name, schema_name, table->name, &schema) != 0) {
         return 1;
     }
 
     char buffer[PATH_MAX];
-    path_db_table_data(db_name, table_name, buffer, PATH_MAX);
+    path_db_schema_table_data(db_name, schema_name, table->name, buffer, PATH_MAX);
 
     size_t pages_count;
     char** pages = get_dir_files(buffer, &pages_count);
@@ -378,7 +429,8 @@ for_each_row_matching_filter_impl(const char* db_name,
 
     for (size_t i = 0; i < pages_count; i++) {
         if (for_each_row_in_page(
-                db_name, pages[i], &schema, filter, rows_affected, callback, user_data) != 0) {
+                db_name, schema_name, pages[i], &schema, filter, rows_affected, callback, user_data
+            ) != 0) {
             fprintf(stderr, "Failed to process page %s\n", pages[i]);
             for (size_t j = 0; j < i; j++) {
                 free(pages[j]);
@@ -396,21 +448,23 @@ for_each_row_matching_filter_impl(const char* db_name,
 }
 
 int
-for_each_row_matching_filter(const char* db_name,
-                             const char* table_name,
-                             const DataFilter* filter,
-                             RowCallback callback,
-                             void* user_data,
-                             size_t* rows_affected) {
-    if (!db_name || !table_name || !callback) {
+for_each_row_matching_filter(
+    const char* db_name,
+    const char* schema_name,
+    const MetaTable* table,
+    const DataFilter* filter,
+    RowCallback callback,
+    void* user_data,
+    size_t* rows_affected
+) {
+    if (!db_name || !table || !callback) {
         fprintf(stderr, "Invalid parameters in for_each_row_matching_filter\n");
         return 2;
     }
 
-    // Use single-threaded implementation for now
-    // TODO: Add multithreading support in the future
     return for_each_row_matching_filter_impl(
-        db_name, table_name, filter, callback, user_data, rows_affected);
+        db_name, schema_name, table, filter, callback, user_data, rows_affected
+    );
 }
 
 static int
@@ -460,6 +514,7 @@ update_callback(ROW_CALLBACK_PARAMS) {
     lseek(fd, row_pos, SEEK_SET);
     lseek(fd, sizeof(uint64_t), SEEK_CUR); // length
     lseek(fd, sizeof(row->row_id), SEEK_CUR);
+
     if (write_dr_flags(row->flags | RF_OBSOLETE, fd) != 0) {
         return 1;
     }
@@ -467,31 +522,35 @@ update_callback(ROW_CALLBACK_PARAMS) {
     lseek(fd, 0, SEEK_END);
 
     DataRow combined;
-    if (combine_row(&combined, schema, row, (DataRowUpdate*)user_data) != 0) {
+    if (combine_row(&combined, table, row, (DataRowUpdate*)user_data) != 0) {
         fprintf(stderr, "Failed to combine row while updating\n");
         free_tokens(combined.tokens, combined.count);
         return 2;
     }
 
-    if (write_dr(schema, &combined, fd) != 0) {
+    if (write_dr(table, &combined, fd) != 0) {
         return 3;
     }
 
     header->rows_count++;
 
     // need to save because of incrementing the last_rid in combine_row
-    update_table(db_name, schema);
+    update_table(db_name, schema_name, table);
     return 0;
 }
 
 int
-update_rows_by_filter(const char* db_name,
-                      const char* table_name,
-                      const DataFilter* filter,
-                      const DataRowUpdate* update,
-                      size_t* rows_affected) {
+update_rows_by_filter(
+    const char* db_name,
+    const char* schema_name,
+    const MetaTable* table,
+    const DataFilter* filter,
+    const DataRowUpdate* update,
+    size_t* rows_affected
+) {
     return for_each_row_matching_filter(
-        db_name, table_name, filter, update_callback, (void*)update, rows_affected);
+        db_name, schema_name, table, filter, update_callback, (void*)update, rows_affected
+    );
 }
 
 int
@@ -508,24 +567,31 @@ delete_callback(ROW_CALLBACK_PARAMS) {
 }
 
 int
-delete_rows_by_filter(const char* db_name,
-                      const char* table_name,
-                      const DataFilter* filter,
-                      size_t* rows_affected) {
+delete_rows_by_filter(
+    const char* db_name,
+    const char* schema_name,
+    const MetaTable* table,
+    const DataFilter* filter,
+    size_t* rows_affected
+) {
     return for_each_row_matching_filter(
-        db_name, table_name, filter, delete_callback, NULL, rows_affected);
+        db_name, schema_name, table, filter, delete_callback, NULL, rows_affected
+    );
 }
 
 int
-seq_scan(const char* db_name,
-         const MetaTable* table,
-         const char** column_names,
-         size_t columns_count,
-         const DataFilter* filter,
-         DataTable* out) {
+seq_scan(
+    const char* db_name,
+    const char* schema_name,
+    const MetaTable* table,
+    const char** column_names,
+    size_t columns_count,
+    const DataFilter* filter,
+    DataTable* out
+) {
 
     char buffer[PATH_MAX];
-    path_db_table_data(db_name, table->name, buffer, PATH_MAX);
+    path_db_schema_table_data(db_name, schema_name, table->name, buffer, PATH_MAX);
 
     size_t pages_count;
     char** pages = get_dir_files(buffer, &pages_count);

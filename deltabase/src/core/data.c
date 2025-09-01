@@ -1,5 +1,5 @@
 #include "include/data.h"
-#include "include/ll_io.h"
+#include "include/binary_io.h"
 #include "include/paths.h"
 #include "include/utils.h"
 #include <linux/limits.h>
@@ -212,10 +212,13 @@ row_satisfies_filter(const MetaTable* schema, const DataRow* row, const DataFilt
 }
 
 int
-create_page(const char* db_name,
-            const char* table_name,
-            PageHeader* out_page,
-            char** out_path) {
+create_page(
+    const char* db_name,
+    const char* schema_name,
+    const char* table_name,
+    PageHeader* out_page,
+    char** out_path
+) {
     if (!out_path) {
         fprintf(stderr, "Passed NULL to OUT_PAGE \n");
         return 4;
@@ -228,16 +231,22 @@ create_page(const char* db_name,
     header->rows_count = 0;
 
     char file_path[PATH_MAX];
-    path_db_table_page(db_name, table_name, header->page_id, file_path, PATH_MAX);
+    if (path_db_schema_table_page(
+            db_name, schema_name, table_name, header->page_id, file_path, PATH_MAX
+        ) != 0) {
+
+        fprintf(stderr, "In create_page: failed to get path for page\n");
+        return 1;
+    }
 
     FILE* file = fopen(file_path, "w+");
     if (!file) {
         fprintf(stderr, "Failed to create page file %s\n", header->page_id);
-        return 1;
+        return 2;
     }
 
     if (write_ph(header, fileno(file)) != 0) {
-        return 2;
+        return 3;
     }
 
     size_t len = strlen(file_path);
@@ -245,7 +254,7 @@ create_page(const char* db_name,
 
     if (!path) {
         fclose(file);
-        return 3;
+        return 4;
     }
 
     memcpy(path, file_path, len);
@@ -260,11 +269,11 @@ create_page(const char* db_name,
 }
 
 PagePaths
-get_pages(const char* db_name, const char* table_name) {
+get_pages(const char* db_name, const char* schema_name, const char* table_name) {
     PagePaths result = {0};
     
     char dir_path[PATH_MAX];
-    path_db_table_data(db_name, table_name, dir_path, PATH_MAX);
+    path_db_schema_table_data(db_name, schema_name, table_name, dir_path, PATH_MAX);
 
     result.paths = get_dir_files(dir_path, &result.count);
     

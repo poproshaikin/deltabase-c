@@ -13,6 +13,7 @@
 int
 ensure_fs_initialized();
 
+
 int
 create_database(const char* db_name);
 
@@ -25,43 +26,57 @@ exists_database(const char* db_name);
 char**
 get_databases(size_t* out_count);
 
+
 int
-create_table(const char* db_name, const MetaTable* table);
+create_schema(const char* db_name, const MetaSchema* schema);
+
+
+int
+create_table(const char* db_name, const MetaSchema* schema, const MetaTable* table);
 
 bool
-exists_table(const char* db_name, const char* table_name);
+exists_table(const char* db_name, const char* schema_name, const char* table_name);
 
 int
-get_table(const char* db_name, const char* table_name, MetaTable* out);
+get_table(const char* db_name, const char* schema_name, const char* table_name, MetaTable* out);
 
 int
-update_table(const char* db_name, const MetaTable* table);
+update_table(const char* db_name, const char* schema_name, const MetaTable* table);
 
 char**
 get_tables(const char* db_name, size_t* out_count);
 
 int
-insert_row(const char* db_name, MetaTable* table, DataRow* row);
+insert_row(const char* db_name, const MetaSchema* schema, MetaTable* table, DataRow* row);
 
 int
-update_rows_by_filter(const char* db_name,
-                      const char* table_name,
-                      const DataFilter* filter,
-                      const DataRowUpdate* update,
-                      size_t* rows_affected);
+update_rows_by_filter(
+    const char* db_name,
+    const char* schema_name,
+    const MetaTable* table,
+    const DataFilter* filter,
+    const DataRowUpdate* update,
+    size_t* rows_affected
+);
 
 int
-delete_rows_by_filter(const char* db_name,
-                      const char* table_name,
-                      const DataFilter* filter,
-                      size_t* rows_affected);
+delete_rows_by_filter(
+    const char* db_name,
+    const char* schema_name,
+    const MetaTable* table,
+    const DataFilter* filter,
+    size_t* rows_affected
+);
 
 int
-seq_scan(const char* db_name,
-         const MetaTable* table,
-         const char** column_names,
-         size_t columns_count,
-         const DataFilter* filter,
-         DataTable* out);
+seq_scan(
+    const char* db_name,
+    const char* schema_name,
+    const MetaTable* table,
+    const char** column_names,
+    size_t columns_count,
+    const DataFilter* filter,
+    DataTable* out
+);
 
 #endif // CORE_H

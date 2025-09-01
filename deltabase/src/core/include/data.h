@@ -104,7 +104,13 @@ void
 free_filter(DataFilter* filter);
 
 int
-create_page(const char* db_name, const char* table_name, PageHeader* out_new_page, char** out_path);
+create_page(
+    const char* db_name,
+    const char* schema_name,
+    const char* table_name,
+    PageHeader* out_new_page,
+    char** out_path
+);
 
 typedef struct {
     char** paths;
@@ -112,6 +118,6 @@ typedef struct {
 } PagePaths;
 
 PagePaths
-get_pages(const char* db_name, const char* table_name);
+get_pages(const char* db_name, const char* schema_name, const char* table_name);
 
 #endif // CORE_DATA_H

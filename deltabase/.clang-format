@@ -6,7 +6,7 @@ UseTab: Never
 
 ColumnLimit: 100
 ContinuationIndentWidth: 4
-AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: BlockIndent
 NamespaceIndentation: All
 AllowAllParametersOfDeclarationOnNextLine: true
 BinPackParameters: false

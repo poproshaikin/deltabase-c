@@ -1,4 +1,6 @@
 #include "include/meta.h"
+#include <stdlib.h>
+#include <string.h>
 
 int
 find_column(const char* name, const MetaTable* table, MetaColumn *out) {
@@ -24,4 +26,9 @@ get_table_column_index(const uuid_t column_id, const MetaTable* table) {
         }
     }
     return -1;
+}
+
+void
+free_schema(MetaSchema* schema) {
+    free(schema->name);
 }
