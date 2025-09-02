@@ -79,14 +79,22 @@ namespace exe {
         analyze_create_db(const sql::CreateDbStatement& stmt) -> AnalysisResult;
 
         auto
+        analyze_create_schema(const sql::CreateSchemaStatement& stmt) -> AnalysisResult;
+
+        auto
         analyze_where(const std::unique_ptr<sql::AstNode>& where, const catalog::CppMetaTable& table) -> AnalysisResult;
 
         auto
-        validate_column_comparison(const std::unique_ptr<sql::AstNode>& left,
-                                   const std::unique_ptr<sql::AstNode>& right,
-                                   const catalog::CppMetaTable& table) -> AnalysisResult;
+        validate_column_comparison(
+            const std::unique_ptr<sql::AstNode>& left,
+            const std::unique_ptr<sql::AstNode>& right,
+            const catalog::CppMetaTable& table
+        ) -> AnalysisResult;
+
         auto
-        validate_column_assignment(const sql::AstNode& assignment, const catalog::CppMetaTable& table) -> AnalysisResult;
+        validate_column_assignment(
+            const sql::AstNode& assignment, const catalog::CppMetaTable& table
+        ) -> AnalysisResult;
 
         void
         ensure_db_exists();
@@ -95,17 +103,9 @@ namespace exe {
         ensure_db_exists(const std::string& name);
 
       public:
-        SemanticAnalyzer(catalog::MetaRegistry& registry) : registry_(registry) {
-        }
-
-        SemanticAnalyzer(catalog::MetaRegistry& registry, std::string db_name)
-            : registry_(registry), db_name_(db_name) {
-                this->ensure_db_exists(db_name);
-        }
-
-        SemanticAnalyzer(catalog::MetaRegistry& registry, engine::EngineConfig cfg)
-            : registry_(registry), db_name_(cfg.db_name), def_schema_(cfg.default_schema) {
-        }
+        SemanticAnalyzer(catalog::MetaRegistry& registry);
+        SemanticAnalyzer(catalog::MetaRegistry& registry, std::string db_name);
+        SemanticAnalyzer(catalog::MetaRegistry& registry, engine::EngineConfig cfg);
 
         auto
         analyze(const sql::AstNode& ast) -> AnalysisResult;

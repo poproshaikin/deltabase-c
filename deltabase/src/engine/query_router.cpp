@@ -31,6 +31,7 @@ namespace engine {
         case sql::AstNodeType::UPDATE:
         case sql::AstNodeType::DELETE:
         case sql::AstNodeType::CREATE_TABLE:
+        case sql::AstNodeType::CREATE_SCHEMA:
             return db_executor_.value().execute(node);
 
         case sql::AstNodeType::CREATE_DATABASE:
@@ -57,6 +58,7 @@ namespace engine {
         case sql::AstNodeType::UPDATE:
         case sql::AstNodeType::DELETE:
         case sql::AstNodeType::CREATE_TABLE:
+        case sql::AstNodeType::CREATE_SCHEMA:
             return db_executor_.has_value();
         case sql::AstNodeType::CREATE_DATABASE:
             return admin_executor_.has_value();

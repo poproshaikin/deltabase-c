@@ -1,5 +1,6 @@
 #include "include/semantic_analyzer.hpp"
 #include "../misc/include/exceptions.hpp"
+#include <format>
 #include <iostream>
 #include <stdexcept>
 #include <cstring>
@@ -10,6 +11,18 @@ extern "C" {
 }
 
 namespace exe {
+
+    SemanticAnalyzer::SemanticAnalyzer(catalog::MetaRegistry& registry) : registry_(registry) {
+    }
+
+    SemanticAnalyzer::SemanticAnalyzer(catalog::MetaRegistry& registry, std::string db_name)
+        : registry_(registry), db_name_(db_name) {
+        this->ensure_db_exists(db_name);
+    }
+
+    SemanticAnalyzer::SemanticAnalyzer(catalog::MetaRegistry& registry, engine::EngineConfig cfg)
+        : registry_(registry), db_name_(cfg.db_name), def_schema_(cfg.default_schema) {
+    }
 
     auto
     normalize_table_identifier(const sql::TableIdentifier& table) -> sql::TableIdentifier {
@@ -43,6 +56,9 @@ namespace exe {
 
         case sql::AstNodeType::CREATE_DATABASE:
             return analyze_create_db(std::get<sql::CreateDbStatement>(ast.value));
+
+        case sql::AstNodeType::CREATE_SCHEMA:
+            return analyze_create_schema(std::get<sql::CreateSchemaStatement>(ast.value));
 
         default:
             return std::runtime_error("Unsupported AST node type for semantic analysis");
@@ -314,6 +330,14 @@ namespace exe {
     SemanticAnalyzer::analyze_create_db(const sql::CreateDbStatement& stmt) -> AnalysisResult {
         if (exists_database(stmt.name.value.c_str())) {
             return DbExists(stmt.name.value);
+        }
+        return true;
+    }
+
+    auto
+    SemanticAnalyzer::analyze_create_schema(const sql::CreateSchemaStatement& stmt) -> AnalysisResult {
+        if (registry_.has_schema(stmt.name.value)) {
+            return std::runtime_error(std::format("Schema {} already exists", stmt.name.value));
         }
         return true;
     }

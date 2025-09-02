@@ -36,6 +36,8 @@ namespace exe {
         execute_delete(const sql::DeleteStatement& stmt) -> int;
         auto
         execute_create_table(const sql::CreateTableStatement& stmt) -> int;
+        auto 
+        execute_create_schema(const sql::CreateSchemaStatement& stmt) -> int;
 
     public:
         DatabaseExecutor() = delete;

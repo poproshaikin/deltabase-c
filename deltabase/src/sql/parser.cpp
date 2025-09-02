@@ -99,6 +99,9 @@ namespace sql {
             if (match(SqlKeyword::DATABASE)) {
                 return std::make_unique<AstNode>(AstNodeType::CREATE_DATABASE, parse_create_db());
             }
+            if (match(SqlKeyword::SCHEMA)) {
+                return std::make_unique<AstNode>(AstNodeType::CREATE_SCHEMA, parse_create_schema());
+            }
         }
 
         throw std::runtime_error("Unsupported statement");
@@ -374,6 +377,17 @@ namespace sql {
         }
 
         return TableIdentifier(first_token, std::nullopt);
+    }
+
+    auto
+    SqlParser::parse_create_schema() -> CreateSchemaStatement {
+        CreateSchemaStatement stmt;
+
+        match_or_throw(SqlKeyword::SCHEMA);
+        advance_or_throw("Expected schema identifier");
+
+        stmt.name = current();
+        return stmt;
     }
 
 } // namespace sql

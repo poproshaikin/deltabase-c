@@ -49,7 +49,8 @@ namespace sql {
         KEY,
         NOT,
         AUTOINCREMENT,
-        UNIQUE
+        UNIQUE,
+        SCHEMA
     };
 
     enum class SqlSymbol {
@@ -119,7 +120,9 @@ namespace sql {
             {"key", SqlKeyword::KEY},
             {"not", SqlKeyword::NOT},
             {"autoincrement", SqlKeyword::AUTOINCREMENT},
-            {"unique", SqlKeyword::UNIQUE}};
+            {"unique", SqlKeyword::UNIQUE},
+            {"schema", SqlKeyword::SCHEMA}
+        };
 
         return dictionary;
     }

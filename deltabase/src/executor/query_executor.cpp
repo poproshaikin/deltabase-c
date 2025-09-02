@@ -90,6 +90,10 @@ namespace exe {
         if (node.type == sql::AstNodeType::CREATE_TABLE) {
             return execute_create_table(std::get<sql::CreateTableStatement>(node.value));
         }
+        
+        if (node.type == sql::AstNodeType::CREATE_SCHEMA) {
+            return execute_create_schema(std::get<sql::CreateSchemaStatement>(node.value));
+        }
 
         throw std::runtime_error("Unsupported query");
     }
@@ -244,6 +248,18 @@ namespace exe {
         catalog::models::cleanup_meta_table(table);
         catalog::models::cleanup_meta_schema(c_schema);
 
+        return 0;
+    }
+
+    auto
+    DatabaseExecutor::execute_create_schema(const sql::CreateSchemaStatement& stmt) -> int {
+        MetaSchema schema = catalog::models::create_meta_schema(stmt.name.value);
+
+        if (create_schema(cfg.db_name->c_str(), &schema) != 0) {
+            throw std::runtime_error("In execute_create_schema: falied to create schema");
+        }
+
+        catalog::models::cleanup_meta_schema(schema);
         return 0;
     }
 

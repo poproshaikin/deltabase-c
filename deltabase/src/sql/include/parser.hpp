@@ -17,7 +17,8 @@ namespace sql {
         UPDATE,
         DELETE,
         CREATE_TABLE,
-        CREATE_DATABASE
+        CREATE_DATABASE,
+        CREATE_SCHEMA,
     };
 
     enum class AstOperator {
@@ -108,19 +109,25 @@ namespace sql {
         std::vector<ColumnDefinition> columns;
     };
 
+    struct CreateSchemaStatement {
+        SqlToken name;
+    };
+
     struct CreateDbStatement {
         SqlToken name;
     };
 
-    using AstNodeValue = std::variant<SqlToken,
-                                      BinaryExpr,
-                                      SelectStatement,
-                                      InsertStatement,
-                                      UpdateStatement,
-                                      DeleteStatement,
-                                      CreateTableStatement,
-                                      CreateDbStatement,
-                                      ColumnDefinition>;
+    using AstNodeValue = std::variant<
+        SqlToken,
+        BinaryExpr,
+        SelectStatement,
+        InsertStatement,
+        UpdateStatement,
+        DeleteStatement,
+        CreateTableStatement,
+        CreateDbStatement,
+        CreateSchemaStatement,
+        ColumnDefinition>;
 
     struct AstNode {
         AstNodeType type;
@@ -131,34 +138,23 @@ namespace sql {
     };
 
     class SqlParser {
-      public:
-        SqlParser(std::vector<SqlToken> tokens);
-
-        auto
-        parse() -> std::unique_ptr<AstNode>;
-
-      private:
         std::vector<SqlToken> tokens_;
         size_t current_;
 
         auto
         parse_select() -> SelectStatement;
-
         auto
         parse_insert() -> InsertStatement;
-
         auto
         parse_update() -> UpdateStatement;
-
         auto
         parse_delete() -> DeleteStatement;
-
         auto
         parse_create_table() -> CreateTableStatement;
-
         auto
         parse_create_db() -> CreateDbStatement;
-
+        auto
+        parse_create_schema() -> CreateSchemaStatement;
         auto
         parse_binary(int min_priority) -> std::unique_ptr<AstNode>;
 
@@ -168,7 +164,7 @@ namespace sql {
 
         template <typename TEnum>
         auto
-        match_or_throw(TEnum expected, std::string error_msg = "Invalid statement syntax") const -> bool;
+        match_or_throw(TEnum expected, std::string error_msg = "Invalid syntax") const -> bool;
 
         auto
         advance() noexcept -> bool;
@@ -196,5 +192,11 @@ namespace sql {
 
         auto
         parse_table_identifier() -> TableIdentifier;
+
+    public:
+        SqlParser(std::vector<SqlToken> tokens);
+
+        auto
+        parse() -> std::unique_ptr<AstNode>;
     };
 } // namespace sql
