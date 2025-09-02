@@ -196,6 +196,13 @@ SqlTokenizer::tokenize(const std::string& sql) -> std::vector<SqlToken> {
 
             i++;
             pos++;
+        } else if (c == '.') {
+            std::string sym_str(1, c);
+            SqlToken token(SqlTokenType::SYMBOL, sym_str, line, pos, SqlSymbol::PERIOD);
+            result.push_back(token);
+
+            i++;
+            pos++;
         }
     }
 

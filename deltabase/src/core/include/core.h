@@ -59,7 +59,7 @@ int
 update_rows_by_filter(
     const char* db_name,
     const char* schema_name,
-    const MetaTable* table,
+    MetaTable* table,
     const DataFilter* filter,
     const DataRowUpdate* update,
     size_t* rows_affected
@@ -69,7 +69,7 @@ int
 delete_rows_by_filter(
     const char* db_name,
     const char* schema_name,
-    const MetaTable* table,
+    MetaTable* table,
     const DataFilter* filter,
     size_t* rows_affected
 );

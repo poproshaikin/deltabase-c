@@ -3,6 +3,7 @@
 
 #include "../../sql/include/parser.hpp"
 #include "../../catalog/include/meta_registry.hpp"
+#include "../../engine/include/config.hpp"
 #include <optional>
 #include <set>
 #include <utility>
@@ -57,6 +58,7 @@ namespace exe {
     class SemanticAnalyzer {
         catalog::MetaRegistry& registry_;
         std::optional<std::string> db_name_;
+        std::string def_schema_;
 
         auto
         analyze_select(const sql::SelectStatement& stmt) -> AnalysisResult;
@@ -99,6 +101,10 @@ namespace exe {
         SemanticAnalyzer(catalog::MetaRegistry& registry, std::string db_name)
             : registry_(registry), db_name_(db_name) {
                 this->ensure_db_exists(db_name);
+        }
+
+        SemanticAnalyzer(catalog::MetaRegistry& registry, engine::EngineConfig cfg)
+            : registry_(registry), db_name_(cfg.db_name), def_schema_(cfg.default_schema) {
         }
 
         auto

@@ -11,13 +11,13 @@ namespace sql {
     AstNode::AstNode(AstNodeType type, AstNodeValue&& value) : type(type), value(std::move(value)) {
     }
 
-    SqlParser::SqlParser(std::vector<SqlToken> tokens) : _tokens(std::move(tokens)), _current(0) {
+    SqlParser::SqlParser(std::vector<SqlToken> tokens) : tokens_(std::move(tokens)), current_(0) {
     }
 
     auto
     SqlParser::advance() noexcept -> bool {
-        if (_current + 1 < _tokens.size()) {
-            _current++;
+        if (current_ + 1 < tokens_.size()) {
+            current_++;
             return true;
         }
 
@@ -44,18 +44,18 @@ namespace sql {
     template <typename TEnum>
     auto
     SqlParser::match(const TEnum& expected) const -> bool {
-        if (_current >= _tokens.size()) {
+        if (current_ >= tokens_.size()) {
             return false;
         }
 
         if constexpr (std::is_same_v<TEnum, SqlTokenType>) {
-            return _tokens[_current].type == expected;
+            return tokens_[current_].type == expected;
         } else if constexpr (std::is_same_v<TEnum, std::monostate> ||
                              std::is_same_v<TEnum, SqlOperator> ||
                              std::is_same_v<TEnum, SqlSymbol> ||
                              std::is_same_v<TEnum, SqlKeyword> ||
                              std::is_same_v<TEnum, SqlLiteral>) {
-            const auto* value = std::get_if<TEnum>(&_tokens[_current].detail);
+            const auto* value = std::get_if<TEnum>(&tokens_[current_].detail);
             return value && *value == expected;
         } else {
             throw std::runtime_error("Unsupported type passed for match()");
@@ -73,10 +73,10 @@ namespace sql {
 
     auto
     SqlParser::current() const -> const SqlToken& {
-        if (_current >= _tokens.size()) {
+        if (current_ >= tokens_.size()) {
             throw std::out_of_range("Parser: current() out of bounds");
         }
-        return _tokens[_current];
+        return tokens_[current_];
     }
 
     auto
@@ -159,7 +159,7 @@ namespace sql {
                 stmt.columns.push_back(current());
 
                 if (!advance() || !match(SqlSymbol::COMMA)) {
-                    _current--;
+                    current_--;
                     break;
                 }
             }
@@ -184,7 +184,7 @@ namespace sql {
             stmt.values.push_back(current());
 
             if (!advance() || !match(SqlSymbol::COMMA)) {
-                _current--;
+                current_--;
                 break;
             }
         }
@@ -324,7 +324,7 @@ namespace sql {
         while (true) {
             if (!advance())
                 break;
-            if (_current >= _tokens.size())
+            if (current_ >= tokens_.size())
                 break;
             const SqlToken& token = current();
 
@@ -338,7 +338,7 @@ namespace sql {
                 break;
 
             if (!match(SqlSymbol::COMMA)) {
-                _current--;
+                current_--;
                 break;
             }
         }
@@ -361,19 +361,19 @@ namespace sql {
     auto
     SqlParser::parse_table_identifier() -> TableIdentifier {
         match_or_throw(SqlTokenType::IDENTIFIER);
-        const SqlToken& first_token = current();
+        SqlToken first_token = current();
 
         advance();
         
         if (match(SqlSymbol::PERIOD)) {
             advance_or_throw("Expected table name after schema");
             match_or_throw(SqlTokenType::IDENTIFIER, "Expected table identifier after schema name");
-            const SqlToken& second_token = current();
+            SqlToken second_token = current();
             advance();
-            return {second_token, first_token};   
+            return TableIdentifier(second_token, first_token);   
         }
 
-        return {first_token, std::nullopt};
+        return TableIdentifier(first_token, std::nullopt);
     }
 
 } // namespace sql

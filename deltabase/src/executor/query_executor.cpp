@@ -20,7 +20,7 @@ extern "C" {
 namespace {
     const char*
     get_node_name(const sql::AstNode* node) {
-        const sql::SqlToken& token = std::get<sql::SqlToken>(node->value);
+        const auto& token = std::get<sql::SqlToken>(node->value);
         return token.value.data();
     }
 
@@ -37,9 +37,36 @@ namespace exe {
     IQueryExecutor::~IQueryExecutor() {
     }
 
-    void
-    DatabaseExecutor::set_db_name(std::string db_name) {
-        db_name_ = db_name;
+    IQueryExecutor::IQueryExecutor(catalog::MetaRegistry& registry, const engine::EngineConfig& cfg) 
+        : registry(registry), cfg(cfg) {
+    }
+
+    DatabaseExecutor::DatabaseExecutor(
+        catalog::MetaRegistry& registry, const engine::EngineConfig& cfg
+    )
+        : IQueryExecutor(registry, cfg) {
+    }
+
+    DatabaseExecutor::DatabaseExecutor(DatabaseExecutor&& other)
+        : IQueryExecutor(other.registry, other.cfg) {
+    }
+
+    AdminExecutor::AdminExecutor(catalog::MetaRegistry& registry, const engine::EngineConfig& cfg)
+        : IQueryExecutor(registry, cfg) {
+    }
+
+    AdminExecutor::AdminExecutor(AdminExecutor&& other)
+        : IQueryExecutor(other.registry, other.cfg) {
+    }
+
+    VirtualExecutor::VirtualExecutor(
+        catalog::MetaRegistry& registry, const engine::EngineConfig& cfg
+    )
+        : IQueryExecutor(registry, cfg) {
+    }
+
+    VirtualExecutor::VirtualExecutor(VirtualExecutor&& other)
+        : IQueryExecutor(other.registry, other.cfg) {
     }
 
     IntOrDataTable
@@ -72,7 +99,9 @@ namespace exe {
         auto cpp_table = this->registry.get_table(stmt.table.table_name);
         MetaTable c_table = cpp_table.create_meta_table();
 
-        const sql::SqlToken& table_name = stmt.table.table_name;
+        std::string schema_name = stmt.table.schema_name.has_value()
+                                      ? stmt.table.schema_name.value().value
+                                      : cfg.default_schema;
 
         size_t columns_count = stmt.columns.size();
 
@@ -92,8 +121,8 @@ namespace exe {
 
         DataTable result;
         if (seq_scan(
-                db_name_.data(),
-                stmt.table.schema_name.value().value.c_str(),
+                cfg.db_name.value().c_str(),
+                schema_name.c_str(),
                 &c_table,
                 (const char**)column_names,
                 columns_count,
@@ -111,16 +140,22 @@ namespace exe {
     int
     DatabaseExecutor::execute_insert(const sql::InsertStatement& stmt) {
         auto table = this->registry.get_table(stmt.table.table_name.value);
-        auto schema = this->registry.get_object();
         auto c_table = table.create_meta_table();
 
+        std::string schema_name = stmt.table.schema_name.has_value()
+                                      ? stmt.table.schema_name.value().value
+                                      : cfg.default_schema;
+
+        auto schema = this->registry.get_schema(schema_name);
+        auto c_schema = schema.to_meta_schema();
+
+
         DataRow row = converter::convert_insert_to_data_row(c_table, stmt);
-        if (insert_row(
-                db_name_.c_str(), , &c_table, &row
-            ) != 0) {
+        if (insert_row(cfg.db_name.value().c_str(), &c_schema, &c_table, &row) != 0) {
             throw std::runtime_error("Failed to insert row");
         }
 
+        catalog::models::cleanup_meta_schema(c_schema);
         catalog::models::cleanup_meta_table(c_table);
 
         return 1;
@@ -131,16 +166,25 @@ namespace exe {
         auto table = this->registry.get_table(stmt.table.table_name.value);
         auto c_table = table.create_meta_table();
 
+        std::string schema_name = stmt.table.schema_name.has_value()
+                                      ? stmt.table.schema_name.value().value
+                                      : cfg.default_schema;
+
         DataRowUpdate update = converter::create_row_update(c_table, stmt);
-        DataFilter filter = converter::convert_binary_to_filter(
-            std::get<sql::BinaryExpr>(stmt.where->value), c_table);
+        std::unique_ptr<DataFilter> filter = nullptr;
+        if (stmt.where && std::holds_alternative<sql::BinaryExpr>(stmt.where->value)) {
+            filter = std::make_unique<DataFilter>(converter::convert_binary_to_filter(std::get<sql::BinaryExpr>(stmt.where->value), c_table));
+        }
 
         size_t rows_affected = 0;
-        if (update_rows_by_filter(this->db_name.data(),
-                                  table.get_name().c_str(),
-                                  (const DataFilter*)&filter,
-                                  &update,
-                                  &rows_affected) != 0) {
+        if (update_rows_by_filter(
+                cfg.db_name.value().c_str(),
+                schema_name.c_str(),
+                &c_table,
+                (const DataFilter*)filter.get(),
+                &update,
+                &rows_affected
+            ) != 0) {
             throw std::runtime_error("Failed to update row");
         }
 
@@ -154,6 +198,10 @@ namespace exe {
         auto table = this->registry.get_table(stmt.table.table_name.value);
         auto c_table = table.create_meta_table();
 
+        std::string schema_name = stmt.table.schema_name.has_value()
+                                      ? stmt.table.schema_name.value().value
+                                      : cfg.default_schema;
+
         std::unique_ptr<DataFilter> filter = nullptr;
         if (stmt.where) {
             filter = std::make_unique<DataFilter>(converter::convert_binary_to_filter(
@@ -162,7 +210,12 @@ namespace exe {
 
         size_t rows_affected = 0;
         int rc = delete_rows_by_filter(
-            this->db_name.c_str(), table.get_name().c_str(), filter.get(), &rows_affected);
+            cfg.db_name.value().c_str(),
+            schema_name.c_str(),
+            &c_table,
+            filter.get(),
+            &rows_affected
+        );
 
         if (rc != 0) {
             throw std::runtime_error("Failed to delete rows by filter");
@@ -175,19 +228,23 @@ namespace exe {
     int
     DatabaseExecutor::execute_create_table(const sql::CreateTableStatement& stmt) {
         MetaTable table = converter::convert_create_table_to_mt(stmt);
+        
+        std::string schema_name = stmt.table.schema_name.has_value()
+                                      ? stmt.table.schema_name.value().value
+                                      : cfg.default_schema;
+            
+        catalog::CppMetaSchema schema = registry.get_schema(schema_name);
+        MetaSchema c_schema = schema.to_meta_schema();
 
-        if (create_table(this->db_name.data(), &table) != 0) {
-            throw std::runtime_error("Failed to create table");
+        int res;
+        if ((res = create_table(cfg.db_name.value().c_str(), &c_schema, &table) ) != 0) {
+            throw std::runtime_error("Failed to create table " + std::to_string(res));
         }
 
         catalog::models::cleanup_meta_table(table);
+        catalog::models::cleanup_meta_schema(c_schema);
 
         return 0;
-    }
-
-    void
-    AdminExecutor::set_db_name(std::string db_name) {
-        this->db_name = db_name;
     }
 
     IntOrDataTable
@@ -205,13 +262,21 @@ namespace exe {
             throw std::runtime_error("Failed to create database " + stmt.name.value);
         }
 
+        MetaSchema default_schema = catalog::models::create_meta_schema(cfg.default_schema);
+        
+        if (create_schema(stmt.name.value.c_str(), &default_schema) != 0) {
+            throw std::runtime_error("Failed to create default schema");
+        }
+
+        catalog::models::cleanup_meta_schema(default_schema);
+
         return 0;
     }
 
     IntOrDataTable
     VirtualExecutor::execute(const sql::AstNode& node) {
         if (node.type == sql::AstNodeType::SELECT) {
-            const sql::SelectStatement& stmt = std::get<sql::SelectStatement>(node.value);
+            const auto& stmt = std::get<sql::SelectStatement>(node.value);
 
             if (stmt.table.table_name.value == "tables") {
                 return this->execute_information_schema_tables();

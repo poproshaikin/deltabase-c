@@ -147,24 +147,27 @@ create_table(const char* db_name, const MetaSchema* schema, const MetaTable* tab
         return 2;
     }
 
-    path_db_schema_table_meta(db_name, schema->name, table->name, buffer, PATH_MAX);
-
-    FILE* meta_file = fopen(buffer, "w+");
-    if (!meta_file) {
+    if (path_db_schema_table_meta(db_name, schema->name, table->name, buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In create_table: failed to get path db_schema_table_meta\n");
         return 3;
+    }
+
+    FILE* meta_file = fopen(buffer, "w");
+    if (!meta_file) {
+        return 4;
     }
 
     if ((op = write_mt(table, fileno(meta_file))) != 0) {
         printf("In create_table: write_mt returned %i\n", op);
         fclose(meta_file);
-        return 4;
+        return 5;
     }
     fclose(meta_file);
 
     path_db_schema_table_data(db_name, schema->name, table->name, buffer, PATH_MAX);
     if (mkdir_recursive(buffer, 0755) != 0) {
         fprintf(stderr, "Failed to create a directory for table %s\n", table->name);
-        return 5;
+        return 6;
     }
 
     return 0;
@@ -184,17 +187,24 @@ get_table(const char* db_name, const char* schema_name, const char* table_name, 
         return 1;
     }
 
-    int res = 0;
     char buffer[PATH_MAX];
 
-    path_db_schema_table_meta(db_name, schema_name, table_name, buffer, PATH_MAX);
+    if (path_db_schema_table_meta(db_name, schema_name, table_name, buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In get_table: failed to create path for db_schema_table_meta\n");
+        return 2;
+    }
 
     FILE* file = fopen(buffer, "r");
+    if (!file) {
+        fprintf(stderr, "In get_table: failed to open meta file %s\n", buffer);
+        return 3; 
+    }
+    
     int fd = fileno(file);
 
-    if ((res = read_mt(out, fd)) != 0) {
-        fclose(file);
-        return res;
+    if (read_mt(out, fd) != 0) {
+        fprintf(stderr, "In get_table: failed to read mt \n");
+        return 4;
     }
 
     fclose(file);
@@ -207,6 +217,10 @@ update_table(const char* db_name, const char* schema_name, const MetaTable* tabl
     path_db_schema_table_meta(db_name, schema_name, table->name, buffer, PATH_MAX);
 
     FILE* file = fopen(buffer, "w+");
+    if (!file) {
+        return 1; // Failed to open file
+    }
+    
     int fd = fileno(file);
 
     if (write_mt(table, fd) != 0) {
@@ -407,17 +421,12 @@ static int
 for_each_row_matching_filter_impl(
     const char* db_name,
     const char* schema_name,
-    const MetaTable* table,
+    MetaTable* table,
     const DataFilter* filter,
     RowCallback callback,
     const void* user_data,
     size_t* rows_affected
 ) {
-    MetaTable schema;
-    if (get_table(db_name, schema_name, table->name, &schema) != 0) {
-        return 1;
-    }
-
     char buffer[PATH_MAX];
     path_db_schema_table_data(db_name, schema_name, table->name, buffer, PATH_MAX);
 
@@ -429,7 +438,7 @@ for_each_row_matching_filter_impl(
 
     for (size_t i = 0; i < pages_count; i++) {
         if (for_each_row_in_page(
-                db_name, schema_name, pages[i], &schema, filter, rows_affected, callback, user_data
+                db_name, schema_name, pages[i], table, filter, rows_affected, callback, user_data
             ) != 0) {
             fprintf(stderr, "Failed to process page %s\n", pages[i]);
             for (size_t j = 0; j < i; j++) {
@@ -451,7 +460,7 @@ int
 for_each_row_matching_filter(
     const char* db_name,
     const char* schema_name,
-    const MetaTable* table,
+    MetaTable* table,
     const DataFilter* filter,
     RowCallback callback,
     void* user_data,
@@ -468,26 +477,26 @@ for_each_row_matching_filter(
 }
 
 static int
-combine_row(DataRow* out, MetaTable* schema, const DataRow* old_row, const DataRowUpdate* update) {
-    out->tokens = malloc(schema->columns_count * sizeof(DataToken));
+combine_row(DataRow* out, MetaTable* table, const DataRow* old_row, const DataRowUpdate* update) {
+    out->tokens = malloc(table->columns_count * sizeof(DataToken));
     if (!out->tokens) {
         fprintf(stderr, "Failed to allocate memory in combine_row\n");
         return 1;
     }
     out->count = old_row->count;
     out->flags = old_row->flags;
-    out->row_id = ++schema->last_rid;
+    out->row_id = ++table->last_rid;
 
     size_t j = 0;
-    for (size_t i = 0; i < schema->columns_count; i++) {
+    for (size_t i = 0; i < table->columns_count; i++) {
         // if column indices are equal
         if (j < update->count &&
-            uuid_compare(schema->columns[i].id, update->column_indices[j]) == 0) {
+            uuid_compare(table->columns[i].id, update->column_indices[j]) == 0) {
             // count size
-            size_t size = dtype_size(schema->columns[i].data_type);
+            size_t size = dtype_size(table->columns[i].data_type);
 
             if (size == 0) {
-                switch (schema->columns[i].data_type) {
+                switch (table->columns[i].data_type) {
                 case DT_STRING:
                     size = strlen(update->values[j]);
                     break;
@@ -497,7 +506,7 @@ combine_row(DataRow* out, MetaTable* schema, const DataRow* old_row, const DataR
             }
 
             // create a token
-            out->tokens[i] = make_token(schema->columns[i].data_type, update->values[j], size);
+            out->tokens[i] = make_token(table->columns[i].data_type, update->values[j], size);
 
             j++;
         } else {
@@ -543,7 +552,7 @@ int
 update_rows_by_filter(
     const char* db_name,
     const char* schema_name,
-    const MetaTable* table,
+    MetaTable* table,
     const DataFilter* filter,
     const DataRowUpdate* update,
     size_t* rows_affected
@@ -570,7 +579,7 @@ int
 delete_rows_by_filter(
     const char* db_name,
     const char* schema_name,
-    const MetaTable* table,
+    MetaTable* table,
     const DataFilter* filter,
     size_t* rows_affected
 ) {
@@ -724,14 +733,15 @@ get_schema(const char *db_name, const char *schema_name, MetaSchema *out) {
         return 3;
     }
 
-    FILE* file = fopen(buffer, "w+");
+    FILE* file = fopen(buffer, "r");
     if (!file) {
         fprintf(stderr, "In get_schema: failed to open the meta file of the schema %s\n", schema_name);
         return 4;
     }
 
-    if (read_ms(out, fileno(file)) != 0) {
-        fprintf(stderr, "In get_schema: failed to read meta schema in the page %s\n", buffer);
+    int res;
+    if (( res = read_ms(out, fileno(file))) != 0) {
+        fprintf(stderr, "In get_schema: failed to read meta schema in the page: \n error code: %i \n path: %s\n", res, buffer);
     }
 
     fclose(file);

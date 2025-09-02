@@ -30,6 +30,14 @@ namespace catalog::models {
         return table;
     }
 
+    auto
+    create_meta_schema(const std::string& name) -> MetaSchema {
+        MetaSchema schema;
+        schema.name = make_c_string(name);
+        uuid_generate_time(schema.id);
+        return schema;
+    }
+
     void
     cleanup_meta_table(MetaTable& table) {
         if (table.name) {

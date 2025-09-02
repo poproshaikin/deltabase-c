@@ -187,8 +187,8 @@ namespace catalog {
     template <typename T>
     void
     MetaRegistry::add_schema(T&& schema) {
-        static_assert(std::is_base_of_v<CppMetaObjectWrapper, std::decay_t<T>>,
-                      "T must derive from CppMetaSchemaWrapper");
+        static_assert(std::is_base_of_v<CppMetaObjectWrapper, std::decay_t<T>>);
+
         registry_[schema.get_id()] = std::make_unique<std::decay_t<T>>(std::forward<T>(schema));
     }
 

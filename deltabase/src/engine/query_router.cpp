@@ -4,6 +4,13 @@
 #include "../catalog/include/meta_registry.hpp"
 
 namespace engine {
+    QueryRouter::QueryRouter(catalog::MetaRegistry& registry, const EngineConfig& cfg)
+        : registry_(registry), cfg_(cfg) {
+        db_executor_.emplace(registry, cfg);
+        virtual_executor_.emplace(registry, cfg);
+        admin_executor_.emplace(registry, cfg);
+    }
+
     auto
     QueryRouter::route_and_execute(const sql::AstNode& node, const exe::AnalysisResult& analysis) -> exe::IntOrDataTable {
         if (!this->can_execute(node, analysis)) {
@@ -15,19 +22,19 @@ namespace engine {
             const auto& stmt = std::get<sql::SelectStatement>(node.value);
             
             if (catalog::is_table_virtual(stmt.table)) {
-                return virtual_executor_->execute(node);
+                return virtual_executor_.value().execute(node);
             }
             
-            return db_executor_->execute(node);
+            return db_executor_.value().execute(node);
         }
         case sql::AstNodeType::INSERT:
         case sql::AstNodeType::UPDATE:
         case sql::AstNodeType::DELETE:
         case sql::AstNodeType::CREATE_TABLE:
-            return db_executor_->execute(node);
-            
+            return db_executor_.value().execute(node);
+
         case sql::AstNodeType::CREATE_DATABASE:
-            return admin_executor_->execute(node);
+            return admin_executor_.value().execute(node);
             
         default:
             throw std::runtime_error("QueryRouter: Unsupported query type");

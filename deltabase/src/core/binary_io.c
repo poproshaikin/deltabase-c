@@ -788,14 +788,20 @@ read_ms(MetaSchema* out, int fd) {
     }
 
     size_t name_len = 0;
-    r = read(fd, &name_len, sizeof(size_t));
+    r = read(fd, &name_len, sizeof(name_len));
     if (r != sizeof(size_t)) {
         return 3;
+    }
+    
+    out->name = malloc(name_len);
+    if (!out->name) {
+        fprintf(stderr, "In read_ms: failed to allocate memory for a name buffer\n");
+        return 4;
     }
 
     r = read(fd, out->name, name_len);
     if (r != name_len) {
-        return 4;
+        return 5;
     }
 
     return 0;

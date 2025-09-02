@@ -4,6 +4,7 @@
 #include "../../executor/include/query_executor.hpp"
 #include "../../executor/include/semantic_analyzer.hpp"
 #include "query_router.hpp"
+#include "config.hpp"
 #include <string>
 
 namespace engine {
@@ -22,15 +23,13 @@ namespace engine {
         QueryRouter router_;
         exe::SemanticAnalyzer semantic_analyzer_;
         catalog::MetaRegistry registry_;
+        EngineConfig cfg_;
 
         auto
         execute(const sql::AstNode& node) -> exe::IntOrDataTable;
 
     public:
-        std::string db_name;
-
-        DltEngine();
-        DltEngine(std::string db_name);
+        DltEngine(EngineConfig cfg_ = {});
 
         auto
         run_query(const std::string& sql) -> ExecutionResult;

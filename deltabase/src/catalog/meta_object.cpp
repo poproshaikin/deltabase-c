@@ -1,5 +1,6 @@
 #include "include/meta_object.hpp"
 #include "../misc/include/exceptions.hpp"
+#include "../misc/include/utils.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -182,5 +183,15 @@ namespace catalog {
         char uuid_str[37];
         uuid_unparse(id_, uuid_str);
         return "Schema (ID: " + std::string(uuid_str) + ", Name: " + name_ + ")";
+    }
+
+    auto
+    CppMetaSchema::to_meta_schema() const -> MetaSchema {
+        MetaSchema schema;
+
+        schema.name = make_c_string(name_);
+        memcpy(schema.id, id_, sizeof(uuid_t));
+        
+        return schema;
     }
 } // namespace catalog

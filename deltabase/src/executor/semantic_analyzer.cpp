@@ -1,5 +1,6 @@
 #include "include/semantic_analyzer.hpp"
 #include "../misc/include/exceptions.hpp"
+#include <iostream>
 #include <stdexcept>
 #include <cstring>
 #include <variant>
@@ -17,7 +18,7 @@ namespace exe {
             sql::SqlToken public_token;
             public_token.value = "public";
             public_token.type = sql::SqlTokenType::IDENTIFIER;
-            normalized.schema_name = std::make_optional(public_token);
+            normalized.schema_name = public_token;
         }
         return normalized;
     }
@@ -49,34 +50,43 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze_select(const sql::SelectStatement& selectStmt) -> AnalysisResult {
-        if (selectStmt.table.table_name.value.empty()) {
+    SemanticAnalyzer::analyze_select(const sql::SelectStatement& stmt) -> AnalysisResult {
+        auto normalized_table = normalize_table_identifier(stmt.table);
+
+        if (normalized_table.table_name.value.empty()) {
             return std::runtime_error("Select statement missing target table");
         }
 
-        if (!registry_.has_table(selectStmt.table) &&
-            !registry_.has_virtual_table(selectStmt.table)) {
-            return TableDoesntExist(selectStmt.table.table_name.value);
+        if (!registry_.has_table(normalized_table) &&
+            !registry_.has_virtual_table(normalized_table)) {
+            return TableDoesntExist(normalized_table.table_name.value);
         }
 
         std::unique_ptr<catalog::CppMetaTable> table;
-        if (catalog::is_table_virtual(selectStmt.table)) {
-            table = std::make_unique<catalog::CppMetaTable>(registry_.get_virtual_table(selectStmt.table));
+        if (catalog::is_table_virtual(stmt.table)) {
+
+            std::cout << normalized_table.table_name.value << std::endl;
+            std::cout << normalized_table.schema_name.value().value << std::endl;
+            table = std::make_unique<catalog::CppMetaTable>(
+                registry_.get_virtual_table(normalized_table)
+            );
         } else {
-            table = std::make_unique<catalog::CppMetaTable>(registry_.get_table(selectStmt.table.table_name.value));
+            table = std::make_unique<catalog::CppMetaTable>(
+                registry_.get_table(normalized_table.table_name.value)
+            );
         }
 
         if (!table) {
             throw std::runtime_error("Registry inconsistency: table exists check passed but retrieval failed - possible race condition or registry corruption");
         }
 
-        for (const sql::SqlToken& col : selectStmt.columns) {
+        for (const sql::SqlToken& col : stmt.columns) {
             if (!table->has_column(col.value)) {
                 return ColumnDoesntExists(col.value);
             }
         }
 
-        auto where_result = analyze_where(selectStmt.where, *table);
+        auto where_result = analyze_where(stmt.where, *table);
         if (!where_result.is_valid) {
             return where_result.err.value();
         }
@@ -86,19 +96,22 @@ namespace exe {
 
     auto
     SemanticAnalyzer::analyze_insert(const sql::InsertStatement& stmt) -> AnalysisResult {
+        auto normalized_table = normalize_table_identifier(stmt.table);
+
         if (stmt.table.table_name.value.empty()) {
             return std::runtime_error("Insert statement missing target table");
         }
+
         if (stmt.columns.size() != 0 &&
             stmt.columns.size() != stmt.values.size()) {
             return std::runtime_error("Insert statement columns count does not match values count");
         }
 
-        if (!registry_.has_table(stmt.table)) {
-            return TableDoesntExist(stmt.table.table_name.value);
+        if (!registry_.has_table(normalized_table)) {
+            return TableDoesntExist(normalized_table.table_name.value);
         }
 
-        catalog::CppMetaTable table = registry_.get_table(stmt.table.table_name);
+        catalog::CppMetaTable table = registry_.get_table(normalized_table.table_name);
 
         for (size_t i = 0; i < stmt.columns.size(); i++) {
             if (!table.has_column(stmt.columns[i].value)) {

@@ -192,12 +192,20 @@ print_data_table(const DataTable& table) {
 }
 
 SqlCli::SqlCli() {
+    engine::EngineConfig cfg;
+    engine_ = std::make_unique<engine::DltEngine>(cfg);
+
     this->add_cmd_handler("q", [](std::string arg) {
         std::cout << "Exiting deltabase." << std::endl;
         std::exit(0);
     });
     this->add_cmd_handler("c", [this](std::string arg) {
-        engine_ = std::make_unique<DltEngine>(arg);
+        if (arg == "") {
+            std:: cout << "Cannot create database with that name\n";
+            return;
+        }
+        engine::EngineConfig cfg(arg);  
+        engine_ = std::make_unique<DltEngine>(cfg);
         std::cout << "Connected successfuly to the '" << arg << "'" << std::endl;
     });
 }
@@ -238,7 +246,7 @@ void SqlCli::run_cmd(const std::string& input) {
 void
 SqlCli::run_query_console() {
     std::string input;
-    engine_ = std::make_unique<DltEngine>();
+
     std::cout << "Welcome to deltabase! Type '\\q' to quit." << std::endl;
 
     while (true) {

@@ -40,6 +40,9 @@ namespace catalog {
         [[nodiscard]] auto
         to_string() const -> std::string override;
 
+        [[nodiscard]] auto
+        to_meta_schema() const -> MetaSchema;
+
     private:
         uuid_t id_;
         std::string name_;

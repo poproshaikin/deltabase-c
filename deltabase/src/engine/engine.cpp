@@ -8,28 +8,20 @@
 
 namespace engine {
 
-    DltEngine::DltEngine() : registry(), router(this->registry), semantic_analyzer(this->registry) {
-    }
-
-    DltEngine::DltEngine(std::string db_name)
-        : db_name(db_name), registry(), router(this->registry, db_name),
-          semantic_analyzer(this->registry, db_name) {
+    DltEngine::DltEngine(EngineConfig cfg)
+        : cfg_(cfg), registry_(), router_(registry_, cfg),
+          semantic_analyzer_(registry_, cfg) {
     }
 
     auto
     DltEngine::execute(const sql::AstNode& node) -> exe::IntOrDataTable {
-        exe::AnalysisResult analysis_result = this->semantic_analyzer.analyze(node);
+        exe::AnalysisResult analysis_result = semantic_analyzer_.analyze(node);
         if (!analysis_result.is_valid) {
             std::cerr << "Execution failed at the analyzation phase" << std::endl;
             throw analysis_result.err.value();
         }
 
-        try {
-            return this->router.route_and_execute(node, analysis_result);
-        } catch (...) {
-            std::cerr << "Execution failed at the execution phase" << std::endl;
-            throw;
-        }
+        return router_.route_and_execute(node, analysis_result);
     }
 
     auto
@@ -60,6 +52,6 @@ namespace engine {
         auto duration_ns =
             std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-        return ExecutionResult(std::move(result), duration_ns);
+        return {std::move(result), duration_ns};
     }
 } // namespace engine

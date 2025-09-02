@@ -45,7 +45,7 @@ path_db_schema_meta(
         fprintf(stderr, "Failed to get executable directory\n");
         return 1;   
     }
-    snprintf(out_result, buf_size, "%s/%s/%s/%s/%s", exec_dir, DATA, db_name, schema_name, META);
+    snprintf(out_result, buf_size, "%s/%s/%s/%s/%s", exec_dir, DATA, db_name, schema_name, META_SCHEMA_FILE);
     return 0;
 }
 
@@ -113,7 +113,7 @@ path_db_schema_table_meta(
         return 1;
     }
     snprintf(
-        out_result, buf_size, "%s/%s/%s/%s/%s", exec_dir, DATA, db_name, table_name, META_TABLE_FILE
+        out_result, buf_size, "%s/%s/%s/%s/%s/%s", exec_dir, DATA, db_name, schema_name, table_name, META_TABLE_FILE
     );
     return 0;
 }

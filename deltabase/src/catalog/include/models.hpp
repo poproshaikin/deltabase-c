@@ -14,6 +14,9 @@ namespace catalog::models {
     auto
     create_meta_table(const std::string& name, const std::vector<sql::ColumnDefinition> col_defs) -> MetaTable;
 
+    auto
+    create_meta_schema(const std::string& name) -> MetaSchema;
+
     void 
     cleanup_meta_schema(MetaSchema& schema);
 
