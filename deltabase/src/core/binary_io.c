@@ -771,6 +771,17 @@ write_ms(const MetaSchema* schema, int fd) {
         return 4;
     }
 
+    size_t db_name_len = strlen(schema->db_name);
+    w = write(fd, &db_name_len, sizeof(db_name_len));
+    if (w != sizeof(db_name_len)) {
+        return 5;
+    }
+
+    w = write(fd, schema->db_name, db_name_len);
+    if (w != db_name_len) {
+        return 6;
+    }
+
     return 0;
 }
 
@@ -802,6 +813,23 @@ read_ms(MetaSchema* out, int fd) {
     r = read(fd, out->name, name_len);
     if (r != name_len) {
         return 5;
+    }
+
+    size_t db_name_len = 0;
+    r = read(fd, &db_name_len, sizeof(db_name_len));
+    if (r != sizeof(db_name_len)) {
+        return 6;
+    }
+
+    out->db_name = malloc(db_name_len);
+    if (!out->db_name) {
+        fprintf(stderr, "In read_ms: failed to allocate memory for a db_name buffer\n");
+        return 7;
+    }
+
+    r = read(fd, out->db_name, db_name_len);
+    if (r != db_name_len) {
+        return 8;
     }
 
     return 0;

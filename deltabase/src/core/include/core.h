@@ -36,6 +36,9 @@ get_schema(const char *db_name, const char *schema_name, MetaSchema* out);
 char**
 get_schemas(const char* db_name, size_t* out_count);
 
+int 
+update_schema(const MetaSchema* schema);
+
 
 int
 create_table(const char* db_name, const MetaSchema* schema, const MetaTable* table);
@@ -51,6 +54,7 @@ update_table(const char* db_name, const char* schema_name, const MetaTable* tabl
 
 char**
 get_tables(const char* db_name, const char* schema_name, size_t* out_count);
+
 
 int
 insert_row(const char* db_name, const MetaSchema* schema, MetaTable* table, DataRow* row);

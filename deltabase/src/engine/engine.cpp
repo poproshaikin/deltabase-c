@@ -1,5 +1,4 @@
 #include "include/engine.hpp"
-#include "../executor/include/query_executor.hpp"
 #include "../executor/include/semantic_analyzer.hpp"
 #include "../sql/include/lexer.hpp"
 #include "../sql/include/parser.hpp"
@@ -7,7 +6,6 @@
 #include <iostream>
 
 namespace engine {
-
     DltEngine::DltEngine(EngineConfig cfg)
         : cfg_(cfg), registry_(), router_(registry_, cfg),
           semantic_analyzer_(registry_, cfg) {

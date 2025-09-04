@@ -173,6 +173,32 @@ create_table(const char* db_name, const MetaSchema* schema, const MetaTable* tab
     return 0;
 }
 
+int 
+update_schema(const MetaSchema* schema) {
+    char buffer[PATH_MAX];
+    if (path_db_schema_meta(schema->db_name, schema->name, buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In update_schema: failed to build path `db_schema__meta`\n");
+        return 1;
+    }
+
+    FILE* file = fopen(buffer, "w");
+    if (!file) {
+        fprintf(stderr, "In update_schema: failed to open file in path %s\n", buffer);
+        return 2; // Failed to open file
+    }
+    
+    int fd = fileno(file);
+
+    if (write_ms(schema, fd) != 0) {
+        fclose(file);
+        fprintf(stderr, "In update_schema: failed to write ms\n");
+        return 3;
+    }
+
+    fclose(file);
+    return 0;
+}
+
 bool
 exists_table(const char* db_name, const char* schema_name, const char* table_name) {
     char table_path[PATH_MAX];
@@ -214,18 +240,23 @@ get_table(const char* db_name, const char* schema_name, const char* table_name, 
 int
 update_table(const char* db_name, const char* schema_name, const MetaTable* table) {
     char buffer[PATH_MAX];
-    path_db_schema_table_meta(db_name, schema_name, table->name, buffer, PATH_MAX);
+    if (path_db_schema_table_meta(db_name, schema_name, table->name, buffer, PATH_MAX) != 0) {
+        fprintf(stderr, "In update_table: failed to build path `db_schema_table_meta`\n");
+        return 1;
+    }
 
     FILE* file = fopen(buffer, "w+");
     if (!file) {
-        return 1; // Failed to open file
+        fprintf(stderr, "In update_table: failed to open file in path %s\n", buffer);
+        return 2; // Failed to open file
     }
     
     int fd = fileno(file);
 
     if (write_mt(table, fd) != 0) {
         fclose(file);
-        return 1;
+        fprintf(stderr, "In update_table: failed to write mt\n");
+        return 3;
     }
 
     fclose(file);

@@ -42,6 +42,7 @@ free_col(MetaColumn* column);
 typedef struct {
     uuid_t id;
     char* name;
+    char* db_name;
 } MetaSchema;
 
 void
