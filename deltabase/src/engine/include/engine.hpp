@@ -30,7 +30,7 @@ namespace engine {
         EngineConfig cfg_;
 
         exe::QueryPlanExecutionResult
-        execute(const sql::AstNode& node);
+        execute(sql::AstNode& node);
 
         std::unique_ptr<sql::AstNode>
         build_ast(const std::string& sql);

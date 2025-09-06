@@ -86,6 +86,7 @@ namespace catalog {
 
     public:
         MetaRegistry(engine::EngineConfig cfg);
+        // TODO: вот тут же блять, самое интересное
         void
         save_changes();
         void

@@ -312,11 +312,7 @@ namespace catalog {
         const std::string& table_name, const std::string& schema_name
     ) const {
         if (schema_name == "information_schema") {
-
-            if (table_name == "tables" ||
-                table_name == "columns") {
-                return true;
-            }
+            return table_name == "tables" || table_name == "columns";
         }
 
         return false;

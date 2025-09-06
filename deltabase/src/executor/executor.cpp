@@ -5,8 +5,6 @@ extern "C" {
 #include "../../core/include/data.h"
 }
 
-#include <format>
-
 namespace exe {
 
     ActionExecutionResult::ActionExecutionResult(IntOrDataTable&& result) 
@@ -17,9 +15,23 @@ namespace exe {
         : success(false), error(error) {
     }
 
+    QueryPlanExecutionResult::QueryPlanExecutionResult(ActionExecutionResult&& result)
+        : success(true), final_result(std::move(result.result)) {
+    }
+
+    QueryPlanExecutionResult::QueryPlanExecutionResult(IntOrDataTable&& result)
+        : success(true), final_result(std::move(result)) {
+    }
+
+    QueryPlanExecutionResult::QueryPlanExecutionResult(std::pair<std::string, ActionError> error) 
+        : success(false), error(error) {
+    }
+
     ActionExecutor::ActionExecutor(engine::EngineConfig cfg, catalog::MetaRegistry& registry)
         : cfg_(cfg), registry_(registry) {
     }
+
+    // Plans execution
 
     QueryPlanExecutionResult
     ActionExecutor::execute_plan(QueryPlan&& plan) {
@@ -29,7 +41,7 @@ namespace exe {
     }
 
     QueryPlanExecutionResult
-    ActionExecutor::execute_plan(SingleActionPlan&& plan) {
+    ActionExecutor::execute_plan(SingleActionPlan&& plan) noexcept{
         return QueryPlanExecutionResult(execute_action(plan.action));
     }
 
@@ -39,14 +51,14 @@ namespace exe {
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const Action& action) {
+    ActionExecutor::execute_action(const Action& action) noexcept {
         return std::visit([this](const auto& a) {
             return this->execute_action(a);
         }, action);
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const SeqScanAction& action) {
+    ActionExecutor::execute_action(const SeqScanAction& action) noexcept {
         const auto& schema = registry_.get_schema_by_id(action.table.schema_id);
         MetaTable c_meta_table = action.table.to_c();
 
@@ -54,7 +66,11 @@ namespace exe {
 
         char** column_names = (char**)std::malloc(columns_count * sizeof(char*));
         if (!column_names) {
-            throw std::runtime_error("Failed to allocate memory in execute_query");
+            return ActionExecutionResult(
+                std::make_pair(
+                    "Seq scan execution error: failed to allocate memory", ActionError::SYSTEM_ERROR
+                )
+            );
         }
         for (size_t i = 0; i < columns_count; i++) {
             column_names[i] = const_cast<char*>(action.columns[i].c_str());
@@ -76,7 +92,11 @@ namespace exe {
                 filter.get(),
                 &result
             ) != 0) {
-            throw std::runtime_error("Failed to scan a table");
+            return ActionExecutionResult(
+                std::make_pair(
+                    "Seq scan execution error: core function returned error", ActionError::SYSTEM_ERROR
+                )
+            );
         }
 
         result.schema = c_meta_table;
@@ -84,13 +104,17 @@ namespace exe {
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const InsertAction& action) {
+    ActionExecutor::execute_action(const InsertAction& action) noexcept {
         auto c_table = action.table.to_c();
         auto c_schema = action.schema.to_c();
         auto c_row = action.row.to_c();
 
         if (insert_row(cfg_.db_name.value().c_str(), &c_schema, &c_table, &c_row) != 0) {
-            throw std::runtime_error("In execute_action: failed to insert row");
+            return ActionExecutionResult(
+                std::make_pair(
+                    "Insert action execution error: core function returned error", ActionError::CORE_ERROR
+                )
+            );
         }
 
         catalog::CppMetaTable::cleanup_c(c_table);
@@ -101,7 +125,7 @@ namespace exe {
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const UpdateByFilterAction& action) {
+    ActionExecutor::execute_action(const UpdateByFilterAction& action) noexcept {
         auto c_table = action.table.to_c();
         auto c_update = action.row_update.to_c();
         DataFilter* filter = nullptr;
@@ -119,7 +143,11 @@ namespace exe {
             &c_update,
             &rows_affected
         ) != 0) {
-            throw std::runtime_error("In execute_action: failed to update rows by filter");
+            return ActionExecutionResult(
+                std::make_pair(
+                    "Update by filter action execution error: core function returned error", ActionError::CORE_ERROR
+                )
+            );
         }
 
         catalog::CppMetaTable::cleanup_c(c_table);
@@ -134,7 +162,7 @@ namespace exe {
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const DeleteByFilterAction& action) {
+    ActionExecutor::execute_action(const DeleteByFilterAction& action) noexcept {
         auto c_table = action.table.to_c();
 
         DataFilter* filter = nullptr;
@@ -150,7 +178,11 @@ namespace exe {
             filter,
             &rows_affected
         ) != 0) {
-            throw std::runtime_error("In execute_action: failed to delete rows by filter");
+            return ActionExecutionResult(
+                std::make_pair(
+                    "Delete by filter action execution error: core function returned error", ActionError::CORE_ERROR
+                )
+            );
         }
 
         if (filter) {
@@ -162,7 +194,7 @@ namespace exe {
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const CreateTableAction& action) {
+    ActionExecutor::execute_action(const CreateTableAction& action) noexcept {
         auto c_schema = action.schema.to_c();
         auto c_table = action.table.to_c();
 
@@ -171,7 +203,11 @@ namespace exe {
             &c_schema,
             &c_table
         ) != 0) {
-            throw std::runtime_error(std::format("In execute_action: failed to create table '{}'", action.table.name));
+            return ActionExecutionResult(
+                std::make_pair(
+                    "Create table action execution error: core function returned error", ActionError::CORE_ERROR
+                )
+            );
         }
 
         catalog::CppMetaSchema::cleanup_c(c_schema);
@@ -181,11 +217,15 @@ namespace exe {
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const CreateSchemaAction& action) {
+    ActionExecutor::execute_action(const CreateSchemaAction& action) noexcept {
         auto c_schema = action.schema.to_c();
 
         if (create_schema(cfg_.db_name->c_str(), &c_schema) != 0) {
-            throw std::runtime_error("In execute_action: failed to create schema");
+            return ActionExecutionResult(
+                std::make_pair(
+                    "Create schema action execution error: core function returned error", ActionError::CORE_ERROR
+                )
+            );
         }
 
         catalog::CppMetaSchema::cleanup_c(c_schema);
@@ -193,12 +233,41 @@ namespace exe {
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const CreateDatabaseAction& action) {
+    ActionExecutor::execute_action(const CreateDatabaseAction& action) noexcept {
         if (create_database(action.name.c_str()) != 0) {
-            throw std::runtime_error("In execute_action: failed to create database " + action.name);
+            return ActionExecutionResult(
+                std::make_pair(
+                    "Create database action execution error: core function returned error", ActionError::CORE_ERROR
+                )
+            );
         }
 
         return ActionExecutionResult(0lu);
     }
 
+    ActionExecutionResult
+    ActionExecutor::execute_action(const WriteMetaTableAction& action) noexcept {
+        try {
+            registry_.add_table(action.table);
+            return ActionExecutionResult(1lu);
+        } catch (const std::exception& e) {
+            return ActionExecutionResult(std::make_pair(
+                std::string("Failed to write meta table: ") + e.what(), 
+                ActionError::UNDEFINED
+            ));
+        }
+    }
+
+    ActionExecutionResult
+    ActionExecutor::execute_action(const WriteMetaSchemaAction& action) noexcept {
+        try {
+            registry_.add_schema(action.schema);
+            return ActionExecutionResult(1lu);
+        } catch (const std::exception& e) {
+            return ActionExecutionResult(std::make_pair(
+                std::string("Failed to write meta schema: ") + e.what(), 
+                ActionError::UNDEFINED
+            ));
+        }
+    }
 }

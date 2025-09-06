@@ -8,13 +8,28 @@
 #include <iostream>
 
 namespace engine {
+    ExecutionResult::ExecutionResult(exe::QueryPlanExecutionResult&& result, long execution_time_ns)
+        : result(std::move(result.final_result)), execution_time_ns(execution_time_ns) {
+        if (!result.success && result.error) {
+            error = result.error.value();
+        }
+    }
+
+    ExecutionResult::ExecutionResult(std::pair<std::string, exe::ActionError> error)
+        : error(error), execution_time_ns(0) {
+    }
+
+    ExecutionResult::ExecutionResult(exe::IntOrDataTable&& result, long execution_time_ns)
+        : result(std::move(result)), execution_time_ns(execution_time_ns) {
+    }
+
     DltEngine::DltEngine(EngineConfig cfg)
         : cfg_(cfg), registry_(cfg), semantic_analyzer_(registry_, cfg), 
           executor_(cfg, registry_), planner_(cfg, registry_) {
     }
 
     exe::QueryPlanExecutionResult
-    DltEngine::execute(const sql::AstNode& node) {
+    DltEngine::execute(sql::AstNode& node) {
         auto analysis = semantic_analyzer_.analyze(node);
         if (!analysis.is_valid) {
             std::cerr << "Execution failed at the analyzation phase" << std::endl;

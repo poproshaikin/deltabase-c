@@ -57,7 +57,7 @@ function(add_cpp_module module_name)
     endif()
     
     if (${module_name} STREQUAL "converter")
-        target_link_libraries(${module_name} PUBLIC misc executor )
+        target_link_libraries(${module_name} PUBLIC misc executor catalog )
     endif()
 
     if (${module_name} STREQUAL "engine")

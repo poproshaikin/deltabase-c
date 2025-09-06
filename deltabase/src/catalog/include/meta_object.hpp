@@ -13,6 +13,7 @@ namespace catalog {
         std::string name;
         std::string db_name;
 
+        CppMetaSchema() = default;
         CppMetaSchema(std::string name, std::string db_name);
 
         [[nodiscard]] static CppMetaSchema
@@ -28,8 +29,6 @@ namespace catalog {
 
         bool
         compare_content(const CppMetaSchema& other) const;
-    private:
-        CppMetaSchema() = default;
     };
 
     struct CppMetaColumn {
@@ -68,7 +67,9 @@ namespace catalog {
         uint64_t last_rid;
 
         bool
-        has_column(const std::string& name);
+        has_column(const std::string& name) const;
+        const CppMetaColumn&
+        get_column(const std::string& name) const;
 
         [[nodiscard]] static CppMetaTable
         from_c(const MetaTable& c_table);

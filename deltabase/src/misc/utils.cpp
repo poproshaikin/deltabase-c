@@ -30,8 +30,8 @@ std::vector<Value> get_values(std::unordered_map<Key, Value> map) {
 }
 
 char *make_c_string(const std::string& str) {
-    char *ptr = new char[str.size() + 1];
-    std::memcpy(ptr, str.c_str(), str.size() + 1);
+    char *ptr = (char*)malloc(str.size() + 1);
+    memcpy(ptr, str.c_str(), str.size() + 1);
     
     return ptr;
 }

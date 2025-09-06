@@ -80,6 +80,7 @@ namespace exe {
 
         std::unique_ptr<catalog::CppMetaTable> table;
         if (registry_.has_virtual_table(stmt.table)) {
+            std::cout << "debil\n";
 
             std::cout << stmt.table.table_name.value << std::endl;
             std::cout << stmt.table.schema_name.value().value << std::endl;
@@ -111,8 +112,8 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze_insert(const sql::InsertStatement& stmt) -> AnalysisResult {
-        auto normalized_table = normalize_table_identifier(stmt.table);
+    SemanticAnalyzer::analyze_insert(sql::InsertStatement& stmt) -> AnalysisResult {
+        stmt.table = normalize_table_identifier(stmt.table);
 
         if (stmt.table.table_name.value.empty()) {
             return std::runtime_error("Insert statement missing target table");
@@ -123,11 +124,11 @@ namespace exe {
             return std::runtime_error("Insert statement columns count does not match values count");
         }
 
-        if (!registry_.has_table(normalized_table)) {
-            return TableDoesntExist(normalized_table.table_name.value);
+        if (!registry_.has_table(stmt.table)) {
+            return TableDoesntExist(stmt.table.table_name.value);
         }
 
-        catalog::CppMetaTable table = registry_.get_table(normalized_table.table_name);
+        catalog::CppMetaTable table = registry_.get_table(stmt.table);
 
         for (size_t i = 0; i < stmt.columns.size(); i++) {
             if (!table.has_column(stmt.columns[i].value)) {
@@ -138,7 +139,7 @@ namespace exe {
             const sql::SqlLiteral literal_type = std::get<sql::SqlLiteral>(value_token.detail);
             const catalog::CppMetaColumn& column = table.get_column(stmt.columns[i].value);            
 
-            if (!is_literal_assignable_to(literal_type, column.get_data_type())) {
+            if (!is_literal_assignable_to(literal_type, column.data_type)) {
                 return std::runtime_error("Incompatible types conversion");
             }
         }
@@ -147,7 +148,7 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze_update(const sql::UpdateStatement& stmt) -> AnalysisResult {
+    SemanticAnalyzer::analyze_update(sql::UpdateStatement& stmt) -> AnalysisResult {
         if (stmt.table.table_name.value.empty()) {
             return std::runtime_error("Update statement missing target table");
         }
@@ -174,7 +175,7 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze_delete(const sql::DeleteStatement& stmt) -> AnalysisResult {
+    SemanticAnalyzer::analyze_delete(sql::DeleteStatement& stmt) -> AnalysisResult {
         if (stmt.table.table_name.value.empty()) {
             return std::runtime_error("Delete statement missing target table");
         }
@@ -194,10 +195,14 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze_create_table(const sql::CreateTableStatement& stmt) -> AnalysisResult {
+    SemanticAnalyzer::analyze_create_table(sql::CreateTableStatement& stmt) -> AnalysisResult {
         // if (exists_table((*db_name).c_str(), stmt.table.table_name.value.c_str())) {
         //     return TableExists(stmt.table.table_name.value);
         // }
+
+        if (registry_.has_table(stmt.table)) {
+            return false;
+        }
         return true;
     }
 
@@ -231,7 +236,7 @@ namespace exe {
 
         const catalog::CppMetaColumn& column = table.get_column(column_token.value);
 
-        if (!is_literal_assignable_to(literal_type, column.get_data_type())) {
+        if (!is_literal_assignable_to(literal_type, column.data_type)) {
             return std::runtime_error("Incompatible types conversion");
         }
 
@@ -265,7 +270,7 @@ namespace exe {
 
         const auto& value_token = std::get<sql::SqlToken>(value_node->value);
         sql::SqlLiteral literal_type = std::get<sql::SqlLiteral>(value_token.detail);
-        if (!is_literal_assignable_to(literal_type, column.get_data_type())) {
+        if (!is_literal_assignable_to(literal_type, column.data_type)) {
             return std::runtime_error("Incompatible types conversion in assignment");
         }
 
@@ -327,7 +332,7 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze_create_db(const sql::CreateDbStatement& stmt) -> AnalysisResult {
+    SemanticAnalyzer::analyze_create_db(sql::CreateDbStatement& stmt) -> AnalysisResult {
         if (exists_database(stmt.name.value.c_str())) {
             return DbExists(stmt.name.value);
         }
@@ -335,7 +340,7 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze_create_schema(const sql::CreateSchemaStatement& stmt) -> AnalysisResult {
+    SemanticAnalyzer::analyze_create_schema(sql::CreateSchemaStatement& stmt) -> AnalysisResult {
         if (registry_.has_schema(stmt.name.value)) {
             return std::runtime_error(std::format("Schema {} already exists", stmt.name.value));
         }

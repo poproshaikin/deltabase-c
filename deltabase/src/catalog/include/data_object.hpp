@@ -13,15 +13,13 @@ extern "C" {
 #include "../../core/include/misc.h"
 }
 
-namespace {
-    struct FreeDeleter {
-        void operator()(void* ptr) {
-            std::free(ptr);
-        }
-    };
+struct FreeDeleter {
+    void operator()(void* ptr) {
+        std::free(ptr);
+    }
+};
 
-    using unique_void_ptr = std::unique_ptr<void, FreeDeleter>;
-}
+using unique_void_ptr = std::unique_ptr<void, FreeDeleter>;
 
 namespace catalog {
     struct CppDataToken {
@@ -134,12 +132,18 @@ namespace catalog {
     struct CppDataRowUpdate {
         std::vector<std::pair<catalog::CppMetaColumn, unique_void_ptr>> assignments;
 
+        // Constructor with table schema
+        explicit CppDataRowUpdate(const CppMetaTable& table);
+        
         static CppDataRowUpdate
-        from_c(const DataRowUpdate& update);
+        from_c(const DataRowUpdate& update, const CppMetaTable& table);
         [[nodiscard]] DataRowUpdate
         to_c() const;
 
         static void
         cleanup_c(DataRowUpdate& update);
+        
+    private:
+        CppMetaTable table_schema_;
     };
 }

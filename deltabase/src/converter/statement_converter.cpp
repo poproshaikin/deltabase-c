@@ -1,10 +1,10 @@
 #include "../sql/include/parser.hpp"
 #include "../catalog/include/models.hpp"
-#include <cstdlib>
-#include <stdexcept>
-
 #include "include/converter.hpp"
 #include "include/statement_converter.hpp"
+
+#include <cstdlib>
+#include <stdexcept>
 
 extern "C" {
 #include "../core/include/meta.h"
@@ -79,8 +79,8 @@ namespace converter {
         return row;
     }
 
-    auto
-    convert_create_table_to_mt(const sql::CreateTableStatement& stmt) -> MetaTable {
-        return catalog::models::create_meta_table(stmt.table.table_name.value, stmt.columns);
+    MetaTable
+    convert_create_table_to_mt(const sql::CreateTableStatement& stmt) {
+        return catalog::create_meta_table(stmt.table.table_name.value, stmt.columns);
     }
 } // namespace converter

@@ -23,6 +23,8 @@ namespace exe {
 
     enum class ActionError {
         UNDEFINED = 0,
+        SYSTEM_ERROR,
+        CORE_ERROR
     };
 
     struct ActionExecutionResult {
@@ -51,39 +53,39 @@ namespace exe {
         // --- Actions ---
         
         ActionExecutionResult
-        execute_action(const SeqScanAction& action);
+        execute_action(const SeqScanAction& action) noexcept;
 
         ActionExecutionResult
-        execute_action(const InsertAction& action);
+        execute_action(const InsertAction& action) noexcept;
         
         ActionExecutionResult
-        execute_action(const UpdateByFilterAction& action);
+        execute_action(const UpdateByFilterAction& action) noexcept;
 
         ActionExecutionResult
-        execute_action(const DeleteByFilterAction& action);
+        execute_action(const DeleteByFilterAction& action) noexcept;
 
         ActionExecutionResult
-        execute_action(const WriteMetaTableAction& action);
+        execute_action(const WriteMetaTableAction& action) noexcept;
 
         ActionExecutionResult
-        execute_action(const WriteMetaSchemaAction& action);
+        execute_action(const WriteMetaSchemaAction& action) noexcept;
 
         ActionExecutionResult
-        execute_action(const CreateTableAction& action);
+        execute_action(const CreateTableAction& action) noexcept;
 
         ActionExecutionResult
-        execute_action(const CreateSchemaAction& action);
+        execute_action(const CreateSchemaAction& action) noexcept;
 
         ActionExecutionResult
-        execute_action(const CreateDatabaseAction& action);
+        execute_action(const CreateDatabaseAction& action) noexcept;
 
         ActionExecutionResult
-        execute_action(const Action& action);
+        execute_action(const Action& action) noexcept;
 
         // --- Plans ---
 
         QueryPlanExecutionResult
-        execute_plan(SingleActionPlan&& plan);
+        execute_plan(SingleActionPlan&& plan) noexcept;
 
         QueryPlanExecutionResult
         execute_plan(TransactionPlan&& plan);

@@ -61,6 +61,7 @@ namespace exe {
         DeleteByFilterAction,
         CreateTableAction,
         CreateSchemaAction,
+        CreateDatabaseAction,
         WriteMetaTableAction,
         WriteMetaSchemaAction
     >;

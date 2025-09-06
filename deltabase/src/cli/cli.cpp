@@ -213,7 +213,7 @@ SqlCli::SqlCli() {
 void SqlCli::run_cmd(const std::string& input) {
         if (input[0] == '\\') {
             std::string cmd = input.substr(1);
-            auto splitted = split(cmd, ' ', 1);
+            auto splitted = split(cmd, ' ');
 
             std::string command = splitted[0];
             std::string argument = (splitted.size() > 1) ? splitted[1] : "";
@@ -233,9 +233,9 @@ void SqlCli::run_cmd(const std::string& input) {
                               << std::endl;
 
                     if (std::holds_alternative<std::unique_ptr<catalog::CppDataTable>>(result.result))
-                        ::print_data_table(std::get<std::unique_ptr<catalog::CppDataTable>>(result.result).get()->to_data_table());
+                        ::print_data_table(std::get<std::unique_ptr<catalog::CppDataTable>>(result.result).get()->to_c());
                     else
-                        std::cout << "Rows affected: " << std::get<int>(result.result) << std::endl;
+                        std::cout << "Rows affected: " << std::get<size_t>(result.result) << std::endl;
                 } catch (std::runtime_error e) {
                     std::cout << "Failed to execute query: " << e.what() << std::endl;
                 }

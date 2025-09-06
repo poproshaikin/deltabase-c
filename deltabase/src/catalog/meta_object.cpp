@@ -1,15 +1,26 @@
 #include "include/meta_object.hpp"
 #include "../../misc/include/utils.hpp"
+#include "exceptions.hpp"
 
 namespace catalog {
     bool
-    CppMetaTable::has_column(const std::string& name) {
+    CppMetaTable::has_column(const std::string& name) const {
         for (const auto& col : columns) {
             if (col.name == name) {
                 return true;
             }
         }
         return false;
+    }
+
+    const CppMetaColumn&
+    CppMetaTable::get_column(const std::string& name) const {
+        for (const auto& col : columns) {
+            if (col.name == name) {
+                return col;
+            }
+        }
+        throw ColumnDoesntExists(name);
     }
     // Operators
 
@@ -103,8 +114,8 @@ namespace catalog {
 
     void
     CppMetaSchema::cleanup_c(MetaSchema& schema) {
-        delete[] schema.name;
-        delete[] schema.db_name;
+        free(schema.name);
+        free(schema.db_name);
     }
 
     CppMetaColumn
@@ -131,7 +142,7 @@ namespace catalog {
 
     void
     CppMetaColumn::cleanup_c(MetaColumn& column) {
-        delete[] column.name;
+        free(column.name);
     }
 
     CppMetaTable
@@ -162,7 +173,7 @@ namespace catalog {
         // Convert columns
         result.columns_count = columns.size();
         if (result.columns_count > 0) {
-            result.columns = new MetaColumn[result.columns_count];
+            result.columns = (MetaColumn*)malloc(result.columns_count * sizeof(MetaColumn));
             for (size_t i = 0; i < result.columns_count; ++i) {
                 result.columns[i] = columns[i].to_c();
             }
@@ -186,12 +197,12 @@ namespace catalog {
 
     void
     CppMetaTable::cleanup_c(MetaTable& table) {
-        delete[] table.name;
+        free(table.name);
         if (table.columns) {
             for (uint64_t i = 0; i < table.columns_count; ++i) {
                 CppMetaColumn::cleanup_c(table.columns[i]);
             }
-            delete[] table.columns;
+            free(table.columns);
         }
     }
 

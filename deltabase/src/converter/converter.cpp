@@ -120,15 +120,13 @@ namespace converter {
 
     auto
     convert_def_to_mc(const sql::ColumnDefinition& definition) -> MetaColumn {
-        // Создаем C++ объект
         catalog::CppMetaColumn cpp_column;
-        cpp_column.id = ""; // Будет заполнен позже при добавлении в таблицу
-        cpp_column.table_id = ""; // Будет заполнен позже
+        cpp_column.id = ""; 
+        cpp_column.table_id = ""; 
         cpp_column.name = definition.name.value;
         cpp_column.data_type = convert_kw_to_dt(definition.type.get_detail<sql::SqlKeyword>());
         cpp_column.flags = convert_tokens_to_cfs(definition.constraints);
         
-        // Конвертируем в C структуру
         return cpp_column.to_c();
     }
 
