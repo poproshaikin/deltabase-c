@@ -1,11 +1,11 @@
 #include "include/converter.hpp"
 #include "../executor/include/literals.hpp"
-#include "../catalog/include/models.hpp"
 #include "../misc/include/exceptions.hpp"
 #include "../sql/include/lexer.hpp"
 #include "../sql/include/parser.hpp"
 #include <cstring>
 #include <stdexcept>
+#include <algorithm>
 
 extern "C" {
 #include "../core/include/data.h"
@@ -77,48 +77,59 @@ namespace converter {
     }
 
     auto
-    convert_binary_to_filter(const sql::BinaryExpr& where, const MetaTable& table) -> DataFilter {
-        DataFilter filter = {};
-
+    convert_binary_to_filter(const sql::BinaryExpr& where, const catalog::CppMetaTable& table) -> catalog::CppDataFilter {
         if (where.op == sql::AstOperator::AND || where.op == sql::AstOperator::OR) {
             const auto& left_expr = std::get<sql::BinaryExpr>(where.left->value);
             const auto& right_expr = std::get<sql::BinaryExpr>(where.right->value);
 
-            auto* left_filter = new DataFilter(convert_binary_to_filter(left_expr, table));
-            auto* right_filter = new DataFilter(convert_binary_to_filter(right_expr, table));
+            auto left_filter = std::make_shared<catalog::CppDataFilter>(convert_binary_to_filter(left_expr, table));
+            auto right_filter = std::make_shared<catalog::CppDataFilter>(convert_binary_to_filter(right_expr, table));
 
-            filter.is_node = true;
-            filter.data.node.left = left_filter;
-            filter.data.node.right = right_filter;
-            filter.data.node.op = (where.op == sql::AstOperator::AND) ? LOGIC_AND : LOGIC_OR;
-            return filter;
+            LogicOp logic_op = (where.op == sql::AstOperator::AND) ? LOGIC_AND : LOGIC_OR;
+            auto node = catalog::CppDataFilterNode{left_filter, logic_op, right_filter};
+            
+            return catalog::CppDataFilter{node};
         }
 
         const auto& left = std::get<sql::SqlToken>(where.left->value);
         const auto& right = std::get<sql::SqlToken>(where.right->value);
-        const char* column_name = left.value.data();
+        const std::string column_name = left.value;
 
-        MetaColumn column;
-        if (find_column(column_name, &table, &column) != 0) {
+        // Найдем колонку в таблице
+        auto column_it = std::find_if(table.columns.begin(), table.columns.end(),
+            [&column_name](const catalog::CppMetaColumn& col) {
+                return col.name == column_name;
+            });
+        
+        if (column_it == table.columns.end()) {
             throw std::runtime_error("Column doesn't exist");
         }
 
-        const auto value = convert_str_to_literal(right.value, column.data_type);
+        const auto value = convert_str_to_literal(right.value, column_it->data_type);
 
-        filter.is_node = false;
-        memcpy(filter.data.condition.column_id, column.id, sizeof(uuid_t));
-        filter.data.condition.op = parse_filter_op(where.op);
-        filter.data.condition.type = column.data_type;
-        filter.data.condition.value = value.first;
+        catalog::CppDataFilterCondition condition;
+        condition.column_id = column_it->id;
+        condition.operation = parse_filter_op(where.op);
+        condition.type = column_it->data_type;
+        condition.value = unique_void_ptr(value.first);
+
+        catalog::CppDataFilter filter;
+        filter.value = std::move(condition);
         return filter;
     }
 
     auto
     convert_def_to_mc(const sql::ColumnDefinition& definition) -> MetaColumn {
-        return catalog::models::create_meta_column(
-            definition.name.value,
-            convert_kw_to_dt(definition.type.get_detail<sql::SqlKeyword>()),
-            convert_tokens_to_cfs(definition.constraints));
+        // Создаем C++ объект
+        catalog::CppMetaColumn cpp_column;
+        cpp_column.id = ""; // Будет заполнен позже при добавлении в таблицу
+        cpp_column.table_id = ""; // Будет заполнен позже
+        cpp_column.name = definition.name.value;
+        cpp_column.data_type = convert_kw_to_dt(definition.type.get_detail<sql::SqlKeyword>());
+        cpp_column.flags = convert_tokens_to_cfs(definition.constraints);
+        
+        // Конвертируем в C структуру
+        return cpp_column.to_c();
     }
 
     auto

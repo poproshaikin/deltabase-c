@@ -1,30 +1,31 @@
 #include "include/engine.hpp"
+#include "../executor/include/executor.hpp"
 #include "../executor/include/semantic_analyzer.hpp"
 #include "../sql/include/lexer.hpp"
 #include "../sql/include/parser.hpp"
+
 #include <chrono>
 #include <iostream>
 
 namespace engine {
     DltEngine::DltEngine(EngineConfig cfg)
-        : cfg_(cfg), registry_(), router_(registry_, cfg),
-          semantic_analyzer_(registry_, cfg) {
+        : cfg_(cfg), registry_(cfg), semantic_analyzer_(registry_, cfg), 
+          executor_(cfg, registry_), planner_(cfg, registry_) {
     }
 
-    auto
-    DltEngine::execute(const sql::AstNode& node) -> exe::IntOrDataTable {
-        exe::AnalysisResult analysis_result = semantic_analyzer_.analyze(node);
-        if (!analysis_result.is_valid) {
+    exe::QueryPlanExecutionResult
+    DltEngine::execute(const sql::AstNode& node) {
+        auto analysis = semantic_analyzer_.analyze(node);
+        if (!analysis.is_valid) {
             std::cerr << "Execution failed at the analyzation phase" << std::endl;
-            throw analysis_result.err.value();
+            throw analysis.err.value();
         }
-
-        return router_.route_and_execute(node, analysis_result);
+        
+        return executor_.execute_plan(planner_.create_plan(node));
     }
 
-    auto
-    DltEngine::run_query(const std::string& sql) -> ExecutionResult {
-        auto start = std::chrono::high_resolution_clock::now();
+    std::unique_ptr<sql::AstNode>
+    DltEngine::build_ast(const std::string& sql) {
         std::vector<sql::SqlToken> tokens;
 
         try {
@@ -44,12 +45,20 @@ namespace engine {
             throw;
         }
 
-        exe::IntOrDataTable result = execute(*node);
+        return node;
+    }
+
+    ExecutionResult
+    DltEngine::run_query(const std::string& sql) {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        auto tree = build_ast(sql);
+        auto result = execute(*tree);
 
         auto end = std::chrono::high_resolution_clock::now();
         auto duration_ns =
             std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-        return {std::move(result), duration_ns};
+        return ExecutionResult(std::move(result), duration_ns);
     }
 } // namespace engine

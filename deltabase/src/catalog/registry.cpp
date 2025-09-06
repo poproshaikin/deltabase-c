@@ -1,8 +1,9 @@
 #include "include/registry.hpp"
+#include "../../sql/include/lexer.hpp"
 
 #include <stdexcept>
-#include <iostream>
 #include <format>
+#include <ranges>
 
 extern "C" {
 #include "../../core/include/core.h"
@@ -215,6 +216,11 @@ namespace catalog {
     }
 
     bool
+    MetaRegistry::has_table(const sql::TableIdentifier& identifier) const {
+        return has_table(identifier.table_name.value, identifier.schema_name.value().value);
+    };
+
+    bool
     MetaRegistry::has_table(const std::string& table_name) const noexcept {
         for (const auto& table : tables_) {
             if (table.second.name == table_name && schemas_.contains(table.second.schema_id)) {
@@ -296,6 +302,50 @@ namespace catalog {
         return false;
     }
 
+    bool
+    MetaRegistry::has_virtual_table(const sql::TableIdentifier& identifier) const {
+        return has_virtual_table(identifier.table_name.value, identifier.schema_name.value().value);
+    }
+
+    bool
+    MetaRegistry::has_virtual_table(
+        const std::string& table_name, const std::string& schema_name
+    ) const {
+        if (schema_name == "information_schema") {
+
+            if (table_name == "tables" ||
+                table_name == "columns") {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    CppMetaTable
+    MetaRegistry::get_virtual_table(const sql::TableIdentifier& identifier) const {
+        return get_virtual_table(identifier.table_name.value, identifier.schema_name.value().value);
+    }
+
+    CppMetaTable
+    MetaRegistry::get_virtual_table(const std::string& table_name, const std::string& schema_name) const {
+        if (schema_name == "information_schema") {
+            if (table_name == "tables") {
+                return get_information_schema_tables_meta();
+            }
+            if (table_name == "columns") {
+                return get_information_schema_columns_meta();
+            }
+        }
+
+        throw std::runtime_error("Failed to get virtual table " + table_name);
+    }
+
+    const CppMetaTable&
+    MetaRegistry::get_table(const sql::TableIdentifier& identifier) const {
+        return get_table(identifier.table_name.value, identifier.schema_name.value().value);
+    }
+
     const CppMetaTable&
     MetaRegistry::get_table(const std::string& table_name) const {
         return get_table(table_name, cfg_.default_schema);
@@ -374,6 +424,11 @@ namespace catalog {
         }
 
         throw std::runtime_error("In get_schema: failed to get schema '" + schema_name + "'");
+    }
+    
+    const CppMetaSchema&
+    MetaRegistry::get_schema_by_id(const std::string& id) const {
+        return schemas_.at(id);
     }
 
     void
@@ -595,5 +650,97 @@ namespace catalog {
         }
 
         CppMetaSchema::cleanup_c(c_schema);
+    }
+
+    CppMetaTable
+    MetaRegistry::get_information_schema_tables_meta() {
+        CppMetaTable result("tables", "information_schema");
+
+        result.columns.reserve(3);
+        result.columns.emplace_back("id", DT_STRING, CF_NONE, result.id);
+        result.columns.emplace_back("name", DT_STRING, CF_NONE, result.id);
+        result.columns.emplace_back("last_rid", DT_INTEGER, CF_NONE, result.id);
+
+        return result;
+    }
+
+    CppMetaTable
+    MetaRegistry::get_information_schema_columns_meta() {
+        CppMetaTable result("columns", "information_schema");
+
+        result.columns.reserve(3);
+        result.columns.emplace_back("id", DT_STRING, CF_NONE, result.id);
+        result.columns.emplace_back("name", DT_STRING, CF_NONE, result.id);
+        result.columns.emplace_back("data_type", DT_STRING, CF_NONE, result.id);
+
+        return result;
+    }
+
+    CppDataTable
+    MetaRegistry::get_information_schema_tables_data() {
+        auto schema = get_information_schema_tables_meta();
+        auto tables = this->get_all_tables();
+        catalog::CppDataTable result(schema);
+
+        for (uint64_t i = 0; i < tables.size(); i++) {
+            const auto& table = tables[i];
+            std::string id_str = table.name + "_schema";
+            std::string table_name = table.name;
+            std::string last_rid_str = "0"; // TODO: get actual last row id
+
+            result.add_row(CppDataRow(i, { 
+                CppDataToken(id_str.length(), const_cast<char*>(id_str.c_str()), DT_STRING),
+                CppDataToken(table_name.length(), const_cast<char*>(table_name.c_str()), DT_STRING), 
+                CppDataToken(last_rid_str.length(), const_cast<char*>(last_rid_str.c_str()), DT_STRING), 
+            }));
+        }
+        
+        return result;
+    }
+
+    CppDataTable
+    MetaRegistry::get_information_schema_columns_data() {
+        auto schema = get_information_schema_columns_meta();
+        auto columns = get_all_columns();
+        catalog::CppDataTable result(schema);
+
+        for (uint64_t i = 0; i < columns.size(); i++) {
+            const auto& col = columns[i];
+            std::string id_str = col.name + "_schema";
+            std::string col_name = col.name;
+            std::string data_type = sql::utils::get_data_type_str(col.data_type);
+
+            result.add_row(CppDataRow(i, {
+                CppDataToken(id_str.length(), const_cast<char*>(id_str.c_str()), DT_STRING),
+                CppDataToken(col_name.length(), const_cast<char*>(col_name.c_str()), DT_STRING),
+                CppDataToken(data_type.length(), const_cast<char*>(data_type.c_str()), DT_STRING),
+            }));
+        }
+
+        return result;
+    }
+
+    std::vector<CppMetaTable>
+    MetaRegistry::get_all_tables() const {
+        std::vector<CppMetaTable> result;   
+        result.reserve(tables_.size());
+
+        for (const auto& t : tables_ | std::views::values) {
+            result.push_back(t);
+        }
+
+        return result;
+    }
+
+    std::vector<CppMetaColumn>
+    MetaRegistry::get_all_columns() const {
+        std::vector<CppMetaColumn> result;
+        result.reserve(columns_.size());
+
+        for (const auto& c : columns_ | std::views::values) {
+            result.push_back(c);
+        }
+
+        return result;
     }
 } // namespace catalog

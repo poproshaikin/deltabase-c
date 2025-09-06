@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "../../sql/include/parser.hpp"
+#include "../../catalog/include/data_object.hpp"
 
 extern "C" {
 #include "../../core/include/data.h"
@@ -21,7 +22,7 @@ namespace converter {
     parse_filter_op(sql::AstOperator op) -> FilterOp;
 
     auto
-    convert_binary_to_filter(const sql::BinaryExpr& where, const MetaTable& table) -> DataFilter;
+    convert_binary_to_filter(const sql::BinaryExpr& where, const MetaTable& table) -> catalog::CppDataFilter;
 
     auto
     convert_def_to_mc(const sql::ColumnDefinition& def) -> MetaColumn;

@@ -2,7 +2,8 @@
 #define SEMANTIC_ANALYZER_HPP
 
 #include "../../sql/include/parser.hpp"
-#include "../../catalog/include/meta_registry.hpp"
+#include "../../catalog/include/registry.hpp"
+#include "../../catalog/include/meta_object.hpp"
 #include "../../engine/include/config.hpp"
 #include <optional>
 #include <set>
@@ -61,25 +62,25 @@ namespace exe {
         std::string def_schema_;
 
         auto
-        analyze_select(const sql::SelectStatement& stmt) -> AnalysisResult;
+        analyze_select(sql::SelectStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_insert(const sql::InsertStatement& stmt) -> AnalysisResult;
+        analyze_insert(sql::InsertStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_update(const sql::UpdateStatement& stmt) -> AnalysisResult;
+        analyze_update(sql::UpdateStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_delete(const sql::DeleteStatement& stmt) -> AnalysisResult;
+        analyze_delete(sql::DeleteStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_create_table(const sql::CreateTableStatement& stmt) -> AnalysisResult;
+        analyze_create_table(sql::CreateTableStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_create_db(const sql::CreateDbStatement& stmt) -> AnalysisResult;
+        analyze_create_db(sql::CreateDbStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_create_schema(const sql::CreateSchemaStatement& stmt) -> AnalysisResult;
+        analyze_create_schema(sql::CreateSchemaStatement& stmt) -> AnalysisResult;
 
         auto
         analyze_where(const std::unique_ptr<sql::AstNode>& where, const catalog::CppMetaTable& table) -> AnalysisResult;
@@ -108,7 +109,7 @@ namespace exe {
         SemanticAnalyzer(catalog::MetaRegistry& registry, engine::EngineConfig cfg);
 
         auto
-        analyze(const sql::AstNode& ast) -> AnalysisResult;
+        analyze(sql::AstNode& ast) -> AnalysisResult;
     };
 }; // namespace exe
 

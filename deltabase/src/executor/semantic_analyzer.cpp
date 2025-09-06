@@ -37,7 +37,7 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze(const sql::AstNode& ast) -> AnalysisResult {
+    SemanticAnalyzer::analyze(sql::AstNode& ast) -> AnalysisResult {
         switch (ast.type) {
         case sql::AstNodeType::SELECT:
             return analyze_select(std::get<sql::SelectStatement>(ast.value));
@@ -66,29 +66,29 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze_select(const sql::SelectStatement& stmt) -> AnalysisResult {
-        auto normalized_table = normalize_table_identifier(stmt.table);
+    SemanticAnalyzer::analyze_select(sql::SelectStatement& stmt) -> AnalysisResult {
+        stmt.table = normalize_table_identifier(stmt.table);
 
-        if (normalized_table.table_name.value.empty()) {
+        if (stmt.table.table_name.value.empty()) {
             return std::runtime_error("Select statement missing target table");
         }
 
-        if (!registry_.has_table(normalized_table) &&
-            !registry_.has_virtual_table(normalized_table)) {
-            return TableDoesntExist(normalized_table.table_name.value);
+        if (!registry_.has_table(stmt.table) &&
+            !registry_.has_virtual_table(stmt.table)) {
+            return TableDoesntExist(stmt.table.table_name.value);
         }
 
         std::unique_ptr<catalog::CppMetaTable> table;
-        if (catalog::is_table_virtual(stmt.table)) {
+        if (registry_.has_virtual_table(stmt.table)) {
 
-            std::cout << normalized_table.table_name.value << std::endl;
-            std::cout << normalized_table.schema_name.value().value << std::endl;
+            std::cout << stmt.table.table_name.value << std::endl;
+            std::cout << stmt.table.schema_name.value().value << std::endl;
             table = std::make_unique<catalog::CppMetaTable>(
-                registry_.get_virtual_table(normalized_table)
+                registry_.get_virtual_table(stmt.table)
             );
         } else {
             table = std::make_unique<catalog::CppMetaTable>(
-                registry_.get_table(normalized_table.table_name.value)
+                registry_.get_table(stmt.table)
             );
         }
 

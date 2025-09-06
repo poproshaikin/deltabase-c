@@ -1,7 +1,9 @@
 #pragma once
 
+#include "data_object.hpp"
 #include "meta_object.hpp"
 #include "../../engine/include/config.hpp"
+#include "../../sql/include/parser.hpp"
 
 #include <unordered_map>
 #include <ctime>
@@ -66,6 +68,22 @@ namespace catalog {
         void 
         upload_schema(const CppMetaSchema& schema);
 
+        std::vector<CppMetaTable> 
+        get_all_tables() const;
+
+        std::vector<CppMetaColumn>
+        get_all_columns() const;
+
+        static CppMetaTable
+        get_information_schema_tables_meta();
+        static CppMetaTable
+        get_information_schema_columns_meta();
+
+        CppDataTable
+        get_information_schema_tables_data();
+        CppDataTable
+        get_information_schema_columns_data();
+
     public:
         MetaRegistry(engine::EngineConfig cfg);
         void
@@ -79,22 +97,39 @@ namespace catalog {
         bool
         has_table(const std::string& table_name, const std::string& schema_name) const;
         bool
+        has_table(const sql::TableIdentifier& identifer) const;
+        bool
         has_column(const std::string& column_name, const std::string& table_name) const;
         bool
         has_column(const std::string& column_name, const std::string& table_name, const std::string& schema_name) const;
         bool 
         has_schema(const std::string& schema_name) const noexcept;
 
+        bool
+        has_virtual_table(const std::string& table_name, const std::string& schema_name) const;
+        bool
+        has_virtual_table(const sql::TableIdentifier& identifier) const;
+
         const CppMetaTable&
         get_table(const std::string& table_name) const;
         const CppMetaTable&
         get_table(const std::string& table_name, const std::string& schema_name) const;
+        const CppMetaTable&
+        get_table(const sql::TableIdentifier& identifier) const;
         const CppMetaColumn&
         get_column(const std::string& column_name, const std::string& table_name) const;
         const CppMetaColumn&
         get_column(const std::string& column_name, const std::string& table_name, const std::string& schema_name) const;
         const CppMetaSchema& 
         get_schema(const std::string& schema_name) const;
+
+        CppMetaTable
+        get_virtual_table(const std::string& table_name, const std::string& schema_name) const;
+        CppMetaTable
+        get_virtual_table(const sql::TableIdentifier& identifier) const;
+        
+        const CppMetaSchema&
+        get_schema_by_id(const std::string& id) const;
 
         void
         add_table(const CppMetaTable& table);
