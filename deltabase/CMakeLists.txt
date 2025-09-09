@@ -66,7 +66,6 @@ add_cpp_module(cli)
 add_cpp_module(catalog)
 add_cpp_module(converter)
 add_cpp_module(engine)
-add_cpp_module(scheduler)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
@@ -77,7 +76,7 @@ file(GLOB_RECURSE TESTS_SRC
 
 add_executable(test.exe ${TESTS_SRC})
 target_link_libraries(test.exe 
-    core
+    storage
     misc
     sql
     executor
@@ -86,13 +85,12 @@ target_link_libraries(test.exe
     catalog
     converter
     engine
-    scheduler
 )
 
 # --- main ---
 add_executable(main.exe main.cpp)
 target_link_libraries(main.exe 
-    core
+    storage
     misc
     sql
     executor
@@ -101,5 +99,4 @@ target_link_libraries(main.exe
     catalog
     converter
     engine
-    scheduler
 )
