@@ -1,16 +1,11 @@
-#ifndef SEMANTIC_ANALYZER_HPP
-#define SEMANTIC_ANALYZER_HPP
+#pragma once
 
-#include "../../sql/include/parser.hpp"
+#include "../../storage/include/storage.hpp"
 #include "../../catalog/include/meta_registry.hpp"
 #include "../../engine/include/config.hpp"
 #include <optional>
 #include <set>
 #include <utility>
-
-extern "C" {
-#include "../../core/include/meta.h"
-}
 
 namespace exe {
     inline auto
@@ -111,5 +106,3 @@ namespace exe {
         analyze(const sql::AstNode& ast) -> AnalysisResult;
     };
 }; // namespace exe
-
-#endif

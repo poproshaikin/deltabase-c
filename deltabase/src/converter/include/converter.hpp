@@ -4,37 +4,30 @@
 #include <utility>
 
 #include "../../sql/include/parser.hpp"
-
-extern "C" {
-#include "../../core/include/data.h"
-#include "../../core/include/meta.h"
-}
+#include "../../storage/include/storage.hpp"
 
 namespace converter {
-    auto
-    convert_str_to_literal(const std::string& literal, DataType expected_type) -> std::pair<void*, std::size_t>;
+    std::vector<std::byte>
+    convert_str_to_literal(const std::string& literal, storage::ValueType expected_type);
 
     auto
-    convert_astnode_to_token(const sql::AstNode* node, DataType expected_type) -> DataToken;
+    convert_astnode_to_token(const sql::AstNode* node, storage::ValueType expected_type) -> storage::DataToken;
 
     auto
-    parse_filter_op(sql::AstOperator op) -> FilterOp;
+    parse_filter_op(sql::AstOperator op) -> storage::FilterOp;
 
     auto
-    convert_binary_to_filter(const sql::BinaryExpr& where, const MetaTable& table) -> DataFilter;
+    convert_binary_to_filter(const sql::BinaryExpr& where, const storage::MetaTable& table) -> storage::DataFilter;
 
     auto
-    convert_def_to_mc(const sql::ColumnDefinition& def) -> MetaColumn;
+    convert_defs_to_mcs(std::vector<sql::ColumnDefinition> defs) -> std::vector<storage::MetaColumn>;
 
     auto
-    convert_defs_to_mcs(std::vector<sql::ColumnDefinition> defs) -> std::vector<MetaColumn>;
+    convert_kw_to_vt(const sql::SqlKeyword& kw) -> storage::ValueType;
 
     auto
-    convert_kw_to_dt(const sql::SqlKeyword& kw) -> DataType;
+    convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints) -> storage::MetaColumnFlags;
 
     auto
-    convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints) -> DataColumnFlags;
-
-    auto
-    get_data_type_kw(DataType dt) -> sql::SqlKeyword;
+    get_data_type_kw(storage::ValueType dt) -> sql::SqlKeyword;
 } // namespace converter

@@ -7,10 +7,7 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
-
-extern "C" {
-#include "../../core/include/meta.h"
-}
+#include "../../storage/include/objects/meta_object.hpp"
 
 namespace sql {
     enum class SqlTokenType {
@@ -229,12 +226,12 @@ namespace sql {
                  size_t position,
                  SqlTokenDetail detail = std::monostate());
 
-        [[nodiscard]] auto
-        is_data_type() const -> bool;
-        [[nodiscard]] auto
-        is_constraint() const -> bool;
-        [[nodiscard]] auto
-        is_keyword() const -> bool;
+        [[nodiscard]] bool
+        is_data_type() const;
+        [[nodiscard]] bool
+        is_constraint() const;
+        [[nodiscard]] bool
+        is_keyword() const;
 
         template <typename TDetail>
         auto
@@ -248,7 +245,6 @@ namespace sql {
         }
     };
 
-    // Template definition must be in header
     template <typename TDetail>
     auto
     SqlToken::get_detail() const -> TDetail {
@@ -264,7 +260,7 @@ namespace sql {
     }
 
     class SqlTokenizer {
-      public:
+    public:
         auto
         tokenize(const std::string& raw_sql) -> std::vector<SqlToken>;
     };
@@ -282,9 +278,9 @@ namespace sql {
         to_string(sql::SqlLiteral type, const std::string& value) -> std::string;
 
         auto
-        get_data_type_str(DataType dt) -> std::string;
+        get_data_type_str(storage::ValueType vt) -> std::string;
 
-        } // namespace utils
+    } // namespace utils
 } // namespace sql
 
 #endif

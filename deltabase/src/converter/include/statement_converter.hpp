@@ -1,22 +1,18 @@
 #pragma once
 
 #include "../../sql/include/parser.hpp"
+#include "../../storage/include/storage.hpp"
 
-extern "C" {
-#include "../../core/include/data.h"
-#include "../../core/include/meta.h"
-#include "../../core/include/misc.h"
-}
 
 namespace converter {
 
     auto
-    convert_create_table_to_mt(const sql::CreateTableStatement& stmt) -> MetaTable;
+    convert_create_table_to_mt(const sql::CreateTableStatement& stmt) -> storage::MetaTable;
 
     auto
-    create_row_update(const MetaTable& table, const sql::UpdateStatement& query) -> DataRowUpdate;
+    create_row_update(const storage::MetaTable& table, const sql::UpdateStatement& query) -> storage::DataRowUpdate;
 
     auto
-    convert_insert_to_data_row(const MetaTable& table, const sql::InsertStatement& insert) -> DataRow;
+    convert_insert_to_data_row(const storage::MetaTable& table, const sql::InsertStatement& insert) -> storage::DataRow;
 
 } // namespace converter

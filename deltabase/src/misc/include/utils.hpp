@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <uuid/uuid.h>
 
 auto
 split(const std::string& s, char delimiter, int count = 0) -> std::vector<std::string>;
@@ -80,5 +81,14 @@ make_c_ptr_arr(const std::vector<T>& vec) -> T** {
 
 void
 print_ram_usage();
+
+std::string
+make_uuid_str();
+
+std::string
+make_uuid_str(const uuid_t uuid);
+
+void
+parse_uuid_str(const std::string& str, uuid_t uuid);
 
 #endif
