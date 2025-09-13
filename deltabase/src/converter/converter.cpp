@@ -94,7 +94,7 @@ namespace converter {
             throw std::runtime_error("Column doesn't exist");
         }
         storage::MetaColumn column = table.get_column(column_name);
-        storage::literal literal = convert_str_to_literal(right.value, column.type);
+        storage::bytes_arr literal = convert_str_to_literal(right.value, column.type);
 
         storage::DataFilterCondition condition;
         condition.op = parse_filter_op(where.op);

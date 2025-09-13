@@ -25,18 +25,15 @@ namespace exe {
     QueryPlan
     QueryPlanner::create_plan(const sql::SelectStatement& stmt) {
 
-        exe::SeqScanAction action;
+        exe::SeqScanAction action{
+            storage_.get_table(stmt.table)
+        };
+
         action.columns.reserve(stmt.columns.size());
-        
+
         for (const auto& col_token : stmt.columns) {
             action.columns.push_back(col_token.value);
         }
-
-        std::string schema_name = stmt.table.schema_name.has_value()
-                                      ? stmt.table.schema_name.value().value
-                                      : cfg_.default_schema;
-
-        action.table = storage_.get_table(stmt.table.table_name.value, schema_name);
 
         if (stmt.where) {
             action.filter = converter::convert_binary_to_filter(
@@ -53,13 +50,11 @@ namespace exe {
                                       ? stmt.table.schema_name.value().value
                                       : cfg_.default_schema;
 
-        auto table = storage_.get_table(stmt.table.table_name.value, schema_name);
-        auto schema = storage_.get_schema_by_id(table.schema_id);
-        
-        exe::InsertAction action;
-        action.table = table;
-        action.schema = schema;
-        
+        auto& table = storage_.get_table(stmt.table.table_name.value, schema_name);
+        auto& schema = storage_.get_schema_by_id(table.schema_id);
+
+        exe::InsertAction action{.table = table, .schema = schema};
+
         storage::DataRow row;
         row.tokens.reserve(stmt.values.size());
         
@@ -67,7 +62,7 @@ namespace exe {
             const auto& column = table.get_column(stmt.columns[i].value);
             const auto& value = stmt.values[i].value;
             
-            storage::literal literal = converter::convert_str_to_literal(value, column.type);
+            storage::bytes_arr literal = converter::convert_str_to_literal(value, column.type);
             storage::DataToken token(literal, column.type);
             row.tokens.push_back(std::move(token));
         } 
@@ -82,15 +77,10 @@ namespace exe {
                                       ? stmt.table.schema_name.value().value
                                       : cfg_.default_schema;
 
-        auto table = storage_.get_table(stmt.table.table_name.value, schema_name);
-        auto schema = storage_.get_schema_by_id(table.schema_id);
-        
-        auto row_update = converter::create_row_update(table, stmt);
-        
         exe::UpdateByFilterAction action{
-            .table = table,
-            .schema = schema,
-            .row_update = row_update
+            .table = storage_.get_table(stmt.table.table_name.value, schema_name),
+            .schema = storage_.get_schema_by_id(action.table.schema_id),
+            .row_update = converter::create_row_update(action.table, stmt)
         };
 
         if (stmt.where) {
@@ -108,10 +98,13 @@ namespace exe {
                                       ? stmt.table.schema_name.value().value
                                       : cfg_.default_schema;
 
-        exe::DeleteByFilterAction action;
-        action.table  = storage_.get_table(stmt.table.table_name.value, schema_name);
-        action.schema = storage_.get_schema_by_id(action.table.schema_id);
-        
+        auto& table = storage_.get_table(stmt.table.table_name.value, schema_name);
+
+        exe::DeleteByFilterAction action {
+            .schema = storage_.get_schema_by_id(table.schema_id),
+            .table = table
+        };
+
         if (stmt.where) {
             action.filter = converter::convert_binary_to_filter(
                 std::get<sql::BinaryExpr>(stmt.where->value), action.table
@@ -123,16 +116,11 @@ namespace exe {
 
     QueryPlan
     QueryPlanner::create_plan(const sql::CreateTableStatement& stmt) {
-        std::string schema_name = stmt.table.schema_name.has_value()
-                                      ? stmt.table.schema_name.value().value
-                                      : cfg_.default_schema;
+        auto& schema = storage_.get_schema(stmt.table);
 
-        exe::CreateTableAction action;
-        action.schema = storage_.get_schema(schema_name);
-        
         storage::MetaTable table;
         table.name = stmt.table.table_name.value;
-        table.schema_id = action.schema.id;
+        table.schema_id = schema.id;
         table.columns.reserve(stmt.columns.size());
         
         for (const auto& col_def : stmt.columns) {
@@ -143,21 +131,19 @@ namespace exe {
             column.flags = converter::convert_tokens_to_cfs(col_def.constraints);
             table.columns.push_back(std::move(column));
         }
-        
-        action.table = std::move(table);
-        return SingleActionPlan{std::move(action)};
+
+        return SingleActionPlan{exe::CreateTableAction{
+            .schema = schema,
+            .table = table,
+        }};
     }
 
     QueryPlan
     QueryPlanner::create_plan(const sql::CreateSchemaStatement& stmt) {
-
         storage::MetaSchema schema;
         schema.name = stmt.name.value;
 
-        exe::CreateSchemaAction action;
-        action.schema = std::move(schema);
-
-        return SingleActionPlan{std::move(action)};
+        return SingleActionPlan{exe::CreateSchemaAction{schema}};
     }
 
     QueryPlan

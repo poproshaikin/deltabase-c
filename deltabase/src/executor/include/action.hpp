@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../../storage/include/storage.hpp"
+#include "../../storage/include/objects/meta_object.hpp"
+#include "../../storage/include/objects/data_object.hpp"
 
 #include <optional>
 
@@ -8,37 +9,39 @@ namespace exe {
     using IntOrDataTable = std::variant<size_t, std::unique_ptr<storage::DataTable>>;
 
     struct SeqScanAction {
-        storage::MetaTable table;
+        storage::MetaTable& table;
         std::vector<std::string> columns;
         std::optional<storage::DataFilter> filter;
+
+        SeqScanAction(const storage::MetaTable& table);
     };
 
     struct InsertAction {
-        storage::MetaTable table;
-        storage::MetaSchema schema;
+        storage::MetaTable& table;
+        storage::MetaSchema& schema;
         storage::DataRow row;
     };
 
     struct UpdateByFilterAction {
-        storage::MetaTable table;
-        storage::MetaSchema schema;
+        storage::MetaTable& table;
+        storage::MetaSchema& schema;
         storage::DataRowUpdate row_update;
         std::optional<storage::DataFilter> filter;
     };
 
     struct DeleteByFilterAction {
-        storage::MetaSchema schema;
-        storage::MetaTable table;
+        storage::MetaSchema& schema;
+        storage::MetaTable& table;
         std::optional<storage::DataFilter> filter;
     };
 
     struct CreateTableAction {
-        storage::MetaSchema schema;
-        storage::MetaTable table;
+        storage::MetaSchema& schema;
+        storage::MetaTable& table;
     };
 
     struct CreateSchemaAction {
-        storage::MetaSchema schema;
+        storage::MetaSchema& schema;
     };
 
     struct CreateDatabaseAction {
@@ -46,11 +49,11 @@ namespace exe {
     };
 
     struct WriteMetaTableAction {
-        storage::MetaTable table;
+        storage::MetaTable& table;
     };
 
     struct WriteMetaSchemaAction {
-        storage::MetaSchema schema;
+        storage::MetaSchema& schema;
     };
 
     using Action = std::variant<

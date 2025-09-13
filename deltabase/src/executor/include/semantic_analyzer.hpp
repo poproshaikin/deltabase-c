@@ -1,29 +1,27 @@
 #pragma once
 
 #include "../../storage/include/storage.hpp"
-#include "../../catalog/include/meta_registry.hpp"
 #include "../../engine/include/config.hpp"
 #include <optional>
 #include <set>
-#include <utility>
 
 namespace exe {
     inline auto
-    get_compatibility_table() -> const std::set<std::pair<sql::SqlLiteral, DataType>>& {
-        static std::set<std::pair<sql::SqlLiteral, DataType>> map = {
-            {sql::SqlLiteral::STRING, DT_STRING},
-            {sql::SqlLiteral::INTEGER, DT_INTEGER},
-            {sql::SqlLiteral::INTEGER, DT_REAL},
-            {sql::SqlLiteral::REAL, DT_REAL},
-            {sql::SqlLiteral::CHAR, DT_CHAR},
-            {sql::SqlLiteral::CHAR, DT_STRING},
-            {sql::SqlLiteral::BOOL, DT_BOOL},
+    get_compatibility_table() -> const std::set<std::pair<sql::SqlLiteral, storage::ValueType>>& {
+        static std::set<std::pair<sql::SqlLiteral, storage::ValueType>> map = {
+            {sql::SqlLiteral::STRING, storage::ValueType::STRING},
+            {sql::SqlLiteral::INTEGER, storage::ValueType::INTEGER},
+            {sql::SqlLiteral::INTEGER, storage::ValueType::REAL},
+            {sql::SqlLiteral::REAL, storage::ValueType::REAL},
+            {sql::SqlLiteral::CHAR, storage::ValueType::CHAR},
+            {sql::SqlLiteral::CHAR, storage::ValueType::STRING},
+            {sql::SqlLiteral::BOOL, storage::ValueType::BOOL},
         };
         return map;
     }
 
     inline auto
-    is_literal_assignable_to(sql::SqlLiteral literal_type, DataType column_type) -> bool {
+    is_literal_assignable_to(sql::SqlLiteral literal_type, storage::ValueType column_type) -> bool {
         return get_compatibility_table().count(std::make_pair(literal_type, column_type)) > 0;
     }
 
@@ -51,44 +49,44 @@ namespace exe {
     };
 
     class SemanticAnalyzer {
-        catalog::MetaRegistry& registry_;
+        storage::Storage& storage_;
         std::optional<std::string> db_name_;
         std::string def_schema_;
 
         auto
-        analyze_select(const sql::SelectStatement& stmt) -> AnalysisResult;
+        analyze_select(sql::SelectStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_insert(const sql::InsertStatement& stmt) -> AnalysisResult;
+        analyze_insert(sql::InsertStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_update(const sql::UpdateStatement& stmt) -> AnalysisResult;
+        analyze_update(sql::UpdateStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_delete(const sql::DeleteStatement& stmt) -> AnalysisResult;
+        analyze_delete(sql::DeleteStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_create_table(const sql::CreateTableStatement& stmt) -> AnalysisResult;
+        analyze_create_table(sql::CreateTableStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_create_db(const sql::CreateDbStatement& stmt) -> AnalysisResult;
+        analyze_create_db(sql::CreateDbStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_create_schema(const sql::CreateSchemaStatement& stmt) -> AnalysisResult;
+        analyze_create_schema(sql::CreateSchemaStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_where(const std::unique_ptr<sql::AstNode>& where, const catalog::CppMetaTable& table) -> AnalysisResult;
+        analyze_where(std::unique_ptr<sql::AstNode>& where, const storage::MetaTable& table) -> AnalysisResult;
 
         auto
         validate_column_comparison(
             const std::unique_ptr<sql::AstNode>& left,
             const std::unique_ptr<sql::AstNode>& right,
-            const catalog::CppMetaTable& table
+            const storage::MetaTable& table
         ) -> AnalysisResult;
 
         auto
         validate_column_assignment(
-            const sql::AstNode& assignment, const catalog::CppMetaTable& table
+            const sql::AstNode& assignment, const storage::MetaTable& table
         ) -> AnalysisResult;
 
         void
@@ -98,11 +96,11 @@ namespace exe {
         ensure_db_exists(const std::string& name);
 
       public:
-        SemanticAnalyzer(catalog::MetaRegistry& registry);
-        SemanticAnalyzer(catalog::MetaRegistry& registry, std::string db_name);
-        SemanticAnalyzer(catalog::MetaRegistry& registry, engine::EngineConfig cfg);
+        SemanticAnalyzer(storage::Storage& storage);
+        SemanticAnalyzer(storage::Storage& storage, std::string db_name);
+        SemanticAnalyzer(storage::Storage& storage, engine::EngineConfig cfg);
 
         auto
-        analyze(const sql::AstNode& ast) -> AnalysisResult;
+        analyze(sql::AstNode& ast) -> AnalysisResult;
     };
 }; // namespace exe

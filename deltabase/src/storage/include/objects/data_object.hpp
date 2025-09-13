@@ -1,27 +1,31 @@
 #pragma once
 
 #include <memory>
+#include <type_traits>
 #include <variant>
 
+#include "../shared.hpp"
 #include "meta_object.hpp"
 
 namespace storage {
-    namespace detail {
-        class FileDeleter {
-            void operator()(void* ptr) {
-                std::free(ptr);
-            }
-        };
-    }
-
-    using unique_void_ptr = std::unique_ptr<void, detail::FileDeleter>;
     using assignment = std::pair<MetaColumn, unique_void_ptr>;
-    using literal = std::vector<std::byte>;
 
     enum class DataRowFlags {
         NONE = 0,
         OBSOLETE = 1 << 0
     };
+
+    DataRowFlags operator|(DataRowFlags left, DataRowFlags right) {
+        using T = std::underlying_type_t<DataRowFlags>;
+        return static_cast<DataRowFlags>(static_cast<T>(left) | static_cast<T>(right));
+    }      
+
+    DataRowFlags operator|=(DataRowFlags& left, DataRowFlags right) {
+        using T = std::underlying_type_t<DataRowFlags>;
+        auto value = static_cast<DataRowFlags>(static_cast<T>(left) | static_cast<T>(right));
+        left = value;
+        return value;
+    } 
 
     enum class FilterOp {
         EQ = 1,
@@ -38,16 +42,39 @@ namespace storage {
     };
 
     struct DataToken {
-        literal bytes;
+        bytes_arr bytes;
         ValueType type;
 
-        DataToken(literal bytes, ValueType type);
+        DataToken(bytes_arr bytes, ValueType type);
+
+        uint64_t
+        estimate_size() const;
+
+        bytes_arr
+        serialize() const;
+    };
+
+    using RowId = uint64_t;
+
+    struct DataRowUpdate {
+        MetaTable table;
+        std::vector<assignment> assignments;
     };
 
     struct DataRow {
+        // initialize only in the storage
         uint64_t row_id;
         DataRowFlags flags;
         std::vector<DataToken> tokens;  
+
+        uint64_t
+        estimate_size() const;
+
+        bytes_arr 
+        serialize() const;
+
+        DataRow 
+        update(const DataRowUpdate& update) const;
     };
 
     struct DataTable {
@@ -59,7 +86,7 @@ namespace storage {
         std::string column_id;
         FilterOp op;
         ValueType type;
-        literal data;
+        bytes_arr data;
     };
 
     struct DataFilter;
@@ -72,10 +99,5 @@ namespace storage {
 
     struct DataFilter {
         std::variant<DataFilterCondition, DataFilterNode> value;
-    };
-
-    struct DataRowUpdate {
-        MetaTable table;
-        std::vector<assignment> assignments;
     };
 }

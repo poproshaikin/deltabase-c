@@ -1,5 +1,4 @@
-#ifndef SQL_LEXER_HPP
-#define SQL_LEXER_HPP
+#pragma once
 
 #include <cstddef>
 #include <stdexcept>
@@ -7,7 +6,7 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include "../../storage/include/objects/meta_object.hpp"
+#include "../../storage/include/value_type.hpp"
 
 namespace sql {
     enum class SqlTokenType {
@@ -282,5 +281,3 @@ namespace sql {
 
     } // namespace utils
 } // namespace sql
-
-#endif

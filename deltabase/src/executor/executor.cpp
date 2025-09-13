@@ -60,12 +60,9 @@ namespace exe {
             auto result = storage_.seq_scan(action.table, action.columns, action.filter);
             return ActionExecutionResult(std::make_unique<storage::DataTable>(std::move(result)));
         } catch (const std::exception& e) {
-            return ActionExecutionResult(
-                std::make_pair(
-                    std::string("Seq scan execution error: ") + e.what(), 
-                    ActionError::SYSTEM_ERROR
-                )
-            );
+            return {std::make_pair(
+                std::string("Seq scan execution error: ") + e.what(), ActionError::SYSTEM_ERROR
+            )};
         }
     }
 
@@ -124,14 +121,11 @@ namespace exe {
     ActionExecutor::execute_action(const CreateTableAction& action) noexcept {
         try {
             storage_.create_table(action.table);
-            return ActionExecutionResult(0lu);
+            return {0lu};
         } catch (const std::exception& e) {
-            return ActionExecutionResult(
-                std::make_pair(
-                    std::string("Create table execution error: ") + e.what(), 
-                    ActionError::SYSTEM_ERROR
-                )
-            );
+            return {std::make_pair(
+                std::string("Create table execution error: ") + e.what(), ActionError::SYSTEM_ERROR
+            )};
         }
     }
 
@@ -139,14 +133,11 @@ namespace exe {
     ActionExecutor::execute_action(const CreateSchemaAction& action) noexcept {
         try {
             storage_.create_schema(action.schema);
-            return ActionExecutionResult(0lu);
+            return {0lu};
         } catch (const std::exception& e) {
-            return ActionExecutionResult(
-                std::make_pair(
-                    std::string("Create schema execution error: ") + e.what(), 
-                    ActionError::SYSTEM_ERROR
-                )
-            );
+            return {std::make_pair(
+                std::string("Create schema execution error: ") + e.what(), ActionError::SYSTEM_ERROR
+            )};
         }
     }
 
@@ -154,14 +145,12 @@ namespace exe {
     ActionExecutor::execute_action(const CreateDatabaseAction& action) noexcept {
         try {
             storage_.create_database(action.name);
-            return ActionExecutionResult(0lu);
+            return {0lu};
         } catch (const std::exception& e) {
-            return ActionExecutionResult(
-                std::make_pair(
-                    std::string("Create database execution error: ") + e.what(), 
-                    ActionError::SYSTEM_ERROR
-                )
-            );
+            return {std::make_pair(
+                std::string("Create database execution error: ") + e.what(),
+                ActionError::SYSTEM_ERROR
+            )};
         }
     }
 

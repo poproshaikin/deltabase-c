@@ -4,10 +4,11 @@
 #include <vector>
 #include <optional>
 
-#include "meta_object.hpp"
-#include "objects/data_object.hpp"
 #include "objects/meta_object.hpp"
+#include "objects/data_object.hpp"
+
 #include "cache/entity_cache.hpp"
+#include "pages/page_buffers.hpp"
 #include "wal/wal_manager.hpp"
 
 namespace storage {
@@ -18,6 +19,7 @@ namespace storage {
 
         EntityCache<std::string, MetaSchema> schemas_;
         EntityCache<std::string, MetaTable> tables_;
+        PageBuffers page_buffers_;
 
         void
         ensure_fs_initialize();
@@ -33,6 +35,8 @@ namespace storage {
             meta registry будет упрощен, за кеширование будут отвечать специализированные шаблонные классы
             
         */
+        Storage();
+
         // ----- Databases -----
         void
         create_database(const std::string& db_name);
@@ -51,11 +55,13 @@ namespace storage {
         void
         create_schema(const MetaSchema& schema);
 
-        const MetaSchema& 
+        MetaSchema& 
         get_schema(const std::string& schema_name);
-        const MetaSchema& 
+        MetaSchema& 
         get_schema(const std::string& schema_name, const std::string& db_name);
-        const MetaSchema&
+        MetaSchema&
+        get_schema(const sql::TableIdentifier& identifier);
+        MetaSchema&
         get_schema_by_id(const std::string& id);
         
         int
@@ -72,13 +78,23 @@ namespace storage {
         exists_table(const std::string& name);
         bool
         exists_table(const std::string& name, const std::string& db_name);
+        bool
+        exists_table(const sql::TableIdentifier& identifier);
+        bool
+        exists_virtual_table(const sql::TableIdentifier& identifier);
 
-        const MetaTable&
+        MetaTable&
         get_table(const std::string& name);
-        const MetaTable&
+        MetaTable&
         get_table(const std::string& name, const std::string& db_name);
-        const MetaTable&
+        MetaTable&
+        get_table(const sql::TableIdentifier& identifier);
+        MetaTable&
         get_table_by_id(const std::string& id) const;
+        MetaTable&&
+        get_virtual_meta_table(const sql::TableIdentifier& identifier);
+        DataTable
+        get_virtual_data_table(const sql::TableIdentifier& identifier);
 
         void
         update_table(const MetaTable& new_table);
@@ -86,7 +102,7 @@ namespace storage {
         // ----- Data -----       
 
         void
-        insert_row(const MetaTable& table, const DataRow& row);
+        insert_row(MetaTable& table, DataRow row);
 
         uint64_t
         update_rows_by_filter(
