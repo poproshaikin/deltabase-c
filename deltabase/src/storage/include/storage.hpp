@@ -17,9 +17,13 @@ namespace storage {
 
         WalManager wal_;
 
-        EntityCache<std::string, MetaSchema> schemas_;
-        EntityCache<std::string, MetaTable> tables_;
+        EntityCache<std::string, MetaSchema, MetaSchemaAccessor> schemas_;
+        EntityCache<std::string, MetaTable, MetaTableAccessor> tables_;
         PageBuffers page_buffers_;
+
+        // Configuration
+
+        fs::path data_dir_;
 
         void
         ensure_fs_initialize();
@@ -35,7 +39,9 @@ namespace storage {
             meta registry будет упрощен, за кеширование будут отвечать специализированные шаблонные классы
             
         */
+
         Storage();
+        Storage(fs::path data_dir);
 
         // ----- Databases -----
         void

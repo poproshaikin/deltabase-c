@@ -2,6 +2,7 @@
 #include "include/objects/data_object.hpp"
 #include "include/objects/meta_object.hpp"
 
+#include <cstring>
 #include <format>
 
 namespace storage {
@@ -57,10 +58,21 @@ namespace storage {
         throw std::runtime_error(std::format("Row with id {} was not found in DataPage {}", rid, id_));
     }
 
+    bool
+    DataPage::can_insert(const DataRow& row) const noexcept {
+        return size_ + row.estimate_size() <= MAX_SIZE;
+    }
+
     RowId
     DataPage::insert_row(MetaTable& table, DataRow& row) {
+        if (!can_insert(row)) {
+            throw std::runtime_error(std::format("Page {} hasn't enough space for a new row", id_));
+        }
+
         row.row_id = ++table.last_rid;
         rows_.push_back(row);
+        size_ += row.estimate_size();
+
         return row.row_id;
     }
 
@@ -88,4 +100,29 @@ namespace storage {
         return new_row.row_id;
     }
 
+    bytes_v
+    DataPage::serialize() const {
+        bytes_v v;
+        uint64_t header_size = strlen(id_.c_str()) + sizeof(size_) + sizeof(min_rid_) + sizeof(max_rid_);
+        v.reserve(header_size);
+
+        v.insert(v.end(), id_.begin(), id_.end());
+        v.insert(v.end(), &size_, &size_ + sizeof(size_));
+        v.insert(v.end(), &min_rid_, &min_rid_ + sizeof(min_rid_));
+        v.insert(v.end(), &max_rid_, &max_rid_ + sizeof(max_rid_));
+
+        uint64_t rows_size = 0;
+        for (const auto& row : rows_) {
+            rows_size += row.estimate_size();
+        }
+
+        v.reserve(rows_size);
+
+        for (const auto& row : rows_) {
+            auto serialized_row = row.serialize();
+            v.insert(v.end(), serialized_row.begin(), serialized_row.end());
+        }
+
+        return v;
+    }
 }

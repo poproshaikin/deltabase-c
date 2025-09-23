@@ -1,9 +1,19 @@
 #include "include/storage.hpp"
+#include "include/cache/accessors.hpp"
+#include "include/objects/meta_object.hpp"
 
 namespace storage {
+    Storage::Storage() : schemas_(MetaSchemaAccessor()) {
+
+    }
+
+    Storage(fs::path data_dir) {
+
+    }
+
     void
     Storage::create_database(const std::string& db_name) {
-
+        auto path = path_db();
     }
 
     void

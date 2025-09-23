@@ -5,10 +5,12 @@
 
 namespace storage {
     class DataPage {
+        // --- Header ---
         std::string id_;
         uint64_t size_;
         RowId min_rid_;
         RowId max_rid_;
+        // --------------
         
         std::vector<DataRow> rows_;
         bool is_dirty_;
@@ -16,7 +18,13 @@ namespace storage {
     public:
         static constexpr uint64_t MAX_SIZE = 8 * 1024;
 
-        DataPage(const MetaTable& table, bytes_arr bytes);
+        static bool
+        can_deserialize(const bytes_v& bytes);
+        static DataPage
+        deserialize(const bytes_v& bytes);
+
+        DataPage() = default;
+        DataPage(const MetaTable& table, bytes_v bytes);
 
         std::string
         id() const;
@@ -37,6 +45,8 @@ namespace storage {
         const std::vector<DataRow>& 
         rows() const;
 
+        bool
+        can_insert(const DataRow& row) const noexcept;
         RowId
         insert_row(MetaTable& table, DataRow& row);
 
@@ -45,5 +55,7 @@ namespace storage {
 
         void
         delete_row(RowId id);
+
+        bytes_v serialize() const;
     };
 }

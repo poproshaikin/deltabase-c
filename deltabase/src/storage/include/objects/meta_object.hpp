@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 
+#include "../shared.hpp"
 #include "../../../sql/include/parser.hpp"
 
 namespace storage {
@@ -32,6 +33,13 @@ namespace storage {
         MetaSchema();
         MetaSchema(const MetaSchema&) = delete;
         MetaSchema(MetaSchema&&) = default;
+
+        static bool
+        can_deserialize(bytes_v bytes);
+        static MetaSchema
+        deserialize(bytes_v bytes);
+        bytes_v
+        serialize() const;
     };
 
     struct MetaColumn {
@@ -48,6 +56,13 @@ namespace storage {
         MetaColumn(const MetaColumn&) = delete;
         MetaColumn(MetaColumn&&) = default;
         MetaColumn(const std::string& name, ValueType type, MetaColumnFlags flags);
+
+        static bool
+        can_deserialize(bytes_v bytes);
+        static MetaColumn
+        deserialize(bytes_v bytes);
+        bytes_v
+        serialize() const;
     };
 
     struct MetaTable {
@@ -70,5 +85,12 @@ namespace storage {
         
         bool
         compare_content(const MetaTable& other) const;
+
+        static bool
+        can_deserialize(bytes_v bytes);
+        static MetaTable
+        deserialize(bytes_v bytes);
+        bytes_v
+        serialize() const;
     };
 }

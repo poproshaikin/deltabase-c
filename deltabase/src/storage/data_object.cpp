@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 namespace storage {
-    bytes_arr
+    bytes_v
     DataRow::serialize() const {
         auto estimate_rows_size = [this]() -> uint64_t {
             uint64_t size = 0;
@@ -18,22 +18,22 @@ namespace storage {
             return size;
         };
 
-        auto serialize_rows = [this, estimate_rows_size]() -> bytes_arr {
-            bytes_arr v;
+        auto serialize_rows = [this, estimate_rows_size]() -> bytes_v {
+            bytes_v v;
             v.reserve(estimate_rows_size());
             for (const auto& token : tokens) {
-                bytes_arr serialized = token.serialize();
+                bytes_v serialized = token.serialize();
                 v.insert(v.end(), serialized.begin(), serialized.end());
             }
             return v;
         };
 
-        bytes_arr v;
+        bytes_v v;
         v.reserve(sizeof(row_id) + sizeof(flags) + estimate_rows_size());
 
         auto rid_ptr = &row_id;
         auto drf_ptr = reinterpret_cast<const uint64_t*>(&flags);
-        bytes_arr serialized_rows = serialize_rows();
+        bytes_v serialized_rows = serialize_rows();
 
         v.insert(v.end(), rid_ptr, rid_ptr + sizeof(row_id));
         v.insert(v.end(), drf_ptr, drf_ptr + sizeof(flags));
@@ -66,9 +66,9 @@ namespace storage {
         return size;
     }
 
-    bytes_arr
+    bytes_v
     DataToken::serialize() const {
-        bytes_arr v;
+        bytes_v v;
         v.reserve(estimate_size());
 
         auto type_ptr = reinterpret_cast<const uint64_t*>(&type);

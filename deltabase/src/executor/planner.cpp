@@ -62,7 +62,7 @@ namespace exe {
             const auto& column = table.get_column(stmt.columns[i].value);
             const auto& value = stmt.values[i].value;
             
-            storage::bytes_arr literal = converter::convert_str_to_literal(value, column.type);
+            storage::bytes_v literal = converter::convert_str_to_literal(value, column.type);
             storage::DataToken token(literal, column.type);
             row.tokens.push_back(std::move(token));
         } 

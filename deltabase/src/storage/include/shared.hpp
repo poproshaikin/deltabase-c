@@ -12,5 +12,5 @@ namespace storage {
     };
 
     using unique_void_ptr = std::unique_ptr<void, FileDeleter>;
-    using bytes_arr = std::vector<uint8_t>;
+    using bytes_v = std::vector<uint8_t>;
 }

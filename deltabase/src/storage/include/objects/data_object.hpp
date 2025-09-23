@@ -42,15 +42,15 @@ namespace storage {
     };
 
     struct DataToken {
-        bytes_arr bytes;
+        bytes_v bytes;
         ValueType type;
 
-        DataToken(bytes_arr bytes, ValueType type);
+        DataToken(bytes_v bytes, ValueType type);
 
         uint64_t
         estimate_size() const;
 
-        bytes_arr
+        bytes_v
         serialize() const;
     };
 
@@ -70,7 +70,7 @@ namespace storage {
         uint64_t
         estimate_size() const;
 
-        bytes_arr 
+        bytes_v 
         serialize() const;
 
         DataRow 
@@ -86,7 +86,7 @@ namespace storage {
         std::string column_id;
         FilterOp op;
         ValueType type;
-        bytes_arr data;
+        bytes_v data;
     };
 
     struct DataFilter;

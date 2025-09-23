@@ -7,9 +7,9 @@
 
 namespace storage {
     class PageBuffers {
-        EntityCache<std::string, DataPage> pages_;
-        EntityCache<std::string, MetaSchema>& schemas_;
-        EntityCache<std::string, MetaTable>& tables_;
+        EntityCache<std::string, DataPage, DataPageAccessor> pages_;
+        EntityCache<std::string, MetaSchema, MetaSchemaAccessor>& schemas_;
+        EntityCache<std::string, MetaTable, MetaTableAccessor>& tables_;
 
         DataPage&
         create_page();
@@ -21,8 +21,9 @@ namespace storage {
 
     public:
         PageBuffers(
-            EntityCache<std::string, MetaSchema>& schemas,
-            EntityCache<std::string, MetaTable>& tables
+            EntityCache<std::string, DataPage, DataPageAccessor>& pages,
+            EntityCache<std::string, MetaSchema, MetaSchemaAccessor>& schemas,
+            EntityCache<std::string, MetaTable, MetaTableAccessor>& tables
         );
 
         int

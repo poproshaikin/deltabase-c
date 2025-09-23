@@ -21,7 +21,7 @@ namespace storage {
             x.type;
             x.serialize();
             requires std::same_as<decltype(x.type), const WalRecordType>;
-            requires std::same_as<decltype(x.serialize()), bytes_arr>;
+            requires std::same_as<decltype(x.serialize()), bytes_v>;
         };
 
         template <with_wal_type... Ts> 
@@ -31,9 +31,9 @@ namespace storage {
     struct InsertRecord {
         const WalRecordType type = WalRecordType::INSERT;
         std::string table_id;
-        bytes_arr serialized_row;
+        bytes_v serialized_row;
 
-        bytes_arr
+        bytes_v
         serialize() const;
     };
 
