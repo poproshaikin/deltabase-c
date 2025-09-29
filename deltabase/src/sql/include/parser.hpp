@@ -69,8 +69,9 @@ namespace sql {
 
         TableIdentifier() = default;
 
-        explicit TableIdentifier(SqlToken table_name,
-                        std::optional<SqlToken> schema_name = std::nullopt)
+        explicit TableIdentifier(
+            SqlToken table_name, std::optional<SqlToken> schema_name = std::nullopt
+        )
             : table_name(std::move(table_name)), schema_name(std::move(schema_name)) {
         }
     };

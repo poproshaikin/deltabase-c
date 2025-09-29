@@ -2,9 +2,9 @@
 
 namespace storage {
     int
-    PageBuffers::insert_row(MetaTable& table, DataRow& row) {
+    page_buffers::insert_row(meta_table& table, data_row& row) {
         uint64_t size = row.estimate_size();
-        DataPage& page = has_available_page(size) ? get_available_page(size) : create_page();
+        data_page& page = has_available_page(size) ? get_available_page(size) : create_page();
 
         page.insert_row(table, row);
         page.mark_dirty();

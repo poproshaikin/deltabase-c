@@ -7,37 +7,37 @@
 
 namespace storage {
     std::string
-    DataPage::id() const {
+    data_page::id() const {
         return id_;
     }
 
     uint64_t
-    DataPage::size() const {
+    data_page::size() const {
         return size_;
     }
     
     RowId
-    DataPage::min_rid() const {
+    data_page::min_rid() const {
         return min_rid_;
     }
 
     RowId
-    DataPage::max_rid() const {
+    data_page::max_rid() const {
         return max_rid_;
     }
 
     void
-    DataPage::mark_dirty() {
+    data_page::mark_dirty() {
         is_dirty_ = true;
     }
 
-    const std::vector<DataRow>&
-    DataPage::rows() const {
+    const std::vector<data_row>&
+    data_page::rows() const {
         return rows_;
     }
 
     bool
-    DataPage::has_row(RowId rid) const {
+    data_page::has_row(RowId rid) const {
         for (const auto& row : rows_) {
             if (row.row_id == rid) {
                 return true;
@@ -47,8 +47,8 @@ namespace storage {
         return false;
     }
 
-    DataRow&
-    DataPage::get_row(RowId rid) {
+    data_row&
+    data_page::get_row(RowId rid) {
         for (auto& row : rows_) {
             if (row.row_id == rid) {
                 return row;
@@ -59,12 +59,12 @@ namespace storage {
     }
 
     bool
-    DataPage::can_insert(const DataRow& row) const noexcept {
-        return size_ + row.estimate_size() <= MAX_SIZE;
+    data_page::can_insert(const data_row& row) const noexcept {
+        return size_ + row.estimate_size() <= max_size;
     }
 
     RowId
-    DataPage::insert_row(MetaTable& table, DataRow& row) {
+    data_page::insert_row(meta_table& table, data_row& row) {
         if (!can_insert(row)) {
             throw std::runtime_error(std::format("Page {} hasn't enough space for a new row", id_));
         }
@@ -77,22 +77,22 @@ namespace storage {
     }
 
     void
-    DataPage::delete_row(RowId id) {
+    data_page::delete_row(RowId id) {
         if (!has_row(id)) {
             throw std::runtime_error("");
         }
 
-        get_row(id).flags |= DataRowFlags::OBSOLETE;
+        get_row(id).flags |= data_row_flags::OBSOLETE;
     }
 
     RowId
-    DataPage::update_row(MetaTable& table, RowId old_row_id, DataRowUpdate& update) {
+    data_page::update_row(meta_table& table, RowId old_row_id, data_row_update& update) {
         if (!has_row(old_row_id)) {
             throw std::runtime_error("");
         }
 
         auto& old_row = get_row(old_row_id);
-        old_row.flags |= DataRowFlags::OBSOLETE;
+        old_row.flags |= data_row_flags::OBSOLETE;
 
         auto new_row = old_row.update(update);
         insert_row(table, new_row);
@@ -101,7 +101,7 @@ namespace storage {
     }
 
     bytes_v
-    DataPage::serialize() const {
+    data_page::serialize() const {
         bytes_v v;
         uint64_t header_size = strlen(id_.c_str()) + sizeof(size_) + sizeof(min_rid_) + sizeof(max_rid_);
         v.reserve(header_size);

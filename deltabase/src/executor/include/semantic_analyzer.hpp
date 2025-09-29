@@ -49,7 +49,7 @@ namespace exe {
     };
 
     class SemanticAnalyzer {
-        storage::Storage& storage_;
+        storage::storage& storage_;
         std::optional<std::string> db_name_;
         std::string def_schema_;
 
@@ -75,18 +75,18 @@ namespace exe {
         analyze_create_schema(sql::CreateSchemaStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_where(std::unique_ptr<sql::AstNode>& where, const storage::MetaTable& table) -> AnalysisResult;
+        analyze_where(std::unique_ptr<sql::AstNode>& where, const storage::meta_table& table) -> AnalysisResult;
 
         auto
         validate_column_comparison(
             const std::unique_ptr<sql::AstNode>& left,
             const std::unique_ptr<sql::AstNode>& right,
-            const storage::MetaTable& table
+            const storage::meta_table& table
         ) -> AnalysisResult;
 
         auto
         validate_column_assignment(
-            const sql::AstNode& assignment, const storage::MetaTable& table
+            const sql::AstNode& assignment, const storage::meta_table& table
         ) -> AnalysisResult;
 
         void
@@ -96,9 +96,9 @@ namespace exe {
         ensure_db_exists(const std::string& name);
 
       public:
-        SemanticAnalyzer(storage::Storage& storage);
-        SemanticAnalyzer(storage::Storage& storage, std::string db_name);
-        SemanticAnalyzer(storage::Storage& storage, engine::EngineConfig cfg);
+        SemanticAnalyzer(storage::storage& storage);
+        SemanticAnalyzer(storage::storage& storage, std::string db_name);
+        SemanticAnalyzer(storage::storage& storage, engine::EngineConfig cfg);
 
         auto
         analyze(sql::AstNode& ast) -> AnalysisResult;

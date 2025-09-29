@@ -6,9 +6,9 @@
 #include "../../storage/include/storage.hpp"
 
 namespace exe {
-    class QueryPlanner {
+    class query_planner {
         engine::EngineConfig cfg_;
-        storage::Storage& storage_;
+        storage::storage& storage_;
 
         QueryPlan
         create_plan(const sql::SelectStatement& stmt);
@@ -33,7 +33,7 @@ namespace exe {
         create_plan(const sql::ColumnDefinition&);
 
     public:
-        QueryPlanner(engine::EngineConfig cfg, storage::Storage& storage);
+        query_planner(engine::EngineConfig cfg, storage::storage& storage);
 
         QueryPlan
         create_plan(const sql::AstNode& node);

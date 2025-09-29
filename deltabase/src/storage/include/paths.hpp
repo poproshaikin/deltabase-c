@@ -47,6 +47,14 @@ namespace storage {
     }
 
     fs::path
+    path_db_schema_table(
+        const fs::path& data_dir,
+        const std::string& db_name,
+        const std::string& schema_name,
+        const std::string& table_name
+    );
+
+    fs::path
     path_db_schema_table_data(
         const fs::path& data_dir,
         const std::string& db_name,

@@ -39,7 +39,7 @@ namespace converter {
         return bytes;
     }
 
-    storage::DataToken
+    storage::data_token
     convert_astnode_to_token(const sql::AstNode* node, storage::ValueType expected_type) {
         const auto& token = std::get<sql::SqlToken>(node->value);
         std::string literal = token.value;
@@ -48,38 +48,38 @@ namespace converter {
         return storage::DataToken(bytes, expected_type);
     }
 
-    storage::FilterOp
+    storage::filter_op
     parse_filter_op(sql::AstOperator op) {
         if (op == sql::AstOperator::EQ)
-            return storage::FilterOp::EQ;
+            return storage::filter_op::EQ;
         if (op == sql::AstOperator::NEQ)
-            return storage::FilterOp::NEQ;
+            return storage::filter_op::NEQ;
         if (op == sql::AstOperator::LT)
-            return storage::FilterOp::LT;
+            return storage::filter_op::LT;
         if (op == sql::AstOperator::LTE)
-            return storage::FilterOp::LTE;
+            return storage::filter_op::LTE;
         if (op == sql::AstOperator::GR)
-            return storage::FilterOp::GT;
+            return storage::filter_op::GT;
         if (op == sql::AstOperator::GRE)
-            return storage::FilterOp::GTE;
+            return storage::filter_op::GTE;
         throw std::runtime_error("Unknown filter operator");
     }
 
-    storage::DataFilter
-    convert_binary_to_filter(const sql::BinaryExpr& where, const storage::MetaTable& table) {
-        storage::DataFilter filter = {};
+    storage::data_filter
+    convert_binary_to_filter(const sql::BinaryExpr& where, const storage::meta_table& table) {
+        storage::data_filter filter = {};
 
         if (where.op == sql::AstOperator::AND || where.op == sql::AstOperator::OR) {
             const auto& left_expr = std::get<sql::BinaryExpr>(where.left->value);
             const auto& right_expr = std::get<sql::BinaryExpr>(where.right->value);
 
-            storage::DataFilter left_filter(convert_binary_to_filter(left_expr, table));
-            storage::DataFilter right_filter(convert_binary_to_filter(right_expr, table));
+            storage::data_filter left_filter(convert_binary_to_filter(left_expr, table));
+            storage::data_filter right_filter(convert_binary_to_filter(right_expr, table));
 
-            storage::DataFilterNode node;
-            node.left = std::make_unique<storage::DataFilter>(left_filter);
-            node.right = std::make_unique<storage::DataFilter>(right_filter);
-            node.op = (where.op == sql::AstOperator::AND) ? storage::LogicOp::AND : storage::LogicOp::OR;
+            storage::data_filter_node node;
+            node.left = std::make_unique<storage::data_filter>(left_filter);
+            node.right = std::make_unique<storage::data_filter>(right_filter);
+            node.op = (where.op == sql::AstOperator::AND) ? storage::logic_op::AND : storage::logic_op::OR;
 
             filter.value = std::move(node);
 
@@ -93,10 +93,10 @@ namespace converter {
         if (!table.has_column(column_name)) {
             throw std::runtime_error("Column doesn't exist");
         }
-        storage::MetaColumn column = table.get_column(column_name);
+        storage::meta_column column = table.get_column(column_name);
         storage::bytes_v literal = convert_str_to_literal(right.value, column.type);
 
-        storage::DataFilterCondition condition;
+        storage::data_filter_condition condition;
         condition.op = parse_filter_op(where.op);
         condition.type = column.type;
         condition.data = literal;
@@ -107,13 +107,13 @@ namespace converter {
         return filter;
     }
 
-    std::vector<storage::MetaColumn>
+    std::vector<storage::meta_column>
     convert_defs_to_mcs(std::vector<sql::ColumnDefinition> defs) {
-        std::vector<storage::MetaColumn> mcs;
+        std::vector<storage::meta_column> mcs;
         mcs.reserve(defs.size());
 
         for (const auto & def : defs) {
-            mcs.push_back(storage::MetaColumn(def));
+            mcs.push_back(storage::meta_column(def));
         }
 
         return mcs;
@@ -139,9 +139,9 @@ namespace converter {
         }
     }
 
-    storage::MetaColumnFlags
+    storage::meta_column_flags
     convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints) {
-        storage::MetaColumnFlags flags = storage::MetaColumnFlags::NONE;
+        storage::meta_column_flags flags = storage::meta_column_flags::NONE;
 
         for (int i = 0; i < constraints.size(); i++) {
             if (!constraints[i].is_constraint()) {
@@ -158,18 +158,18 @@ namespace converter {
                     constraints[i].get_detail<sql::SqlKeyword>() != sql::SqlKeyword::KEY) {
                     throw InvalidStatementSyntax();
                 }
-                flags = static_cast<storage::MetaColumnFlags>(flags | storage::MetaColumnFlags::PK);
+                flags = static_cast<storage::meta_column_flags>(flags | storage::meta_column_flags::PK);
             } else if (kw == sql::SqlKeyword::NOT) {
                 i++;
                 if (i >= constraints.size() ||
                     constraints[i].get_detail<sql::SqlKeyword>() != sql::SqlKeyword::_NULL) {
                     throw InvalidStatementSyntax();
                 }
-                flags = static_cast<storage::MetaColumnFlags>(flags | storage::MetaColumnFlags::NN);
+                flags = static_cast<storage::meta_column_flags>(flags | storage::meta_column_flags::NN);
             } else if (kw == sql::SqlKeyword::AUTOINCREMENT) {
-                flags = static_cast<storage::MetaColumnFlags>(flags | storage::MetaColumnFlags::AI);
+                flags = static_cast<storage::meta_column_flags>(flags | storage::meta_column_flags::AI);
             } else if (kw == sql::SqlKeyword::UNIQUE) {
-                flags = static_cast<storage::MetaColumnFlags>(flags | storage::MetaColumnFlags::UN);
+                flags = static_cast<storage::meta_column_flags>(flags | storage::meta_column_flags::UN);
             }
         }
 

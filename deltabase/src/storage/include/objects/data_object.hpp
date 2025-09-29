@@ -8,26 +8,26 @@
 #include "meta_object.hpp"
 
 namespace storage {
-    using assignment = std::pair<MetaColumn, unique_void_ptr>;
+    using assignment = std::pair<meta_column, unique_void_ptr>;
 
-    enum class DataRowFlags {
+    enum class data_row_flags {
         NONE = 0,
         OBSOLETE = 1 << 0
     };
 
-    DataRowFlags operator|(DataRowFlags left, DataRowFlags right) {
-        using T = std::underlying_type_t<DataRowFlags>;
-        return static_cast<DataRowFlags>(static_cast<T>(left) | static_cast<T>(right));
+    data_row_flags operator|(data_row_flags left, data_row_flags right) {
+        using T = std::underlying_type_t<data_row_flags>;
+        return static_cast<data_row_flags>(static_cast<T>(left) | static_cast<T>(right));
     }      
 
-    DataRowFlags operator|=(DataRowFlags& left, DataRowFlags right) {
-        using T = std::underlying_type_t<DataRowFlags>;
-        auto value = static_cast<DataRowFlags>(static_cast<T>(left) | static_cast<T>(right));
+    data_row_flags operator|=(data_row_flags& left, data_row_flags right) {
+        using T = std::underlying_type_t<data_row_flags>;
+        auto value = static_cast<data_row_flags>(static_cast<T>(left) | static_cast<T>(right));
         left = value;
         return value;
     } 
 
-    enum class FilterOp {
+    enum class filter_op {
         EQ = 1,
         NEQ,
         LT,
@@ -36,16 +36,16 @@ namespace storage {
         GTE
     };
 
-    enum class LogicOp {
+    enum class logic_op {
         AND = 1,
         OR 
     };
 
-    struct DataToken {
+    struct data_token {
         bytes_v bytes;
         ValueType type;
 
-        DataToken(bytes_v bytes, ValueType type);
+        data_token(bytes_v bytes, ValueType type);
 
         uint64_t
         estimate_size() const;
@@ -56,16 +56,16 @@ namespace storage {
 
     using RowId = uint64_t;
 
-    struct DataRowUpdate {
-        MetaTable table;
+    struct data_row_update {
+        meta_table table;
         std::vector<assignment> assignments;
     };
 
-    struct DataRow {
+    struct data_row {
         // initialize only in the storage
         uint64_t row_id;
-        DataRowFlags flags;
-        std::vector<DataToken> tokens;  
+        data_row_flags flags;
+        std::vector<data_token> tokens;  
 
         uint64_t
         estimate_size() const;
@@ -73,31 +73,31 @@ namespace storage {
         bytes_v 
         serialize() const;
 
-        DataRow 
-        update(const DataRowUpdate& update) const;
+        data_row 
+        update(const data_row_update& update) const;
     };
 
-    struct DataTable {
-        MetaTable table;
-        std::vector<DataRow> rows;
+    struct data_table {
+        meta_table table;
+        std::vector<data_row> rows;
     };
 
-    struct DataFilterCondition {
+    struct data_filter_condition {
         std::string column_id;
-        FilterOp op;
+        filter_op op;
         ValueType type;
         bytes_v data;
     };
 
-    struct DataFilter;
+    struct data_filter;
 
-    struct DataFilterNode {
-        std::unique_ptr<DataFilter> left;
-        LogicOp op;
-        std::unique_ptr<DataFilter> right; 
+    struct data_filter_node {
+        std::unique_ptr<data_filter> left;
+        logic_op op;
+        std::unique_ptr<data_filter> right; 
     };
 
-    struct DataFilter {
-        std::variant<DataFilterCondition, DataFilterNode> value;
+    struct data_filter {
+        std::variant<data_filter_condition, data_filter_node> value;
     };
 }

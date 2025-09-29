@@ -4,7 +4,7 @@
 #include "../objects/data_object.hpp"
 
 namespace storage {
-    class DataPage {
+    class data_page {
         // --- Header ---
         std::string id_;
         uint64_t size_;
@@ -12,19 +12,19 @@ namespace storage {
         RowId max_rid_;
         // --------------
         
-        std::vector<DataRow> rows_;
+        std::vector<data_row> rows_;
         bool is_dirty_;
 
     public:
-        static constexpr uint64_t MAX_SIZE = 8 * 1024;
+        static constexpr uint64_t max_size = 8 * 1024;
 
         static bool
         can_deserialize(const bytes_v& bytes);
-        static DataPage
+        static data_page
         deserialize(const bytes_v& bytes);
 
-        DataPage() = default;
-        DataPage(const MetaTable& table, bytes_v bytes);
+        data_page() = default;
+        data_page(const meta_table& table, bytes_v bytes);
 
         std::string
         id() const;
@@ -39,19 +39,19 @@ namespace storage {
 
         bool
         has_row(RowId rid) const;
-        DataRow&
+        data_row&
         get_row(RowId rid);
 
-        const std::vector<DataRow>& 
+        const std::vector<data_row>& 
         rows() const;
 
         bool
-        can_insert(const DataRow& row) const noexcept;
+        can_insert(const data_row& row) const noexcept;
         RowId
-        insert_row(MetaTable& table, DataRow& row);
+        insert_row(meta_table& table, data_row& row);
 
         RowId
-        update_row(MetaTable& table, RowId old_row, DataRowUpdate& update);
+        update_row(meta_table& table, RowId old_row, data_row_update& update);
 
         void
         delete_row(RowId id);

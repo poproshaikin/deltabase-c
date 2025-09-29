@@ -74,7 +74,7 @@ namespace exe {
             return TableDoesntExist(stmt.table.table_name.value);
         }
 
-        storage::MetaTable& table = storage_.exists_virtual_table(stmt.table)
+        storage::meta_table& table = storage_.exists_virtual_table(stmt.table)
             ? storage_.get_virtual_meta_table(stmt.table)
             : storage_.get_table(stmt.table);
 

@@ -9,41 +9,41 @@
 namespace storage {
 
     template <typename T, typename K, typename V>
-    concept ExternalDataAccessor = requires(T accessor, const K& key) {
+    concept ExternalDataAccessor_c = requires(T accessor, const K& key) {
         { accessor.has(key) } -> std::same_as<bool>;
         { accessor.get(key) } -> std::same_as<V>;
     };
 
-    class DataPageAccessor {
-        FileManager& fm_;
+    class data_page_accessor {
+        file_manager& fm_;
         std::string db_name_;
     public:
-        explicit DataPageAccessor(const std::string& db_name, FileManager& fm);
+        explicit data_page_accessor(const std::string& db_name, file_manager& fm);
         bool
         has(std::string id) const noexcept;
-        DataPage
+        data_page
         get(std::string id);
     };
 
-    class MetaTableAccessor {
-        FileManager& fm_;
+    class meta_table_accessor {
+        file_manager& fm_;
         std::string db_name_;
     public:
-        explicit MetaTableAccessor(const std::string& db_name, FileManager& fm);
+        explicit meta_table_accessor(const std::string& db_name, file_manager& fm);
         bool
         has(std::string id) const noexcept;
-        MetaTable
+        meta_table
         get(std::string id);
     };
 
-    class MetaSchemaAccessor {
-        FileManager& fm_;
+    class meta_schema_accessor {
+        file_manager& fm_;
         std::string db_name_;
     public:
-        explicit MetaSchemaAccessor(const std::string& db_name, FileManager& fm);
+        explicit meta_schema_accessor(const std::string& db_name, file_manager& fm);
         bool
         has(std::string id) const noexcept;
-        MetaSchema
+        meta_schema
         get(std::string id);
     };
 

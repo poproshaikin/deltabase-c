@@ -4,6 +4,7 @@
 #include <vector>
 #include <optional>
 
+#include "cache/key_extractor.hpp"
 #include "objects/meta_object.hpp"
 #include "objects/data_object.hpp"
 
@@ -12,14 +13,20 @@
 #include "wal/wal_manager.hpp"
 
 namespace storage {
-    class Storage {
+    class storage {
         std::optional<std::string> db_name_;
 
-        WalManager wal_;
+        wal_manager wal_;
+        file_manager fm_;
 
-        EntityCache<std::string, MetaSchema, MetaSchemaAccessor> schemas_;
-        EntityCache<std::string, MetaTable, MetaTableAccessor> tables_;
-        PageBuffers page_buffers_;
+        std::optional<
+            entity_cache<std::string, meta_schema, meta_schema_accessor, make_key>>
+            schemas_;
+
+        std::optional<entity_cache<std::string, meta_table, meta_table_accessor, make_key>>
+            tables_;
+
+        std::optional<page_buffers> page_buffers_;
 
         // Configuration
 
@@ -27,6 +34,14 @@ namespace storage {
 
         void
         ensure_fs_initialize();
+        void
+        ensure_attached(const std::string& method_name = "ensure_attached") const;
+
+        std::optional<std::string>
+        find_schema_key(const std::string& schema_id) const;
+
+        std::optional<std::string>
+        find_table_key(const std::string& table_id) const;
     public:
         /* 
             все прямые функции будут удалены
@@ -40,8 +55,11 @@ namespace storage {
             
         */
 
-        Storage();
-        Storage(fs::path data_dir);
+        storage(const fs::path& data_dir);
+        storage(const fs::path& data_dir, const std::string& db_name);
+
+        void
+        attach_db(const std::string& db_name);
 
         // ----- Databases -----
         void
@@ -53,76 +71,72 @@ namespace storage {
         bool
         exists_database(const std::string& db_name);
 
-        std::vector<std::string>
-        get_databases();
-
         // ----- Schemas -----
 
         void
-        create_schema(const MetaSchema& schema);
+        create_schema(meta_schema&& schema);
 
-        MetaSchema& 
-        get_schema(const std::string& schema_name);
-        MetaSchema& 
-        get_schema(const std::string& schema_name, const std::string& db_name);
-        MetaSchema&
-        get_schema(const sql::TableIdentifier& identifier);
-        MetaSchema&
-        get_schema_by_id(const std::string& id);
+        bool
+        exists_schema(const std::string& schema_name) const;
+        bool
+        exists_schema_by_id(const std::string& schema_id) const;
+
+        meta_schema& 
+        get_schema(const std::string& schema_name) const;
+        meta_schema&
+        get_schema(const sql::TableIdentifier& identifier) const; 
+        meta_schema&
+        get_schema_by_id(const std::string& id) const;
         
-        int
+        void
         drop_schema(const std::string& schema_name);                             
-        int         
-        drop_schema(const std::string& schema_name, const std::string& db_name);
 
         // ----- Tables -----
 
         void
-        create_table(const MetaTable& table);
+        create_table(meta_table&& table);
 
         bool
-        exists_table(const std::string& name);
-        bool
-        exists_table(const std::string& name, const std::string& db_name);
+        exists_table(const std::string& schema_name, const std::string& name);
         bool
         exists_table(const sql::TableIdentifier& identifier);
         bool
+        exists_table_by_id(const std::string& table_id);
+        bool
         exists_virtual_table(const sql::TableIdentifier& identifier);
 
-        MetaTable&
+        meta_table&
         get_table(const std::string& name);
-        MetaTable&
-        get_table(const std::string& name, const std::string& db_name);
-        MetaTable&
+        meta_table&
         get_table(const sql::TableIdentifier& identifier);
-        MetaTable&
-        get_table_by_id(const std::string& id) const;
-        MetaTable&&
+        meta_table&
+        get_table_by_id(const std::string& id) ;
+        meta_table&&
         get_virtual_meta_table(const sql::TableIdentifier& identifier);
-        DataTable
+        data_table
         get_virtual_data_table(const sql::TableIdentifier& identifier);
 
         void
-        update_table(const MetaTable& new_table);
+        update_table(const meta_table& new_table);
 
         // ----- Data -----       
 
         void
-        insert_row(MetaTable& table, DataRow row);
+        insert_row(meta_table& table, data_row row);
 
         uint64_t
         update_rows_by_filter(
-            MetaTable& table, const DataFilter& filter, const DataRowUpdate& update
+            meta_table& table, const data_filter& filter, const data_row_update& update
         );
 
         uint64_t
-        delete_rows_by_filter(MetaTable& table, const std::optional<DataFilter>& filter);
+        delete_rows_by_filter(meta_table& table, const std::optional<data_filter>& filter);
 
-        DataTable
+        data_table
         seq_scan(
-            const MetaTable& table,
+            const meta_table& table,
             const std::vector<std::string>& column_names,
-            const std::optional<DataFilter>& filter
+            const std::optional<data_filter>& filter
         );
     };
 }

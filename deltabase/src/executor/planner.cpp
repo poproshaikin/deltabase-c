@@ -5,12 +5,12 @@
 #include "include/action.hpp"
 
 namespace exe {
-    QueryPlanner::QueryPlanner(engine::EngineConfig cfg, storage::Storage& storage) 
+    query_planner::query_planner(engine::EngineConfig cfg, storage::storage& storage) 
         : cfg_(cfg), storage_(storage) {
     }
 
     QueryPlan
-    QueryPlanner::create_plan(const sql::AstNode& node) {
+    query_planner::create_plan(const sql::AstNode& node) {
 
         if (std::holds_alternative<sql::BinaryExpr>(node.value) ||
             std::holds_alternative<sql::SqlToken>(node.value)) {
@@ -23,7 +23,7 @@ namespace exe {
     }
 
     QueryPlan
-    QueryPlanner::create_plan(const sql::SelectStatement& stmt) {
+    query_planner::create_plan(const sql::SelectStatement& stmt) {
 
         exe::SeqScanAction action{
             storage_.get_table(stmt.table)
@@ -45,7 +45,7 @@ namespace exe {
     }
 
     QueryPlan
-    QueryPlanner::create_plan(const sql::InsertStatement& stmt) {
+    query_planner::create_plan(const sql::InsertStatement& stmt) {
         std::string schema_name = stmt.table.schema_name.has_value()
                                       ? stmt.table.schema_name.value().value
                                       : cfg_.default_schema;
@@ -55,7 +55,7 @@ namespace exe {
 
         exe::InsertAction action{.table = table, .schema = schema};
 
-        storage::DataRow row;
+        storage::data_row row;
         row.tokens.reserve(stmt.values.size());
         
         for (size_t i = 0; i < stmt.values.size() && i < table.columns.size(); i++) {
@@ -63,7 +63,7 @@ namespace exe {
             const auto& value = stmt.values[i].value;
             
             storage::bytes_v literal = converter::convert_str_to_literal(value, column.type);
-            storage::DataToken token(literal, column.type);
+            storage::data_token token(literal, column.type);
             row.tokens.push_back(std::move(token));
         } 
         
@@ -72,7 +72,7 @@ namespace exe {
     }
 
     QueryPlan
-    QueryPlanner::create_plan(const sql::UpdateStatement& stmt) {
+    query_planner::create_plan(const sql::UpdateStatement& stmt) {
         std::string schema_name = stmt.table.schema_name.has_value()
                                       ? stmt.table.schema_name.value().value
                                       : cfg_.default_schema;
@@ -93,7 +93,7 @@ namespace exe {
     }
 
     QueryPlan
-    QueryPlanner::create_plan(const sql::DeleteStatement& stmt) {
+    query_planner::create_plan(const sql::DeleteStatement& stmt) {
         std::string schema_name = stmt.table.schema_name.has_value()
                                       ? stmt.table.schema_name.value().value
                                       : cfg_.default_schema;
@@ -115,16 +115,16 @@ namespace exe {
     }
 
     QueryPlan
-    QueryPlanner::create_plan(const sql::CreateTableStatement& stmt) {
+    query_planner::create_plan(const sql::CreateTableStatement& stmt) {
         auto& schema = storage_.get_schema(stmt.table);
 
-        storage::MetaTable table;
+        storage::meta_table table;
         table.name = stmt.table.table_name.value;
         table.schema_id = schema.id;
         table.columns.reserve(stmt.columns.size());
         
         for (const auto& col_def : stmt.columns) {
-            storage::MetaColumn column;
+            storage::meta_column column;
             column.name = col_def.name.value;
             column.table_id = table.id;
             column.type = converter::convert_kw_to_vt(col_def.type.get_detail<sql::SqlKeyword>());
@@ -139,32 +139,32 @@ namespace exe {
     }
 
     QueryPlan
-    QueryPlanner::create_plan(const sql::CreateSchemaStatement& stmt) {
-        storage::MetaSchema schema;
+    query_planner::create_plan(const sql::CreateSchemaStatement& stmt) {
+        storage::meta_schema schema;
         schema.name = stmt.name.value;
 
         return SingleActionPlan{exe::CreateSchemaAction{schema}};
     }
 
     QueryPlan
-    QueryPlanner::create_plan(const sql::CreateDbStatement& stmt) {
+    query_planner::create_plan(const sql::CreateDbStatement& stmt) {
         exe::CreateDatabaseAction action;
         action.name = stmt.name.value;
         return SingleActionPlan{std::move(action)};
     }
 
     [[noreturn]] QueryPlan
-    QueryPlanner::create_plan(const sql::SqlToken&) {
+    query_planner::create_plan(const sql::SqlToken&) {
         throw std::runtime_error("Cannot create plan for SqlToken");
     }
 
     [[noreturn]] QueryPlan
-    QueryPlanner::create_plan(const sql::BinaryExpr&) {
+    query_planner::create_plan(const sql::BinaryExpr&) {
         throw std::runtime_error("Cannot create plan for BinaryExpr");
     }
 
     [[noreturn]] QueryPlan
-    QueryPlanner::create_plan(const sql::ColumnDefinition&) {
+    query_planner::create_plan(const sql::ColumnDefinition&) {
         throw std::runtime_error("Cannot create plan for ColumnDefinition");
     }
 }

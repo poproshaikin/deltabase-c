@@ -2,13 +2,13 @@
 
 #include "../objects/meta_object.hpp"
 #include "../objects/data_object.hpp"
-#include "wal_record.hpp"
+#include "wal_object.hpp"
 #include "wal_writer.hpp"
 #include <chrono>
 #include <thread>
 
 namespace storage {
-    class WalManager {
+    class wal_manager {
         std::vector<WalRecord> log_;
 
         std::vector<WalRecord> buffer_;
@@ -17,7 +17,7 @@ namespace storage {
         std::thread bg_writer_;
         WalWriter writer_;
 
-        std::chrono::duration<uint64_t> flush_interval_ = std::chrono::seconds(1);
+        std::chrono::duration<int64_t> checkpoint_interval_ = std::chrono::minutes(1);
 
         void 
         run_bg_writer();
@@ -27,13 +27,14 @@ namespace storage {
 
     public:
         void
-        push_create_schema();
-        
-        void 
-        write_create_table();
+        push_create_schema(const meta_schema& schema);
+        void
+        push_drop_schema(const meta_schema& schema);
+        void
+        push_create_table(const meta_table& table);
 
         void 
-        push_insert(MetaTable& table, const DataRow& row);
+        push_insert(meta_table& table, const data_row& row);
 
         void 
         write_update_by_filter();

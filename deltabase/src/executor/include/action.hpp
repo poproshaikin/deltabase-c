@@ -6,42 +6,42 @@
 #include <optional>
 
 namespace exe {
-    using IntOrDataTable = std::variant<size_t, std::unique_ptr<storage::DataTable>>;
+    using IntOrDataTable = std::variant<size_t, std::unique_ptr<storage::data_table>>;
 
     struct SeqScanAction {
-        storage::MetaTable& table;
+        storage::meta_table& table;
         std::vector<std::string> columns;
-        std::optional<storage::DataFilter> filter;
+        std::optional<storage::data_filter> filter;
 
-        SeqScanAction(const storage::MetaTable& table);
+        SeqScanAction(const storage::meta_table& table);
     };
 
     struct InsertAction {
-        storage::MetaTable& table;
-        storage::MetaSchema& schema;
-        storage::DataRow row;
+        storage::meta_table& table;
+        storage::meta_schema& schema;
+        storage::data_row row;
     };
 
     struct UpdateByFilterAction {
-        storage::MetaTable& table;
-        storage::MetaSchema& schema;
-        storage::DataRowUpdate row_update;
-        std::optional<storage::DataFilter> filter;
+        storage::meta_table& table;
+        storage::meta_schema& schema;
+        storage::data_row_update row_update;
+        std::optional<storage::data_filter> filter;
     };
 
     struct DeleteByFilterAction {
-        storage::MetaSchema& schema;
-        storage::MetaTable& table;
-        std::optional<storage::DataFilter> filter;
+        storage::meta_schema& schema;
+        storage::meta_table& table;
+        std::optional<storage::data_filter> filter;
     };
 
     struct CreateTableAction {
-        storage::MetaSchema& schema;
-        storage::MetaTable& table;
+        storage::meta_schema& schema;
+        storage::meta_table& table;
     };
 
     struct CreateSchemaAction {
-        storage::MetaSchema& schema;
+        storage::meta_schema& schema;
     };
 
     struct CreateDatabaseAction {
@@ -49,11 +49,11 @@ namespace exe {
     };
 
     struct WriteMetaTableAction {
-        storage::MetaTable& table;
+        storage::meta_table& table;
     };
 
     struct WriteMetaSchemaAction {
-        storage::MetaSchema& schema;
+        storage::meta_schema& schema;
     };
 
     using Action = std::variant<

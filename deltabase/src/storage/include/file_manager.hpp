@@ -8,7 +8,7 @@
 namespace storage {
     namespace fs = std::filesystem;
 
-    class FileManager {
+    class file_manager {
         fs::path data_dir_;
 
         void write_file(const fs::path& path, const bytes_v& content);
@@ -21,7 +21,7 @@ namespace storage {
         find_schema_path(const std::string& db_name, const std::string& schema_id) const;
 
     public:
-        explicit FileManager(const fs::path& data_dir);
+        explicit file_manager(const fs::path& data_dir);
 
         bytes_v read_file(const fs::path& path) const;
 
@@ -35,10 +35,10 @@ namespace storage {
             const std::string& page_id
         ) const;
 
-        DataPage
+        data_page
         load_page(const std::string& db_name, const std::string& page_id) const;
 
-        DataPage
+        data_page
         load_page(
             const std::string& db_name,
             const std::string& schema_name,
@@ -51,7 +51,7 @@ namespace storage {
             const std::string& db_name,
             const std::string& schema_name,
             const std::string& table_name,
-            const DataPage& page
+            const data_page& page
         );
 
         bool
@@ -64,10 +64,10 @@ namespace storage {
             const std::string& table_name
         ) const;
 
-        MetaTable
+        meta_table
         load_table(const std::string& db_name, const std::string& table_id) const;
 
-        MetaTable
+        meta_table
         load_table(
             const std::string& db_name,
             const std::string& schema_name,
@@ -76,7 +76,7 @@ namespace storage {
 
         void
         save_table(
-            const std::string& db_name, const std::string& schema_name, const MetaTable& table
+            const std::string& db_name, const std::string& schema_name, const meta_table& table
         );
 
         
@@ -86,18 +86,21 @@ namespace storage {
         schema_exists_by_name(const std::string& db_name, const std::string& schema_name) const;
 
         
-        MetaSchema
+        meta_schema
         load_schema_by_id(const std::string& db_name, const std::string& schema_id) const;
-        MetaSchema
+        meta_schema
         load_schema_by_name(const std::string& db_name, const std::string& schema_name) const;
 
         void
-        save_schema(const MetaSchema& schema);
+        save_schema(const meta_schema& schema);
 
         std::vector<fs::path>
         get_tables_paths(const std::string& db_name, const std::string& schema_name);
 
         std::vector<fs::path>
         get_schemata_paths(const std::string& db_name);
+
+        bool
+        create_dir(const fs::path& path);
     };
 }

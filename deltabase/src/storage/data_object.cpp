@@ -1,5 +1,3 @@
-#pragma once
-
 #include "include/objects/data_object.hpp"
 #include "include/shared.hpp"
 #include "include/value_type.hpp"
@@ -9,7 +7,7 @@
 
 namespace storage {
     bytes_v
-    DataRow::serialize() const {
+    data_row::serialize() const {
         auto estimate_rows_size = [this]() -> uint64_t {
             uint64_t size = 0;
             for (const auto& token : tokens) {
@@ -59,7 +57,7 @@ namespace storage {
     }
 
     uint64_t
-    DataToken::estimate_size() const {
+    data_token::estimate_size() const {
         uint64_t size = 0; 
         size += sizeof(ValueType); // size of the value type prefix
         size += bytes.size();
@@ -67,7 +65,7 @@ namespace storage {
     }
 
     bytes_v
-    DataToken::serialize() const {
+    data_token::serialize() const {
         bytes_v v;
         v.reserve(estimate_size());
 

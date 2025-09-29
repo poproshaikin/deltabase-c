@@ -1,12 +1,9 @@
 #pragma once
 
-#include "wal_record.hpp"
+#include "wal_object.hpp"
 #include <fstream>
-#include <filesystem>
 
 namespace storage {
-    namespace fs = std::filesystem;
-
     class WalWriter {
         void 
         write_record(const WalRecord& record, std::fstream& fstream);

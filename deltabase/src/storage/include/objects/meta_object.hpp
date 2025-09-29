@@ -8,7 +8,7 @@
 #include "../../../sql/include/parser.hpp"
 
 namespace storage {
-    enum class MetaColumnFlags {
+    enum class meta_column_flags {
         NONE = 0,
         PK = 1 << 0,
         FK = 1 << 1,
@@ -17,78 +17,78 @@ namespace storage {
         UN = 1 << 4
     };
 
-    inline MetaColumnFlags operator|(MetaColumnFlags left, MetaColumnFlags right) {
-        using T = std::underlying_type_t<MetaColumnFlags>;
-        return static_cast<MetaColumnFlags>(static_cast<T>(left) | static_cast<T>(right));
+    inline meta_column_flags operator|(meta_column_flags left, meta_column_flags right) {
+        using T = std::underlying_type_t<meta_column_flags>;
+        return static_cast<meta_column_flags>(static_cast<T>(left) | static_cast<T>(right));
     }
 
-    struct MetaSchema {
+    struct meta_schema {
         std::string id;
         std::string name;
         std::string db_name;
 
         bool
-        compare_content(const MetaSchema& other);
+        compare_content(const meta_schema& other);
 
-        MetaSchema();
-        MetaSchema(const MetaSchema&) = delete;
-        MetaSchema(MetaSchema&&) = default;
+        meta_schema();
+        meta_schema(const meta_schema&) = delete;
+        meta_schema(meta_schema&&) = default;
 
         static bool
         can_deserialize(bytes_v bytes);
-        static MetaSchema
+        static meta_schema
         deserialize(bytes_v bytes);
         bytes_v
         serialize() const;
     };
 
-    struct MetaColumn {
+    struct meta_column {
         std::string id;
         std::string table_id;
         std::string name;
 
         ValueType type;
-        MetaColumnFlags flags;
+        meta_column_flags flags;
 
-        explicit MetaColumn();
-        explicit MetaColumn(const sql::ColumnDefinition& def);
+        explicit meta_column();
+        explicit meta_column(const sql::ColumnDefinition& def);
         // Restrict copying
-        MetaColumn(const MetaColumn&) = delete;
-        MetaColumn(MetaColumn&&) = default;
-        MetaColumn(const std::string& name, ValueType type, MetaColumnFlags flags);
+        meta_column(const meta_column&) = delete;
+        meta_column(meta_column&&) = default;
+        meta_column(const std::string& name, ValueType type, meta_column_flags flags);
 
         static bool
         can_deserialize(bytes_v bytes);
-        static MetaColumn
+        static meta_column
         deserialize(bytes_v bytes);
         bytes_v
         serialize() const;
     };
 
-    struct MetaTable {
+    struct meta_table {
         std::string id;
         std::string schema_id;
         std::string name;
 
-        std::vector<MetaColumn> columns;
+        std::vector<meta_column> columns;
         uint64_t last_rid;
 
-        MetaTable();
-        MetaTable(MetaTable&& other) = default;
+        meta_table();
+        meta_table(meta_table&& other) = default;
         // Restrict copying 
-        MetaTable(const MetaTable& other) = delete;
+        meta_table(const meta_table& other) = delete;
 
         bool
         has_column(const std::string& name) const;
-        const MetaColumn&
+        const meta_column&
         get_column(const std::string& name) const;
         
         bool
-        compare_content(const MetaTable& other) const;
+        compare_content(const meta_table& other) const;
 
         static bool
         can_deserialize(bytes_v bytes);
-        static MetaTable
+        static meta_table
         deserialize(bytes_v bytes);
         bytes_v
         serialize() const;

@@ -1,12 +1,11 @@
-#include "include/wal/wal_record.hpp"
+#include "include/wal/wal_object.hpp"
 #include "include/shared.hpp"
-#include <cstdint>
 #include <cstring>
 
 namespace storage {
     bytes_v
-    InsertRecord::serialize() const {
-        auto type = static_cast<std::underlying_type_t<WalRecordType>>(InsertRecord::type);
+    insert_record::serialize() const {
+        auto type = static_cast<std::underlying_type_t<wal_record_type>>(insert_record::type);
         auto type_ptr = reinterpret_cast<const uint64_t*>(&type);
         auto id = reinterpret_cast<const char*>(this->table_id.c_str());
 
