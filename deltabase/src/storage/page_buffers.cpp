@@ -127,12 +127,36 @@ namespace storage
     void
     PageBuffers::update_page(DataPage& page) 
     {
-        // найти старый файл
-        // переименовать страницу
-        // старый файл удалить
-        // создать новый файл с новым именем 
-        // записать туда новый контент
-
-
+        // Get table_id to resolve schema and table names
+        std::string table_id = page.table_id();
+        if (table_id.empty()) {
+            throw std::runtime_error(
+                std::format("Cannot update page {}: page has no table_id", page.id())
+            );
+        }
+        
+        // Get table metadata
+        if (!tables_.has(table_id)) {
+            throw std::runtime_error(
+                std::format("Cannot update page {}: table {} not found in cache", 
+                           page.id(), table_id)
+            );
+        }
+        auto& table = tables_.get(table_id);
+        
+        // Get schema metadata
+        if (!schemas_.has(table.schema_id)) {
+            throw std::runtime_error(
+                std::format("Cannot update page {}: schema {} not found in cache",
+                           page.id(), table.schema_id)
+            );
+        }
+        auto& schema = schemas_.get(table.schema_id);
+        
+        // Save the page (overwrites existing file with same id)
+        fm_.save_page(db_name_, schema.name, table.name, page);
+        
+        // Mark the page as clean in cache
+        pages_.mark_clean(page.id());
     }
 } // namespace storage
