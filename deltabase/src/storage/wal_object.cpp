@@ -27,7 +27,7 @@ namespace storage {
     }
 
     uint64_t
-    wal_logfile::size() const {
+    WalLogfile::size() const {
         uint64_t size = 0;
         for (const auto& record : records) {
             size += std::visit([](auto& record) { return record.estimate_size(); }, record);

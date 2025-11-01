@@ -88,7 +88,7 @@ namespace storage {
         estimate_size() const;
     };
 
-    using wal_record = detail::wal_record_variant<
+    using WalRecord = detail::wal_record_variant<
         insert_record, 
         create_schema_record,   
         drop_schema_record,
@@ -99,14 +99,14 @@ namespace storage {
         uint64_t lsn;
     };
 
-    struct wal_logfile {
+    struct WalLogfile {
         static constexpr unsigned long max_logfile_size = 4 * 1024 * 1024; 
 
         std::filesystem::path path;
-        std::vector<wal_record> records;
+        std::vector<WalRecord> records;
 
-        wal_logfile(std::filesystem::path path);
-        wal_logfile(wal_logfile& other) = delete;
+        WalLogfile(std::filesystem::path path);
+        WalLogfile(WalLogfile& other) = delete;
 
         uint64_t first_lsn() const;
         uint64_t last_lsn() const;
@@ -115,7 +115,7 @@ namespace storage {
         static bool
         can_deserialize(bytes_v content) noexcept;
 
-        static wal_logfile
+        static WalLogfile
         deserialize(bytes_v content);
         bytes_v
         serialize();

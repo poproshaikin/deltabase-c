@@ -26,15 +26,14 @@ namespace storage {
         bool is_dirty_;
 
         // ---Methods----
+        DataPage() = default;
         DataPage(std::string id, uint64_t size, RowId min_rid, RowId max_rid);
         // --------------
         friend class FileManager;
+        friend class PageBuffers;
 
     public:
         static const uint64_t max_size = 16 * 1024;
-
-        DataPage() = default;
-        
         // prevent copying (expensive operation with large data)
         DataPage(const DataPage&) = delete;
         DataPage& operator=(const DataPage&) = delete;

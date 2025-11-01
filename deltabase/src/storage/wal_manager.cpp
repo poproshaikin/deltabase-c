@@ -20,9 +20,10 @@ namespace storage
         // TODO: Implement proper WAL loading when file_manager provides access to data_dir
         // For now, start with an empty log
         log_.clear();
+        
     }
 
-    wal_logfile*
+    WalLogfile*
     WalManager::last_logfile() {
         if (log_.empty()) {
             return nullptr;
@@ -36,7 +37,7 @@ namespace storage
         return last_lf;
     }
 
-    wal_logfile
+    WalLogfile
     WalManager::create_logfile() {
         uint64_t lsn = 0;
 
@@ -48,7 +49,7 @@ namespace storage
         auto file = fm_.create_wal_logfile(db_name_, lsn, lsn);
         file.first.close();
 
-        return wal_logfile(file.second);
+        return WalLogfile(file.second);
     }
 
     void
@@ -57,7 +58,7 @@ namespace storage
             return;
 
         // безопасно забираем буфер
-        std::vector<wal_record> buf_copy;
+        std::vector<WalRecord> buf_copy;
         {
             std::scoped_lock lock(buffer_mtx_);
             buf_copy = std::move(buffer_);
@@ -65,7 +66,7 @@ namespace storage
         }
 
         // создаём временный логфайл для записи
-        wal_logfile* logfile_to_write = last_logfile();
+        WalLogfile* logfile_to_write = last_logfile();
         std::vector<std::pair<fs::path, bytes_v>> files_to_write;
         
         // если нет существующих логфайлов, создаём новый
@@ -74,7 +75,7 @@ namespace storage
             file.first.close();
             
             // создаём временный логфайл для работы
-            static thread_local wal_logfile temp_logfile(file.second);
+            static thread_local WalLogfile temp_logfile(file.second);
             temp_logfile.records.clear();
             logfile_to_write = &temp_logfile;
         }
@@ -90,7 +91,7 @@ namespace storage
             uint64_t record_size = std::visit([](const auto& r) { return r.estimate_size(); }, record);
 
             // проверяем, помещается ли запись в текущий логфайл
-            if (logfile_to_write->size() + record_size > wal_logfile::max_logfile_size) {
+            if (logfile_to_write->size() + record_size > WalLogfile::max_logfile_size) {
                 // сохраняем текущий файл для записи
                 if (!logfile_to_write->records.empty()) {
                     files_to_write.emplace_back(logfile_to_write->path, logfile_to_write->serialize());
@@ -101,7 +102,7 @@ namespace storage
                 file.first.close();
                 
                 // создаём новый временный логфайл для работы
-                static thread_local wal_logfile new_temp_logfile(file.second);
+                static thread_local WalLogfile new_temp_logfile(file.second);
                 new_temp_logfile.records.clear();
                 logfile_to_write = &new_temp_logfile;
             }
@@ -137,7 +138,7 @@ namespace storage
     }
 
     void
-    WalManager::insert_to_buffer(const wal_record& record) {
+    WalManager::insert_to_buffer(const WalRecord& record) {
         buffer_mtx_.lock();
         buffer_.push_back(record);
         buffer_mtx_.unlock();

@@ -13,26 +13,26 @@ namespace storage {
         FileManager& fm_;
         std::string db_name_;
 
-        std::vector<wal_logfile> log_;
-        std::vector<wal_record> buffer_;
+        std::vector<WalLogfile> log_;
+        std::vector<WalRecord> buffer_;
         std::mutex buffer_mtx_;
 
         std::thread bg_writer_;
-        wal_writer writer_;
+        WalWriter writer_;
 
         std::chrono::duration<int64_t> checkpoint_interval_ = std::chrono::minutes(1);
 
         void
         load_log();
 
-        wal_logfile*
+        WalLogfile*
         last_logfile();
 
-        wal_logfile
+        WalLogfile
         create_logfile();
 
         void
-        insert_to_buffer(const wal_record& record);
+        insert_to_buffer(const WalRecord& record);
 
         // прочитать
         // потом слить на диск

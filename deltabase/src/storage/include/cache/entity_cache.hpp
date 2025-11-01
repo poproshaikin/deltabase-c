@@ -233,8 +233,9 @@ namespace storage
                 it->second.is_dirty = true;
         }
 
-        void 
-        mark_dirty(const TValue& value) {
+        void
+        mark_dirty(const TValue& value)
+        {
             return mark_dirty(ExtractKey(value));
         }
 
@@ -245,18 +246,21 @@ namespace storage
                 it->second.is_dirty = false;
         }
 
-        void 
-        mark_clean(const TValue& value) {
+        void
+        mark_clean(const TValue& value)
+        {
             return mark_clean(ExtractKey(value));
         }
 
         std::unordered_map<TKey, TValue>
-        map_snapshot() const {
+        map_snapshot() const
+        {
             std::shared_lock lock(*mutex_);
+            
             std::unordered_map<TKey, TValue> result;
-            for (const auto& [k, entry] : data_) {
+            for (const auto& [k, entry] : data_)
                 result.emplace(k, entry.value);
-            }
+
             return result;
         }
     };
