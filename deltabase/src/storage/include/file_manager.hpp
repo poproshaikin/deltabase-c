@@ -3,12 +3,14 @@
 #include "objects/meta_object.hpp"
 #include "pages/page.hpp"
 #include "shared.hpp"
+#include <cstdint>
 #include <filesystem>
+#include <fstream>
 
 namespace storage {
     namespace fs = std::filesystem;
 
-    class file_manager {
+    class FileManager {
         fs::path data_dir_;
 
         void write_file(const fs::path& path, const bytes_v& content);
@@ -21,7 +23,7 @@ namespace storage {
         find_schema_path(const std::string& db_name, const std::string& schema_id) const;
 
     public:
-        explicit file_manager(const fs::path& data_dir);
+        explicit FileManager(const fs::path& data_dir);
 
         bytes_v read_file(const fs::path& path) const;
 
@@ -35,10 +37,10 @@ namespace storage {
             const std::string& page_id
         ) const;
 
-        data_page
+        DataPage
         load_page(const std::string& db_name, const std::string& page_id) const;
 
-        data_page
+        DataPage
         load_page(
             const std::string& db_name,
             const std::string& schema_name,
@@ -46,12 +48,15 @@ namespace storage {
             const std::string& page_id
         ) const;
 
+        std::vector<DataPage>
+        load_all_pages(const std::string& db_name) const;
+
         void
         save_page(
             const std::string& db_name,
             const std::string& schema_name,
             const std::string& table_name,
-            const data_page& page
+            const DataPage& page
         );
 
         bool
@@ -64,10 +69,10 @@ namespace storage {
             const std::string& table_name
         ) const;
 
-        meta_table
+        MetaTable
         load_table(const std::string& db_name, const std::string& table_id) const;
 
-        meta_table
+        MetaTable
         load_table(
             const std::string& db_name,
             const std::string& schema_name,
@@ -76,9 +81,8 @@ namespace storage {
 
         void
         save_table(
-            const std::string& db_name, const std::string& schema_name, const meta_table& table
+            const std::string& db_name, const std::string& schema_name, const MetaTable& table
         );
-
         
         bool
         schema_exists_by_id(const std::string& db_name, const std::string& schema_id) const;
@@ -86,13 +90,13 @@ namespace storage {
         schema_exists_by_name(const std::string& db_name, const std::string& schema_name) const;
 
         
-        meta_schema
+        MetaSchema
         load_schema_by_id(const std::string& db_name, const std::string& schema_id) const;
-        meta_schema
+        MetaSchema
         load_schema_by_name(const std::string& db_name, const std::string& schema_name) const;
 
         void
-        save_schema(const meta_schema& schema);
+        save_schema(const MetaSchema& schema);
 
         std::vector<fs::path>
         get_tables_paths(const std::string& db_name, const std::string& schema_name);
@@ -102,5 +106,8 @@ namespace storage {
 
         bool
         create_dir(const fs::path& path);
+
+        std::pair<std::ofstream, fs::path>
+        create_wal_logfile(const std::string& db_name, uint64_t first_lsn, uint64_t last_lsn);
     };
 }

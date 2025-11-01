@@ -55,7 +55,7 @@ namespace exe {
 
         exe::InsertAction action{.table = table, .schema = schema};
 
-        storage::data_row row;
+        storage::DataRow row;
         row.tokens.reserve(stmt.values.size());
         
         for (size_t i = 0; i < stmt.values.size() && i < table.columns.size(); i++) {
@@ -63,7 +63,7 @@ namespace exe {
             const auto& value = stmt.values[i].value;
             
             storage::bytes_v literal = converter::convert_str_to_literal(value, column.type);
-            storage::data_token token(literal, column.type);
+            storage::DataToken token(literal, column.type);
             row.tokens.push_back(std::move(token));
         } 
         
@@ -118,7 +118,7 @@ namespace exe {
     query_planner::create_plan(const sql::CreateTableStatement& stmt) {
         auto& schema = storage_.get_schema(stmt.table);
 
-        storage::meta_table table;
+        storage::MetaTable table;
         table.name = stmt.table.table_name.value;
         table.schema_id = schema.id;
         table.columns.reserve(stmt.columns.size());
@@ -140,7 +140,7 @@ namespace exe {
 
     QueryPlan
     query_planner::create_plan(const sql::CreateSchemaStatement& stmt) {
-        storage::meta_schema schema;
+        storage::MetaSchema schema;
         schema.name = stmt.name.value;
 
         return SingleActionPlan{exe::CreateSchemaAction{schema}};

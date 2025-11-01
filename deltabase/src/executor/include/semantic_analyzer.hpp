@@ -75,18 +75,18 @@ namespace exe {
         analyze_create_schema(sql::CreateSchemaStatement& stmt) -> AnalysisResult;
 
         auto
-        analyze_where(std::unique_ptr<sql::AstNode>& where, const storage::meta_table& table) -> AnalysisResult;
+        analyze_where(std::unique_ptr<sql::AstNode>& where, const storage::MetaTable& table) -> AnalysisResult;
 
         auto
         validate_column_comparison(
             const std::unique_ptr<sql::AstNode>& left,
             const std::unique_ptr<sql::AstNode>& right,
-            const storage::meta_table& table
+            const storage::MetaTable& table
         ) -> AnalysisResult;
 
         auto
         validate_column_assignment(
-            const sql::AstNode& assignment, const storage::meta_table& table
+            const sql::AstNode& assignment, const storage::MetaTable& table
         ) -> AnalysisResult;
 
         void

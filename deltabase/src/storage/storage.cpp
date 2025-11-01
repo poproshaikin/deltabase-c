@@ -3,6 +3,7 @@
 #include "include/cache/key_extractor.hpp"
 #include "include/objects/meta_object.hpp"
 #include "include/paths.hpp"
+#include "wal/wal_manager.hpp"
 #include <filesystem>
 
 namespace storage {
@@ -23,9 +24,11 @@ namespace storage {
     void
     storage::attach_db(const std::string& db_name) {
         db_name_ = db_name;
-        schemas_.emplace(meta_schema_accessor(db_name, fm_));
-        tables_.emplace(meta_table_accessor(db_name, fm_));
+        schemas_.emplace(MetaSchemaAccessor(db_name, fm_));
+        tables_.emplace(MetaTableAccessor(db_name, fm_));
+        wal_manager_.emplace();
         page_buffers_.emplace(schemas_.value(), tables_.value());
+        checkpoint_ctl_.emplace(*wal_manager_, *page_buffers_);
     }
 
     void
@@ -50,7 +53,7 @@ namespace storage {
     // ----- Schemas -----
 
     void
-    storage::create_schema(meta_schema&& schema) {
+    storage::create_schema(MetaSchema&& schema) {
         ensure_attached("create_schema");
 
         // auto dir_path = path_db_schema(data_dir_, db_name_.value(), schema.name);
@@ -74,7 +77,7 @@ namespace storage {
         // metafile.close();
     }
 
-    meta_schema&
+    MetaSchema&
     storage::get_schema(const std::string& schema_name) const { 
         ensure_attached("get_schema");
 
@@ -85,7 +88,7 @@ namespace storage {
         return schemas_->get(schema_key);
     }
 
-    meta_schema&
+    MetaSchema&
     storage::get_schema(const sql::TableIdentifier& identifier) const { 
         return get_schema(identifier.schema_name.value().value);
     }
@@ -120,7 +123,7 @@ namespace storage {
         return find_schema_key(schema_id) != std::nullopt;
     }
 
-    meta_schema&
+    MetaSchema&
     storage::get_schema_by_id(const std::string& id) const {
         ensure_attached("get_schema_by_id");
 
@@ -139,7 +142,7 @@ namespace storage {
         if (!schemas_->has(schema_key)) 
             throw std::runtime_error("Storage::drop_schema: schema " + schema_name + " doesnt exist");
         
-        meta_schema schema = schemas_->remove(schema_key);
+        MetaSchema schema = schemas_->remove(schema_key);
         wal_.push_drop_schema(schema);
 
         auto dir_path = path_db_schema(data_dir_, db_name_.value(), schema.name);
@@ -149,7 +152,7 @@ namespace storage {
     // ----- Tables -----
 
     void
-    storage::create_table(meta_table&& table) {
+    storage::create_table(MetaTable&& table) {
         ensure_attached("create_table");
 
         if (!exists_schema_by_id(table.schema_id)) 
@@ -193,7 +196,7 @@ namespace storage {
         return exists_table(identifier.schema_name->value, identifier.table_name.value);
     }
 
-    meta_table&
+    MetaTable&
     storage::get_table(const std::string& name) {
         ensure_attached("get_table");
 
@@ -221,7 +224,7 @@ namespace storage {
         return find_table_key(table_id) != std::nullopt;
     }
 
-    meta_table&
+    MetaTable&
     storage::get_table_by_id(const std::string& id) {
         ensure_attached("get_table_by_id");
         auto key = find_table_key(id);
@@ -231,14 +234,14 @@ namespace storage {
     }
 
     void
-    storage::update_table(const meta_table& new_table) {
+    storage::update_table(const MetaTable& new_table) {
 
     }
 
     // ----- Data -----
 
     void
-    storage::insert_row(meta_table& table, data_row row) {
+    storage::insert_row(MetaTable& table, DataRow row) {
         if (!page_buffers_.has_value()) 
             throw std::runtime_error("Storage::insert_row: storage is not attached to a db");
 
@@ -247,15 +250,15 @@ namespace storage {
     }
 
     uint64_t
-    update_rows_by_filter(meta_table& table, const data_filter& filter, const data_row_update& update);
+    update_rows_by_filter(MetaTable& table, const DataFilter& filter, const DataRowUpdate& update);
 
     uint64_t
-    delete_rows_by_filter(meta_table& table, const std::optional<data_filter>& filter);
+    delete_rows_by_filter(MetaTable& table, const std::optional<DataFilter>& filter);
 
-    data_table
+    DataTable
     seq_scan(
-        const meta_table& table,
+        const MetaTable& table,
         const std::vector<std::string>& column_names,
-        const std::optional<data_filter>& filter
+        const std::optional<DataFilter>& filter
     );
 }

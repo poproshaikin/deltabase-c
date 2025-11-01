@@ -58,7 +58,7 @@ namespace exe {
     ActionExecutor::execute_action(const SeqScanAction& action) noexcept {
         try {
             auto result = storage_.seq_scan(action.table, action.columns, action.filter);
-            return ActionExecutionResult(std::make_unique<storage::data_table>(std::move(result)));
+            return ActionExecutionResult(std::make_unique<storage::DataTable>(std::move(result)));
         } catch (const std::exception& e) {
             return {std::make_pair(
                 std::string("Seq scan execution error: ") + e.what(), ActionError::SYSTEM_ERROR
@@ -85,7 +85,7 @@ namespace exe {
     ActionExecutor::execute_action(const UpdateByFilterAction& action) noexcept {
         try {
             auto rows_affected = storage_.update_rows_by_filter(
-                const_cast<storage::meta_table&>(action.table),
+                const_cast<storage::MetaTable&>(action.table),
                 action.filter.value(), // Предполагаем что filter обязательный
                 action.row_update
             );
@@ -104,7 +104,7 @@ namespace exe {
     ActionExecutor::execute_action(const DeleteByFilterAction& action) noexcept {
         try {
             auto rows_affected = storage_.delete_rows_by_filter(
-                const_cast<storage::meta_table&>(action.table), action.filter
+                const_cast<storage::MetaTable&>(action.table), action.filter
             );
             return ActionExecutionResult(rows_affected);
         } catch (const std::exception& e) {

@@ -2,12 +2,14 @@
 #define MISC_UTILS_HPP
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include <uuid/uuid.h>
+#include <stdexcept>
 
 auto
 split(const std::string& s, char delimiter, int count = 0) -> std::vector<std::string>;
@@ -90,5 +92,99 @@ make_uuid_str(const uuid_t uuid);
 
 void
 parse_uuid_str(const std::string& str, uuid_t uuid);
+
+class MemoryStream 
+{
+    std::vector<uint8_t>& buffer_;
+    mutable size_t position_;
+public:
+    explicit MemoryStream(std::vector<uint8_t>& buffer) : buffer_(buffer), position_(0)
+    {
+    }
+
+    size_t
+    read(void* dest, size_t count) const
+    {
+        if (position_ + count > buffer_.size())
+            count = buffer_.size() - position_;
+
+        std::memcpy(dest, buffer_.data() + position_, count);
+        position_ += count;
+        return count;
+    }
+
+    void
+    write(const void* src, size_t count)
+    {
+        if (position_ + count > buffer_.size())
+            buffer_.resize(position_ + count);
+
+        std::memcpy(buffer_.data() + position_, src, count);
+        position_ += count;
+    }
+
+    void
+    seek(size_t pos) const
+    {
+        if (pos > buffer_.size())
+            throw std::out_of_range("seek past end");
+
+        position_ = pos;
+    }
+
+    size_t
+    tell() const
+    {
+        return position_;
+    }
+};
+
+class ReadOnlyMemoryStream
+{
+    const std::vector<uint8_t>& buffer_;
+    mutable size_t position_;
+public:
+    explicit ReadOnlyMemoryStream(const std::vector<uint8_t>& buffer) : buffer_(buffer), position_(0)
+    {
+    }
+
+    size_t
+    read(void* dest, size_t count) const
+    {
+        if (position_ + count > buffer_.size())
+            count = buffer_.size() - position_;
+
+        std::memcpy(dest, buffer_.data() + position_, count);
+        position_ += count;
+        return count;
+    }
+
+    void
+    seek(size_t pos) const
+    {
+        if (pos > buffer_.size())
+            throw std::out_of_range("seek past end");
+
+        position_ = pos;
+    }
+
+    size_t
+    tell() const
+    {
+        return position_;
+    }
+
+    size_t
+    size() const
+    {
+        return buffer_.size();
+    }
+
+    size_t
+    remaining() const
+    {
+        return buffer_.size() - position_;
+    }
+};
 
 #endif

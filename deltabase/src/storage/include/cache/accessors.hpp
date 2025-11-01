@@ -14,36 +14,36 @@ namespace storage {
         { accessor.get(key) } -> std::same_as<V>;
     };
 
-    class data_page_accessor {
-        file_manager& fm_;
+    class DataPageAccessor {
+        FileManager& fm_;
         std::string db_name_;
     public:
-        explicit data_page_accessor(const std::string& db_name, file_manager& fm);
+        explicit DataPageAccessor(const std::string& db_name, FileManager& fm);
         bool
         has(std::string id) const noexcept;
-        data_page
+        DataPage
         get(std::string id);
     };
 
-    class meta_table_accessor {
-        file_manager& fm_;
+    class MetaTableAccessor {
+        FileManager& fm_;
         std::string db_name_;
     public:
-        explicit meta_table_accessor(const std::string& db_name, file_manager& fm);
+        explicit MetaTableAccessor(const std::string& db_name, FileManager& fm);
         bool
         has(std::string id) const noexcept;
-        meta_table
+        MetaTable
         get(std::string id);
     };
 
-    class meta_schema_accessor {
-        file_manager& fm_;
+    class MetaSchemaAccessor {
+        FileManager& fm_;
         std::string db_name_;
     public:
-        explicit meta_schema_accessor(const std::string& db_name, file_manager& fm);
+        explicit MetaSchemaAccessor(const std::string& db_name, FileManager& fm);
         bool
         has(std::string id) const noexcept;
-        meta_schema
+        MetaSchema
         get(std::string id);
     };
 

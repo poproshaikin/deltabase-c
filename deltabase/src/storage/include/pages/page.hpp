@@ -4,27 +4,43 @@
 #include "../objects/data_object.hpp"
 
 namespace storage {
-    class data_page {
+    struct DataPageHeader {
+        std::string id;
+        uint64_t size;
+        RowId min_rid;
+        RowId max_rid;
+    };
+
+    class DataPage {
+
         // --- Header ---
         std::string id_;
         uint64_t size_;
         RowId min_rid_;
         RowId max_rid_;
-        // --------------
-        
-        std::vector<data_row> rows_;
+
+        // ----Props-----
+        static const int max_tokens = 50000;
+        std::vector<DataRow> rows_;
         bool is_dirty_;
 
+        // ---Methods----
+        DataPage(std::string id, uint64_t size, RowId min_rid, RowId max_rid);
+        // --------------
+        friend class FileManager;
+
     public:
-        static constexpr uint64_t max_size = 8 * 1024;
+        static const uint64_t max_size = 16 * 1024;
 
-        static bool
-        can_deserialize(const bytes_v& bytes);
-        static data_page
-        deserialize(const bytes_v& bytes);
-
-        data_page() = default;
-        data_page(const meta_table& table, bytes_v bytes);
+        DataPage() = default;
+        
+        // prevent copying (expensive operation with large data)
+        DataPage(const DataPage&) = delete;
+        DataPage& operator=(const DataPage&) = delete;
+        
+        // allow moving
+        DataPage(DataPage&&) = default;
+        DataPage& operator=(DataPage&&) = default;
 
         std::string
         id() const;
@@ -39,23 +55,27 @@ namespace storage {
 
         bool
         has_row(RowId rid) const;
-        data_row&
+        DataRow&
         get_row(RowId rid);
 
-        const std::vector<data_row>& 
+        const std::vector<DataRow>& 
         rows() const;
 
         bool
-        can_insert(const data_row& row) const noexcept;
+        can_insert(const DataRow& row) const noexcept;
         RowId
-        insert_row(meta_table& table, data_row& row);
+        insert_row(MetaTable& table, DataRow& row);
 
         RowId
-        update_row(meta_table& table, RowId old_row, data_row_update& update);
+        update_row(MetaTable& table, RowId old_row, DataRowUpdate& update);
 
         void
         delete_row(RowId id);
 
-        bytes_v serialize() const;
+        bytes_v
+        serialize() const;
+
+        static bool
+        try_deserialize(const bytes_v& bytes, DataPage& out_result);
     };
 }

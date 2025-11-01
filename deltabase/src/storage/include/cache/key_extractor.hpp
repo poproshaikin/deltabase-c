@@ -18,7 +18,7 @@ namespace storage {
     }
 
     std::string
-    make_key(const meta_schema& schema) {
+    make_key(const MetaSchema& schema) {
         return make_schema_key(schema.name);
     }
 
@@ -28,7 +28,7 @@ namespace storage {
     }
 
     std::string
-    make_key(const meta_table& table) {
+    make_key(const MetaTable& table) {
         return make_table_key(table.schema_id, table.name);
     }
 
@@ -38,7 +38,7 @@ namespace storage {
     }
 
     std::string
-    make_key(const data_page& page) {
+    make_key(const DataPage& page) {
         return page.id();
     }
 }

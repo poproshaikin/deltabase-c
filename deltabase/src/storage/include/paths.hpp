@@ -1,5 +1,6 @@
 #pragma once 
 
+#include <cstdint>
 #include <string>
 #include <filesystem>
 
@@ -16,18 +17,18 @@
 namespace storage {
     namespace fs = std::filesystem;
 
-    static const std::string DATA = "data";
-    static const std::string WAL  = "wal";
-    static const std::string META = "meta";
+    static const std::string data = "data";
+    static const std::string wal  = "wal";
+    static const std::string meta = "meta";
 
     fs::path
-    path_db_wal(const fs::path& data_dir) {
-        return data_dir / WAL;
+    path_db_wal(const fs::path& data_dir, const std::string db_name) {
+        return data_dir / db_name / wal;
     }
 
     fs::path
-    path_db_wal() {
-        return path_db_wal(DATA);
+    path_db_wal_logfile(const fs::path& data_dir, const std::string& db_name, uint64_t first_lsn, uint64_t last_lsn) {
+        return data_dir / db_name / (std::to_string(first_lsn) + "_" + std::to_string(last_lsn)); 
     }
 
     fs::path
@@ -43,7 +44,7 @@ namespace storage {
         const std::string& table_name,
         const std::string& page_id
     ) {
-        return data_dir / db_name / schema_name / table_name / DATA / page_id;
+        return data_dir / db_name / schema_name / table_name / data / page_id;
     }
 
     fs::path
@@ -82,6 +83,6 @@ namespace storage {
 
     inline std::string 
     make_meta_filename(const std::string& name) {
-        return name + "." + META;
+        return name + "." + meta;
     }
 }

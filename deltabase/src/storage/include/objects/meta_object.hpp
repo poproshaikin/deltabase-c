@@ -22,27 +22,27 @@ namespace storage {
         return static_cast<meta_column_flags>(static_cast<T>(left) | static_cast<T>(right));
     }
 
-    struct meta_schema {
+    struct MetaSchema {
         std::string id;
         std::string name;
         std::string db_name;
 
         bool
-        compare_content(const meta_schema& other);
+        compare_content(const MetaSchema& other);
 
-        meta_schema();
-        meta_schema(const meta_schema&) = delete;
-        meta_schema(meta_schema&&) = default;
+        MetaSchema();
+        MetaSchema(const MetaSchema&) = delete;
+        MetaSchema(MetaSchema&&) = default;
 
         static bool
         can_deserialize(bytes_v bytes);
-        static meta_schema
+        static MetaSchema
         deserialize(bytes_v bytes);
         bytes_v
         serialize() const;
     };
 
-    struct meta_column {
+    struct MetaColumn {
         std::string id;
         std::string table_id;
         std::string name;
@@ -50,45 +50,45 @@ namespace storage {
         ValueType type;
         meta_column_flags flags;
 
-        explicit meta_column();
-        explicit meta_column(const sql::ColumnDefinition& def);
+        explicit MetaColumn();
+        explicit MetaColumn(const sql::ColumnDefinition& def);
         // Restrict copying
-        meta_column(const meta_column&) = delete;
-        meta_column(meta_column&&) = default;
-        meta_column(const std::string& name, ValueType type, meta_column_flags flags);
+        MetaColumn(const MetaColumn&) = delete;
+        MetaColumn(MetaColumn&&) = default;
+        MetaColumn(const std::string& name, ValueType type, meta_column_flags flags);
 
         static bool
         can_deserialize(bytes_v bytes);
-        static meta_column
+        static MetaColumn
         deserialize(bytes_v bytes);
         bytes_v
         serialize() const;
     };
 
-    struct meta_table {
+    struct MetaTable {
         std::string id;
         std::string schema_id;
         std::string name;
 
-        std::vector<meta_column> columns;
+        std::vector<MetaColumn> columns;
         uint64_t last_rid;
 
-        meta_table();
-        meta_table(meta_table&& other) = default;
+        MetaTable();
+        MetaTable(MetaTable&& other) = default;
         // Restrict copying 
-        meta_table(const meta_table& other) = delete;
+        MetaTable(const MetaTable& other) = delete;
 
         bool
         has_column(const std::string& name) const;
-        const meta_column&
+        const MetaColumn&
         get_column(const std::string& name) const;
         
         bool
-        compare_content(const meta_table& other) const;
+        compare_content(const MetaTable& other) const;
 
         static bool
         can_deserialize(bytes_v bytes);
-        static meta_table
+        static MetaTable
         deserialize(bytes_v bytes);
         bytes_v
         serialize() const;

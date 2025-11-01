@@ -1,26 +1,25 @@
 #pragma once
 
 #include <string>
-#include <utility>
 
 #include "../../sql/include/parser.hpp"
 #include "../../storage/include/storage.hpp"
 
 namespace converter {
-    std::vector<std::byte>
+    storage::bytes_v
     convert_str_to_literal(const std::string& literal, storage::ValueType expected_type);
 
     auto
-    convert_astnode_to_token(const sql::AstNode* node, storage::ValueType expected_type) -> storage::data_token;
+    convert_astnode_to_token(const sql::AstNode* node, storage::ValueType expected_type) -> storage::DataToken;
 
     auto
-    parse_filter_op(sql::AstOperator op) -> storage::filter_op;
+    parse_filter_op(sql::AstOperator op) -> storage::FilterOp;
 
     auto
-    convert_binary_to_filter(const sql::BinaryExpr& where, const storage::meta_table& table) -> storage::data_filter;
+    convert_binary_to_filter(const sql::BinaryExpr& where, const storage::MetaTable& table) -> storage::DataFilter;
 
     auto
-    convert_defs_to_mcs(std::vector<sql::ColumnDefinition> defs) -> std::vector<storage::meta_column>;
+    convert_defs_to_mcs(std::vector<sql::ColumnDefinition> defs) -> std::vector<storage::MetaColumn>;
 
     auto
     convert_kw_to_vt(const sql::SqlKeyword& kw) -> storage::ValueType;
