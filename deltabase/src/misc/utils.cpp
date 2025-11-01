@@ -47,3 +47,26 @@ print_ram_usage() {
         }
     }
 }
+
+std::string
+make_uuid_str() {
+    char str[37];
+    uuid_t uuid;
+
+    uuid_generate_time(uuid);
+    uuid_unparse(uuid, str);
+
+    return std::string(str, 37);
+}
+
+std::string
+make_uuid_str(const uuid_t uuid) {
+    char str[37];
+    uuid_unparse(uuid, str);
+    return std::string(str, 37);
+}
+
+void
+parse_uuid_str(const std::string& str, uuid_t uuid) {
+    uuid_parse(str.c_str(), uuid);
+}

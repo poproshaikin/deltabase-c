@@ -6,10 +6,6 @@
 #include <cstring>
 #include <variant>
 
-extern "C" {
-#include "../core/include/core.h"
-}
-
 namespace exe {
 
     SemanticAnalyzer::SemanticAnalyzer(catalog::MetaRegistry& registry) : registry_(registry) {
@@ -37,7 +33,7 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze(const sql::AstNode& ast) -> AnalysisResult {
+    SemanticAnalyzer::analyze(sql::AstNode& ast) -> AnalysisResult {
         switch (ast.type) {
         case sql::AstNodeType::SELECT:
             return analyze_select(std::get<sql::SelectStatement>(ast.value));
@@ -66,43 +62,29 @@ namespace exe {
     }
 
     auto
-    SemanticAnalyzer::analyze_select(const sql::SelectStatement& stmt) -> AnalysisResult {
-        auto normalized_table = normalize_table_identifier(stmt.table);
+    SemanticAnalyzer::analyze_select(sql::SelectStatement& stmt) -> AnalysisResult {
+        stmt.table = normalize_table_identifier(stmt.table);
 
-        if (normalized_table.table_name.value.empty()) {
+        if (stmt.table.table_name.value.empty()) {
             return std::runtime_error("Select statement missing target table");
         }
 
-        if (!registry_.has_table(normalized_table) &&
-            !registry_.has_virtual_table(normalized_table)) {
-            return TableDoesntExist(normalized_table.table_name.value);
+        if (!storage_.exists_table(stmt.table) &&
+            !storage_.exists_virtual_table(stmt.table)) {
+            return TableDoesntExist(stmt.table.table_name.value);
         }
 
-        std::unique_ptr<catalog::CppMetaTable> table;
-        if (catalog::is_table_virtual(stmt.table)) {
-
-            std::cout << normalized_table.table_name.value << std::endl;
-            std::cout << normalized_table.schema_name.value().value << std::endl;
-            table = std::make_unique<catalog::CppMetaTable>(
-                registry_.get_virtual_table(normalized_table)
-            );
-        } else {
-            table = std::make_unique<catalog::CppMetaTable>(
-                registry_.get_table(normalized_table.table_name.value)
-            );
-        }
-
-        if (!table) {
-            throw std::runtime_error("Registry inconsistency: table exists check passed but retrieval failed - possible race condition or registry corruption");
-        }
+        storage::MetaTable& table = storage_.exists_virtual_table(stmt.table)
+            ? storage_.get_virtual_meta_table(stmt.table)
+            : storage_.get_table(stmt.table);
 
         for (const sql::SqlToken& col : stmt.columns) {
-            if (!table->has_column(col.value)) {
+            if (!table.has_column(col.value)) {
                 return ColumnDoesntExists(col.value);
             }
         }
 
-        auto where_result = analyze_where(stmt.where, *table);
+        auto where_result = analyze_where(stmt.where, table);
         if (!where_result.is_valid) {
             return where_result.err.value();
         }

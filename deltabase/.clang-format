@@ -16,9 +16,8 @@ DerivePointerAlignment: false
 PointerAlignment: Left
 ReferenceAlignment: Left
 
-
 AlwaysBreakAfterReturnType: All
-BreakBeforeBraces: Attach
+BreakBeforeBraces: Allman
 AllowShortFunctionsOnASingleLine: None
 
 AccessModifierOffset: -4

@@ -1,9 +1,8 @@
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
 
-#include "../../executor/include/query_executor.hpp"
+#include "../../executor/include/executor.hpp"
 #include "../../executor/include/semantic_analyzer.hpp"
-#include "query_router.hpp"
 #include "config.hpp"
 #include <string>
 
@@ -20,7 +19,6 @@ namespace engine {
     };
 
     class DltEngine {
-        QueryRouter router_;
         exe::SemanticAnalyzer semantic_analyzer_;
         catalog::MetaRegistry registry_;
         EngineConfig cfg_;
