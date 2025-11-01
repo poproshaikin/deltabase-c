@@ -16,6 +16,11 @@ namespace storage {
         return id_;
     }
 
+    std::string
+    DataPage::table_id() const {
+        return table_id_;
+    }
+
     uint64_t
     DataPage::size() const {
         return size_;
@@ -74,6 +79,11 @@ namespace storage {
             throw std::runtime_error(std::format("Page {} hasn't enough space for a new row", id_));
         }
 
+        // Set table_id if not already set
+        if (table_id_.empty()) {
+            table_id_ = table.id;
+        }
+
         row.row_id = ++table.last_rid;
         rows_.push_back(row);
         size_ += row.estimate_size();
@@ -109,6 +119,7 @@ namespace storage {
     DataPage::serialize() const {
         auto estimate_size = [this]() -> uint64_t {
             uint64_t size = sizeof(uint64_t) + id_.size(); // id length + id bytes
+            size += sizeof(uint64_t) + table_id_.size(); // table_id length + table_id bytes
             size += sizeof(size_) + sizeof(min_rid_) + sizeof(max_rid_);
             
             for (const auto& row : rows_) {
@@ -126,6 +137,11 @@ namespace storage {
         uint64_t id_length = id_.size();
         stream.write(&id_length, sizeof(id_length));
         stream.write(id_.data(), id_.size());
+
+        // Write table_id with length prefix
+        uint64_t table_id_length = table_id_.size();
+        stream.write(&table_id_length, sizeof(table_id_length));
+        stream.write(table_id_.data(), table_id_.size());
 
         // Write size, min_rid, max_rid
         stream.write(&size_, sizeof(size_));
@@ -163,6 +179,20 @@ namespace storage {
             return false;
 
         out_result.id_ = id_str;
+
+        // table_id
+        uint64_t table_id_length;
+        if (stream.read(&table_id_length, sizeof(table_id_length)) != sizeof(table_id_length))
+            return false;
+
+        if (table_id_length > 1024) // sanity check
+            return false;
+
+        std::string table_id_str(table_id_length, '\0');
+        if (stream.read(table_id_str.data(), table_id_length) != table_id_length)
+            return false;
+
+        out_result.table_id_ = table_id_str;
 
         // size
         if (stream.read(&out_result.size_, sizeof(uint64_t)) != sizeof(uint64_t))

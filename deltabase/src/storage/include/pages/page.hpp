@@ -15,6 +15,7 @@ namespace storage {
 
         // --- Header ---
         std::string id_;
+        std::string table_id_;
         uint64_t size_;
         RowId min_rid_;
         RowId max_rid_;
@@ -44,6 +45,8 @@ namespace storage {
 
         std::string
         id() const;
+        std::string
+        table_id() const;
         uint64_t
         size() const;
         RowId

@@ -238,6 +238,18 @@ namespace storage
             return mark_dirty(ExtractKey(value));
         }
 
+        void
+        mark_clean(const TKey& key)
+        {
+            if (auto it = data_.find(key); it != data_.end())
+                it->second.is_dirty = false;
+        }
+
+        void 
+        mark_clean(const TValue& value) {
+            return mark_clean(ExtractKey(value));
+        }
+
         std::unordered_map<TKey, TValue>
         map_snapshot() const {
             std::shared_lock lock(*mutex_);
