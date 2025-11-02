@@ -45,14 +45,17 @@ namespace storage
     void
     PageBuffers::flush()
     {
-        // Collect all dirty pages and their metadata in a snapshot
-        // to minimize time holding the lock
-        struct PageFlushInfo {
+        struct PageFlushInfo
+        {
             std::string page_id;
             std::string table_id;
-            bytes_v serialized_data;
+            const DataPage &page;
+            PageFlushInfo(std::string page_id, std::string table_id, const DataPage& page)
+                : page_id(page_id), table_id(table_id), page(page)
+            {
+            }
         };
-        
+
         std::vector<PageFlushInfo> pages_to_flush;
         
         // Iterate over all pages and collect dirty ones
@@ -60,32 +63,20 @@ namespace storage
         {
             if (entry.is_dirty)
             {
-                const auto& page = entry.value;
+                auto& page = entry.value;
                 
-                // Need to resolve schema_name and table_name from table_id
                 std::string table_id = page.table_id();
                 
-                if (table_id.empty()) {
-                    // Skip pages without table_id (shouldn't happen, but be safe)
+                if (table_id.empty()) 
                     continue;
-                }
                 
-                // Serialize the page while we have access to it
-                PageFlushInfo info;
-                info.page_id = page.id();
-                info.table_id = table_id;
-                info.serialized_data = page.serialize();
-                
-                pages_to_flush.push_back(std::move(info));
+                pages_to_flush.emplace_back(page.id(), table_id, page);
             }
         }
         
-        // Now flush each page to disk
         for (const auto& flush_info : pages_to_flush)
         {
-            // Get table to find schema_name and table_name
             if (!tables_.has(flush_info.table_id)) {
-                // Table not in cache, this is an error
                 throw std::runtime_error(
                     std::format("Cannot flush page {}: table {} not found in cache",
                                flush_info.page_id, flush_info.table_id)
@@ -94,9 +85,7 @@ namespace storage
             
             auto& table = tables_.get(flush_info.table_id);
             
-            // Get schema to find schema_name
             if (!schemas_.has(table.schema_id)) {
-                // Schema not in cache, this is an error
                 throw std::runtime_error(
                     std::format("Cannot flush page {}: schema {} not found in cache",
                                flush_info.page_id, table.schema_id)
@@ -104,22 +93,8 @@ namespace storage
             }
             
             auto& schema = schemas_.get(table.schema_id);
-            
-            // Write the page to disk using FileManager
-            // Note: save_page expects a DataPage, but we only have serialized data
-            // We need to deserialize it back or change the approach
-            
-            // Better approach: Let's reconstruct the page temporarily
-            DataPage temp_page;
-            if (!DataPage::try_deserialize(flush_info.serialized_data, temp_page)) {
-                throw std::runtime_error(
-                    std::format("Failed to deserialize page {} for flushing", flush_info.page_id)
-                );
-            }
-            
-            fm_.save_page(db_name_, schema.name, table.name, temp_page);
-            
-            // Mark the page as clean in the cache
+
+            fm_.save_page(db_name_, schema.name, table.name, flush_info.page);
             pages_.mark_clean(flush_info.page_id);
         }
     }
@@ -127,36 +102,37 @@ namespace storage
     void
     PageBuffers::update_page(DataPage& page) 
     {
-        // Get table_id to resolve schema and table names
         std::string table_id = page.table_id();
-        if (table_id.empty()) {
+        if (table_id.empty())
+        {
             throw std::runtime_error(
                 std::format("Cannot update page {}: page has no table_id", page.id())
             );
         }
-        
-        // Get table metadata
-        if (!tables_.has(table_id)) {
+
+        if (!tables_.has(table_id))
+        {
             throw std::runtime_error(
-                std::format("Cannot update page {}: table {} not found in cache", 
-                           page.id(), table_id)
+                std::format(
+                    "Cannot update page {}: table {} not found in cache", page.id(), table_id
+                )
             );
         }
         auto& table = tables_.get(table_id);
-        
-        // Get schema metadata
-        if (!schemas_.has(table.schema_id)) {
+
+        if (!schemas_.has(table.schema_id))
+        {
             throw std::runtime_error(
-                std::format("Cannot update page {}: schema {} not found in cache",
-                           page.id(), table.schema_id)
+                std::format(
+                    "Cannot update page {}: schema {} not found in cache",
+                    page.id(),
+                    table.schema_id
+                )
             );
         }
         auto& schema = schemas_.get(table.schema_id);
         
-        // Save the page (overwrites existing file with same id)
         fm_.save_page(db_name_, schema.name, table.name, page);
-        
-        // Mark the page as clean in cache
         pages_.mark_clean(page.id());
     }
 } // namespace storage

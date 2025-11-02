@@ -17,10 +17,8 @@ namespace storage
     void
     WalManager::load_log()
     {
-        // TODO: Implement proper WAL loading when file_manager provides access to data_dir
-        // For now, start with an empty log
         log_.clear();
-        auto log = fm_.load_wal(db_name_);
+        log_ = fm_.load_wal(db_name_);
     }
 
     WalLogfile*
@@ -57,7 +55,6 @@ namespace storage
         if (buffer_.empty())
             return;
 
-        // безопасно забираем буфер
         std::vector<WalRecord> buf_copy;
         {
             std::scoped_lock lock(buffer_mtx_);
@@ -65,71 +62,57 @@ namespace storage
             buffer_.clear();
         }
 
-        // создаём временный логфайл для записи
         WalLogfile* logfile_to_write = last_logfile();
         std::vector<std::pair<fs::path, bytes_v>> files_to_write;
         
-        // если нет существующих логфайлов, создаём новый
         if (!logfile_to_write) {
             auto file = fm_.create_wal_logfile(db_name_, 1, 1);
             file.first.close();
             
-            // создаём временный логфайл для работы
             static thread_local WalLogfile temp_logfile(file.second);
             temp_logfile.records.clear();
             logfile_to_write = &temp_logfile;
         }
 
-        // получаем текущий LSN для присвоения записям
         uint64_t current_lsn = logfile_to_write->records.empty() ? 0 : logfile_to_write->last_lsn();
 
         for (auto& record : buf_copy) {
-            // присваиваем LSN записи
             ++current_lsn;
             std::visit([current_lsn](auto& r) { r.lsn = current_lsn; }, record);
 
             uint64_t record_size = std::visit([](const auto& r) { return r.estimate_size(); }, record);
 
-            // проверяем, помещается ли запись в текущий логфайл
             if (logfile_to_write->size() + record_size > WalLogfile::max_logfile_size) {
-                // сохраняем текущий файл для записи
                 if (!logfile_to_write->records.empty()) {
                     files_to_write.emplace_back(logfile_to_write->path, logfile_to_write->serialize());
                 }
                 
-                // создаём новый логфайл
                 auto file = fm_.create_wal_logfile(db_name_, current_lsn, current_lsn);
                 file.first.close();
                 
-                // создаём новый временный логфайл для работы
                 static thread_local WalLogfile new_temp_logfile(file.second);
                 new_temp_logfile.records.clear();
                 logfile_to_write = &new_temp_logfile;
             }
 
-            // добавляем запись в логфайл
             logfile_to_write->records.push_back(std::move(record));
         }
         
-        // добавляем последний файл для записи
         if (!logfile_to_write->records.empty()) {
             files_to_write.emplace_back(logfile_to_write->path, logfile_to_write->serialize());
         }
 
-        // записываем все файлы на диск
         for (const auto& [path, data] : files_to_write) {
             try {
                 std::ofstream stream(path, std::ios::binary | std::ios::trunc);
-                if (!stream.is_open()) {
+                if (!stream.is_open()) 
                     throw std::runtime_error("Failed to open WAL file: " + path.string());
-                }
 
                 stream.write(reinterpret_cast<const char*>(data.data()), data.size());
                 stream.flush();
                 
-                if (stream.fail()) {
+                if (stream.fail()) 
                     throw std::runtime_error("Failed to write WAL file: " + path.string());
-                }
             } catch (const std::exception& e) {
                 std::cerr << "Error writing WAL file " << path << ": " << e.what() << std::endl;
                 throw;
