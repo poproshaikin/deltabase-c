@@ -13,23 +13,23 @@ namespace storage {
     };
 
     std::string 
-    make_schema_key(std::string schema_name) {
-        return schema_name;
+    make_schema_key(std::string schema_id) {
+        return schema_id;
     }
 
     std::string
     make_key(const MetaSchema& schema) {
-        return make_schema_key(schema.name);
+        return make_schema_key(schema.id);
     }
 
     std::string
-    make_table_key(const std::string& schema_id, const std::string& table_name) {
-        return schema_id + "." + table_name;
+    make_table_key(const std::string& table_id) {
+        return table_id;
     }
 
     std::string
     make_key(const MetaTable& table) {
-        return make_table_key(table.schema_id, table.name);
+        return make_table_key(table.id);
     }
 
     std::string

@@ -33,7 +33,7 @@ namespace storage
     PageBuffers::insert_row(MetaTable& table, DataRow& row)
     {
         uint64_t size = row.estimate_size();
-        DataPage& page = has_available_page(size) ? get_available_page(size) : create_page();
+        DataPage& page = has_available_page(size) ? get_available_page(size) : create_page(table);
 
         page.insert_row(table, row);
         page.mark_dirty();
@@ -97,6 +97,17 @@ namespace storage
             fm_.save_page(db_name_, schema.name, table.name, flush_info.page);
             pages_.mark_clean(flush_info.page_id);
         }
+    }
+
+    DataPage&
+    PageBuffers::create_page(MetaTable& table)
+    {
+        auto& schema = schemas_.get(table.schema_id);
+
+        DataPage page = fm_.create_page(db_name_, schema.name, table.id, table.name);
+        pages_.put(std::move(page));
+
+        return pages_.get(make_key(page));
     }
 
     void

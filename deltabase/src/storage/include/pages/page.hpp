@@ -3,16 +3,10 @@
 #include <string>
 #include "../objects/data_object.hpp"
 
-namespace storage {
-    struct DataPageHeader {
-        std::string id;
-        uint64_t size;
-        RowId min_rid;
-        RowId max_rid;
-    };
-
-    class DataPage {
-
+namespace storage
+{
+    class DataPage
+    {
         // --- Header ---
         std::string id_;
         std::string table_id_;
@@ -23,11 +17,11 @@ namespace storage {
         // ----Props-----
         static const int max_tokens = 50000;
         std::vector<DataRow> rows_;
-        bool is_dirty_;
+        bool is_dirty_ = false;
 
         // ---Methods----
         DataPage() = default;
-        DataPage(std::string id, uint64_t size, RowId min_rid, RowId max_rid);
+        DataPage(std::string id, std::string table_id, uint64_t size, RowId min_rid, RowId max_rid);
         // --------------
         friend class FileManager;
         friend class PageBuffers;
@@ -80,4 +74,4 @@ namespace storage {
         static bool
         try_deserialize(const bytes_v& bytes, DataPage& out_result);
     };
-}
+} // namespace storage

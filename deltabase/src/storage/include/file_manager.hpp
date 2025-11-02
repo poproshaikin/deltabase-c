@@ -29,7 +29,8 @@ namespace storage {
         bytes_v read_file(const fs::path& path) const;
 
         bool
-        page_exists(const std::string& db_name, const std::string& page_id) const;
+        exists_page(const std::string& db_name, const std::string& page_id) const;
+
         bool
         exists_page(
             const std::string& db_name,
@@ -37,6 +38,14 @@ namespace storage {
             const std::string& table_name,
             const std::string& page_id
         ) const;
+
+        DataPage
+        create_page(
+            const std::string& db_name,
+            const std::string& schema_name,
+            const std::string& table_id,
+            const std::string& table_name
+        );
 
         DataPage
         load_page(const std::string& db_name, const std::string& page_id) const;

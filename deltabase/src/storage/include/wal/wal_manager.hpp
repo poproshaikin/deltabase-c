@@ -57,6 +57,6 @@ namespace storage {
         write_delete_by_filter();
 
         void
-        flush_on_disk();
+        flush();
     };
 }

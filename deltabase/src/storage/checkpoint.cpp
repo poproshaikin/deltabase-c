@@ -5,7 +5,8 @@
 
 namespace storage {
     CheckpointManager::CheckpointManager(WalManager& wal, PageBuffers& buffers)
-        : wal_manager_(wal), buffers_(buffers) {
+        : wal_manager_(wal), buffers_(buffers)
+    {
     }
 
     void
@@ -13,7 +14,7 @@ namespace storage {
         auto worker = [this]() {
             while (true) {
                 std::this_thread::sleep_for(interval);
-                wal_manager_.flush_on_disk();
+                wal_manager_.flush();
                 buffers_.flush();
             }
         };

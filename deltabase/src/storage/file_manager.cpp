@@ -2,6 +2,8 @@
 #include "include/objects/meta_object.hpp"
 #include "include/paths.hpp"
 #include "include/wal/wal_object.hpp"
+#include "../misc/include/utils.hpp"
+
 #include <bits/fs_fwd.h>
 #include <bits/fs_path.h>
 #include <complex.h>
@@ -14,18 +16,18 @@
 
 namespace storage {
 
-    FileManager::FileManager(const fs::path& data_dir) : data_dir_(data_dir) {
-        if (!fs::exists(data_dir_)) {
+    FileManager::FileManager(const fs::path& data_dir) : data_dir_(data_dir)
+    {
+        if (!fs::exists(data_dir_)) 
             fs::create_directories(data_dir_);
-        }
     }
 
     bytes_v
-    FileManager::read_file(const fs::path& path) const {
+    FileManager::read_file(const fs::path& path) const
+    {
         std::ifstream file(path, std::ios::binary);
-        if (!file) {
+        if (!file) 
             throw std::runtime_error("Cannot open file: " + path.string());
-        }
 
         file.seekg(0, std::ios::end);
         size_t size = file.tellg();
@@ -34,39 +36,39 @@ namespace storage {
         bytes_v data(size);
         file.read(reinterpret_cast<char*>(data.data()), size);
 
-        if (!file) {
+        if (!file)
             throw std::runtime_error("Error reading file: " + path.string());
-        }
 
         return data;
     }
 
     void
-    FileManager::write_file(const fs::path& path, const bytes_v& content) {
-        if (path.has_parent_path()) {
+    FileManager::write_file(const fs::path& path, const bytes_v& content)
+    {
+        if (path.has_parent_path()) 
             fs::create_directories(path.parent_path());
-        }
 
         std::ofstream file(path, std::ios::binary);
-        if (!file) {
+        if (!file) 
             throw std::runtime_error("Cannot create file: " + path.string());
-        }
 
         file.write(reinterpret_cast<const char*>(content.data()), content.size());
-        if (!file) {
+        if (!file) 
             throw std::runtime_error("Error writing file: " + path.string());
-        }
     }
 
     std::optional<fs::path>
-    FileManager::find_page_path(const std::string& db_name, const std::string& page_id) const {
+    FileManager::find_page_path(const std::string& db_name, const std::string& page_id) const
+    {
         auto db_path = path_db(data_dir_, db_name);
 
-        for (const auto& schema_entry : fs::directory_iterator(db_path)) {
+        for (const auto& schema_entry : fs::directory_iterator(db_path))
+        {
             if (!schema_entry.is_directory())
                 continue;
 
-            for (const auto& table_entry : fs::directory_iterator(schema_entry.path())) {
+            for (const auto& table_entry : fs::directory_iterator(schema_entry.path()))
+            {
                 if (!table_entry.is_directory())
                     continue;
 
@@ -77,13 +79,13 @@ namespace storage {
                     table_entry.path().filename()
                 );
 
-                for (const auto& page_entry : fs::directory_iterator(table_data_path)) {
+                for (const auto& page_entry : fs::directory_iterator(table_data_path))
+                {
                     if (!page_entry.is_regular_file())
                         continue;
 
-                    if (page_entry.path().filename() == page_id) {
-                        return page_entry.path();
-                    }
+                    if (page_entry.path().filename() == page_id) 
+                        return page_entry.path(); 
                 }
             }
         }
@@ -92,7 +94,7 @@ namespace storage {
     }
 
     bool
-    FileManager::page_exists(const std::string& db_name, const std::string& page_id) const {
+    FileManager::exists_page(const std::string& db_name, const std::string& page_id) const {
         return find_page_path(db_name, page_id) != std::nullopt;
     }
 
@@ -119,9 +121,23 @@ namespace storage {
         const std::string& schema_name,
         const std::string& table_name,
         const std::string& page_id
-    ) const {
+    ) const
+    {
         auto path = path_db_schema_table_page(data_dir_, db_name, schema_name, table_name, page_id);
         return fs::exists(path);
+    }
+
+    DataPage
+    FileManager::create_page(
+        const std::string& db_name,
+        const std::string& schema_name,
+        const std::string& table_id,
+        const std::string& table_name
+    )
+    {
+        DataPage page(make_uuid_str(), table_id, 0, 0, 0);
+        save_page(db_name, schema_name, table_name, page);
+        return page;
     }
 
     DataPage

@@ -25,8 +25,8 @@ namespace storage
             bool is_dirty = false;
             std::chrono::time_point<std::chrono::steady_clock> cached_at;
 
-            CacheEntry(TValue value)
-                : value(value), is_dirty(false), cached_at(std::chrono::steady_clock::now())
+            CacheEntry(TValue&& value)
+                : value(std::move(value)), is_dirty(false), cached_at(std::chrono::steady_clock::now())
             {
             }
         };
@@ -103,7 +103,7 @@ namespace storage
         }
 
         void
-        put(const TValue& value)
+        put(TValue&& value)
         {
             std::unique_lock<std::shared_mutex> lock(*mutex_);
 
@@ -120,7 +120,7 @@ namespace storage
                 data_.erase(oldest);
             }
 
-            data_[key] = CacheEntry(value);
+            data_[key] = CacheEntry(std::move(value));
         }
 
         TValue

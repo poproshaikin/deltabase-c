@@ -19,7 +19,7 @@ namespace storage {
         load();
 
         DataPage&
-        create_page();
+        create_page(MetaTable& table);
         void
         update_page(DataPage& page);
 

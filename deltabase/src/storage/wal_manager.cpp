@@ -51,7 +51,7 @@ namespace storage
     }
 
     void
-    WalManager::flush_on_disk() {
+    WalManager::flush() {
         if (buffer_.empty())
             return;
 
