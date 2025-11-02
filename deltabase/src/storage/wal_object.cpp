@@ -5,9 +5,9 @@
 
 namespace storage {
     bytes_v
-    insert_record::serialize() const {
+    InsertRecord::serialize() const {
         auto lsn_ptr = ;
-        auto type = static_cast<std::underlying_type_t<wal_record_type>>(insert_record::type);
+        auto type = static_cast<std::underlying_type_t<WalRecordType>>(InsertRecord::type);
         auto type_ptr = reinterpret_cast<const uint64_t*>(&type);
         auto id = reinterpret_cast<const char*>(this->table_id.c_str());
 
@@ -22,7 +22,7 @@ namespace storage {
     }
 
     uint64_t
-    insert_record::estimate_size() const {
+    InsertRecord::estimate_size() const {
         return sizeof(type) + table_id.length() + serialized_row.size();
     }
 

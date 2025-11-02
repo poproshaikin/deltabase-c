@@ -8,7 +8,7 @@
 #include <filesystem>
 
 namespace storage {
-    enum class wal_record_type : uint64_t {
+    enum class WalRecordType : uint64_t {
         INSERT = 1,
         UPDATE_BY_FILTER,
         DELETE_BY_FILTER,
@@ -20,25 +20,25 @@ namespace storage {
 
     namespace detail {
         template <typename T>
-        concept WithWalType_c = requires(const T x) 
+        concept Wal_c = requires(const T x) 
         {
             T::type;
             x.lsn;
             x.serialize();
             x.estimate_size();
 
-            requires std::same_as<decltype(T::type), const wal_record_type>;
+            requires std::same_as<decltype(T::type), const WalRecordType>;
             requires std::same_as<decltype(x.lsn), uint64_t>;
             requires std::same_as<decltype(x.serialize()), bytes_v>;
             requires std::same_as<decltype(x.estimate_size()), uint64_t>;
         };
 
-        template <WithWalType_c... Ts> 
-        using wal_record_variant = std::variant<Ts...>;
+        template <Wal_c... Ts> 
+        using WalRecordVariant = std::variant<Ts...>;
     };
 
-    struct insert_record {
-        static constexpr wal_record_type type = wal_record_type::INSERT;
+    struct InsertRecord {
+        static constexpr WalRecordType type = WalRecordType::INSERT;
 
         uint64_t lsn;
         std::string table_id;
@@ -50,8 +50,8 @@ namespace storage {
         estimate_size() const;
     };
 
-    struct create_schema_record {
-        static constexpr wal_record_type type = wal_record_type::CREATE_SCHEMA; 
+    struct CreateSchemaRecord {
+        static constexpr WalRecordType type = WalRecordType::CREATE_SCHEMA; 
 
         uint64_t lsn;
         std::string schema_id;
@@ -63,8 +63,8 @@ namespace storage {
         estimate_size() const;
     };
 
-    struct drop_schema_record {
-        static constexpr wal_record_type type = wal_record_type::DROP_SCHEMA;
+    struct DropSchemaRecord {
+        static constexpr WalRecordType type = WalRecordType::DROP_SCHEMA;
 
         uint64_t lsn;
         std::string schema_id;
@@ -75,8 +75,8 @@ namespace storage {
         estimate_size() const;
     };
 
-    struct create_table_record {
-        static constexpr wal_record_type type = wal_record_type::CREATE_TABLE;
+    struct CreateTableRecord {
+        static constexpr WalRecordType type = WalRecordType::CREATE_TABLE;
 
         uint64_t lsn;
         std::string table_id;
@@ -88,14 +88,14 @@ namespace storage {
         estimate_size() const;
     };
 
-    using WalRecord = detail::wal_record_variant<
-        insert_record, 
-        create_schema_record,   
-        drop_schema_record,
-        create_table_record
+    using WalRecord = detail::WalRecordVariant<
+        InsertRecord, 
+        CreateSchemaRecord,   
+        DropSchemaRecord,
+        CreateTableRecord
     >;
 
-    struct wal_checkpoint {
+    struct WalCheckpoint {
         uint64_t lsn;
     };
 
@@ -113,11 +113,20 @@ namespace storage {
         uint64_t size() const;
 
         static bool
-        can_deserialize(bytes_v content) noexcept;
-
-        static WalLogfile
-        deserialize(bytes_v content);
+        try_deserialize(bytes_v content, WalLogfile& out);
         bytes_v
         serialize();
+
+        // restrict copying
+        WalLogfile(const WalLogfile&) = delete;
+        WalLogfile& operator=(const WalLogfile&) = delete;
+        
+        // allow moving
+        WalLogfile(WalLogfile&&) = default;
+        WalLogfile& operator=(WalLogfile&&) = default;
+
+    private:
+        friend class FileManager;
+        WalLogfile() = default;
     };
 }

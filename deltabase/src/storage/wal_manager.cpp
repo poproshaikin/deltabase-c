@@ -20,7 +20,7 @@ namespace storage
         // TODO: Implement proper WAL loading when file_manager provides access to data_dir
         // For now, start with an empty log
         log_.clear();
-        
+        auto log = fm_.load_wal(db_name_);
     }
 
     WalLogfile*
@@ -71,7 +71,7 @@ namespace storage
         
         // если нет существующих логфайлов, создаём новый
         if (!logfile_to_write) {
-            auto file = fm_.create_wal_logfile(db_name, 1, 1);
+            auto file = fm_.create_wal_logfile(db_name_, 1, 1);
             file.first.close();
             
             // создаём временный логфайл для работы
@@ -98,7 +98,7 @@ namespace storage
                 }
                 
                 // создаём новый логфайл
-                auto file = fm_.create_wal_logfile(db_name, current_lsn, current_lsn);
+                auto file = fm_.create_wal_logfile(db_name_, current_lsn, current_lsn);
                 file.first.close();
                 
                 // создаём новый временный логфайл для работы
@@ -146,7 +146,7 @@ namespace storage
 
     void
     WalManager::push_insert(MetaTable& table, const DataRow& row) {
-        insert_record record {
+        InsertRecord record {
             .table_id = table.id,
             .serialized_row = row.serialize()
         };
@@ -156,7 +156,7 @@ namespace storage
 
     void
     WalManager::push_create_schema(const MetaSchema& schema) {
-        create_schema_record record {
+        CreateSchemaRecord record {
             .schema_id = schema.id,
             .serialized_schema = schema.serialize()
         };
@@ -166,7 +166,7 @@ namespace storage
 
     void
     WalManager::push_drop_schema(const MetaSchema& schema) {
-        drop_schema_record record {
+        DropSchemaRecord record {
             .schema_id = schema.id
         };
 
@@ -175,7 +175,7 @@ namespace storage
 
     void
     WalManager::push_create_table(const MetaTable& table) {
-        create_table_record record {
+        CreateTableRecord record {
             .table_id = table.id,
             .serialized_table = table.serialize()
         };

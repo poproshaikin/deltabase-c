@@ -7,7 +7,7 @@
 
 namespace storage {
     template<typename TExtractor, typename TKey, typename TValue>
-    concept key_extractor = requires(TExtractor extractor, TValue value) {
+    concept KeyExtractor_c = requires(TExtractor extractor, TValue value) {
         { extractor(value) } -> std::same_as<TKey>;
         { TExtractor::make_key(value) } -> std::same_as<TKey>;
     };

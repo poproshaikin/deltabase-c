@@ -59,87 +59,6 @@ namespace storage
             }
         }
 
-        // Iterator that exposes CacheEntry (value) instead of map pair
-        class Iterator {
-            using underlying_it_t = typename std::unordered_map<TKey, CacheEntry>::iterator;
-            underlying_it_t it_{};
-        public:
-            using iterator_category = std::forward_iterator_tag;
-            using value_type = CacheEntry;
-            using difference_type = std::ptrdiff_t;
-            using pointer = CacheEntry*;
-            using reference = CacheEntry&;
-
-            Iterator() = default;
-            explicit Iterator(underlying_it_t it) : it_(it) {}
-
-            reference operator*() const { return it_->second; }
-            pointer operator->() const { return std::addressof(it_->second); }
-
-            Iterator& operator++() { ++it_; return *this; }
-            Iterator operator++(int) { Iterator tmp = *this; ++it_; return tmp; }
-
-            bool operator==(const Iterator& other) const { return it_ == other.it_; }
-            bool operator!=(const Iterator& other) const { return it_ != other.it_; }
-        };
-
-        class ConstIterator {
-            using underlying_it_t = typename std::unordered_map<TKey, CacheEntry>::const_iterator;
-            underlying_it_t it_{};
-        public:
-            using iterator_category = std::forward_iterator_tag;
-            using value_type = const CacheEntry;
-            using difference_type = std::ptrdiff_t;
-            using pointer = const CacheEntry*;
-            using reference = const CacheEntry&;
-
-            ConstIterator() = default;
-            explicit ConstIterator(underlying_it_t it) : it_(it) {}
-
-            reference operator*() const { return it_->second; }
-            pointer operator->() const { return std::addressof(it_->second); }
-
-            ConstIterator& operator++() { ++it_; return *this; }
-            ConstIterator operator++(int) { ConstIterator tmp = *this; ++it_; return tmp; }
-
-            bool operator==(const ConstIterator& other) const { return it_ == other.it_; }
-            bool operator!=(const ConstIterator& other) const { return it_ != other.it_; }
-        };
-
-        // Range-based for support over CacheEntry values
-        Iterator
-        begin()
-        {
-            return Iterator(data_.begin());
-        }
-        Iterator
-        end()
-        {
-            return Iterator(data_.end());
-        }
-
-        ConstIterator
-        begin() const
-        {
-            return ConstIterator(data_.cbegin());
-        }
-        ConstIterator
-        end() const
-        {
-            return ConstIterator(data_.cend());
-        }
-
-        ConstIterator
-        cbegin() const
-        {
-            return ConstIterator(data_.cbegin());
-        }
-        ConstIterator
-        cend() const
-        {
-            return ConstIterator(data_.cend());
-        }
-
         bool
         has(const TKey& key) const noexcept
         {
@@ -263,5 +182,87 @@ namespace storage
 
             return result;
         }
+
+        // Iterator that exposes CacheEntry (value) instead of map pair
+        class Iterator {
+            using underlying_it_t = typename std::unordered_map<TKey, CacheEntry>::iterator;
+            underlying_it_t it_{};
+        public:
+            using iterator_category = std::forward_iterator_tag;
+            using value_type = CacheEntry;
+            using difference_type = std::ptrdiff_t;
+            using pointer = CacheEntry*;
+            using reference = CacheEntry&;
+
+            Iterator() = default;
+            explicit Iterator(underlying_it_t it) : it_(it) {}
+
+            reference operator*() const { return it_->second; }
+            pointer operator->() const { return std::addressof(it_->second); }
+
+            Iterator& operator++() { ++it_; return *this; }
+            Iterator operator++(int) { Iterator tmp = *this; ++it_; return tmp; }
+
+            bool operator==(const Iterator& other) const { return it_ == other.it_; }
+            bool operator!=(const Iterator& other) const { return it_ != other.it_; }
+        };
+
+        class ConstIterator {
+            using underlying_it_t = typename std::unordered_map<TKey, CacheEntry>::const_iterator;
+            underlying_it_t it_{};
+        public:
+            using iterator_category = std::forward_iterator_tag;
+            using value_type = const CacheEntry;
+            using difference_type = std::ptrdiff_t;
+            using pointer = const CacheEntry*;
+            using reference = const CacheEntry&;
+
+            ConstIterator() = default;
+            explicit ConstIterator(underlying_it_t it) : it_(it) {}
+
+            reference operator*() const { return it_->second; }
+            pointer operator->() const { return std::addressof(it_->second); }
+
+            ConstIterator& operator++() { ++it_; return *this; }
+            ConstIterator operator++(int) { ConstIterator tmp = *this; ++it_; return tmp; }
+
+            bool operator==(const ConstIterator& other) const { return it_ == other.it_; }
+            bool operator!=(const ConstIterator& other) const { return it_ != other.it_; }
+        };
+
+        // Range-based for support over CacheEntry values
+        Iterator
+        begin()
+        {
+            return Iterator(data_.begin());
+        }
+        Iterator
+        end()
+        {
+            return Iterator(data_.end());
+        }
+
+        ConstIterator
+        begin() const
+        {
+            return ConstIterator(data_.cbegin());
+        }
+        ConstIterator
+        end() const
+        {
+            return ConstIterator(data_.cend());
+        }
+
+        ConstIterator
+        cbegin() const
+        {
+            return ConstIterator(data_.cbegin());
+        }
+        ConstIterator
+        cend() const
+        {
+            return ConstIterator(data_.cend());
+        }
+
     };
 } // namespace storage

@@ -1,6 +1,7 @@
 #include "include/file_manager.hpp"
 #include "include/objects/meta_object.hpp"
 #include "include/paths.hpp"
+#include "include/wal/wal_object.hpp"
 #include <bits/fs_fwd.h>
 #include <bits/fs_path.h>
 #include <complex.h>
@@ -466,5 +467,27 @@ namespace storage {
         }
 
         return result;
+    }
+
+    std::vector<WalLogfile>
+    FileManager::load_wal(const std::string& db_name)
+    {
+        auto wal_path = path_db_wal(data_dir_, db_name);
+        std::vector<WalLogfile> log;
+
+        for (const auto& entry : fs::directory_iterator(wal_path))
+        {
+            if (!entry.is_regular_file())
+                continue;
+
+            bytes_v content = read_file(entry.path());
+            WalLogfile logfile;
+            if (!WalLogfile::try_deserialize(content, logfile))
+                throw std::runtime_error("FileManager::load_wal: failed to deserialize wal logfile");
+
+            log.push_back(std::move(logfile));
+        }
+
+        return log;
     }
 } // namespace storage
