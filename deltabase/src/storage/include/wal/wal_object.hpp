@@ -20,17 +20,19 @@ namespace storage {
 
     namespace detail {
         template <typename T>
-        concept Wal_c = requires(const T x) 
+        concept Wal_c = requires(const T x, const bytes_v& content, T& out) 
         {
             T::type;
             x.lsn;
             x.serialize();
             x.estimate_size();
+            T::try_deserialize(content, out);
 
             requires std::same_as<decltype(T::type), const WalRecordType>;
             requires std::same_as<decltype(x.lsn), uint64_t>;
             requires std::same_as<decltype(x.serialize()), bytes_v>;
             requires std::same_as<decltype(x.estimate_size()), uint64_t>;
+            requires std::same_as<decltype(T::try_deserialize(content, out)), bool>;
         };
 
         template <Wal_c... Ts> 
@@ -46,6 +48,8 @@ namespace storage {
 
         bytes_v
         serialize() const;
+        static bool
+        try_deserialize(const bytes_v& content, InsertRecord& out);
         uint64_t
         estimate_size() const;
     };
@@ -59,11 +63,14 @@ namespace storage {
 
         bytes_v
         serialize() const;
+        static bool
+        try_deserialize(const bytes_v& content, CreateSchemaRecord& out);
         uint64_t
         estimate_size() const;
     };
 
-    struct DropSchemaRecord {
+    struct DropSchemaRecord
+    {
         static constexpr WalRecordType type = WalRecordType::DROP_SCHEMA;
 
         uint64_t lsn;
@@ -71,11 +78,14 @@ namespace storage {
 
         bytes_v
         serialize() const;
+        static bool
+        try_deserialize(const bytes_v& content, DropSchemaRecord& out);
         uint64_t
         estimate_size() const;
     };
 
-    struct CreateTableRecord {
+    struct CreateTableRecord
+    {
         static constexpr WalRecordType type = WalRecordType::CREATE_TABLE;
 
         uint64_t lsn;
@@ -84,6 +94,8 @@ namespace storage {
 
         bytes_v
         serialize() const;
+        static bool
+        try_deserialize(const bytes_v& content, CreateTableRecord& out);
         uint64_t
         estimate_size() const;
     };
