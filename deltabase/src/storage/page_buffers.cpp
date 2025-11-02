@@ -110,29 +110,44 @@ namespace storage
         return pages_.get(make_key(page));
     }
 
+    bool
+    PageBuffers::has_available_page(uint64_t payload_size) noexcept
+    {
+        for (const auto& page : pages_)
+            if (page.value.size_ + payload_size < DataPage::max_size)
+                return true;
+
+        return false;
+    }
+
+    DataPage&
+    PageBuffers::get_available_page(uint64_t payload_size)
+    {
+        for (auto& page : pages_)
+            if (page.value.size_ + payload_size < DataPage::max_size)
+                return page.value;
+
+        throw std::runtime_error("PageBuffers::get_available_page: could not find an available page");
+    }
+
     void
     PageBuffers::update_page(DataPage& page) 
     {
         std::string table_id = page.table_id();
         if (table_id.empty())
-        {
             throw std::runtime_error(
                 std::format("Cannot update page {}: page has no table_id", page.id())
             );
-        }
 
         if (!tables_.has(table_id))
-        {
             throw std::runtime_error(
                 std::format(
                     "Cannot update page {}: table {} not found in cache", page.id(), table_id
                 )
             );
-        }
         auto& table = tables_.get(table_id);
 
         if (!schemas_.has(table.schema_id))
-        {
             throw std::runtime_error(
                 std::format(
                     "Cannot update page {}: schema {} not found in cache",
@@ -140,7 +155,6 @@ namespace storage
                     table.schema_id
                 )
             );
-        }
         auto& schema = schemas_.get(table.schema_id);
         
         fm_.save_page(db_name_, schema.name, table.name, page);

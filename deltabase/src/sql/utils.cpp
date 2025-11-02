@@ -83,7 +83,7 @@ namespace sql::utils {
     }
 
     auto
-    get_data_type_str(DataType dt) -> std::string {
+    get_data_type_str(storage::ValueType dt) -> std::string {
         const auto& data_types = data_types_map();
         SqlKeyword kw = converter::get_data_type_kw(dt);
 

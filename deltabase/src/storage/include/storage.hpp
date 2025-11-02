@@ -13,10 +13,9 @@
 #include "checkpoint.hpp"
 
 namespace storage {
-    class storage {
+    class Storage {
         std::optional<std::string> db_name_;
 
-        WalManager wal_;
         FileManager fm_;
 
         std::optional<EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key>>
@@ -26,7 +25,7 @@ namespace storage {
 
         std::optional<PageBuffers> page_buffers_;
         std::optional<CheckpointManager> checkpoint_ctl_;
-        std::optional<WalManager> wal_manager_;
+        std::optional<WalManager> wal_;
 
         fs::path data_dir_;
 
@@ -42,8 +41,8 @@ namespace storage {
         find_table_key(const std::string& table_id) const;
     public:
 
-        storage(const fs::path& data_dir);
-        storage(const fs::path& data_dir, const std::string& db_name);
+        Storage(const fs::path& data_dir);
+        Storage(const fs::path& data_dir, const std::string& db_name);
 
         void
         attach_db(const std::string& db_name);

@@ -47,7 +47,7 @@ namespace exe {
 
     class ActionExecutor {
         engine::EngineConfig cfg_;
-        storage::storage& storage_;
+        storage::Storage& storage_;
 
         // --- Actions ---
         

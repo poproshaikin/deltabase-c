@@ -5,7 +5,7 @@
 #include "include/action.hpp"
 
 namespace exe {
-    query_planner::query_planner(engine::EngineConfig cfg, storage::storage& storage) 
+    query_planner::query_planner(engine::EngineConfig cfg, storage::Storage& storage) 
         : cfg_(cfg), storage_(storage) {
     }
 

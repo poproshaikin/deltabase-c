@@ -25,7 +25,9 @@ namespace storage
             bool is_dirty = false;
             std::chrono::time_point<std::chrono::steady_clock> cached_at;
 
-            CacheEntry(TValue&& value)
+            CacheEntry() : value(), is_dirty(false), cached_at(std::chrono::steady_clock::now()) {}
+            
+            CacheEntry(TValue value)
                 : value(std::move(value)), is_dirty(false), cached_at(std::chrono::steady_clock::now())
             {
             }
@@ -34,28 +36,28 @@ namespace storage
         static constexpr uint64_t max_size = 1000;
 
         TAccessor accessor_;
-        std::unordered_map<TKey, CacheEntry> data_;
-        mutable std::shared_ptr<std::shared_mutex> mutex_;
+        mutable std::unordered_map<TKey, CacheEntry> data_;
+        mutable std::shared_mutex mutex_;
 
     public:
         EntityCache(TAccessor accessor)
-            : accessor_(accessor), mutex_(std::make_shared<std::shared_mutex>())
+            : accessor_(accessor), mutex_()
         {
         }
 
         template <typename... Args>
         EntityCache(std::remove_reference<Args&&>... accessor_args)
-            : accessor_(std::forward<Args>(accessor_args)...), mutex_(std::make_shared<std::shared_mutex>())
+            : accessor_(std::forward<Args>(accessor_args)...), mutex_()
         {
         }
 
         void
         init_with(std::vector<TValue> values)
         {
-            std::unique_lock<std::shared_mutex> lock(*mutex_);
-            for (const TValue& value : values)
+            std::unique_lock<std::shared_mutex> lock(mutex_);
+            for (auto& value : values)
             {
-                data_.emplace(ExtractKey(value), CacheEntry(std::move(values)));
+                data_.emplace(ExtractKey(value), CacheEntry(std::move(value)));
             }
         }
 
@@ -94,7 +96,7 @@ namespace storage
             if (accessor_.has(key))
             {
                 TValue loaded = accessor_.get(key);
-                std::unique_lock<std::shared_mutex> lock(*mutex_);
+                std::unique_lock<std::shared_mutex> lock(mutex_);
                 auto [iter, inserted] = data_.try_emplace(key, CacheEntry(std::move(loaded)));
                 return iter->second.value;
             }
@@ -103,9 +105,9 @@ namespace storage
         }
 
         void
-        put(TValue&& value)
+        put(const TValue& value)
         {
-            std::unique_lock<std::shared_mutex> lock(*mutex_);
+            std::unique_lock<std::shared_mutex> lock(mutex_);
 
             TKey key = ExtractKey(value);
 
@@ -115,18 +117,27 @@ namespace storage
                     data_.begin(),
                     data_.end(),
                     [](const auto& a, const auto& b)
-                    { return a.second.cached_at < b.second.cached_at; }
+                    { 
+                        // dirty entries should not be evicted, treat them as "newer"
+                        if (a.second.is_dirty && !b.second.is_dirty) return false;
+                        if (!a.second.is_dirty && b.second.is_dirty) return true;
+                        return a.second.cached_at < b.second.cached_at;
+                    }
                 );
-                data_.erase(oldest);
+                
+                if (oldest != data_.end() && !oldest->second.is_dirty)
+                    data_.erase(oldest);
+                else
+                    throw std::runtime_error("EntityCache::put: cache is full of dirty entries, cannot evict");
             }
 
-            data_[key] = CacheEntry(std::move(value));
+            data_[key] = CacheEntry(value);
         }
 
         TValue
         remove(const TKey& key)
         {
-            std::unique_lock<std::shared_mutex> lock(*mutex_);
+            std::unique_lock<std::shared_mutex> lock(mutex_);
             auto it = data_.find(key);
             if (it != data_.end())
             {
@@ -174,7 +185,7 @@ namespace storage
         std::unordered_map<TKey, TValue>
         map_snapshot() const
         {
-            std::shared_lock lock(*mutex_);
+            std::shared_lock lock(mutex_);
             
             std::unordered_map<TKey, TValue> result;
             for (const auto& [k, entry] : data_)

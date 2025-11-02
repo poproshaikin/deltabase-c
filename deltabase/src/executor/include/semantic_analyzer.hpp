@@ -49,7 +49,7 @@ namespace exe {
     };
 
     class SemanticAnalyzer {
-        storage::storage& storage_;
+        storage::Storage& storage_;
         std::optional<std::string> db_name_;
         std::string def_schema_;
 
@@ -96,9 +96,9 @@ namespace exe {
         ensure_db_exists(const std::string& name);
 
       public:
-        SemanticAnalyzer(storage::storage& storage);
-        SemanticAnalyzer(storage::storage& storage, std::string db_name);
-        SemanticAnalyzer(storage::storage& storage, engine::EngineConfig cfg);
+        SemanticAnalyzer(storage::Storage& storage);
+        SemanticAnalyzer(storage::Storage& storage, std::string db_name);
+        SemanticAnalyzer(storage::Storage& storage, engine::EngineConfig cfg);
 
         auto
         analyze(sql::AstNode& ast) -> AnalysisResult;

@@ -8,7 +8,7 @@
 namespace exe {
     class query_planner {
         engine::EngineConfig cfg_;
-        storage::storage& storage_;
+        storage::Storage& storage_;
 
         QueryPlan
         create_plan(const sql::SelectStatement& stmt);
@@ -33,7 +33,7 @@ namespace exe {
         create_plan(const sql::ColumnDefinition&);
 
     public:
-        query_planner(engine::EngineConfig cfg, storage::storage& storage);
+        query_planner(engine::EngineConfig cfg, storage::Storage& storage);
 
         QueryPlan
         create_plan(const sql::AstNode& node);

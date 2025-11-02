@@ -11,10 +11,12 @@ namespace storage {
         PageBuffers& buffers_;
 
         std::thread worker_thread_;
+        std::atomic<bool> stop_worker_;
 
         void
         run_bg_worker();
     public:
         CheckpointManager(WalManager& wal, PageBuffers& buffers);
+        ~CheckpointManager();
     };
 }
