@@ -6,15 +6,16 @@
 #include "../objects/meta_object.hpp"
 #include "../file_manager.hpp"
 
-namespace storage {
-
+namespace storage
+{
     template <typename T, typename K, typename V>
     concept ExternalDataAccessor_c = requires(T accessor, const K& key) {
         { accessor.has(key) } -> std::same_as<bool>;
         { accessor.get(key) } -> std::same_as<V>;
     };
 
-    class DataPageAccessor {
+    class DataPageAccessor
+    {
         FileManager& fm_;
         std::string db_name_;
     public:
@@ -25,7 +26,8 @@ namespace storage {
         get(std::string id);
     };
 
-    class MetaTableAccessor {
+    class MetaTableAccessor
+    {
         FileManager& fm_;
         std::string db_name_;
     public:
@@ -36,7 +38,8 @@ namespace storage {
         get(std::string id);
     };
 
-    class MetaSchemaAccessor {
+    class MetaSchemaAccessor
+    {
         FileManager& fm_;
         std::string db_name_;
     public:

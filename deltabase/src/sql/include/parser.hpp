@@ -5,8 +5,10 @@
 #include <memory>
 #include <utility>
 
-namespace sql {
-    enum class AstNodeType {
+namespace sql
+{
+    enum class AstNodeType
+    {
         IDENTIFIER = 1,
         TABLE_IDENTIFIER,
         COLUMN_IDENTIFIER,
@@ -21,7 +23,8 @@ namespace sql {
         CREATE_SCHEMA,
     };
 
-    enum class AstOperator {
+    enum class AstOperator
+    {
         OR = 1,
         AND,
         NOT,
@@ -37,9 +40,11 @@ namespace sql {
         ASSIGN,
     };
 
-    inline auto
-    get_ast_operators_priorities() -> const std::unordered_map<AstOperator, int>& {
-        static std::unordered_map<AstOperator, int> map = {
+    inline const std::unordered_map<AstOperator, int>&
+    ast_operators_priorities() 
+    {
+        static std::unordered_map<AstOperator, int> map = 
+        {
             {AstOperator::OR, 1},
             {AstOperator::AND, 2},
             {AstOperator::NOT, 3},
@@ -57,13 +62,15 @@ namespace sql {
 
     struct AstNode;
 
-    struct BinaryExpr {
+    struct BinaryExpr
+    {
         AstOperator op;
         std::unique_ptr<AstNode> left;
         std::unique_ptr<AstNode> right;
     };
 
-    struct TableIdentifier {
+    struct TableIdentifier
+    {
         SqlToken table_name;
         std::optional<SqlToken> schema_name;
 
@@ -72,49 +79,58 @@ namespace sql {
         explicit TableIdentifier(
             SqlToken table_name, std::optional<SqlToken> schema_name = std::nullopt
         )
-            : table_name(std::move(table_name)), schema_name(std::move(schema_name)) {
+            : table_name(std::move(table_name)), schema_name(std::move(schema_name))
+        {
         }
     };
 
-    struct SelectStatement {
+    struct SelectStatement
+    {
         TableIdentifier table;
         std::vector<SqlToken> columns;
-        std::unique_ptr<AstNode> where;
+        BinaryExpr where;
     };
 
-    struct InsertStatement {
+    struct InsertStatement
+    {
         TableIdentifier table;
         std::vector<SqlToken> columns;
         std::vector<SqlToken> values;
     };
 
-    struct UpdateStatement {
+    struct UpdateStatement
+    {
         TableIdentifier table;
         std::vector<AstNode> assignments;
-        std::unique_ptr<AstNode> where;
+        BinaryExpr where;
     };
 
-    struct DeleteStatement {
+    struct DeleteStatement
+    {
         TableIdentifier table;
-        std::unique_ptr<AstNode> where;
+        BinaryExpr where;
     };
 
-    struct ColumnDefinition {
+    struct ColumnDefinition
+    {
         SqlToken name;
         SqlToken type;
         std::vector<SqlToken> constraints;
     };
 
-    struct CreateTableStatement {
+    struct CreateTableStatement
+    {
         TableIdentifier table;
         std::vector<ColumnDefinition> columns;
     };
 
-    struct CreateSchemaStatement {
+    struct CreateSchemaStatement
+    {
         SqlToken name;
     };
 
-    struct CreateDbStatement {
+    struct CreateDbStatement
+    {
         SqlToken name;
     };
 
@@ -130,7 +146,8 @@ namespace sql {
         CreateSchemaStatement,
         ColumnDefinition>;
 
-    struct AstNode {
+    struct AstNode
+    {
         AstNodeType type;
         AstNodeValue value;
 
@@ -138,66 +155,74 @@ namespace sql {
         AstNode(AstNodeType type, AstNodeValue&& value);
     };
 
-    class SqlParser {
+    class SqlParser
+    {
         std::vector<SqlToken> tokens_;
         size_t current_;
 
-        auto
-        parse_select() -> SelectStatement;
-        auto
-        parse_insert() -> InsertStatement;
-        auto
-        parse_update() -> UpdateStatement;
-        auto
-        parse_delete() -> DeleteStatement;
-        auto
-        parse_create_table() -> CreateTableStatement;
-        auto
-        parse_create_db() -> CreateDbStatement;
-        auto
-        parse_create_schema() -> CreateSchemaStatement;
-        auto
-        parse_binary(int min_priority) -> std::unique_ptr<AstNode>;
+        SelectStatement
+        parse_select();
+
+        SelectStatement
+        parse_insert();
+
+        UpdateStatement
+        parse_update();
+
+        DeleteStatement
+        parse_delete();
+
+        CreateTableStatement
+        parse_create_table();
+        
+        CreateDbStatement
+        parse_create_db();
+
+        CreateSchemaStatement
+        parse_create_schema();
+
+        BinaryExpr
+        parse_binary(int min_priority);
 
         template <typename TEnum>
-        auto
-        match(const TEnum&) const -> bool;
+        bool
+        match(const TEnum&) const;
 
         template <typename TEnum>
-        auto
-        match_or_throw(TEnum expected, std::string error_msg = "Invalid syntax") const -> bool;
+        bool
+        match_or_throw(TEnum expected, std::string error_msg = "Invalid syntax") const;
 
-        auto
-        advance() noexcept -> bool;
+        bool
+        advance() noexcept;
 
-        auto
-        advance_or_throw(std::string error_msg = "Invalid statement syntax") -> bool;
+        bool
+        advance_or_throw(std::string error_msg = "Invalid statement syntax");
 
-        [[nodiscard]] auto
-        previous() const noexcept -> const SqlToken&;
+        [[nodiscard]] const SqlToken&
+        previous() const noexcept;
 
-        [[nodiscard]] auto
-        current() const -> const SqlToken&;
+        [[nodiscard]] const SqlToken&
+        current() const;
 
-        auto
-        parse_primary() -> std::unique_ptr<AstNode>;
+        std::unique_ptr<AstNode>
+        parse_primary();
 
-        auto
-        parse_assignments() -> std::vector<std::unique_ptr<AstNode>>;
+        std::vector<std::unique_ptr<AstNode>>
+        parse_assignments();
 
-        auto
-        parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType) -> std::vector<std::unique_ptr<AstNode>>;
+        std::vector<std::unique_ptr<AstNode>>
+        parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType);
 
-        auto
-        parse_column_def() -> ColumnDefinition;
+        ColumnDefinition
+        parse_column_def();
 
-        auto
-        parse_table_identifier() -> TableIdentifier;
+        TableIdentifier
+        parse_table_identifier();
 
     public:
         SqlParser(std::vector<SqlToken> tokens);
 
-        auto
-        parse() -> std::unique_ptr<AstNode>;
+        AstNode
+        parse();
     };
 } // namespace sql

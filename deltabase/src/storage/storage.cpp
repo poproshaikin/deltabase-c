@@ -139,14 +139,14 @@ namespace storage
     Storage::drop_schema(const std::string& schema_name) {
         ensure_attached("drop_schema");
 
-        std::string schema_key = make_schema_key(schema_name);
-        if (!schemas_->has(schema_key)) 
+        if (!schemas_->has([schema_name](const MetaSchema& val){ return val.name == schema_name; })) 
             throw std::runtime_error("Storage::drop_schema: schema " + schema_name + " doesnt exist");
         
-        MetaSchema schema = schemas_->remove(schema_key);
-        wal_->push_drop_schema(schema);
+        auto* schema = schemas_->find_first([schema_name](const MetaSchema& val){ return val.name == schema_name; });
+        schemas_->remove(*schema);
+        wal_->push_drop_schema(*schema);
 
-        auto dir_path = path_db_schema(data_dir_, db_name_.value(), schema.name);
+        auto dir_path = path_db_schema(data_dir_, db_name_.value(), schema->name);
         fs::remove_all(dir_path);
     }
 
@@ -262,15 +262,24 @@ namespace storage
     }
 
     uint64_t
-    update_rows_by_filter(MetaTable& table, const DataFilter& filter, const DataRowUpdate& update);
+    Storage::update_rows_by_filter(MetaTable& table, const DataFilter& filter, const DataRowUpdate& update)
+    {
+
+    }
 
     uint64_t
-    delete_rows_by_filter(MetaTable& table, const std::optional<DataFilter>& filter);
+    Storage::delete_rows_by_filter(MetaTable& table, const std::optional<DataFilter>& filter)
+    {
+
+    }
 
     DataTable
     seq_scan(
         const MetaTable& table,
         const std::vector<std::string>& column_names,
         const std::optional<DataFilter>& filter
-    );
+    )
+    {
+
+    }
 } // namespace storage

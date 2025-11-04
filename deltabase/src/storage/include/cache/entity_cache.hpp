@@ -1,5 +1,7 @@
 #pragma once
 
+#include "accessors.hpp"
+#include <functional>
 #include <chrono>
 #include <memory>
 #include <shared_mutex>
@@ -8,7 +10,6 @@
 #include <unordered_map>
 #include <algorithm>
 #include <utility>
-#include "accessors.hpp"
 
 namespace storage
 {
@@ -74,6 +75,16 @@ namespace storage
 
             if (accessor_.has(key)) 
                 return true;
+
+            return false;
+        }
+
+        bool
+        has(std::function<bool(const TValue&)> predicate)
+        {
+            for (TValue& val : *this)
+                if (predicate(val))
+                    return true;
 
             return false;
         }
@@ -154,6 +165,31 @@ namespace storage
         {
             TKey key = ExtractKey(value);
             return remove<TKey>(key);
+        }
+
+        TValue*
+        find_first(std::function<bool(const TValue&)> predicate)
+        {
+            for (TValue& val : *this)
+                if (predicate(val))
+                    return &val;
+
+            return nullptr;
+        }
+
+        bool
+        remove_first(std::function<bool(const TValue&)> predicate)
+        {
+            for (TValue& val : *this)
+            {
+                if (predicate(val))
+                {
+                    remove(val);
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         void

@@ -6,14 +6,10 @@
 #include "include/converter.hpp"
 #include "include/statement_converter.hpp"
 
-// extern "C" {
-// #include "../core/include/meta.h"
-// #include "../core/include/misc.h"
-// }
-
 namespace converter {
-    auto
-    create_row_update(const MetaTable& table, const sql::UpdateStatement& query) -> DataRowUpdate {
+    storage::DataRowUpdate
+    create_row_update(const storage::MetaTable& table, const sql::UpdateStatement& query)
+    {
         size_t assignments_count = query.assignments.size();
 
         auto* indices = (uuid_t*)std::malloc(assignments_count * sizeof(uuid_t));
@@ -22,10 +18,10 @@ namespace converter {
         for (size_t i = 0; i < assignments_count; i++) {
             const auto& assignment =
                 std::get<sql::BinaryExpr>(query.assignments[i].value);
-            const sql::SqlToken& left = std::get<sql::SqlToken>(assignment.left->value);
-            const sql::SqlToken& right = std::get<sql::SqlToken>(assignment.right->value);
+            auto& left = std::get<sql::SqlToken>(assignment.left->value);
+            auto& right = std::get<sql::SqlToken>(assignment.right->value);
 
-            MetaColumn column;
+            storage::MetaColumn column;
             if (find_column(left.value.data(), &table, &column) != 0) {
                 throw std::runtime_error("Column doesn't exist");
             }
@@ -38,7 +34,8 @@ namespace converter {
         }
 
         DataRowUpdate update = {
-            .count = assignments_count, .column_indices = indices, .values = values};
+            .count = assignments_count, .column_indices = indices, .values = values
+        };
 
         return update;
     }

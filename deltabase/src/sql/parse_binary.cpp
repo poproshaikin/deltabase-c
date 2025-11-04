@@ -45,7 +45,7 @@ SqlParser::parse_binary(int min_priority) -> std::unique_ptr<AstNode> {
         if (!op_opt)
             break;
 
-        int priority = get_ast_operators_priorities().at(*op_opt);
+        int priority = ast_operators_priorities().at(*op_opt);
         if (priority < min_priority)
             break;
 

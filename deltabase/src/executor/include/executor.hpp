@@ -90,7 +90,7 @@ namespace exe {
         execute_plan(TransactionPlan&& plan);
 
     public:
-        ActionExecutor(engine::EngineConfig cfg);
+        ActionExecutor(const engine::EngineConfig& cfg, storage::Storage& storage);
 
         QueryPlanExecutionResult
         execute_plan(QueryPlan&& plan);

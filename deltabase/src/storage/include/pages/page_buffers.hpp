@@ -7,8 +7,10 @@
 #include "../objects/data_object.hpp"
 #include "../objects/meta_object.hpp"
 
-namespace storage {
-    class PageBuffers {
+namespace storage
+{
+    class PageBuffers
+    {
         std::string db_name_;
         FileManager& fm_;
         EntityCache<std::string, DataPage, DataPageAccessor, make_key> pages_;
@@ -42,4 +44,4 @@ namespace storage {
         void
         flush();
     };
-}
+} // namespace storage

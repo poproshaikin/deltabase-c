@@ -6,13 +6,13 @@
 
 namespace converter {
 
-    auto
-    convert_create_table_to_mt(const sql::CreateTableStatement& stmt) -> storage::MetaTable;
+    storage::MetaTable
+    convert_create_table_to_mt(const sql::CreateTableStatement& stmt);
 
-    auto
-    create_row_update(const storage::MetaTable& table, const sql::UpdateStatement& query) -> storage::DataRowUpdate;
+    storage::DataRowUpdate
+    create_row_update(const storage::MetaTable& table, const sql::UpdateStatement& query);
 
-    auto
-    convert_insert_to_data_row(const storage::MetaTable& table, const sql::InsertStatement& insert) -> storage::DataRow;
+    storage::DataRow
+    convert_insert_to_data_row(const storage::MetaTable& table, const sql::InsertStatement& insert);
 
 } // namespace converter

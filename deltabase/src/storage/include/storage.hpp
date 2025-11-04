@@ -12,16 +12,16 @@
 #include "wal/wal_manager.hpp"
 #include "checkpoint.hpp"
 
-namespace storage {
-    class Storage {
+namespace storage
+{
+    class Storage
+    {
         std::optional<std::string> db_name_;
 
         FileManager fm_;
 
-        std::optional<EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key>>
-            schemas_;
-        std::optional<EntityCache<std::string, MetaTable, MetaTableAccessor, make_key>> 
-            tables_;
+        std::optional<EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key>> schemas_;
+        std::optional<EntityCache<std::string, MetaTable, MetaTableAccessor, make_key>> tables_;
 
         std::optional<PageBuffers> page_buffers_;
         std::optional<CheckpointManager> checkpoint_ctl_;
@@ -125,4 +125,4 @@ namespace storage {
             const std::optional<DataFilter>& filter
         );
     };
-}
+} // namespace storage
