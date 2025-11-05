@@ -109,18 +109,24 @@ namespace storage {
         save_schema(const MetaSchema& schema);
 
         std::vector<fs::path>
-        get_tables_paths(const std::string& db_name, const std::string& schema_name);
+        get_tables_paths(const std::string& db_name, const std::string& schema_name) const;
 
         std::vector<fs::path>
-        get_schemata_paths(const std::string& db_name);
+        get_schemata_paths(const std::string& db_name) const;
 
-        bool
+        static bool
         create_dir(const fs::path& path);
 
         std::vector<WalLogfile>
         load_wal(const std::string& db_name);
 
         std::pair<std::ofstream, fs::path>
-        create_wal_logfile(const std::string& db_name, uint64_t first_lsn, uint64_t last_lsn);
+        create_wal_logfile(const std::string& db_name, uint64_t first_lsn, uint64_t last_lsn) const;
+
+        std::vector<MetaTable>
+        load_all_tables(const std::string& db_name) const;
+
+        std::vector<MetaSchema>
+        load_all_schemas(const std::string& db_name) const;
     };
 }

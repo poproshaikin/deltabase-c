@@ -96,20 +96,16 @@ namespace exe
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_insert(sql::InsertStatement& stmt)
+    SemanticAnalyzer::analyze_insert(const sql::InsertStatement& stmt) const
     {
         auto normalized_table = normalize_table_identifier(stmt.table);
 
         if (stmt.table.table_name.value.empty())
-        {
             return std::runtime_error("Insert statement missing target table");
-        }
 
         if (stmt.columns.size() != 0 &&
             stmt.columns.size() != stmt.values.size())
-        {
             return std::runtime_error("Insert statement columns count does not match values count");
-        }
 
         if (!storage_.exists_table(normalized_table))
             return AnalysisResult(TableDoesntExist(normalized_table.table_name.value));
@@ -119,9 +115,7 @@ namespace exe
         for (size_t i = 0; i < stmt.columns.size(); i++)
         {
             if (!table.has_column(stmt.columns[i].value))
-            {
                 return std::runtime_error("Column doesn't exist");
-            }
 
             const sql::SqlToken& value_token = stmt.values[i];
             const sql::SqlLiteral literal_type = std::get<sql::SqlLiteral>(value_token.detail);
@@ -135,7 +129,7 @@ namespace exe
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_update(sql::UpdateStatement& stmt)
+    SemanticAnalyzer::analyze_update(sql::UpdateStatement& stmt) const
     {
         if (stmt.table.table_name.value.empty())
             return std::runtime_error("Update statement missing target table");
@@ -144,9 +138,7 @@ namespace exe
             return std::runtime_error("Update statement missing assignments");
 
         if (!storage_.exists_table(stmt.table))
-        {
             return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
-        }
 
         const auto& table = storage_.get_table(stmt.table.table_name);
 
@@ -161,7 +153,7 @@ namespace exe
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_delete(sql::DeleteStatement& stmt)
+    SemanticAnalyzer::analyze_delete(sql::DeleteStatement& stmt) const
     {
         if (stmt.table.table_name.value.empty())
             return std::runtime_error("Delete statement missing target table");

@@ -9,10 +9,11 @@ namespace storage
     PageBuffers::PageBuffers(
         const std::string& db_name,
         FileManager& fm,
-        EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key>& schemas,
-        EntityCache<std::string, MetaTable, MetaTableAccessor, make_key>& tables
+        Registry<std::string, MetaSchema, make_key>& schemas,
+        Registry<std::string, MetaTable, make_key>& tables
     )
-        : db_name_(db_name), fm_(fm), pages_(DataPageAccessor(db_name, fm)), schemas_(schemas), tables_(tables)
+        : db_name_(db_name), fm_(fm), pages_(DataPageAccessor(db_name, fm)), schemas_(schemas),
+          tables_(tables)
     {
     }
 
@@ -49,7 +50,8 @@ namespace storage
         {
             std::string page_id;
             std::string table_id;
-            const DataPage &page;
+            const DataPage& page;
+
             PageFlushInfo(std::string page_id, std::string table_id, const DataPage& page)
                 : page_id(page_id), table_id(table_id), page(page)
             {
@@ -57,41 +59,45 @@ namespace storage
         };
 
         std::vector<PageFlushInfo> pages_to_flush;
-        
+
         // Iterate over all pages and collect dirty ones
         for (auto& entry : pages_)
         {
             if (entry.is_dirty)
             {
                 auto& page = entry.value;
-                
+
                 std::string table_id = page.table_id();
-                
-                if (table_id.empty()) 
+
+                if (table_id.empty())
                     continue;
-                
+
                 pages_to_flush.emplace_back(page.id(), table_id, page);
             }
         }
-        
+
         for (const auto& flush_info : pages_to_flush)
         {
-            if (!tables_.has(flush_info.table_id)) {
+            if (!tables_.has(flush_info.table_id))
+            {
                 throw std::runtime_error(
                     std::format("Cannot flush page {}: table {} not found in cache",
-                               flush_info.page_id, flush_info.table_id)
+                                flush_info.page_id,
+                                flush_info.table_id)
                 );
             }
-            
+
             auto& table = tables_.get(flush_info.table_id);
-            
-            if (!schemas_.has(table.schema_id)) {
+
+            if (!schemas_.has(table.schema_id))
+            {
                 throw std::runtime_error(
                     std::format("Cannot flush page {}: schema {} not found in cache",
-                               flush_info.page_id, table.schema_id)
+                                flush_info.page_id,
+                                table.schema_id)
                 );
             }
-            
+
             auto& schema = schemas_.get(table.schema_id);
 
             fm_.save_page(db_name_, schema.name, table.name, flush_info.page);
@@ -99,8 +105,28 @@ namespace storage
         }
     }
 
+
+    std::vector<std::reference_wrapper<DataRow>>
+    PageBuffers::scan_with_filter(const MetaTable& table, const DataFilter& filter)
+    {
+
+    }
+
+    uint64_t
+    PageBuffers::update_rows(const MetaTable& table,
+                             const DataFilter& filter,
+                             const DataRowUpdate& update)
+    {
+        // создать функцию в page_buffers, которая внутри
+        // проедется по всем страницам, каждую строку обозначит как obsolete и сохранит в буффер
+        // потом для каждой строки из буффера применит изменения через DataRowUpdate
+        // найдет свободные страницы и туда повпихивает новые строки
+
+        std::vector<std::reference_wrapper<DataRow>> rows = scan_with_filter(table, filter);
+    }
+
     DataPage&
-    PageBuffers::create_page(MetaTable& table)
+    PageBuffers::create_page(const MetaTable& table)
     {
         auto& schema = schemas_.get(table.schema_id);
 
@@ -127,11 +153,12 @@ namespace storage
             if (page.value.size_ + payload_size < DataPage::max_size)
                 return page.value;
 
-        throw std::runtime_error("PageBuffers::get_available_page: could not find an available page");
+        throw std::runtime_error(
+            "PageBuffers::get_available_page: could not find an available page");
     }
 
     void
-    PageBuffers::update_page(DataPage& page) 
+    PageBuffers::update_page(DataPage& page)
     {
         std::string table_id = page.table_id();
         if (table_id.empty())
@@ -142,7 +169,9 @@ namespace storage
         if (!tables_.has(table_id))
             throw std::runtime_error(
                 std::format(
-                    "Cannot update page {}: table {} not found in cache", page.id(), table_id
+                    "Cannot update page {}: table {} not found in cache",
+                    page.id(),
+                    table_id
                 )
             );
         auto& table = tables_.get(table_id);
@@ -156,7 +185,7 @@ namespace storage
                 )
             );
         auto& schema = schemas_.get(table.schema_id);
-        
+
         fm_.save_page(db_name_, schema.name, table.name, page);
         pages_.mark_clean(page.id());
     }

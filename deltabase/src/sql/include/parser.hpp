@@ -42,9 +42,9 @@ namespace sql
     };
 
     inline const std::unordered_map<AstOperator, int>&
-    ast_operators_priorities() 
+    ast_operators_priorities()
     {
-        static std::unordered_map<AstOperator, int> map = 
+        static std::unordered_map<AstOperator, int> map =
         {
             {AstOperator::OR, 1},
             {AstOperator::AND, 2},
@@ -77,8 +77,10 @@ namespace sql
 
         TableIdentifier() = default;
 
-        explicit TableIdentifier(
-            SqlToken table_name, std::optional<SqlToken> schema_name = std::nullopt
+        explicit
+        TableIdentifier(
+            SqlToken table_name,
+            std::optional<SqlToken> schema_name = std::nullopt
         )
             : table_name(std::move(table_name)), schema_name(std::move(schema_name))
         {
@@ -89,7 +91,7 @@ namespace sql
     {
         TableIdentifier table;
         std::vector<SqlToken> columns;
-        BinaryExpr where;
+        std::optional<BinaryExpr> where;
     };
 
     struct InsertStatement
@@ -102,14 +104,14 @@ namespace sql
     struct UpdateStatement
     {
         TableIdentifier table;
-        std::vector<AstNode> assignments;
-        BinaryExpr where;
+        std::vector<BinaryExpr> assignments;
+        std::optional<BinaryExpr> where;
     };
 
     struct DeleteStatement
     {
         TableIdentifier table;
-        BinaryExpr where;
+        std::optional<BinaryExpr> where;
     };
 
     struct ColumnDefinition
@@ -153,6 +155,7 @@ namespace sql
         AstNodeValue value;
 
         AstNode() = default;
+
         AstNode(AstNodeType type, AstNodeValue&& value);
     };
 
@@ -164,7 +167,7 @@ namespace sql
         SelectStatement
         parse_select();
 
-        SelectStatement
+        InsertStatement
         parse_insert();
 
         UpdateStatement
@@ -175,7 +178,7 @@ namespace sql
 
         CreateTableStatement
         parse_create_table();
-        
+
         CreateDbStatement
         parse_create_db();
 
@@ -190,7 +193,7 @@ namespace sql
         match(const TEnum&) const;
 
         template <typename TEnum>
-        bool
+        void
         match_or_throw(TEnum expected, std::string error_msg = "Invalid syntax") const;
 
         bool
@@ -208,10 +211,10 @@ namespace sql
         std::unique_ptr<AstNode>
         parse_primary();
 
-        std::vector<std::unique_ptr<AstNode>>
+        std::vector<std::unique_ptr<AstNode> >
         parse_assignments();
 
-        std::vector<std::unique_ptr<AstNode>>
+        std::vector<std::unique_ptr<AstNode> >
         parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType);
 
         ColumnDefinition

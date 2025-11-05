@@ -14,11 +14,12 @@
 #include <utility>
 #include <vector>
 
-namespace storage {
+namespace storage
+{
 
     FileManager::FileManager(const fs::path& data_dir) : data_dir_(data_dir)
     {
-        if (!fs::exists(data_dir_)) 
+        if (!fs::exists(data_dir_))
             fs::create_directories(data_dir_);
     }
 
@@ -26,34 +27,34 @@ namespace storage {
     FileManager::read_file(const fs::path& path) const
     {
         std::ifstream file(path, std::ios::binary);
-        if (!file) 
+        if (!file)
             throw std::runtime_error("Cannot open file: " + path.string());
 
         file.seekg(0, std::ios::end);
         size_t size = file.tellg();
         file.seekg(0, std::ios::beg);
 
-        bytes_v data(size);
-        file.read(reinterpret_cast<char*>(data.data()), size);
+        bytes_v content(size);
+        file.read(reinterpret_cast<char*>(content.data()), size);
 
         if (!file)
             throw std::runtime_error("Error reading file: " + path.string());
 
-        return data;
+        return content;
     }
 
     void
     FileManager::write_file(const fs::path& path, const bytes_v& content)
     {
-        if (path.has_parent_path()) 
+        if (path.has_parent_path())
             fs::create_directories(path.parent_path());
 
         std::ofstream file(path, std::ios::binary);
-        if (!file) 
+        if (!file)
             throw std::runtime_error("Cannot create file: " + path.string());
 
         file.write(reinterpret_cast<const char*>(content.data()), content.size());
-        if (!file) 
+        if (!file)
             throw std::runtime_error("Error writing file: " + path.string());
     }
 
@@ -84,8 +85,8 @@ namespace storage {
                     if (!page_entry.is_regular_file())
                         continue;
 
-                    if (page_entry.path().filename() == page_id) 
-                        return page_entry.path(); 
+                    if (page_entry.path().filename() == page_id)
+                        return page_entry.path();
                 }
             }
         }
@@ -94,23 +95,26 @@ namespace storage {
     }
 
     bool
-    FileManager::exists_page(const std::string& db_name, const std::string& page_id) const {
+    FileManager::exists_page(const std::string& db_name, const std::string& page_id) const
+    {
         return find_page_path(db_name, page_id) != std::nullopt;
     }
 
     DataPage
-    FileManager::load_page(const std::string& db_name, const std::string& page_id) const {
+    FileManager::load_page(const std::string& db_name, const std::string& page_id) const
+    {
         auto path = find_page_path(db_name, page_id);
-        
-        if (path == std::nullopt) {
-            throw std::runtime_error("FileManager::load_page: page " + page_id + "doesnt exists in db " + db_name);
-        }
+
+        if (path == std::nullopt)
+            throw std::runtime_error(
+                "FileManager::load_page: page " + page_id + "doesnt exists in db " + db_name);
 
         bytes_v bytes = read_file(path.value());
         DataPage page;
-        if (!DataPage::try_deserialize(bytes, page)) {
-            throw std::runtime_error("FileManager::load_page: failed to deserialize page " + page_id + ": data are corrupted");
-        }
+        if (!DataPage::try_deserialize(bytes, page))
+            throw std::runtime_error(
+                "FileManager::load_page: failed to deserialize page " + page_id +
+                ": data are corrupted");
 
         return page;
     }
@@ -199,14 +203,14 @@ namespace storage {
                     auto path = table_dir_files_entry.path().stem();
                     auto stem = path.stem();
 
-                    if (stem != table_entry.path().stem()) 
+                    if (stem != table_entry.path().stem())
                         continue;
 
                     bytes_v content = read_file(table_dir_files_entry.path());
-                    if (!MetaTable::can_deserialize(content)) 
+                    MetaTable table;
+                    if (!MetaTable::try_deserialize(content, table))
                         continue;
-                    
-                    auto table = MetaTable::deserialize(content);
+
                     if (table.id == table_id)
                         return table_dir_files_entry.path();
                 }
@@ -224,7 +228,9 @@ namespace storage {
 
     bool
     FileManager::table_exists(
-        const std::string& db_name, const std::string& schema_name, const std::string& table_name
+        const std::string& db_name,
+        const std::string& schema_name,
+        const std::string& table_name
     ) const
     {
         auto path = path_db_schema_table_meta(data_dir_, db_name, schema_name, table_name);
@@ -244,30 +250,36 @@ namespace storage {
         }
 
         bytes_v bytes = read_file(path.value());
-        if (!MetaTable::can_deserialize(bytes))
+        MetaTable table;
+        if (!MetaTable::try_deserialize(bytes, table))
             throw std::runtime_error(
                 "FileManager::load_table: failed to deserialize table " + table_id +
                 ": data are corrupted"
             );
 
-        return MetaTable::deserialize(bytes);
+        return table;
     }
 
     MetaTable
     FileManager::load_table(
-        const std::string& db_name, const std::string& schema_name, const std::string& table_name
+        const std::string& db_name,
+        const std::string& schema_name,
+        const std::string& table_name
     ) const
     {
         auto path = path_db_schema_table_meta(data_dir_, db_name, schema_name, table_name);
-        if (!fs::exists(path)) 
-            throw std::runtime_error("Metafile of the table " + schema_name + "." + table_name + " doesnt exist");
+        if (!fs::exists(path))
+            throw std::runtime_error(
+                "Metafile of the table " + schema_name + "." + table_name + " doesnt exist");
 
-        auto data = read_file(path);
+        auto content = read_file(path);
 
-        if (!MetaTable::can_deserialize(data))
-            throw std::runtime_error("Metafile of the table " + schema_name + "." + table_name + " is corrupted");
+        MetaTable table;
+        if (!MetaTable::try_deserialize(content, table))
+            throw std::runtime_error(
+                "Metafile of the table " + schema_name + "." + table_name + " is corrupted");
 
-        return MetaTable::deserialize(data);
+        return table;
     }
 
     void
@@ -275,10 +287,11 @@ namespace storage {
         const std::string& db_name,
         const std::string& schema_name,
         const MetaTable& table
-    ) {
+    )
+    {
         auto path = path_db_schema_table_meta(data_dir_, db_name, schema_name, table.name);
-        bytes_v data = table.serialize();
-        write_file(path, data);
+        bytes_v content = table.serialize();
+        write_file(path, content);
     }
 
     std::optional<fs::path>
@@ -303,12 +316,11 @@ namespace storage {
                     continue;
 
                 bytes_v content = read_file(path);
-                if (!MetaSchema::can_deserialize(content))
+                MetaSchema schema;
+                if (!MetaSchema::try_deserialize(content, schema))
                     continue;
 
-                auto schema = MetaSchema::deserialize(content);
-
-                if (schema.id == schema_id) 
+                if (schema.id == schema_id)
                     return path;
             }
         }
@@ -324,7 +336,8 @@ namespace storage {
 
     bool
     FileManager::schema_exists_by_name(
-        const std::string& db_name, const std::string& schema_name
+        const std::string& db_name,
+        const std::string& schema_name
     ) const
     {
         auto path = path_db_schema_meta(data_dir_, db_name, schema_name);
@@ -342,18 +355,20 @@ namespace storage {
 
         bytes_v content = read_file(path.value());
 
-        if (!MetaSchema::can_deserialize(content))
+        MetaSchema schema;
+        if (!MetaSchema::try_deserialize(content, schema))
             throw std::runtime_error(
                 "FileManager::load_schema_by_name: Metafile of the schema " + schema_id +
                 " is corrupted"
             );
 
-        return MetaSchema::deserialize(content);
+        return schema;
     }
 
     MetaSchema
     FileManager::load_schema_by_name(
-        const std::string& db_name, const std::string& schema_name
+        const std::string& db_name,
+        const std::string& schema_name
     ) const
     {
         auto path = path_db_schema_meta(data_dir_, db_name, schema_name);
@@ -363,27 +378,28 @@ namespace storage {
                 " doesnt exist"
             );
 
-        auto data = read_file(path);
+        auto content = read_file(path);
 
-        if (!MetaSchema::can_deserialize(data))
+        MetaSchema schema;
+        if (!MetaSchema::try_deserialize(content, schema))
             throw std::runtime_error(
                 "FileManager::load_schema_by_name: Metafile of the schema " + schema_name +
                 " is corrupted"
             );
 
-        return MetaSchema::deserialize(data);
+        return schema;
     }
 
     void
     FileManager::save_schema(const MetaSchema& schema)
     {
         auto path = path_db_schema_meta(data_dir_, schema.db_name, schema.name);
-        auto data = schema.serialize();
-        write_file(path, data);
+        auto content = schema.serialize();
+        write_file(path, content);
     }
 
     std::vector<fs::path>
-    FileManager::get_tables_paths(const std::string& db_name, const std::string& schema_name)
+    FileManager::get_tables_paths(const std::string& db_name, const std::string& schema_name) const
     {
         auto path = path_db_schema(data_dir_, db_name, schema_name);
         std::vector<fs::path> tables_dirs_paths;
@@ -398,17 +414,17 @@ namespace storage {
 
         std::vector<fs::path> result(tables_dirs_paths.size());
 
-        for (const auto& path : tables_dirs_paths)
+        for (const auto& table_path : tables_dirs_paths)
         {
-            std::string table_name = path.filename();
-            result.emplace_back(path / make_meta_filename(table_name));
+            std::string table_name = table_path.filename();
+            result.emplace_back(table_path / make_meta_filename(table_name));
         }
 
         return result;
     }
 
     std::vector<fs::path>
-    FileManager::get_schemata_paths(const std::string& db_name)
+    FileManager::get_schemata_paths(const std::string& db_name) const
     {
         auto path = path_db(data_dir_, db_name);
         std::vector<fs::path> schemata_dirs_path;
@@ -421,12 +437,12 @@ namespace storage {
             }
         }
 
-        std::vector<fs::path> result(schemata_dirs_path.size()) ;
+        std::vector<fs::path> result(schemata_dirs_path.size());
 
-        for (const auto& path : schemata_dirs_path)
+        for (const auto& schema_path : schemata_dirs_path)
         {
-            std::string schema_name = path.filename();
-            result.emplace_back(path / make_meta_filename(schema_name));
+            std::string schema_name = schema_path.filename();
+            result.emplace_back(schema_path / make_meta_filename(schema_name));
         }
 
         return result;
@@ -440,11 +456,55 @@ namespace storage {
 
     std::pair<std::ofstream, fs::path>
     FileManager::create_wal_logfile(
-        const std::string& db_name, uint64_t first_lsn, uint64_t last_lsn
-    )
+        const std::string& db_name,
+        uint64_t first_lsn,
+        uint64_t last_lsn
+    ) const
     {
         auto path = path_db_wal_logfile(data_dir_, db_name, first_lsn, last_lsn);
         return std::make_pair(std::ofstream(path), path);
+    }
+
+    std::vector<MetaTable>
+    FileManager::load_all_tables(const std::string& db_name) const
+    {
+        std::vector<MetaTable> tables;
+        auto path = path_db(data_dir_, db_name);
+
+        for (const auto& schema_dir : fs::directory_iterator(path))
+        {
+            if (!schema_dir.is_directory())
+                continue;
+
+            for (const auto& table_dir : fs::directory_iterator(schema_dir.path()))
+            {
+                if (!table_dir.is_directory())
+                    continue;
+
+                tables.emplace_back(load_table(db_name,
+                                               schema_dir.path().filename(),
+                                               table_dir.path().filename()));
+            }
+        }
+
+        return tables;
+    }
+
+    std::vector<MetaSchema>
+    FileManager::load_all_schemas(const std::string& db_name) const
+    {
+        std::vector<MetaSchema> schemas;
+        auto path = path_db(data_dir_, db_name);
+
+        for (const auto& schema_dir : fs::directory_iterator(path))
+        {
+            if (!schema_dir.is_directory())
+                continue;
+
+            schemas.emplace_back(load_schema_by_name(db_name, schema_dir.path().filename()));
+        }
+
+        return schemas;
     }
 
     std::vector<DataPage>
@@ -460,11 +520,14 @@ namespace storage {
 
             for (const auto& table_dir : fs::directory_iterator(schema_dir.path()))
             {
-                if (!table_dir.is_directory()) 
+                if (!table_dir.is_directory())
                     continue;
 
                 auto data_path = path_db_schema_table_data(
-                    data_dir_, db_name, schema_dir.path().filename(), table_dir.path().filename()
+                    data_dir_,
+                    db_name,
+                    schema_dir.path().filename(),
+                    table_dir.path().filename()
                 );
 
                 for (const auto& page_file : fs::directory_iterator(data_path))
@@ -475,7 +538,8 @@ namespace storage {
                     auto content = read_file(page_file.path());
                     DataPage page;
                     if (!DataPage::try_deserialize(content, page))
-                        throw std::runtime_error("FileManager::load_all_pages: failed to serialize data page");
+                        throw std::runtime_error(
+                            "FileManager::load_all_pages: failed to serialize data page");
 
                     result.push_back(std::move(page));
                 }
@@ -499,7 +563,8 @@ namespace storage {
             bytes_v content = read_file(entry.path());
             WalLogfile logfile;
             if (!WalLogfile::try_deserialize(content, logfile))
-                throw std::runtime_error("FileManager::load_wal: failed to deserialize wal logfile");
+                throw std::runtime_error(
+                    "FileManager::load_wal: failed to deserialize wal logfile");
 
             log.push_back(std::move(logfile));
         }

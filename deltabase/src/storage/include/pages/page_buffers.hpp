@@ -6,6 +6,7 @@
 #include "../cache/key_extractor.hpp"
 #include "../objects/data_object.hpp"
 #include "../objects/meta_object.hpp"
+#include "cache/registry.hpp"
 
 namespace storage
 {
@@ -14,14 +15,14 @@ namespace storage
         std::string db_name_;
         FileManager& fm_;
         EntityCache<std::string, DataPage, DataPageAccessor, make_key> pages_;
-        EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key>& schemas_;
-        EntityCache<std::string, MetaTable, MetaTableAccessor, make_key>& tables_;
+        Registry<std::string, MetaSchema, make_key>& schemas_;
+        Registry<std::string, MetaTable, make_key>& tables_;
 
         void
         load();
 
         DataPage&
-        create_page(MetaTable& table);
+        create_page(const MetaTable& table);
         void
         update_page(DataPage& page);
 
@@ -30,12 +31,15 @@ namespace storage
         DataPage&
         get_available_page(uint64_t payload_size);
 
+        std::vector<std::reference_wrapper<DataRow>>
+        scan_with_filter(const MetaTable& table, const DataFilter& filter);
+
     public:
         PageBuffers(
             const std::string& db_name,
             FileManager& fm,
-            EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key>& schemas,
-            EntityCache<std::string, MetaTable, MetaTableAccessor, make_key>& tables
+            Registry<std::string, MetaSchema, make_key>& schemas,
+            Registry<std::string, MetaTable, make_key>& tables
         );
 
         int
@@ -43,5 +47,8 @@ namespace storage
 
         void
         flush();
+
+        uint64_t
+        update_rows(const MetaTable& table, const DataFilter& filter, const DataRowUpdate& update);
     };
 } // namespace storage

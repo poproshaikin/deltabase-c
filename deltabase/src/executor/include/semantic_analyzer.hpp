@@ -66,13 +66,13 @@ namespace exe
         analyze_select(sql::SelectStatement& stmt) const;
 
         AnalysisResult
-        analyze_insert(sql::InsertStatement& stmt) ;
+        analyze_insert(const sql::InsertStatement& stmt) const;
 
         AnalysisResult
-        analyze_update(sql::UpdateStatement& stmt) ;
+        analyze_update(sql::UpdateStatement& stmt) const;
 
         AnalysisResult
-        analyze_delete(sql::DeleteStatement& stmt) ;
+        analyze_delete(sql::DeleteStatement& stmt) const;
 
         AnalysisResult
         analyze_create_table(const sql::CreateTableStatement& stmt) const;

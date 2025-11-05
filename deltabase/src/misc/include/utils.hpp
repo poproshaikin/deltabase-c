@@ -142,14 +142,14 @@ public:
 class ReadOnlyMemoryStream
 {
     const std::vector<uint8_t>& buffer_;
-    mutable size_t position_;
+    mutable uint64_t position_;
 public:
     explicit ReadOnlyMemoryStream(const std::vector<uint8_t>& buffer) : buffer_(buffer), position_(0)
     {
     }
 
-    size_t
-    read(void* dest, size_t count) const
+    uint64_t
+    read(void* dest, uint64_t count) const
     {
         if (position_ + count > buffer_.size())
             count = buffer_.size() - position_;
@@ -157,6 +157,14 @@ public:
         std::memcpy(dest, buffer_.data() + position_, count);
         position_ += count;
         return count;
+    }
+
+    uint64_t
+    read(std::string& out) const
+    {
+        uint64_t len = 0;
+        if (read(&len , sizeof(uint64_t)) != sizeof(uint64_t))
+            return 0;
     }
 
     void
@@ -168,13 +176,13 @@ public:
         position_ = pos;
     }
 
-    size_t
+    uint64_t
     tell() const
     {
         return position_;
     }
 
-    size_t
+    uint64_t
     size() const
     {
         return buffer_.size();

@@ -92,6 +92,11 @@ namespace storage
 
         DataRow
         update(const DataRowUpdate& update) const;
+
+        DataRow(const DataRow&) = delete;
+        DataRow& operator=(const DataRow&) = delete;
+        DataRow(DataRow&&) = default;
+        DataRow& operator=(DataRow&&) = default;
     };
 
     struct DataTable

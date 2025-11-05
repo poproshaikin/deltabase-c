@@ -25,7 +25,7 @@ namespace converter {
     convert_kw_to_vt(const sql::SqlKeyword& kw) -> storage::ValueType;
 
     auto
-    convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints) -> storage::meta_column_flags;
+    convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints) -> storage::MetaColumnFlags;
 
     auto
     get_data_type_kw(storage::ValueType dt) -> sql::SqlKeyword;

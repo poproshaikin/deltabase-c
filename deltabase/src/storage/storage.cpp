@@ -1,23 +1,16 @@
 #include "include/storage.hpp"
+
+#include "../misc/include/exceptions.hpp"
+#include "include/objects/meta_object.hpp"
 #include "include/cache/accessors.hpp"
 #include "include/cache/key_extractor.hpp"
-#include "include/objects/meta_object.hpp"
 #include "include/paths.hpp"
 #include "wal/wal_manager.hpp"
 #include <filesystem>
+#include <ranges>
 
 namespace storage
 {
-    Storage::Storage(const fs::path& data_dir) : data_dir_(data_dir), fm_(data_dir)
-    {
-    }
-
-    Storage::Storage(const fs::path& data_dir, const std::string& db_name)
-        : data_dir_(data_dir), fm_(data_dir)
-    {
-        attach_db(db_name);
-    }
-
     void
     Storage::ensure_attached(const std::string& method_name) const
     {
@@ -27,26 +20,47 @@ namespace storage
             );
     }
 
+    Storage::Storage(const fs::path& data_dir) : data_dir_(data_dir), fm_(data_dir)
+    {
+    }
+
+    Storage::Storage(const fs::path& data_dir, const std::string& db_name)
+        : fm_(data_dir), data_dir_(data_dir)
+    {
+        load(db_name);
+        attach_db(db_name);
+    }
+
+    void
+    Storage::load(const std::string& db_name)
+    {
+        auto tables = fm_.load_all_tables(db_name);
+        auto schemas = fm_.load_all_schemas(db_name);
+
+        tables_->init_with(std::move(tables));
+        schemas_->init_with(std::move(schemas));
+    }
+
     void
     Storage::attach_db(const std::string& db_name)
     {
         db_name_ = db_name;
-        schemas_.emplace(MetaSchemaAccessor(db_name, fm_));
-        tables_.emplace(MetaTableAccessor(db_name, fm_));
+        schemas_.emplace();
+        tables_.emplace();
         wal_.emplace(db_name, fm_);
         page_buffers_.emplace(db_name, fm_, schemas_.value(), tables_.value());
         checkpoint_ctl_.emplace(*wal_, *page_buffers_);
     }
 
     void
-    Storage::create_database(const std::string& db_name)
+    Storage::create_database(const std::string& db_name) const
     {
-        auto path = path_db(data_dir_, db_name);
+        const auto path = path_db(data_dir_, db_name);
         fs::create_directory(path);
     }
 
     void
-    Storage::drop_database(const std::string& db_name)
+    Storage::drop_database(const std::string& db_name) const
     {
         auto path = path_db(data_dir_, db_name);
         if (fs::exists(path))
@@ -54,7 +68,7 @@ namespace storage
     }
 
     bool
-    Storage::exists_database(const std::string& db_name)
+    Storage::exists_database(const std::string& db_name) const
     {
         auto path = path_db(data_dir_, db_name);
         return fs::exists(path);
@@ -67,32 +81,12 @@ namespace storage
     {
         ensure_attached("create_schema");
 
-        // auto dir_path = path_db_schema(data_dir_, db_name_.value(), schema.name);
-
-        // if (fs::exists(dir_path))
-        //     throw std::runtime_error("Storage::create_schema: schema " + schema.name + " already
-        //     exists");
-
-        // if (!fs::create_directory(dir_path))
-        //     throw std::runtime_error("Storage::create_schema: failed to create directory " +
-        //     std::string(dir_path));
-
         wal_->push_create_schema(schema);
-        schemas_->put(schema);
-
-        // auto mf_path = path_db_schema_meta(data_dir_, db_name_.value(), schema.name);
-        // std::ofstream metafile(mf_path, std::ios::binary);
-        // if (!metafile)
-        //     throw std::runtime_error("Storage::create_schema: failed to open metafile at path " +
-        //     std::string(mf_path));
-
-        // bytes_v serialized = schema.serialize();
-        // metafile.write(reinterpret_cast<const char*>(serialized.data()), serialized.size());
-        // metafile.close();
+        schemas_->put(std::move(schema));
     }
 
     MetaSchema&
-    Storage::get_schema(const std::string& schema_name) const
+    Storage::get_schema(const std::string& schema_name)
     {
         ensure_attached("get_schema");
 
@@ -104,7 +98,7 @@ namespace storage
     }
 
     MetaSchema&
-    Storage::get_schema(const sql::TableIdentifier& identifier) const
+    Storage::get_schema(const sql::TableIdentifier& identifier)
     {
         return get_schema(identifier.schema_name.value().value);
     }
@@ -124,12 +118,8 @@ namespace storage
         ensure_attached("find_schema_name");
 
         for (const auto& entry : *schemas_)
-        {
-            if (entry.value.id == schema_id)
-            {
-                return make_key(entry.value);
-            }
-        }
+            if (entry.second.id == schema_id)
+                return make_key(entry.second);
 
         return std::nullopt;
     }
@@ -139,21 +129,15 @@ namespace storage
     {
         ensure_attached("exists_schema_by_id");
 
-        return find_schema_key(schema_id) != std::nullopt;
+        return schemas_->has(schema_id);
     }
 
     MetaSchema&
-    Storage::get_schema_by_id(const std::string& id) const
+    Storage::get_schema_by_id(const std::string& id)
     {
         ensure_attached("get_schema_by_id");
 
-        auto name = find_schema_key(id);
-        if (name == std::nullopt)
-            throw std::runtime_error(
-                "Storage::get_schema_by_id: schema with id " + id + " doesnt exist"
-            );
-
-        return get_schema(*name);
+        return schemas_->get(id);
     }
 
     void
@@ -161,14 +145,15 @@ namespace storage
     {
         ensure_attached("drop_schema");
 
-        if (!schemas_->has([schema_name](const MetaSchema& val)
-                           { return val.name == schema_name; }))
+        const MetaSchema* schema = schemas_->find_first([schema_name](const MetaSchema& val)
+        {
+            return val.name == schema_name;
+        });
+        if (!schema)
             throw std::runtime_error(
                 "Storage::drop_schema: schema " + schema_name + " doesnt exist"
             );
 
-        auto* schema = schemas_->find_first([schema_name](const MetaSchema& val)
-                                            { return val.name == schema_name; });
         schemas_->remove(*schema);
         wal_->push_drop_schema(*schema);
 
@@ -188,33 +173,8 @@ namespace storage
                 "Storage::create_table: schema with id " + table.schema_id + " does not exist"
             );
 
-        // const auto& schema = get_schema_by_id(table.schema_id);
-        // auto path = path_db_schema_table(data_dir_, *db_name_, schema.name, table.name);
-
-        // if (fs::exists(path) && tables_->has(table))
-        //     throw std::runtime_error("Storage::create_table: table " + table.name + " already
-        //     exists");
-
-        // try {
-        //     fs::create_directory(path);
-        // } catch (const fs::filesystem_error& err) {
-        //     throw std::runtime_error("Storage::create_table: fs_error in fs::create_directory: "
-        //     + std::string(err.what()));
-        // }
-
         wal_->push_create_table(table);
-        tables_->put(table);
-
-        // auto mf_path = path_db_schema_table_meta(data_dir_, *db_name_, schema.name, table.name);
-        // bytes_v serialized = table.serialize();
-
-        // std::ofstream metafile(mf_path, std::ios::binary);
-        // if (!metafile)
-        //     throw std::runtime_error("Storage::create_schema: failed to open metafile at path " +
-        //     std::string(mf_path));
-
-        // metafile.write(reinterpret_cast<const char*>(serialized.data()), serialized.size());
-        // metafile.close();
+        tables_->put(std::move(table));
     }
 
     bool
@@ -223,17 +183,17 @@ namespace storage
         ensure_attached("exists_table");
 
         const std::string* schema_id = nullptr;
-        for (const auto& schema : *schemas_)
-            if (schema.value.name == schema_name)
-                schema_id = &schema.value.id;
+        for (const auto& val : *schemas_ | std::views::values)
+            if (val.name == schema_name)
+                schema_id = &val.id;
 
         if (!schema_id)
             return false;
 
         const std::string* table_id = nullptr;
-        for (const auto& table : *tables_)
-            if (table.value.name == name)
-                table_id = &table.value.name;
+        for (const auto& val : *tables_ | std::views::values)
+            if (val.name == name)
+                table_id = &val.name;
 
         return table_id;
     }
@@ -249,7 +209,43 @@ namespace storage
     {
         ensure_attached("get_table");
 
-        return tables_->get(name);
+        auto* ptr = tables_->find_first([name](const MetaTable& table)
+        {
+            return table.name == name;
+        });
+
+        if (!ptr)
+            throw TableDoesntExist(name);
+
+        return *ptr;
+    }
+
+    MetaTable&
+    Storage::get_table(const std::string& table_name, const std::string& schema_name)
+    {
+        const auto* schema = schemas_->find_first([schema_name](const MetaSchema& val)
+        {
+            return val.name == schema_name;
+        });
+
+        if (!schema)
+            throw SchemaDoesntExist(schema_name);
+
+        auto* table = tables_->find_first([table_name, schema](const MetaTable& val)
+        {
+            return val.name == table_name && val.schema_id == schema->id;
+        });
+
+        if (!table)
+            throw TableDoesntExist(table_name);
+
+        return *table;
+    }
+
+    MetaTable&
+    Storage::get_table(const sql::TableIdentifier& identifier)
+    {
+        return get_table(identifier.table_name.value, identifier.schema_name->value);
     }
 
     std::optional<std::string>
@@ -257,11 +253,11 @@ namespace storage
     {
         ensure_attached("find_table_key");
 
-        for (const auto& entry : *tables_)
+        for (const auto& val : *tables_ | std::views::values)
         {
-            if (entry.value.id == table_id)
+            if (val.id == table_id)
             {
-                return make_key(entry.value);
+                return make_key(val);
             }
         }
 
@@ -269,7 +265,7 @@ namespace storage
     }
 
     bool
-    Storage::exists_table_by_id(const std::string& table_id)
+    Storage::exists_table_by_id(const std::string& table_id) const
     {
         ensure_attached("exists_table_by_id");
         return find_table_key(table_id) != std::nullopt;
@@ -279,12 +275,7 @@ namespace storage
     Storage::get_table_by_id(const std::string& id)
     {
         ensure_attached("get_table_by_id");
-        auto key = find_table_key(id);
-        if (key == std::nullopt)
-            throw std::runtime_error(
-                "Storage::get_table_by_id: table with id " + id + " doesnt exist"
-            );
-        return tables_->get(*key);
+        return tables_->get(id);
     }
 
     void
@@ -306,9 +297,12 @@ namespace storage
 
     uint64_t
     Storage::update_rows(
-        MetaTable& table, const DataFilter& filter, const DataRowUpdate& update
+        MetaTable& table,
+        const DataFilter& filter,
+        const DataRowUpdate& update
     )
     {
+        return page_buffers_->update_rows(table, filter, update);
     }
 
     uint64_t

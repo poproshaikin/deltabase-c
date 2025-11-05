@@ -20,20 +20,65 @@ namespace storage
         TKey (*ExtractKey)(const TValue& value)>
     class EntityCache
     {
+    public:
         struct CacheEntry
         {
             TValue value;
             bool is_dirty = false;
             std::chrono::time_point<std::chrono::steady_clock> cached_at;
 
-            CacheEntry() : value(), cached_at(std::chrono::steady_clock::now()) {}
-            
+            CacheEntry() : value(), cached_at(std::chrono::steady_clock::now())
+            {
+            }
+
+            explicit
             CacheEntry(TValue value)
                 : value(std::move(value)), cached_at(std::chrono::steady_clock::now())
             {
             }
+
+            CacheEntry(const CacheEntry& other)
+                requires std::is_copy_constructible_v<TValue>
+                : value(other.value), is_dirty(other.is_dirty), cached_at(other.cached_at)
+            {
+            }
+
+            CacheEntry(CacheEntry&& other) noexcept
+                : value(std::move(other.value)), is_dirty(other.is_dirty), cached_at(other.cached_at)
+            {
+            }
+
+            CacheEntry& operator=(const CacheEntry& other)
+                requires std::is_copy_assignable_v<TValue>
+            {
+                value = other.value;
+                is_dirty = other.is_dirty;
+                cached_at = other.cached_at;
+                return *this;
+            }
+
+            CacheEntry& operator=(CacheEntry&& other) noexcept
+            {
+                if (this != &other)
+                {
+                    if constexpr (std::is_move_assignable_v<TValue>)
+                    {
+                        value = std::move(other.value);
+                    }
+                    else
+                    {
+                        // Destruct and reconstruct with move constructor
+                        value.~TValue();
+                        new (&value) TValue(std::move(other.value));
+                    }
+                    is_dirty = other.is_dirty;
+                    cached_at = other.cached_at;
+                }
+                return *this;
+            }
         };
-        
+
+    private:
         static constexpr uint64_t max_size = 1000;
 
         TAccessor accessor_;
@@ -64,8 +109,7 @@ namespace storage
 
         bool
         has(const TKey& key) const noexcept
-        {
-            {
+        { {
                 std::shared_lock lock(mutex_);
                 if (data_.contains(key))
                 {
@@ -73,7 +117,7 @@ namespace storage
                 }
             }
 
-            if (accessor_.has(key)) 
+            if (accessor_.has(key))
                 return true;
 
             return false;
@@ -96,9 +140,8 @@ namespace storage
         }
 
         TValue&
-        get(const TKey& key) const
-        {
-            {
+        get(const TKey& key)
+        { {
                 std::shared_lock lock(mutex_);
                 if (data_.contains(key))
                     return data_.at(key).value;
@@ -107,7 +150,7 @@ namespace storage
             if (accessor_.has(key))
             {
                 TValue loaded = accessor_.get(key);
-                std::unique_lock<std::shared_mutex> lock(mutex_);
+                std::unique_lock lock(mutex_);
                 auto [iter, inserted] = data_.try_emplace(key, CacheEntry(std::move(loaded)));
                 return iter->second.value;
             }
@@ -115,10 +158,12 @@ namespace storage
             throw std::runtime_error("Key not found in cache or external storage");
         }
 
+        template <typename U = TValue>
+            requires(!std::is_copy_constructible_v<U>)
         void
-        put(const TValue& value)
+        put(U&& value)
         {
-            std::unique_lock<std::shared_mutex> lock(mutex_);
+            std::unique_lock lock(mutex_);
 
             TKey key = ExtractKey(value);
 
@@ -128,27 +173,65 @@ namespace storage
                     data_.begin(),
                     data_.end(),
                     [](const auto& a, const auto& b)
-                    { 
+                    {
                         // dirty entries should not be evicted, treat them as "newer"
-                        if (a.second.is_dirty && !b.second.is_dirty) return false;
-                        if (!a.second.is_dirty && b.second.is_dirty) return true;
+                        if (a.second.is_dirty && !b.second.is_dirty)
+                            return false;
+                        if (!a.second.is_dirty && b.second.is_dirty)
+                            return true;
                         return a.second.cached_at < b.second.cached_at;
                     }
                 );
-                
+
                 if (oldest != data_.end() && !oldest->second.is_dirty)
                     data_.erase(oldest);
                 else
-                    throw std::runtime_error("EntityCache::put: cache is full of dirty entries, cannot evict");
+                    throw std::runtime_error(
+                        "EntityCache::put: cache is full of dirty entries, cannot evict");
             }
 
-            data_[key] = CacheEntry(value);
+            data_.insert_or_assign(key, CacheEntry(std::move(value)));
+        }
+
+        template <typename U = TValue>
+            requires(std::is_copy_constructible_v<U>)
+        void
+        put(const U& value)
+        {
+            std::unique_lock lock(mutex_);
+
+            TKey key = ExtractKey(value);
+
+            if (data_.size() >= max_size && !data_.contains(key))
+            {
+                auto oldest = std::min_element(
+                    data_.begin(),
+                    data_.end(),
+                    [](const auto& a, const auto& b)
+                    {
+                        // dirty entries should not be evicted, treat them as "newer"
+                        if (a.second.is_dirty && !b.second.is_dirty)
+                            return false;
+                        if (!a.second.is_dirty && b.second.is_dirty)
+                            return true;
+                        return a.second.cached_at < b.second.cached_at;
+                    }
+                );
+
+                if (oldest != data_.end() && !oldest->second.is_dirty)
+                    data_.erase(oldest);
+                else
+                    throw std::runtime_error(
+                        "EntityCache::put: cache is full of dirty entries, cannot evict");
+            }
+
+            data_.insert_or_assign(key, CacheEntry(value));
         }
 
         TValue
         remove(const TKey& key)
         {
-            std::unique_lock<std::shared_mutex> lock(mutex_);
+            std::unique_lock lock(mutex_);
             auto it = data_.find(key);
             if (it != data_.end())
             {
@@ -164,15 +247,15 @@ namespace storage
         remove(const TValue& value)
         {
             TKey key = ExtractKey(value);
-            return remove<TKey>(key);
+            return remove(key);
         }
 
         TValue*
         find_first(std::function<bool(const TValue&)> predicate)
         {
-            for (TValue& val : *this)
-                if (predicate(val))
-                    return &val;
+            for (CacheEntry& entry : *this)
+                if (predicate(entry.value))
+                    return &entry.value;
 
             return nullptr;
         }
@@ -180,11 +263,11 @@ namespace storage
         bool
         remove_first(std::function<bool(const TValue&)> predicate)
         {
-            for (TValue& val : *this)
+            for (CacheEntry& entry : *this)
             {
-                if (predicate(val))
+                if (predicate(entry.value))
                 {
-                    remove(val);
+                    remove(entry.value);
                     return true;
                 }
             }
@@ -222,7 +305,7 @@ namespace storage
         map_snapshot() const
         {
             std::shared_lock lock(mutex_);
-            
+
             std::unordered_map<TKey, TValue> result;
             for (const auto& [k, entry] : data_)
                 result.emplace(k, entry.value);
@@ -231,9 +314,11 @@ namespace storage
         }
 
         // Iterator that exposes CacheEntry (value) instead of map pair
-        class Iterator {
+        class Iterator
+        {
             using underlying_it_t = typename std::unordered_map<TKey, CacheEntry>::iterator;
             underlying_it_t it_{};
+
         public:
             using iterator_category = std::forward_iterator_tag;
             using value_type = CacheEntry;
@@ -242,21 +327,57 @@ namespace storage
             using reference = CacheEntry&;
 
             Iterator() = default;
-            explicit Iterator(underlying_it_t it) : it_(it) {}
 
-            reference operator*() const { return it_->second; }
-            pointer operator->() const { return std::addressof(it_->second); }
+            explicit
+            Iterator(underlying_it_t it) : it_(it)
+            {
+            }
 
-            Iterator& operator++() { ++it_; return *this; }
-            Iterator operator++(int) { Iterator tmp = *this; ++it_; return tmp; }
+            reference
+            operator*() const
+            {
+                return it_->second;
+            }
 
-            bool operator==(const Iterator& other) const { return it_ == other.it_; }
-            bool operator!=(const Iterator& other) const { return it_ != other.it_; }
+            pointer
+            operator->() const
+            {
+                return std::addressof(it_->second);
+            }
+
+            Iterator&
+            operator++()
+            {
+                ++it_;
+                return *this;
+            }
+
+            Iterator
+            operator++(int)
+            {
+                Iterator tmp = *this;
+                ++it_;
+                return tmp;
+            }
+
+            bool
+            operator==(const Iterator& other) const
+            {
+                return it_ == other.it_;
+            }
+
+            bool
+            operator!=(const Iterator& other) const
+            {
+                return it_ != other.it_;
+            }
         };
 
-        class ConstIterator {
+        class ConstIterator
+        {
             using underlying_it_t = typename std::unordered_map<TKey, CacheEntry>::const_iterator;
             underlying_it_t it_{};
+
         public:
             using iterator_category = std::forward_iterator_tag;
             using value_type = const CacheEntry;
@@ -265,16 +386,50 @@ namespace storage
             using reference = const CacheEntry&;
 
             ConstIterator() = default;
-            explicit ConstIterator(underlying_it_t it) : it_(it) {}
 
-            reference operator*() const { return it_->second; }
-            pointer operator->() const { return std::addressof(it_->second); }
+            explicit
+            ConstIterator(underlying_it_t it) : it_(it)
+            {
+            }
 
-            ConstIterator& operator++() { ++it_; return *this; }
-            ConstIterator operator++(int) { ConstIterator tmp = *this; ++it_; return tmp; }
+            reference
+            operator*() const
+            {
+                return it_->second;
+            }
 
-            bool operator==(const ConstIterator& other) const { return it_ == other.it_; }
-            bool operator!=(const ConstIterator& other) const { return it_ != other.it_; }
+            pointer
+            operator->() const
+            {
+                return std::addressof(it_->second);
+            }
+
+            ConstIterator&
+            operator++()
+            {
+                ++it_;
+                return *this;
+            }
+
+            ConstIterator
+            operator++(int)
+            {
+                ConstIterator tmp = *this;
+                ++it_;
+                return tmp;
+            }
+
+            bool
+            operator==(const ConstIterator& other) const
+            {
+                return it_ == other.it_;
+            }
+
+            bool
+            operator!=(const ConstIterator& other) const
+            {
+                return it_ != other.it_;
+            }
         };
 
         // Range-based for support over CacheEntry values
@@ -283,6 +438,7 @@ namespace storage
         {
             return Iterator(data_.begin());
         }
+
         Iterator
         end()
         {
@@ -294,6 +450,7 @@ namespace storage
         {
             return ConstIterator(data_.cbegin());
         }
+
         ConstIterator
         end() const
         {
@@ -305,6 +462,7 @@ namespace storage
         {
             return ConstIterator(data_.cbegin());
         }
+
         ConstIterator
         cend() const
         {

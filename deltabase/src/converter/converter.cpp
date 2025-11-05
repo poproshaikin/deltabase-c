@@ -136,9 +136,9 @@ namespace converter {
         }
     }
 
-    storage::meta_column_flags
+    storage::MetaColumnFlags
     convert_tokens_to_cfs(const std::vector<sql::SqlToken>& constraints) {
-        storage::meta_column_flags flags = storage::meta_column_flags::NONE;
+        storage::MetaColumnFlags flags = storage::MetaColumnFlags::NONE;
 
         for (int i = 0; i < constraints.size(); i++) {
             if (!constraints[i].is_constraint()) {
@@ -155,18 +155,18 @@ namespace converter {
                     constraints[i].get_detail<sql::SqlKeyword>() != sql::SqlKeyword::KEY) {
                     throw InvalidStatementSyntax();
                 }
-                flags = static_cast<storage::meta_column_flags>(flags | storage::meta_column_flags::PK);
+                flags = static_cast<storage::MetaColumnFlags>(flags | storage::MetaColumnFlags::PK);
             } else if (kw == sql::SqlKeyword::NOT) {
                 i++;
                 if (i >= constraints.size() ||
                     constraints[i].get_detail<sql::SqlKeyword>() != sql::SqlKeyword::_NULL) {
                     throw InvalidStatementSyntax();
                 }
-                flags = static_cast<storage::meta_column_flags>(flags | storage::meta_column_flags::NN);
+                flags = static_cast<storage::MetaColumnFlags>(flags | storage::MetaColumnFlags::NN);
             } else if (kw == sql::SqlKeyword::AUTOINCREMENT) {
-                flags = static_cast<storage::meta_column_flags>(flags | storage::meta_column_flags::AI);
+                flags = static_cast<storage::MetaColumnFlags>(flags | storage::MetaColumnFlags::AI);
             } else if (kw == sql::SqlKeyword::UNIQUE) {
-                flags = static_cast<storage::meta_column_flags>(flags | storage::meta_column_flags::UN);
+                flags = static_cast<storage::MetaColumnFlags>(flags | storage::MetaColumnFlags::UN);
             }
         }
 

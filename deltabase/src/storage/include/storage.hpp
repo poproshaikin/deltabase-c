@@ -11,6 +11,7 @@
 #include "pages/page_buffers.hpp"
 #include "wal/wal_manager.hpp"
 #include "checkpoint.hpp"
+#include "cache/registry.hpp"
 
 namespace storage
 {
@@ -20,8 +21,8 @@ namespace storage
 
         FileManager fm_;
 
-        std::optional<EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key> > schemas_;
-        std::optional<EntityCache<std::string, MetaTable, MetaTableAccessor, make_key> > tables_;
+        std::optional<Registry<std::string, MetaSchema, make_key>> schemas_;
+        std::optional<Registry<std::string, MetaTable, make_key>> tables_;
 
         std::optional<PageBuffers> page_buffers_;
         std::optional<CheckpointManager> checkpoint_ctl_;
@@ -30,7 +31,7 @@ namespace storage
         fs::path data_dir_;
 
         void
-        ensure_fs_initialize();
+        load(const std::string& db_name);
 
         void
         ensure_attached(const std::string& method_name = "ensure_attached") const;
@@ -43,7 +44,6 @@ namespace storage
 
     public:
         Storage(const fs::path& data_dir);
-
         Storage(const fs::path& data_dir, const std::string& db_name);
 
         void
@@ -51,13 +51,13 @@ namespace storage
 
         // ----- Databases -----
         void
-        create_database(const std::string& db_name);
+        create_database(const std::string& db_name) const;
 
         void
-        drop_database(const std::string& db_name);
+        drop_database(const std::string& db_name) const;
 
         bool
-        exists_database(const std::string& db_name);
+        exists_database(const std::string& db_name) const;
 
         // ----- Schemas -----
 
@@ -71,13 +71,13 @@ namespace storage
         exists_schema_by_id(const std::string& schema_id) const;
 
         MetaSchema&
-        get_schema(const std::string& schema_name) const;
+        get_schema(const std::string& schema_name);
 
         MetaSchema&
-        get_schema(const sql::TableIdentifier& identifier) const;
+        get_schema(const sql::TableIdentifier& identifier);
 
         MetaSchema&
-        get_schema_by_id(const std::string& id) const;
+        get_schema_by_id(const std::string& id);
 
         void
         drop_schema(const std::string& schema_name);
@@ -94,13 +94,16 @@ namespace storage
         exists_table(const sql::TableIdentifier& identifier);
 
         bool
-        exists_table_by_id(const std::string& table_id);
+        exists_table_by_id(const std::string& table_id) const;
 
         bool
         exists_virtual_table(const sql::TableIdentifier& identifier);
 
         MetaTable&
         get_table(const std::string& name);
+
+        MetaTable&
+        get_table(const std::string& table_name, const std::string& schema_name);
 
         MetaTable&
         get_table(const sql::TableIdentifier& identifier);
