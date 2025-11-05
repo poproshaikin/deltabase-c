@@ -63,7 +63,7 @@ namespace exe
         std::string def_schema_;
 
         AnalysisResult
-        analyze_select(sql::SelectStatement& stmt) ;
+        analyze_select(sql::SelectStatement& stmt) const;
 
         AnalysisResult
         analyze_insert(sql::InsertStatement& stmt) ;
@@ -75,36 +75,36 @@ namespace exe
         analyze_delete(sql::DeleteStatement& stmt) ;
 
         AnalysisResult
-        analyze_create_table(sql::CreateTableStatement& stmt);
+        analyze_create_table(const sql::CreateTableStatement& stmt) const;
 
         AnalysisResult
-        analyze_create_db(sql::CreateDbStatement& stmt);
+        analyze_create_db(const sql::CreateDbStatement& stmt) const;
 
         AnalysisResult
-        analyze_create_schema(sql::CreateSchemaStatement& stmt);
+        analyze_create_schema(sql::CreateSchemaStatement& stmt) const;
 
-        AnalysisResult
-        analyze_where(std::unique_ptr<sql::AstNode>& where,
+        static AnalysisResult
+        analyze_where(const sql::BinaryExpr& where,
                       const storage::MetaTable& table);
 
-        AnalysisResult
+        static AnalysisResult
         validate_column_comparison(
             const std::unique_ptr<sql::AstNode>& left,
             const std::unique_ptr<sql::AstNode>& right,
             const storage::MetaTable& table
         );
 
-        AnalysisResult
+        static AnalysisResult
         validate_column_assignment(
             const sql::AstNode& assignment,
             const storage::MetaTable& table
         );
 
         void
-        ensure_db_exists();
+        ensure_db_exists() const;
 
         void
-        ensure_db_exists(const std::string& name);
+        ensure_db_exists(const std::string& name) const;
 
     public:
         SemanticAnalyzer(storage::Storage& storage);
