@@ -63,7 +63,6 @@ add_cpp_module(sql)
 add_cpp_module(server)
 add_cpp_module(misc)
 add_cpp_module(cli)
-add_cpp_module(catalog)
 add_cpp_module(converter)
 add_cpp_module(engine)
 

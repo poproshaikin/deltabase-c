@@ -5,10 +5,12 @@
 #include <optional>
 #include <set>
 
-namespace exe {
+namespace exe
+{
     inline auto
-    get_compatibility_table() -> const std::set<std::pair<sql::SqlLiteral, storage::ValueType>>& {
-        static std::set<std::pair<sql::SqlLiteral, storage::ValueType>> map = {
+    get_compatibility_table() -> const std::set<std::pair<sql::SqlLiteral, storage::ValueType> >&
+    {
+        static std::set<std::pair<sql::SqlLiteral, storage::ValueType> > map = {
             {sql::SqlLiteral::STRING, storage::ValueType::STRING},
             {sql::SqlLiteral::INTEGER, storage::ValueType::INTEGER},
             {sql::SqlLiteral::INTEGER, storage::ValueType::REAL},
@@ -21,73 +23,82 @@ namespace exe {
     }
 
     inline auto
-    is_literal_assignable_to(sql::SqlLiteral literal_type, storage::ValueType column_type) -> bool {
+    is_literal_assignable_to(sql::SqlLiteral literal_type, storage::ValueType column_type) -> bool
+    {
         return get_compatibility_table().count(std::make_pair(literal_type, column_type)) > 0;
     }
 
-    struct AnalysisResult {
+    struct AnalysisResult
+    {
         bool is_valid;
         std::optional<std::runtime_error> err;
 
         std::optional<bool> is_system_query;
 
-        AnalysisResult(bool is_valid) : is_valid(is_valid) {
+        AnalysisResult(bool is_valid) : is_valid(is_valid)
+        {
         }
 
-        AnalysisResult(std::runtime_error err) : is_valid(false), err(err) {
+        AnalysisResult(std::runtime_error err) : is_valid(false), err(err)
+        {
         }
 
         AnalysisResult(std::runtime_error err, bool is_system_query)
-            : is_valid(false), err(err), is_system_query(is_system_query) {
+            : is_valid(false), err(err), is_system_query(is_system_query)
+        {
         }
 
         AnalysisResult(bool is_valid,
                        std::optional<std::runtime_error> err,
                        std::optional<bool> is_system_query)
-            : is_valid(is_valid), err(std::move(err)), is_system_query(is_system_query) {
+            : is_valid(is_valid), err(std::move(err)), is_system_query(is_system_query)
+        {
         }
     };
 
-    class SemanticAnalyzer {
+    class SemanticAnalyzer
+    {
         storage::Storage& storage_;
         std::optional<std::string> db_name_;
         std::string def_schema_;
 
-        auto
-        analyze_select(sql::SelectStatement& stmt) -> AnalysisResult;
+        AnalysisResult
+        analyze_select(sql::SelectStatement& stmt) ;
 
-        auto
-        analyze_insert(sql::InsertStatement& stmt) -> AnalysisResult;
+        AnalysisResult
+        analyze_insert(sql::InsertStatement& stmt) ;
 
-        auto
-        analyze_update(sql::UpdateStatement& stmt) -> AnalysisResult;
+        AnalysisResult
+        analyze_update(sql::UpdateStatement& stmt) ;
 
-        auto
-        analyze_delete(sql::DeleteStatement& stmt) -> AnalysisResult;
+        AnalysisResult
+        analyze_delete(sql::DeleteStatement& stmt) ;
 
-        auto
-        analyze_create_table(sql::CreateTableStatement& stmt) -> AnalysisResult;
+        AnalysisResult
+        analyze_create_table(sql::CreateTableStatement& stmt);
 
-        auto
-        analyze_create_db(sql::CreateDbStatement& stmt) -> AnalysisResult;
+        AnalysisResult
+        analyze_create_db(sql::CreateDbStatement& stmt);
 
-        auto
-        analyze_create_schema(sql::CreateSchemaStatement& stmt) -> AnalysisResult;
+        AnalysisResult
+        analyze_create_schema(sql::CreateSchemaStatement& stmt);
 
-        auto
-        analyze_where(std::unique_ptr<sql::AstNode>& where, const storage::MetaTable& table) -> AnalysisResult;
+        AnalysisResult
+        analyze_where(std::unique_ptr<sql::AstNode>& where,
+                      const storage::MetaTable& table);
 
-        auto
+        AnalysisResult
         validate_column_comparison(
             const std::unique_ptr<sql::AstNode>& left,
             const std::unique_ptr<sql::AstNode>& right,
             const storage::MetaTable& table
-        ) -> AnalysisResult;
+        );
 
-        auto
+        AnalysisResult
         validate_column_assignment(
-            const sql::AstNode& assignment, const storage::MetaTable& table
-        ) -> AnalysisResult;
+            const sql::AstNode& assignment,
+            const storage::MetaTable& table
+        );
 
         void
         ensure_db_exists();
@@ -95,12 +106,14 @@ namespace exe {
         void
         ensure_db_exists(const std::string& name);
 
-      public:
+    public:
         SemanticAnalyzer(storage::Storage& storage);
+
         SemanticAnalyzer(storage::Storage& storage, std::string db_name);
+
         SemanticAnalyzer(storage::Storage& storage, engine::EngineConfig cfg);
 
-        auto
-        analyze(sql::AstNode& ast) -> AnalysisResult;
+        AnalysisResult
+        analyze(sql::AstNode& ast) ;
     };
 }; // namespace exe

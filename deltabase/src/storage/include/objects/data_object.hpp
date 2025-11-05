@@ -18,6 +18,7 @@ namespace storage
     };
 
     DataRowFlags
+    inline
     operator|(DataRowFlags left, DataRowFlags right)
     {
         using T = std::underlying_type_t<DataRowFlags>;
@@ -25,10 +26,11 @@ namespace storage
     }
 
     DataRowFlags
+    inline
     operator|=(DataRowFlags& left, DataRowFlags right)
     {
         using T = std::underlying_type_t<DataRowFlags>;
-        auto value = static_cast<DataRowFlags>(static_cast<T>(left) | static_cast<T>(right));
+        const auto value = static_cast<DataRowFlags>(static_cast<T>(left) | static_cast<T>(right));
         left = value;
         return value;
     }
@@ -49,7 +51,8 @@ namespace storage
         OR
     };
 
-    struct DataToken {
+    struct DataToken
+    {
         bytes_v bytes;
         ValueType type;
 
@@ -84,10 +87,10 @@ namespace storage
         uint64_t
         estimate_size() const;
 
-        bytes_v 
+        bytes_v
         serialize() const;
 
-        DataRow 
+        DataRow
         update(const DataRowUpdate& update) const;
     };
 

@@ -52,16 +52,16 @@ namespace exe {
         // --- Actions ---
         
         ActionExecutionResult
-        execute_action(const SeqScanAction& action) noexcept;
+        execute_action(const SeqScanAction& action) const noexcept;
 
         ActionExecutionResult
-        execute_action(const InsertAction& action) noexcept;
+        execute_action(const InsertAction& action) const noexcept;
         
         ActionExecutionResult
-        execute_action(const UpdateByFilterAction& action) noexcept;
+        execute_action(const UpdateByFilterAction& action) const noexcept;
 
         ActionExecutionResult
-        execute_action(const DeleteByFilterAction& action) noexcept;
+        execute_action(const DeleteByFilterAction& action) const noexcept;
 
         ActionExecutionResult
         execute_action(const WriteMetaTableAction& action) noexcept;
@@ -70,16 +70,16 @@ namespace exe {
         execute_action(const WriteMetaSchemaAction& action) noexcept;
 
         ActionExecutionResult
-        execute_action(const CreateTableAction& action) noexcept;
+        execute_action(const CreateTableAction& action) const noexcept;
 
         ActionExecutionResult
-        execute_action(const CreateSchemaAction& action) noexcept;
+        execute_action(const CreateSchemaAction& action) const noexcept;
 
         ActionExecutionResult
-        execute_action(const CreateDatabaseAction& action) noexcept;
+        execute_action(const CreateDatabaseAction& action) const noexcept;
 
         ActionExecutionResult
-        execute_action(const Action& action) noexcept;
+        execute_action(const Action& action) const noexcept;
 
         // --- Plans ---
 

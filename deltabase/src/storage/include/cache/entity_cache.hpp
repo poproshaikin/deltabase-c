@@ -26,10 +26,10 @@ namespace storage
             bool is_dirty = false;
             std::chrono::time_point<std::chrono::steady_clock> cached_at;
 
-            CacheEntry() : value(), is_dirty(false), cached_at(std::chrono::steady_clock::now()) {}
+            CacheEntry() : value(), cached_at(std::chrono::steady_clock::now()) {}
             
             CacheEntry(TValue value)
-                : value(std::move(value)), is_dirty(false), cached_at(std::chrono::steady_clock::now())
+                : value(std::move(value)), cached_at(std::chrono::steady_clock::now())
             {
             }
         };
@@ -42,13 +42,13 @@ namespace storage
 
     public:
         EntityCache(TAccessor accessor)
-            : accessor_(accessor), mutex_()
+            : accessor_(accessor)
         {
         }
 
         template <typename... Args>
         EntityCache(std::remove_reference<Args&&>... accessor_args)
-            : accessor_(std::forward<Args>(accessor_args)...), mutex_()
+            : accessor_(std::forward<Args>(accessor_args)...)
         {
         }
 

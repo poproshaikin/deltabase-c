@@ -6,13 +6,15 @@
 #include <cstdint>
 #include <stdexcept>
 
-namespace storage {
+namespace storage
+{
     bytes_v
     DataRow::serialize() const
     {
         auto estimate_size = [this]() -> uint64_t
         {
-            uint64_t size = sizeof(row_id) + sizeof(flags) + sizeof(uint64_t); // row_id + flags + tokens count
+            uint64_t size = sizeof(row_id) + sizeof(flags) + sizeof(uint64_t);
+            // row_id + flags + tokens count
 
             for (const auto& token : tokens)
                 size += token.estimate_size();
@@ -35,7 +37,8 @@ namespace storage {
         stream.write(&tokens_count, sizeof(tokens_count));
 
         // Write each token
-        for (const auto& token : tokens) {
+        for (const auto& token : tokens)
+        {
             bytes_v serialized = token.serialize();
             stream.write(serialized.data(), serialized.size());
         }
@@ -70,9 +73,9 @@ namespace storage {
     DataToken::estimate_size() const
     {
         uint64_t size = sizeof(ValueType); // size of the value type
-        if (type == ValueType::STRING) 
+        if (type == ValueType::STRING)
             size += sizeof(uint64_t); // size of the string length field
-        
+
         size += bytes.size(); // actual data
         return size;
     }

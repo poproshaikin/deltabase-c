@@ -1,11 +1,14 @@
 #include "include/lexer.hpp"
 #include "../converter/include/converter.hpp"
 
-namespace sql::utils {
+namespace sql::utils
+{
 
-    auto
-    to_string(sql::SqlTokenType type) -> std::string {
-        switch (type) {
+    std::string
+    to_string(sql::SqlTokenType type)
+    {
+        switch (type)
+        {
         case SqlTokenType::IDENTIFIER:
             return "IDENTIFIER";
         case SqlTokenType::KEYWORD:
@@ -21,11 +24,13 @@ namespace sql::utils {
         }
     }
 
-    auto
-    to_string(sql::SqlKeyword type) -> std::string {
-        const auto& keywords = keywords_map();
-        for (const auto& [key, value] : keywords) {
-            if (value == type) {
+    std::string
+    to_string(sql::SqlKeyword type)
+    {
+        for (const auto& keywords = keywords_map(); const auto& [key, value] : keywords)
+        {
+            if (value == type)
+            {
                 return key;
             }
         }
@@ -33,10 +38,13 @@ namespace sql::utils {
     }
 
     auto
-    to_string(sql::SqlOperator type) -> std::string {
+    to_string(sql::SqlOperator type) -> std::string
+    {
         const auto& operators = operators_map();
-        for (const auto& [key, value] : operators) {
-            if (value == type) {
+        for (const auto& [key, value] : operators)
+        {
+            if (value == type)
+            {
                 return key;
             }
         }
@@ -44,10 +52,13 @@ namespace sql::utils {
     }
 
     auto
-    to_string(sql::SqlSymbol type) -> std::string {
+    to_string(sql::SqlSymbol type) -> std::string
+    {
         const auto& symbols = symbols_map();
-        for (const auto& [key, value] : symbols) {
-            if (value == type) {
+        for (const auto& [key, value] : symbols)
+        {
+            if (value == type)
+            {
                 return key;
             }
         }
@@ -55,10 +66,12 @@ namespace sql::utils {
     }
 
     auto
-    to_string(sql::SqlLiteral type, const std::string& value) -> std::string {
+    to_string(sql::SqlLiteral type, const std::string& value) -> std::string
+    {
         std::string literal;
 
-        switch (type) {
+        switch (type)
+        {
         case sql::SqlLiteral::INTEGER:
             literal = "INTEGER";
             break;
@@ -83,12 +96,15 @@ namespace sql::utils {
     }
 
     auto
-    get_data_type_str(storage::ValueType dt) -> std::string {
+    get_data_type_str(storage::ValueType dt) -> std::string
+    {
         const auto& data_types = data_types_map();
         SqlKeyword kw = converter::get_data_type_kw(dt);
 
-        for (const auto& kvp : data_types) {
-            if (kvp.second == kw) {
+        for (const auto& kvp : data_types)
+        {
+            if (kvp.second == kw)
+            {
                 return kvp.first;
             }
         }

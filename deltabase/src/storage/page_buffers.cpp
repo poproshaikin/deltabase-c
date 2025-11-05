@@ -12,7 +12,7 @@ namespace storage
         EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key>& schemas,
         EntityCache<std::string, MetaTable, MetaTableAccessor, make_key>& tables
     )
-        : db_name_(db_name), fm_(fm), schemas_(schemas), tables_(tables), pages_(DataPageAccessor(db_name, fm))
+        : db_name_(db_name), fm_(fm), pages_(DataPageAccessor(db_name, fm)), schemas_(schemas), tables_(tables)
     {
     }
 

@@ -4,7 +4,6 @@
 
 namespace exe
 {
-
     ActionExecutionResult::ActionExecutionResult(IntOrDataTable&& result)
         : success(true), result(std::forward<IntOrDataTable>(result))
     {
@@ -59,13 +58,13 @@ namespace exe
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const Action& action) noexcept
+    ActionExecutor::execute_action(const Action& action) const noexcept
     {
         return std::visit([this](const auto& a) { return this->execute_action(a); }, action);
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const SeqScanAction& action) noexcept
+    ActionExecutor::execute_action(const SeqScanAction& action) const noexcept
     {
         try
         {
@@ -81,7 +80,7 @@ namespace exe
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const InsertAction& action) noexcept
+    ActionExecutor::execute_action(const InsertAction& action) const noexcept
     {
         try
         {
@@ -99,12 +98,12 @@ namespace exe
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const UpdateByFilterAction& action) noexcept
+    ActionExecutor::execute_action(const UpdateByFilterAction& action) const noexcept
     {
         try
         {
-            auto rows_affected = storage_.update_rows_by_filter(
-                const_cast<storage::MetaTable&>(action.table),
+            auto rows_affected = storage_.update_rows(
+                action.table,
                 action.filter.value(), 
                 action.row_update
             );
@@ -121,12 +120,12 @@ namespace exe
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const DeleteByFilterAction& action) noexcept
+    ActionExecutor::execute_action(const DeleteByFilterAction& action) const noexcept
     {
         try
         {
-            auto rows_affected = storage_.delete_rows_by_filter(
-                const_cast<storage::MetaTable&>(action.table), action.filter
+            auto rows_affected = storage_.delete_rows(
+                action.table, action.filter
             );
             return ActionExecutionResult(rows_affected);
         }
@@ -141,7 +140,7 @@ namespace exe
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const CreateTableAction& action) noexcept
+    ActionExecutor::execute_action(const CreateTableAction& action) const noexcept
     {
         try
         {
@@ -157,7 +156,7 @@ namespace exe
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const CreateSchemaAction& action) noexcept
+    ActionExecutor::execute_action(const CreateSchemaAction& action) const noexcept
     {
         try
         {
@@ -173,7 +172,7 @@ namespace exe
     }
 
     ActionExecutionResult
-    ActionExecutor::execute_action(const CreateDatabaseAction& action) noexcept
+    ActionExecutor::execute_action(const CreateDatabaseAction& action) const noexcept
     {
         try
         {

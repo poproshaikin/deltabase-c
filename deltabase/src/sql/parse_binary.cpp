@@ -32,15 +32,17 @@ to_ast_operator(SqlOperator type) -> std::optional<AstOperator> {
     }
 }
 
-auto
-SqlParser::parse_binary(int min_priority) -> std::unique_ptr<AstNode> {
+BinaryExpr
+SqlParser::parse_binary(int min_priority)
+{
     std::unique_ptr<AstNode> left = parse_primary();
 
-    while (true) {
+    while (true)
+    {
         const SqlToken& token = current();
-        if (token.type != SqlTokenType::OPERATOR) {
+        if (token.type != SqlTokenType::OPERATOR)
             break;
-        }
+
         auto op_opt = to_ast_operator(std::get<SqlOperator>(token.detail));
         if (!op_opt)
             break;
@@ -52,30 +54,46 @@ SqlParser::parse_binary(int min_priority) -> std::unique_ptr<AstNode> {
         AstOperator op = *op_opt;
         advance();
 
-        auto right = parse_binary(priority + 1);
+        BinaryExpr right = parse_binary(priority + 1);
 
-        BinaryExpr expr{.op = op, .left = std::move(left), .right = std::move(right)};
+        BinaryExpr expr{
+            .op = op,
+            .left = std::move(left),
+            .right =
+                std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, AstNodeValue(std::move(right)))
+        };
 
         left = std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, AstNodeValue(std::move(expr)));
     }
 
-    return left;
+    if (left->type == AstNodeType::BINARY_EXPR)
+        return std::get<BinaryExpr>(std::move(left->value));
+
+    BinaryExpr result{
+        .op = AstOperator::NONE,
+        .left = std::move(left),
+        .right = nullptr
+    };
+    return result;
 }
 
-auto
-SqlParser::parse_primary() -> std::unique_ptr<AstNode> {
+std::unique_ptr<AstNode>
+SqlParser::parse_primary()
+{
     const SqlToken& token = current();
 
-    if (match(SqlSymbol::LPAREN)) {
+    if (match(SqlSymbol::LPAREN))
+    {
         advance();
         auto node = parse_binary(0);
-        if (!match(SqlSymbol::RPAREN)) {
+        if (!match(SqlSymbol::RPAREN))
             throw std::runtime_error("Expected right parenthesis");
-        }
-        return node;
+
+        return std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, std::move(node));
     }
 
-    if (match(SqlOperator::NOT)) {
+    if (match(SqlOperator::NOT))
+    {
         advance();
         auto right = parse_primary();
 
@@ -84,19 +102,18 @@ SqlParser::parse_primary() -> std::unique_ptr<AstNode> {
         return std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, std::move(expr));
     }
 
-    if (match(SqlTokenType::LITERAL)) {
+    if (match(SqlTokenType::LITERAL))
+    {
         advance();
         SqlToken copy = token;
-
         return std::make_unique<AstNode>(AstNodeType::LITERAL, AstNodeValue(std::move(copy)));
     }
 
-    if (match(SqlTokenType::IDENTIFIER)) {
+    if (match(SqlTokenType::IDENTIFIER))
+    {
         advance();
         SqlToken copy = token;
-
-        auto node = std::make_unique<AstNode>(AstNodeType::IDENTIFIER, copy);
-        return node;
+        return std::make_unique<AstNode>(AstNodeType::IDENTIFIER, AstNodeValue(std::move(copy)));
     }
 
     char buffer[256];

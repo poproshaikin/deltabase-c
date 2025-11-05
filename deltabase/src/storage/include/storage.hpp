@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 
 #include <string>
 #include <vector>
@@ -20,8 +20,8 @@ namespace storage
 
         FileManager fm_;
 
-        std::optional<EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key>> schemas_;
-        std::optional<EntityCache<std::string, MetaTable, MetaTableAccessor, make_key>> tables_;
+        std::optional<EntityCache<std::string, MetaSchema, MetaSchemaAccessor, make_key> > schemas_;
+        std::optional<EntityCache<std::string, MetaTable, MetaTableAccessor, make_key> > tables_;
 
         std::optional<PageBuffers> page_buffers_;
         std::optional<CheckpointManager> checkpoint_ctl_;
@@ -31,6 +31,7 @@ namespace storage
 
         void
         ensure_fs_initialize();
+
         void
         ensure_attached(const std::string& method_name = "ensure_attached") const;
 
@@ -39,9 +40,10 @@ namespace storage
 
         std::optional<std::string>
         find_table_key(const std::string& table_id) const;
-    public:
 
+    public:
         Storage(const fs::path& data_dir);
+
         Storage(const fs::path& data_dir, const std::string& db_name);
 
         void
@@ -64,18 +66,21 @@ namespace storage
 
         bool
         exists_schema(const std::string& schema_name) const;
+
         bool
         exists_schema_by_id(const std::string& schema_id) const;
 
-        MetaSchema& 
-        get_schema(const std::string& schema_name) const;
         MetaSchema&
-        get_schema(const sql::TableIdentifier& identifier) const; 
+        get_schema(const std::string& schema_name) const;
+
+        MetaSchema&
+        get_schema(const sql::TableIdentifier& identifier) const;
+
         MetaSchema&
         get_schema_by_id(const std::string& id) const;
-        
+
         void
-        drop_schema(const std::string& schema_name);                             
+        drop_schema(const std::string& schema_name);
 
         // ----- Tables -----
 
@@ -84,22 +89,29 @@ namespace storage
 
         bool
         exists_table(const std::string& schema_name, const std::string& name);
+
         bool
         exists_table(const sql::TableIdentifier& identifier);
+
         bool
         exists_table_by_id(const std::string& table_id);
+
         bool
         exists_virtual_table(const sql::TableIdentifier& identifier);
 
         MetaTable&
         get_table(const std::string& name);
+
         MetaTable&
         get_table(const sql::TableIdentifier& identifier);
+
         MetaTable&
-        get_table_by_id(const std::string& id) ;
-        MetaTable&&
+        get_table_by_id(const std::string& id);
+
+        const MetaTable&
         get_virtual_meta_table(const sql::TableIdentifier& identifier);
-        DataTable
+
+        const DataTable&
         get_virtual_data_table(const sql::TableIdentifier& identifier);
 
         void
@@ -111,12 +123,14 @@ namespace storage
         insert_row(MetaTable& table, DataRow row);
 
         uint64_t
-        update_rows_by_filter(
-            MetaTable& table, const DataFilter& filter, const DataRowUpdate& update
+        update_rows(
+            MetaTable& table,
+            const DataFilter& filter,
+            const DataRowUpdate& update
         );
 
         uint64_t
-        delete_rows_by_filter(MetaTable& table, const std::optional<DataFilter>& filter);
+        delete_rows(MetaTable& table, const std::optional<DataFilter>& filter);
 
         DataTable
         seq_scan(
