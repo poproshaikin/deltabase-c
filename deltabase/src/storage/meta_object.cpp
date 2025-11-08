@@ -29,22 +29,19 @@ namespace storage
             uint64_t id_len = 0;
             if (stream.read(&id_len, sizeof(uint64_t)) != sizeof(uint64_t))
                 return false;
-            out.id.resize(id_len);
-            if (stream.read(out.id.data(), id_len) != id_len)
+            if (stream.read(&out.id, id_len) != id_len)
                 return false;
 
             uint64_t name_len = 0;
             if (stream.read(&name_len, sizeof(uint64_t)) != sizeof(uint64_t))
                 return false;
-            out.name.resize(name_len);
-            if (stream.read(out.name.data(), name_len) != name_len)
+            if (stream.read(&out.name, name_len) != name_len)
                 return false;
 
             uint64_t db_name_len = 0;
             if (stream.read(&db_name_len, sizeof(uint64_t)) != sizeof(uint64_t))
                 return false;
-            out.db_name.resize(db_name_len);
-            if (stream.read(out.db_name.data(), db_name_len) != db_name_len)
+            if (stream.read(&out.db_name, db_name_len) != db_name_len)
                 return false;
 
             return true;
@@ -105,22 +102,19 @@ namespace storage
             uint64_t id_len = 0;
             if (stream.read(&id_len, sizeof(uint64_t)) != sizeof(uint64_t))
                 return false;
-            out.id.resize(id_len);
-            if (stream.read(out.id.data(), id_len) != id_len)
+            if (stream.read(&out.id, id_len) != id_len)
                 return false;
 
             uint64_t table_id_len = 0;
             if (stream.read(&table_id_len, sizeof(uint64_t)) != sizeof(uint64_t))
                 return false;
-            out.table_id.resize(table_id_len);
-            if (stream.read(out.table_id.data(), table_id_len) != table_id_len)
+            if (stream.read(&out.table_id, table_id_len) != table_id_len)
                 return false;
 
             uint64_t name_len = 0;
             if (stream.read(&name_len, sizeof(uint64_t)) != sizeof(uint64_t))
                 return false;
-            out.name.resize(name_len);
-            if (stream.read(out.name.data(), name_len) != name_len)
+            if (stream.read(&out.name, name_len) != name_len)
                 return false;
 
             if (stream.read(&out.type, sizeof(out.type)) != sizeof(out.type))
@@ -216,24 +210,6 @@ namespace storage
     {
         try
         {
-            bytes_v result;
-            ReadOnlyMemoryStream stream(bytes);
-
-            uint64_t id_len = 0;
-            if (stream.read(&id_len, sizeof(uint64_t)) != sizeof(uint64_t))
-                return false;
-            out.id.resize(id_len);
-            if (stream.read(out.id.data(), id_len) != id_len)
-                return false;
-
-            uint64_t schema_id_len = 0;
-            if (stream.read(&schema_id_len, sizeof(uint64_t) ) != sizeof(uint64_t))
-                return false;
-            out.schema_id.resize(schema_id_len);
-            if (stream.read(out.schema_id.data(), schema_id_len) != schema_id_len)
-                return false;
-
-            uint64_t
         }
         catch (...)
         {
@@ -244,32 +220,6 @@ namespace storage
     bytes_v
     MetaTable::serialize() const
     {
-        bytes_v result;
-        MemoryStream stream(result);
-
-        uint64_t id_len = id.size();
-        stream.write(&id_len, sizeof(uint64_t));
-        stream.write(id.c_str(), id_len);
-
-        uint64_t schema_id_len = schema_id.size();
-        stream.write(&schema_id_len, sizeof(uint64_t));
-        stream.write(schema_id.c_str(), schema_id_len);
-
-        uint64_t name_len = name.size();
-        stream.write(&name_len, sizeof(uint64_t));
-        stream.write(name.c_str(), name_len);
-
-        uint64_t columns_count = columns.size();
-        stream.write(&columns_count, sizeof(uint64_t));
-
-        for (const auto& col : columns)
-        {
-            auto serialized = col.serialize();
-            stream.write(serialized.data(), serialized.size());
-        }
-
-        stream.write(&last_rid, sizeof(uint64_t));
-        return result;
     }
 
 } // namespace storage

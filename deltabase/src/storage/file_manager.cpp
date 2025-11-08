@@ -426,7 +426,7 @@ namespace storage
     std::vector<fs::path>
     FileManager::get_schemata_paths(const std::string& db_name) const
     {
-        auto path = path_db(data_dir_, db_name);
+        const auto path = path_db(data_dir_, db_name);
         std::vector<fs::path> schemata_dirs_path;
 
         for (const auto& entry : fs::directory_iterator(path))
@@ -481,9 +481,12 @@ namespace storage
                 if (!table_dir.is_directory())
                     continue;
 
-                tables.emplace_back(load_table(db_name,
-                                               schema_dir.path().filename(),
-                                               table_dir.path().filename()));
+                tables.emplace_back(
+                    load_table(db_name,
+                               schema_dir.path().filename(),
+                               table_dir.path().filename()
+                    )
+                );
             }
         }
 
@@ -550,7 +553,7 @@ namespace storage
     }
 
     std::vector<WalLogfile>
-    FileManager::load_wal(const std::string& db_name)
+    FileManager::load_wal(const std::string& db_name) const
     {
         auto wal_path = path_db_wal(data_dir_, db_name);
         std::vector<WalLogfile> log;
