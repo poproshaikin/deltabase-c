@@ -1,24 +1,22 @@
-#include "include/parser.hpp"
+//
+// Created by poproshaikin on 09.11.25.
+//
+
+#include "parser.hpp"
+
 #include "../misc/include/exceptions.hpp"
-#include "include/lexer.hpp"
-#include <memory>
-#include <stdexcept>
-#include <type_traits>
-#include <variant>
-#include <vector>
+
+using namespace types;
 
 namespace sql
 {
-    AstNode::AstNode(AstNodeType type, AstNodeValue&& value) : type(type), value(std::move(value))
-    {
-    }
 
     SqlParser::SqlParser(std::vector<SqlToken> tokens) : tokens_(std::move(tokens)), current_(0)
     {
     }
 
-    auto
-    SqlParser::advance() noexcept -> bool
+    bool
+    SqlParser::advance() noexcept
     {
         if (current_ + 1 < tokens_.size())
         {
@@ -29,60 +27,13 @@ namespace sql
         return false;
     }
 
-    auto
-    SqlParser::advance_or_throw(std::string error_msg) -> bool
+    bool
+    SqlParser::advance_or_throw(const std::string& error_msg)
     {
         if (!advance())
             throw std::runtime_error(error_msg);
 
         return true;
-    }
-
-    const SqlToken&
-    SqlParser::previous() const noexcept
-    {
-        return tokens_[current_ - 1];
-    }
-
-    template <typename T, typename Variant> struct is_in_variant;
-
-    template <typename T, typename... Ts> struct is_in_variant<T, std::variant<Ts...> >
-    {
-        static constexpr bool value = (std::is_same_v<T, Ts> || ...);
-    };
-
-    template <typename T, typename Variant>
-    constexpr bool is_in_variant_v = is_in_variant<T, Variant>::value;
-
-    template <typename TEnum>
-    bool
-    SqlParser::match(const TEnum& expected) const
-    {
-        if (current_ >= tokens_.size())
-            return false;
-
-        if constexpr (std::is_same_v<TEnum, SqlTokenType>)
-            return tokens_[current_].type == expected;
-
-        else if constexpr (std::is_same_v<TEnum, std::monostate> ||
-                           std::is_same_v<TEnum, SqlOperator> ||
-                           std::is_same_v<TEnum, SqlSymbol> ||
-                           std::is_same_v<TEnum, SqlKeyword> ||
-                           std::is_same_v<TEnum, SqlLiteral>)
-        {
-            const auto* value = std::get_if<TEnum>(&tokens_[current_].detail);
-            return value && *value == expected;
-        }
-        else
-            throw std::runtime_error("Unsupported type passed for match()");
-    }
-
-    template <typename TEnum>
-    void
-    SqlParser::match_or_throw(TEnum expected, const std::string error_msg) const
-    {
-        if (!match<TEnum>(expected))
-            throw std::runtime_error(error_msg);
     }
 
     const SqlToken&
@@ -92,6 +43,12 @@ namespace sql
             throw std::out_of_range("Parser: current() out of bounds");
 
         return tokens_[current_];
+    }
+
+    const SqlToken&
+    SqlParser::previous() const noexcept
+    {
+        return tokens_[current_ - 1];
     }
 
     AstNode
@@ -235,8 +192,8 @@ namespace sql
         return stmt;
     }
 
-    auto
-    SqlParser::parse_update() -> UpdateStatement
+    UpdateStatement
+    SqlParser::parse_update()
     {
         UpdateStatement stmt;
 
@@ -268,8 +225,8 @@ namespace sql
         return stmt;
     }
 
-    auto
-    SqlParser::parse_delete() -> DeleteStatement
+    DeleteStatement
+    SqlParser::parse_delete()
     {
         DeleteStatement stmt;
 
@@ -288,8 +245,8 @@ namespace sql
         return stmt;
     }
 
-    auto
-    SqlParser::parse_create_table() -> CreateTableStatement
+    CreateTableStatement
+    SqlParser::parse_create_table()
     {
         CreateTableStatement stmt;
 
@@ -307,9 +264,8 @@ namespace sql
                 stmt.columns.push_back(parse_column_def());
 
                 if (match(SqlSymbol::RPAREN))
-                {
                     stop = true;
-                }
+
                 advance();
             }
         }
@@ -317,8 +273,8 @@ namespace sql
         return stmt;
     }
 
-    auto
-    SqlParser::parse_column_def() -> ColumnDefinition
+    ColumnDefinition
+    SqlParser::parse_column_def()
     {
         ColumnDefinition def;
 
@@ -331,9 +287,7 @@ namespace sql
         advance_or_throw();
 
         if (match(SqlSymbol::COMMA) || match(SqlSymbol::RPAREN))
-        {
             return def;
-        }
 
         advance_or_throw();
 
@@ -354,15 +308,13 @@ namespace sql
             def.constraints.push_back(copy);
             advance_or_throw();
         }
-
-        return def;
     }
 
-    std::vector<std::unique_ptr<AstNode>>
+    std::vector<AstNode>
     SqlParser::parse_tokens_list(SqlTokenType tokenType,
                                  AstNodeType nodeType)
     {
-        std::vector<std::unique_ptr<AstNode>> tokens;
+        std::vector<AstNode> tokens;
 
         while (true)
         {
@@ -373,7 +325,7 @@ namespace sql
             if (!match(tokenType))
                 break;
 
-            tokens.push_back(std::make_unique<AstNode>(nodeType, current()));
+            tokens.emplace_back(nodeType, current());
 
             if (!advance())
                 break;
@@ -401,8 +353,8 @@ namespace sql
         return stmt;
     }
 
-    auto
-    SqlParser::parse_table_identifier() -> TableIdentifier
+    TableIdentifier
+    SqlParser::parse_table_identifier()
     {
         match_or_throw(SqlTokenType::IDENTIFIER);
         SqlToken first_token = current();
@@ -421,8 +373,8 @@ namespace sql
         return TableIdentifier(first_token, std::nullopt);
     }
 
-    auto
-    SqlParser::parse_create_schema() -> CreateSchemaStatement
+    CreateSchemaStatement
+    SqlParser::parse_create_schema()
     {
         CreateSchemaStatement stmt;
 
@@ -433,4 +385,124 @@ namespace sql
         return stmt;
     }
 
-} // namespace sql
+    static std::optional<AstOperator>
+    to_ast_operator(SqlOperator type)
+    {
+        switch (type)
+        {
+        case SqlOperator::OR:
+            return AstOperator::OR;
+        case SqlOperator::AND:
+            return AstOperator::AND;
+        case SqlOperator::EQ:
+            return AstOperator::EQ;
+        case SqlOperator::NEQ:
+            return AstOperator::NEQ;
+        case SqlOperator::NOT:
+            return AstOperator::NOT;
+        case SqlOperator::GR:
+            return AstOperator::GR;
+        case SqlOperator::GRE:
+            return AstOperator::GRE;
+        case SqlOperator::LT:
+            return AstOperator::LT;
+        case SqlOperator::LTE:
+            return AstOperator::LTE;
+        case SqlOperator::ASSIGN:
+            return AstOperator::ASSIGN;
+        default:
+            return std::nullopt;
+        }
+    }
+
+    BinaryExpr
+    SqlParser::parse_binary(int min_priority)
+    {
+        std::unique_ptr<AstNode> left = parse_primary();
+
+        while (true)
+        {
+            const SqlToken& token = current();
+            if (token.type != SqlTokenType::OPERATOR)
+                break;
+
+            auto op_opt = to_ast_operator(std::get<SqlOperator>(token.detail));
+            if (!op_opt)
+                break;
+
+            int priority = ast_operators_priorities().at(*op_opt);
+            if (priority < min_priority)
+                break;
+
+            AstOperator op = *op_opt;
+            advance();
+
+            BinaryExpr right = parse_binary(priority + 1);
+
+            BinaryExpr expr{
+                .op = op,
+                .left = std::move(left),
+                .right =
+                std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, AstNodeValue(std::move(right)))
+            };
+
+            left = std::make_unique<AstNode>(AstNodeType::BINARY_EXPR,
+                                             AstNodeValue(std::move(expr)));
+        }
+
+        if (left->type == AstNodeType::BINARY_EXPR)
+            return std::get<BinaryExpr>(std::move(left->value));
+
+        BinaryExpr result{
+            .op = AstOperator::NONE,
+            .left = std::move(left),
+            .right = nullptr
+        };
+        return result;
+    }
+
+    std::unique_ptr<AstNode>
+    SqlParser::parse_primary()
+    {
+        const SqlToken& token = current();
+
+        if (match(SqlSymbol::LPAREN))
+        {
+            advance();
+            auto node = parse_binary(0);
+            if (!match(SqlSymbol::RPAREN))
+                throw std::runtime_error("Expected right parenthesis");
+
+            return std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, std::move(node));
+        }
+
+        if (match(SqlOperator::NOT))
+        {
+            advance();
+            auto right = parse_primary();
+
+            BinaryExpr expr{.op = AstOperator::NOT, .left = nullptr, .right = std::move(right)};
+
+            return std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, std::move(expr));
+        }
+
+        if (match(SqlTokenType::LITERAL))
+        {
+            advance();
+            SqlToken copy = token;
+            return std::make_unique<AstNode>(AstNodeType::LITERAL, AstNodeValue(std::move(copy)));
+        }
+
+        if (match(SqlTokenType::IDENTIFIER))
+        {
+            advance();
+            SqlToken copy = token;
+            return std::make_unique<
+                AstNode>(AstNodeType::IDENTIFIER, AstNodeValue(std::move(copy)));
+        }
+
+        char buffer[256];
+        snprintf(buffer, 256, "Unexpected token in expression: %s", token.to_string().data());
+        throw std::runtime_error(buffer);
+    }
+}

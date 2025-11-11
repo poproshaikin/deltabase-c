@@ -1,37 +1,34 @@
-#ifndef ENGINE_HPP
-#define ENGINE_HPP
+//
+// Created by poproshaikin on 09.11.25.
+//
 
-#include "../../executor/include/executor.hpp"
-#include "../../executor/include/semantic_analyzer.hpp"
-#include "config.hpp"
-#include <string>
+#ifndef DELTABASE_ENGINE_HPP
+#define DELTABASE_ENGINE_HPP
 
-namespace engine {
+#include "database.hpp"
 
-    struct ExecutionResult {
+#include <filesystem>
 
-        exe::IntOrDataTable result;
-        long execution_time_ns;
-
-        ExecutionResult(exe::IntOrDataTable&& result, long execution_time_ns)
-            : result(std::move(result)), execution_time_ns(execution_time_ns) {
-        }
-    };
-
-    class DltEngine {
-        exe::SemanticAnalyzer semantic_analyzer_;
-        catalog::MetaRegistry registry_;
-        EngineConfig cfg_;
-
-        auto
-        execute(const sql::AstNode& node) -> exe::IntOrDataTable;
+namespace engine
+{
+    class Engine
+    {
+        std::filesystem::path data_path_;
+        std::unique_ptr<IDatabase> db_;
 
     public:
-        DltEngine(EngineConfig cfg_ = {});
+        explicit
+        Engine(const std::filesystem::path& data_path);
 
-        auto
-        run_query(const std::string& sql) -> ExecutionResult;
+        void
+        attach_db(const std::string& db_name);
+
+        void
+        create_db(const std::string& db_name);
+
+        std::unique_ptr<types::IExecutionResult>
+        execute_query(const std::string& query);
     };
-} // namespace engine
+}
 
-#endif
+#endif //DELTABASE_ENGINE_HPP

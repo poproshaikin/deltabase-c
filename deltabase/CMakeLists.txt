@@ -60,11 +60,10 @@ endfunction()
 add_cpp_module(storage)
 add_cpp_module(executor)
 add_cpp_module(sql)
-add_cpp_module(server)
 add_cpp_module(misc)
 add_cpp_module(cli)
-add_cpp_module(converter)
 add_cpp_module(engine)
+add_cpp_module(types)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
@@ -76,26 +75,22 @@ file(GLOB_RECURSE TESTS_SRC
 add_executable(test.exe ${TESTS_SRC})
 target_link_libraries(test.exe 
     storage
-    misc
-    sql
     executor
-    server
+    sql
+    misc
     cli
-    catalog
-    converter
     engine
+    types
 )
 
 # --- main ---
 add_executable(main.exe main.cpp)
 target_link_libraries(main.exe 
     storage
-    misc
-    sql
     executor
-    server
+    sql
+    misc
     cli
-    catalog
-    converter
     engine
+    types
 )
