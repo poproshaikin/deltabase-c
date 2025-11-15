@@ -4,13 +4,22 @@
 
 #include "include/std_planner.hpp"
 
+#include "cli.hpp"
+
 #include <format>
+#include <functional>
+#include "../misc/include/convert.hpp"
 
 namespace exq
 {
     using namespace types;
 
-    QueryPlanNode
+    StdPlanner::StdPlanner(const DbConfig& db_config, storage::IStorage& storage)
+        : storage_(storage), db_config_(db_config)
+    {
+    }
+
+    QueryPlan
     StdPlanner::plan(AstNode&& ast)
     {
         try
@@ -18,6 +27,18 @@ namespace exq
             if (ast.type == AstNodeType::SELECT)
             {
                 return plan_select(std::get<SelectStatement>(ast.value));
+            }
+            if (ast.type == AstNodeType::INSERT)
+            {
+                return plan_insert(std::get<InsertStatement>(ast.value));
+            }
+            if (ast.type == AstNodeType::UPDATE)
+            {
+                return plan_update(std::get<UpdateStatement>(ast.value));
+            }
+            if (ast.type == AstNodeType::DELETE)
+            {
+                return plan_delete(std::get<DeleteStatement>(ast.value));
             }
         }
         catch (std::exception ex)
@@ -33,34 +54,161 @@ namespace exq
         );
     }
 
-    QueryPlanNode
+    QueryPlan
     StdPlanner::plan_select(SelectStatement& stmt) const
     {
-        QueryPlanNode plan{SeqScanPlanNode{
-            stmt.table.table_name.value,
-            stmt.table.schema_name.has_value()
-                ? std::optional(stmt.table.schema_name.value().value)
-                : std::nullopt
-        }};
+        QueryPlanNode node{
+            SeqScanPlanNode{
+                .table_name = stmt.table.table_name.value,
+                .schema_name = stmt.table.schema_name.has_value()
+                                   ? stmt.table.schema_name.value().value
+                                   : db_config_.default_schema
+            }
+        };
 
         if (stmt.where)
-            plan = QueryPlanNode{
+            node = QueryPlanNode{
                 FilterPlanNode{std::move(*stmt.where),
-                               std::make_unique<QueryPlanNode>(std::move(plan))}};
+                               std::make_unique<QueryPlanNode>(std::move(node))}};
 
         if (!stmt.columns.empty())
         {
             ProjectPlanNode project;
             for (const auto& column : stmt.columns)
                 project.columns.push_back(column.value);
-            project.child = std::make_unique<QueryPlanNode>(std::move(plan));
-            plan = QueryPlanNode{std::move(project)};
+            project.child = std::make_unique<QueryPlanNode>(std::move(node));
+            node = QueryPlanNode{std::move(project)};
         }
 
         if (stmt.limit)
-            plan = QueryPlanNode{
+            node = QueryPlanNode{
                 LimitPlanNode{stmt.limit.value(),
-                              std::make_unique<QueryPlanNode>(std::move(plan))}};
+                              std::make_unique<QueryPlanNode>(std::move(node))}
+            };
+
+        QueryPlan plan{
+            .needs_stream = storage_.needs_stream(node),
+            .node = std::move(node),
+        };
+
+        return plan;
+    }
+
+    QueryPlan
+    StdPlanner::plan_insert(InsertStatement& stmt) const
+    {
+        InsertPlanNode insert{
+            .table_name = stmt.table.table_name.value,
+            .schema_name = stmt.table.schema_name.has_value()
+                               ? stmt.table.schema_name.value().value
+                               : db_config_.default_schema,
+        };
+
+        if (!stmt.columns.empty())
+        {
+            for (auto col : stmt.columns)
+            {
+                insert.column_names.emplace();
+                insert.column_names->push_back(col);
+            }
+        }
+
+        // TODO: temporary, extend when implement sub-SELECT functionality
+        ValuesPlanNode values_node;
+        for (const auto& [values] : stmt.values)
+            values_node.values.emplace_back(DataRow(values));
+
+        insert.child = std::make_unique<QueryPlanNode>(std::move(values_node));
+        QueryPlan plan{
+            .needs_stream = false,
+            .node = std::move(insert),
+        };
+        return plan;
+    }
+
+    QueryPlan
+    StdPlanner::plan_update(UpdateStatement& stmt) const
+    {
+        auto table = storage_.get_table(stmt.table);
+
+        UpdatePlanNode update{};
+        for (const auto& assignment : stmt.assignments)
+        {
+            if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
+                assignment.right->type == AstNodeType::LITERAL)
+            {
+                const auto& col_id = table->get_column(stmt.table.table_name).id;
+                auto data_token = misc::convert(std::get<SqlToken>(assignment.right->value));
+
+                update.assignments.emplace_back(std::make_pair(col_id, data_token));
+            }
+            if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
+                assignment.right->type == AstNodeType::COLUMN_IDENTIFIER)
+            {
+                const auto& left = table->get_column(std::get<SqlToken>(assignment.left->value));
+                const auto& right = table->get_column(std::get<SqlToken>(assignment.right->value));
+
+                update.assignments.emplace_back(std::make_pair(left.id, right.id));
+            }
+        }
+
+        QueryPlanNode plan_node{
+            SeqScanPlanNode{
+                .table_name = stmt.table.table_name,
+                .schema_name = stmt.table.schema_name.has_value()
+                                   ? stmt.table.schema_name.value().value
+                                   : db_config_.default_schema,
+            }
+        };
+
+        if (stmt.where)
+        {
+            FilterPlanNode filter_node{
+                .where = std::move(stmt.where.value()),
+                .child = std::make_unique<QueryPlanNode>(std::move(plan_node))
+            };
+            plan_node = std::move(filter_node);
+        }
+
+        update.child = std::make_unique<QueryPlanNode>(std::move(plan_node));
+
+        QueryPlan plan{
+            .needs_stream = false,
+            .node = std::move(plan_node),
+        };
+
+        return plan;
+    }
+
+    QueryPlan
+    StdPlanner::plan_delete(DeleteStatement& stmt) const
+    {
+        QueryPlanNode plan_node{
+            SeqScanPlanNode{
+                .table_name = stmt.table.table_name,
+                .schema_name = stmt.table.schema_name.has_value()
+                                   ? stmt.table.schema_name.value().value
+                                   : db_config_.default_schema,
+            }
+        };
+
+        if (stmt.where)
+        {
+            FilterPlanNode filter_node{
+                .where = std::move(stmt.where.value()),
+                .child = std::make_unique<QueryPlanNode>(std::move(plan_node))
+            };
+            plan_node = std::move(filter_node);
+        }
+
+        DeletePlanNode delete_node{
+            .child = std::make_unique<QueryPlanNode>(std::move(plan_node))
+        };
+
+        QueryPlan plan{
+            .needs_stream = false,
+            .node = std::move(plan_node)
+        };
 
         return plan;
     }

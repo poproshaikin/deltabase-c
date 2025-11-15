@@ -76,6 +76,7 @@ namespace types
         std::unique_ptr<AstNode> left;
         std::unique_ptr<AstNode> right;
 
+        BinaryExpr() = default;
         BinaryExpr(BinaryExpr&&) = default;
         BinaryExpr& operator=(BinaryExpr&&) = default;
     };
@@ -105,11 +106,16 @@ namespace types
         std::optional<uint64_t> limit;
     };
 
+    struct ValuesExpr
+    {
+        std::vector<SqlToken> values;
+    };
+
     struct InsertStatement
     {
         TableIdentifier table;
         std::vector<SqlToken> columns;
-        std::vector<SqlToken> values;
+        std::vector<ValuesExpr> values;
     };
 
     struct UpdateStatement

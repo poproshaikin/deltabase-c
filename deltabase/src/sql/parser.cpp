@@ -439,25 +439,26 @@ namespace sql
 
             BinaryExpr right = parse_binary(priority + 1);
 
-            BinaryExpr expr{
-                .op = op,
-                .left = std::move(left),
-                .right =
-                std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, AstNodeValue(std::move(right)))
-            };
+            BinaryExpr expr;
+            expr.op = op;
+            expr.left = std::move(left);
+            expr.right =
+                std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, AstNodeValue(std::move(right)));
 
-            left = std::make_unique<AstNode>(AstNodeType::BINARY_EXPR,
-                                             AstNodeValue(std::move(expr)));
+            left = std::make_unique<AstNode>(
+                AstNodeType::BINARY_EXPR,
+                AstNodeValue(std::move(expr))
+            );
         }
 
         if (left->type == AstNodeType::BINARY_EXPR)
             return std::get<BinaryExpr>(std::move(left->value));
 
-        BinaryExpr result{
-            .op = AstOperator::NONE,
-            .left = std::move(left),
-            .right = nullptr
-        };
+        BinaryExpr result;
+        result.op = AstOperator::NONE;
+        result.left = std::move(left);
+        result.right = nullptr;
+
         return result;
     }
 
@@ -481,7 +482,10 @@ namespace sql
             advance();
             auto right = parse_primary();
 
-            BinaryExpr expr{.op = AstOperator::NOT, .left = nullptr, .right = std::move(right)};
+            BinaryExpr expr;
+            expr.op = AstOperator::NOT;
+            expr.left = nullptr;
+            expr.right = std::move(right);
 
             return std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, std::move(expr));
         }

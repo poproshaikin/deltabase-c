@@ -14,32 +14,20 @@ namespace types
 {
     struct MetaTable
     {
-        std::string id;
-        std::string schema_id;
+        Uuid id;
+        Uuid schema_id;
         std::string name;
         std::vector<MetaColumn> columns;
         uint64_t last_rid;
-
         std::vector<std::string> pages_ids; // DO NOT SERIALIZE, RAM ONLY
 
         MetaTable();
-        MetaTable(MetaTable&& other) = default;
-        // Restrict copying
-        MetaTable(const MetaTable& other) = delete;
 
         bool
         has_column(const std::string& name) const;
 
         const MetaColumn&
         get_column(const std::string& name) const;
-
-        bool
-        compare_content(const MetaTable& other) const;
-
-        static bool
-        try_deserialize(const Bytes& bytes, MetaTable& out);
-        Bytes
-        serialize() const;
     };
 }
 

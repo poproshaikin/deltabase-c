@@ -15,7 +15,7 @@ namespace exq
         virtual ~IPlanExecutor() = default;
 
         virtual std::unique_ptr<types::IExecutionResult>
-        execute(const types::QueryPlanNode& plan) = 0;
+        execute(const types::QueryPlan& plan) = 0;
     };
 }
 

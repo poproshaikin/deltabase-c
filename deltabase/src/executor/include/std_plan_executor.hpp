@@ -11,7 +11,7 @@ namespace exq
     class StdPlanExecutor final : public IPlanExecutor
     {
         std::unique_ptr<types::IExecutionResult>
-        execute(const types::QueryPlanNode& plan) override;
+        execute(const types::QueryPlan& plan) override;
     };
 }
 

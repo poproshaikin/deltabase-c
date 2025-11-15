@@ -4,7 +4,9 @@
 
 #ifndef DELTABASE_META_COLUMN_HPP
 #define DELTABASE_META_COLUMN_HPP
+#include "ast_tree.hpp"
 #include "typedefs.hpp"
+#include "uuid.hpp"
 #include "value_type.hpp"
 
 #include <string>
@@ -30,29 +32,18 @@ namespace types
 
     struct MetaColumn
     {
-        std::string id;
-        std::string table_id;
+        Uuid id;
+        Uuid table_id;
         std::string name;
         ValueType type;
         MetaColumnFlags flags;
 
         explicit
         MetaColumn();
-
         explicit
-        MetaColumn(const sql::ColumnDefinition& def);
-
-        // Restrict copying
-        MetaColumn(const MetaColumn&) = delete;
-
-        MetaColumn(MetaColumn&&) = default;
-
+        MetaColumn(const ColumnDefinition& def);
+        explicit
         MetaColumn(const std::string& name, ValueType type, MetaColumnFlags flags);
-
-        static bool
-        try_deserialize(const Bytes& bytes, MetaColumn& out);
-        Bytes
-        serialize() const;
     };
 }
 

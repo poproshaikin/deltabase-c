@@ -8,19 +8,21 @@
 #include "plan_executor.hpp"
 #include "planner.hpp"
 #include "storage.hpp"
+#include "../../types/include/db_cfg.hpp"
 
 namespace engine
 {
     class StdDatabase final : public IDatabase
     {
         std::string db_name_;
-        std::unique_ptr<storage::Storage> storage_;
+        types::DbConfig db_config_;
+        std::unique_ptr<storage::IStorage> storage_;
         std::unique_ptr<exq::IPlanner> planner_;
         std::unique_ptr<exq::IPlanExecutor> plan_executor_;
 
     public:
         explicit
-        StdDatabase(std::string db_name);
+        StdDatabase(const std::string& db_name, const types::DbConfig& db_config);
 
         std::unique_ptr<types::IExecutionResult>
         execute(const std::string& query) override;

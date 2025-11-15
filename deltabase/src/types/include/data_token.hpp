@@ -5,6 +5,8 @@
 #ifndef DELTABASE_DATA_TOKEN_HPP
 #define DELTABASE_DATA_TOKEN_HPP
 
+#include "sql_token.hpp"
+#include "typedefs.hpp"
 #include "value_type.hpp"
 
 #include <cstdint>
@@ -13,15 +15,19 @@ namespace types
 {
     struct DataToken
     {
-        bytes_v bytes;
+        Bytes bytes;
         ValueType type;
 
-        DataToken(bytes_v bytes, ValueType type);
+        explicit
+        DataToken(const SqlToken& sql_token);
+
+        explicit
+        DataToken(const Bytes& bytes, ValueType type);
 
         uint64_t
         estimate_size() const;
 
-        bytes_v
+        Bytes
         serialize() const;
     };
 

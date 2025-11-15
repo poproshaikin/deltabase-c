@@ -254,6 +254,9 @@ namespace types
         bool
         is_keyword() const;
 
+        bool
+        is_literal() const;
+
         template <typename TDetail>
         TDetail
         get_detail() const
@@ -262,7 +265,7 @@ namespace types
                 std::is_same_v<TDetail, SqlKeyword> || std::is_same_v<TDetail, SqlOperator> ||
                 std::is_same_v<TDetail, SqlSymbol> || std::is_same_v<TDetail, SqlLiteral>)
             {
-                if constexpr (std::holds_alternative<TDetail>(detail))
+                if (std::holds_alternative<TDetail>(detail))
                 {
                     return std::get<TDetail>(detail);
                 }

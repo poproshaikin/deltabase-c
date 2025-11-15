@@ -13,7 +13,7 @@ namespace exq
     public:
         virtual ~IPlanner() = default;
 
-        virtual types::QueryPlanNode
+        virtual types::QueryPlan
         plan(types::AstNode&& ast) = 0;
     };
 }

@@ -53,10 +53,17 @@ namespace types
         update(const DataRowUpdate& update) const;
 
         DataRow(const DataRow&) = delete;
-        DataRow& operator=(const DataRow&) = delete;
+
+        DataRow&
+        operator=(const DataRow&) = delete;
 
         DataRow(DataRow&&) = default;
-        DataRow& operator=(DataRow&&) = default;
+
+        DataRow&
+        operator=(DataRow&&) = default;
+
+        explicit
+        DataRow(const std::vector<SqlToken>& sql_tokens);
     };
 }
 

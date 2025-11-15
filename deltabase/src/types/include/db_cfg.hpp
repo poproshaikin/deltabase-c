@@ -10,7 +10,7 @@ namespace types
 {
     struct DbConfig
     {
-        std::string default_schema;
+        std::string default_schema = "common";
     };
 }
 
