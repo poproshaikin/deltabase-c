@@ -11,8 +11,13 @@ namespace exq
     class StdPlanExecutor final : public IPlanExecutor
     {
         std::unique_ptr<types::IExecutionResult>
+        execute_select(const types::QueryPlan& plan);
+
+    public:
+        std::unique_ptr<types::IExecutionResult>
         execute(const types::QueryPlan& plan) override;
     };
+
 }
 
 #endif //DELTABASE_SIMPLE_PLAN_EXECUTOR_HPP

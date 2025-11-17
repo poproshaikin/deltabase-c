@@ -20,6 +20,7 @@ namespace types
     struct ValuesPlanNode;
     struct SeqScanPlanNode;
     struct UpdatePlanNode;
+    struct DeletePlanNode;
 
     using QueryPlanNode = std::variant<
         FromPlanNode,
@@ -29,8 +30,18 @@ namespace types
         InsertPlanNode,
         ValuesPlanNode,
         SeqScanPlanNode,
-        UpdatePlanNode
+        UpdatePlanNode,
+        DeletePlanNode
     >;
+
+    enum class QueryPlanType
+    {
+        UNDEFINED = 0,
+        SELECT = 1,
+        INSERT = 2,
+        UPDATE = 3,
+        DELETE = 4,
+    };
 
     struct SeqScanPlanNode
     {
@@ -72,7 +83,7 @@ namespace types
     {
         std::string table_name;
         std::string schema_name;
-        std::optional<std::vector<std::string>> column_names;
+        std::optional<std::vector<std::string> > column_names;
         std::unique_ptr<QueryPlanNode> child;
     };
 
@@ -90,6 +101,7 @@ namespace types
     struct QueryPlan
     {
         bool needs_stream;
+        QueryPlanType type;
         QueryPlanNode node;
     };
 }

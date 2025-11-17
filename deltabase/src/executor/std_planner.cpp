@@ -3,12 +3,11 @@
 //
 
 #include "include/std_planner.hpp"
-
+#include "../misc/include/convert.hpp"
 #include "cli.hpp"
 
 #include <format>
 #include <functional>
-#include "../misc/include/convert.hpp"
 
 namespace exq
 {
@@ -88,6 +87,7 @@ namespace exq
 
         QueryPlan plan{
             .needs_stream = storage_.needs_stream(node),
+            .type = QueryPlanType::SELECT,
             .node = std::move(node),
         };
 
@@ -121,6 +121,7 @@ namespace exq
         insert.child = std::make_unique<QueryPlanNode>(std::move(values_node));
         QueryPlan plan{
             .needs_stream = false,
+            .type = QueryPlanType::INSERT,
             .node = std::move(insert),
         };
         return plan;
@@ -174,6 +175,7 @@ namespace exq
 
         QueryPlan plan{
             .needs_stream = false,
+            .type = QueryPlanType::UPDATE,
             .node = std::move(plan_node),
         };
 
@@ -207,6 +209,7 @@ namespace exq
 
         QueryPlan plan{
             .needs_stream = false,
+            .type = QueryPlanType::DELETE,
             .node = std::move(plan_node)
         };
 
