@@ -12,98 +12,194 @@
 
 namespace types
 {
-    struct FromPlanNode;
-    struct FilterPlanNode;
-    struct ProjectPlanNode;
-    struct LimitPlanNode;
-    struct InsertPlanNode;
-    struct ValuesPlanNode;
-    struct SeqScanPlanNode;
-    struct UpdatePlanNode;
-    struct DeletePlanNode;
-
-    using QueryPlanNode = std::variant<
-        FromPlanNode,
-        FilterPlanNode,
-        ProjectPlanNode,
-        LimitPlanNode,
-        InsertPlanNode,
-        ValuesPlanNode,
-        SeqScanPlanNode,
-        UpdatePlanNode,
-        DeletePlanNode
-    >;
-
-    enum class QueryPlanType
+    struct IPlanNode
     {
-        UNDEFINED = 0,
-        SELECT = 1,
-        INSERT = 2,
-        UPDATE = 3,
-        DELETE = 4,
+        virtual ~IPlanNode() = default;
+
+        enum class Type
+        {
+            From,
+            Filter,
+            Project,
+            Limit,
+            Insert,
+            Values,
+            SeqScan,
+            Update,
+            Delete
+        };
+
+        virtual Type
+        type() const = 0;
     };
 
-    struct SeqScanPlanNode
+    struct UnaryPlanNode : public IPlanNode
+    {
+        std::unique_ptr<IPlanNode> child;
+
+        explicit
+        UnaryPlanNode(std::unique_ptr<IPlanNode> child)
+            : child(std::move(child))
+        {
+        };
+    };
+
+    struct LeafPlanNode : public IPlanNode
+    {
+    };
+
+    struct SeqScanPlanNode final : public LeafPlanNode
     {
         std::string table_name;
         std::string schema_name;
+
+        explicit
+        SeqScanPlanNode(std::string table, std::string schema)
+            : table_name(std::move(table)),
+              schema_name(std::move(schema))
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::SeqScan;
+        }
     };
 
-    struct FromPlanNode
+    struct FromPlanNode final : UnaryPlanNode
     {
         std::string table_name;
         std::string schema_name;
-        std::unique_ptr<QueryPlanNode> child;
+
+        explicit
+        FromPlanNode(std::string table, std::string schema, std::unique_ptr<IPlanNode> child)
+            : UnaryPlanNode(std::move(child)),
+              table_name(std::move(table)),
+              schema_name(std::move(schema))
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::From;
+        }
     };
 
-    struct FilterPlanNode
+    struct FilterPlanNode final : UnaryPlanNode
     {
         BinaryExpr where;
-        std::unique_ptr<QueryPlanNode> child;
+
+        explicit
+        FilterPlanNode(BinaryExpr expr, std::unique_ptr<IPlanNode> child)
+            : UnaryPlanNode(std::move(child)),
+              where(std::move(expr))
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::Filter;
+        }
     };
 
-    struct ProjectPlanNode
+    struct ProjectPlanNode final : UnaryPlanNode
     {
         std::vector<std::string> columns;
-        std::unique_ptr<QueryPlanNode> child;
+
+        explicit
+        ProjectPlanNode(std::vector<std::string> cols, std::unique_ptr<IPlanNode> child)
+            : UnaryPlanNode(std::move(child)),
+              columns(std::move(cols))
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::Project;
+        }
     };
 
-    struct LimitPlanNode
+    struct LimitPlanNode final : UnaryPlanNode
     {
         uint64_t limit;
-        std::unique_ptr<QueryPlanNode> child;
+
+        explicit
+        LimitPlanNode(uint64_t limit, std::unique_ptr<IPlanNode> child)
+            : UnaryPlanNode(std::move(child)),
+              limit(limit)
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::Limit;
+        }
     };
 
-    struct ValuesPlanNode
-    {
-        std::vector<DataRow> values;
-    };
-
-    struct InsertPlanNode
+    struct InsertPlanNode final : UnaryPlanNode
     {
         std::string table_name;
         std::string schema_name;
         std::optional<std::vector<std::string> > column_names;
-        std::unique_ptr<QueryPlanNode> child;
+
+        explicit
+        InsertPlanNode(std::string table,
+                       std::string schema,
+                       std::optional<std::vector<std::string> > cols,
+                       std::unique_ptr<IPlanNode> child)
+            : UnaryPlanNode(std::move(child)),
+              table_name(std::move(table)),
+              schema_name(std::move(schema)),
+              column_names(std::move(cols))
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::Insert;
+        }
     };
 
-    struct UpdatePlanNode
+    struct UpdatePlanNode final : UnaryPlanNode
     {
         std::vector<Assignment> assignments;
-        std::unique_ptr<QueryPlanNode> child;
+
+        explicit
+        UpdatePlanNode(std::vector<Assignment> asg, std::unique_ptr<IPlanNode> child)
+            : UnaryPlanNode(std::move(child)),
+              assignments(std::move(asg))
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::Update;
+        }
     };
 
-    struct DeletePlanNode
+    struct DeletePlanNode final : UnaryPlanNode
     {
-        std::unique_ptr<QueryPlanNode> child;
+        explicit
+        DeletePlanNode(std::unique_ptr<IPlanNode> child)
+            : UnaryPlanNode(std::move(child))
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::Delete;
+        }
     };
 
-    struct QueryPlan
-    {
-        bool needs_stream;
-        QueryPlanType type;
-        QueryPlanNode node;
-    };
+
 }
 
 #endif //DELTABASE_QUERY_PLAN_HPP
