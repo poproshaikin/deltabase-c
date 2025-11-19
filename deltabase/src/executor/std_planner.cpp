@@ -56,74 +56,86 @@ namespace exq
     QueryPlan
     StdPlanner::plan_select(SelectStatement& stmt) const
     {
-        QueryPlanNode node{
-            SeqScanPlanNode{
-                .table_name = stmt.table.table_name.value,
-                .schema_name = stmt.table.schema_name.has_value()
-                                   ? stmt.table.schema_name.value().value
-                                   : db_config_.default_schema
-            }
-        };
+        // 1. SEQ SCAN
+        auto scan = std::make_unique<SeqScanPlanNode>(
+            stmt.table.table_name.value,
+            stmt.table.schema_name.has_value()
+                ? stmt.table.schema_name.value().value
+                : db_config_.default_schema
+        );
 
+        std::unique_ptr<IPlanNode> node = std::move(scan);
+
+        // 2. WHERE
         if (stmt.where)
-            node = QueryPlanNode{
-                FilterPlanNode{std::move(*stmt.where),
-                               std::make_unique<QueryPlanNode>(std::move(node))}};
-
-        if (!stmt.columns.empty())
         {
-            ProjectPlanNode project;
-            for (const auto& column : stmt.columns)
-                project.columns.push_back(column.value);
-            project.child = std::make_unique<QueryPlanNode>(std::move(node));
-            node = QueryPlanNode{std::move(project)};
+            auto filter = std::make_unique<FilterPlanNode>(
+                std::move(*stmt.where),
+                std::move(node)
+            );
+            node = std::move(filter);
         }
 
+        // 3. PROJECT
+        if (!stmt.columns.empty())
+        {
+            std::vector<std::string> cols;
+            for (auto& c : stmt.columns)
+                cols.push_back(c.value);
+
+            auto project = std::make_unique<ProjectPlanNode>(
+                cols,
+                std::move(node)
+            );
+            node = std::move(project);
+        }
+
+        // 4. LIMIT
         if (stmt.limit)
-            node = QueryPlanNode{
-                LimitPlanNode{stmt.limit.value(),
-                              std::make_unique<QueryPlanNode>(std::move(node))}
-            };
+        {
+            auto limit = std::make_unique<LimitPlanNode>(stmt.limit.value(), std::move(node));
+            node = std::move(limit);
+        }
 
-        QueryPlan plan{
-            .needs_stream = storage_.needs_stream(node),
-            .type = QueryPlanType::SELECT,
-            .node = std::move(node),
-        };
-
+        QueryPlan plan;
+        plan.type = QueryPlan::Type::SELECT;
+        plan.needs_stream = storage_.needs_stream(*node);
+        plan.root = std::move(node);
         return plan;
     }
 
     QueryPlan
     StdPlanner::plan_insert(InsertStatement& stmt) const
     {
-        InsertPlanNode insert{
-            .table_name = stmt.table.table_name.value,
-            .schema_name = stmt.table.schema_name.has_value()
-                               ? stmt.table.schema_name.value().value
-                               : db_config_.default_schema,
-        };
+        std::vector<DataRow> rows;
+        for (auto& [vals] : stmt.values)
+            rows.emplace_back(vals);
 
+        auto values_node = std::make_unique<ValuesPlanNode>(std::move(rows));
+
+        std::optional<std::vector<std::string> > cols{};
         if (!stmt.columns.empty())
         {
-            for (auto col : stmt.columns)
-            {
-                insert.column_names.emplace();
-                insert.column_names->push_back(col);
-            }
+            std::vector<std::string> col_names;
+            for (const auto& col : stmt.columns)
+                col_names.push_back(col.value);
+            cols.emplace(std::move(col_names));
         }
 
-        // TODO: temporary, extend when implement sub-SELECT functionality
-        ValuesPlanNode values_node;
-        for (const auto& [values] : stmt.values)
-            values_node.values.emplace_back(DataRow(values));
+        auto insert = std::make_unique<InsertPlanNode>(
+            stmt.table.table_name.value,
+            stmt.table.schema_name.has_value()
+                ? stmt.table.schema_name.value().value
+                : db_config_.default_schema,
+            cols,
+            std::move(values_node)
+        );
 
-        insert.child = std::make_unique<QueryPlanNode>(std::move(values_node));
-        QueryPlan plan{
-            .needs_stream = false,
-            .type = QueryPlanType::INSERT,
-            .node = std::move(insert),
-        };
+        QueryPlan plan;
+        plan.root = std::move(insert);
+        plan.type = QueryPlan::Type::INSERT;
+        plan.needs_stream = false;
+
         return plan;
     }
 
@@ -132,7 +144,7 @@ namespace exq
     {
         auto table = storage_.get_table(stmt.table);
 
-        UpdatePlanNode update{};
+        std::vector<Assignment> assignments;
         for (const auto& assignment : stmt.assignments)
         {
             if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
@@ -141,7 +153,7 @@ namespace exq
                 const auto& col_id = table->get_column(stmt.table.table_name).id;
                 auto data_token = misc::convert(std::get<SqlToken>(assignment.right->value));
 
-                update.assignments.emplace_back(std::make_pair(col_id, data_token));
+                assignments.emplace_back(std::make_pair(col_id, data_token));
             }
             if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
                 assignment.right->type == AstNodeType::COLUMN_IDENTIFIER)
@@ -149,35 +161,33 @@ namespace exq
                 const auto& left = table->get_column(std::get<SqlToken>(assignment.left->value));
                 const auto& right = table->get_column(std::get<SqlToken>(assignment.right->value));
 
-                update.assignments.emplace_back(std::make_pair(left.id, right.id));
+                assignments.emplace_back(std::make_pair(left.id, right.id));
             }
         }
 
-        QueryPlanNode plan_node{
-            SeqScanPlanNode{
-                .table_name = stmt.table.table_name,
-                .schema_name = stmt.table.schema_name.has_value()
-                                   ? stmt.table.schema_name.value().value
-                                   : db_config_.default_schema,
-            }
-        };
+        std::unique_ptr<IPlanNode> root =
+            std::make_unique<SeqScanPlanNode>(
+                stmt.table.table_name,
+                stmt.table.schema_name.has_value()
+                    ? stmt.table.schema_name.value().value
+                    : db_config_.default_schema
+            );
 
         if (stmt.where)
         {
-            FilterPlanNode filter_node{
-                .where = std::move(stmt.where.value()),
-                .child = std::make_unique<QueryPlanNode>(std::move(plan_node))
-            };
-            plan_node = std::move(filter_node);
+            root = std::make_unique<FilterPlanNode>(
+                std::move(*stmt.where),
+                std::move(root));
         }
 
-        update.child = std::make_unique<QueryPlanNode>(std::move(plan_node));
+        auto update = std::make_unique<UpdatePlanNode>(
+            std::move(assignments),
+            std::move(root));
 
-        QueryPlan plan{
-            .needs_stream = false,
-            .type = QueryPlanType::UPDATE,
-            .node = std::move(plan_node),
-        };
+        QueryPlan plan;
+        plan.root = std::move(update);
+        plan.type = QueryPlan::Type::UPDATE;
+        plan.needs_stream = false;
 
         return plan;
     }
@@ -185,33 +195,27 @@ namespace exq
     QueryPlan
     StdPlanner::plan_delete(DeleteStatement& stmt) const
     {
-        QueryPlanNode plan_node{
-            SeqScanPlanNode{
-                .table_name = stmt.table.table_name,
-                .schema_name = stmt.table.schema_name.has_value()
-                                   ? stmt.table.schema_name.value().value
-                                   : db_config_.default_schema,
-            }
-        };
+        std::unique_ptr<IPlanNode> root =
+            std::make_unique<SeqScanPlanNode>(
+                stmt.table.table_name,
+                stmt.table.schema_name.has_value()
+                    ? stmt.table.schema_name.value().value
+                    : db_config_.default_schema
+            );
 
         if (stmt.where)
         {
-            FilterPlanNode filter_node{
-                .where = std::move(stmt.where.value()),
-                .child = std::make_unique<QueryPlanNode>(std::move(plan_node))
-            };
-            plan_node = std::move(filter_node);
+            root = std::make_unique<FilterPlanNode>(
+                std::move(*stmt.where),
+                std::move(root));
         }
 
-        DeletePlanNode delete_node{
-            .child = std::make_unique<QueryPlanNode>(std::move(plan_node))
-        };
+        auto del = std::make_unique<DeletePlanNode>(std::move(root));
 
-        QueryPlan plan{
-            .needs_stream = false,
-            .type = QueryPlanType::DELETE,
-            .node = std::move(plan_node)
-        };
+        QueryPlan plan;
+        plan.root = std::move(del);
+        plan.type = QueryPlan::Type::DELETE;
+        plan.needs_stream = false;
 
         return plan;
     }

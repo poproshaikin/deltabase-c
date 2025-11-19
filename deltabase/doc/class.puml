@@ -1,0 +1,120 @@
+@startuml
+
+package "Engine" {
+    class Engine {
+        -parser : SqlParser
+        -analyzer : SemanticAnalyzer
+        -planner : QueryPlanner
+        -executor : PlanExecutor
+        -storage : Storage
+
+        +execute_query(query : String) : IExecutionResult
+    }
+    Engine <-- "Parser"
+    Engine <-- "Executor"
+    Engine <-- "Storage"
+
+    package "Parser" {
+        class SqlParser {
+            -tokens : List<SqlToken>
+            -current : int
+            +parse(query : String) : AstNode
+
+            -parse_select() : SelectStatement
+            -parse_insert() : InsertStatement
+            -parse_update() : UpdateStatement
+            -parse_delete() : DeleteStatement
+            -parse_create_table() : CreateTableStatement
+            -parse_create_db() : CreateDbStatement
+            -parse_binary() : BinaryExpr
+            -parse_column_def() : ColumnDefinition
+        }
+    }
+
+    package "Executor" {
+        class QueryPlanner {
+            +plan(node : AstNode) : QueryPlan
+            -plan_select(stmt : SelectStatement) : QueryPlan
+            -plan_insert(stmt : SelectStatement) : QueryPlan
+            -plan_update(stmt : SelectStatement) : QueryPlan
+            -plan_delete(stmt : SelectStatement) : QueryPlan
+        }
+
+        class SemanticAnalyzer {
+            +analyze(node : AstNode) : AnalysisResult
+            -analyze_select(stmt : SelectStatement) : AnalysisResult
+            -analyze_insert(stmt : InsertStatement) : AnalysisResult
+            -analyze_update(stmt : UpdateStatement) : AnalysisResult
+            -analyze_delete(stmt : DeleteStatement) : AnalysisResult
+        }
+
+        class PlanExecutor {
+            +execute(plan : QueryPlan) : IExecutionResult
+            -execute_select(plan : QueryPlan) : IExecutionResult
+            -execute_insert(plan : QueryPlan) : IExecutionResult
+            -execute_update(plan : QueryPlan) : IExecutionResult
+            -execute_delete(plan : QueryPlan) : IExecutionResult
+        }
+    }
+
+    package "Storage" {
+        class Storage {
+            -data_buffers : DataBuffers
+            -wal_manager : WalManager
+
+            +begin_txn() : Transaction
+
+            +get_table(table_name : String, schema_name : String) : MetaTable
+            +get_schema(schema_name : String) : MetaSchema
+
+            +seq_scan(table : MetaTable) : DataTable
+            +index_scan(index : MetaIndex ) : DataTable
+            +insert_row(row: DataRow, txn : Transaction)
+            +update_row(old: DataRow, new: DataRow, txn : Transaction)
+
+            +commit_txn(txn : Transaction)
+        }
+
+        interface IOManager {
+            +write_page(page : DataPage)
+            +read_page(id : uuid)
+
+            +read_table_meta(name : String)
+            +write_table_meta(table : MetaTable)
+
+            +read_schema_meta(name : String)
+            +write_schema_meta(schema : MetaSchema)
+        }
+
+        class FileIOManager {
+            -data_path : std::filesystem::path
+            +write_page(page : DataPage)
+            +read_page(id : uuid)
+
+            +read_table_meta(name : String)
+            +write_table_meta(table : MetaTable)
+
+            +read_schema_meta(name : String)
+            +write_schema_meta(schema : MetaSchema)
+        }
+        IOManager <|.. FileIOManager
+
+        class DataBuffers {
+            -pages : List<DataPage>
+
+            +get_page(id : uuid) : DataPage&
+            +get_available_page(free_space : uint64_t) : DataPage&
+            +create_page() : DataPage&
+            +flush()
+        }
+        DataBuffers <.. IOManager
+
+        Storage <.. DataBuffers
+
+        class Transaction {
+            id : uuid
+            logs : List<IWalLog>
+        }
+    }
+}
+@enduml

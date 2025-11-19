@@ -1,0 +1,318 @@
+@startuml
+package "Storage"
+{
+class Database {
+    name : String
+}
+
+class MetaSchema {
+    name : String
+    databaseName : String
+    tables: List<MetaTable>
+}
+
+class MetaTable {
+    name : String
+    columns : List<Column>
+    rows : List<Row>
+}
+
+class MetaColumn {
+    name : String
+    type : DataType
+}
+
+class MetaIndex {
+    name : String
+    column : Column
+}
+
+class DataToken {
+    content : List<byte>
+    type : DataTokenType
+}
+
+class DataRow {
+    rowid : uint64_t
+    values : List<DataToken>
+}
+
+class DataPage {
+    id : uuid
+    first_lsn : uint64_t
+    last_lsn : uint64_t
+    dirty : bool
+    rows : List<DataRow>
+}
+DataPage <-- DataRow
+
+class DataTable {
+    meta_table : MetaTable
+    rows: List<DataRow>
+}
+
+Database -- MetaSchema
+MetaSchema -- MetaTable
+MetaTable -- MetaColumn
+MetaIndex -- MetaColumn
+
+DataRow -- DataToken
+DataTable -- DataRow
+MetaTable -- DataTable
+}
+
+package "Parser" {
+    enum SqlTokenType {
+        Identifier
+        Keyword
+        Operator
+        Symbol
+    }
+
+    SqlTokenType -- SqlToken
+
+    class SqlToken {
+        value: String
+        type: SqlTokenType
+    }
+
+    class AstNodeValue {
+        <<variant>>
+    }
+
+    AstNodeValue o-- SqlToken
+
+    class BinaryExpr {
+        left : AstNode
+        right : AstNode
+        op : String
+    }
+    AstNodeValue o-- BinaryExpr
+
+    class SelectStatement {
+        table_name : SqlToken
+        schema_name : SqlToken
+        columns : List<SqlToken>?
+        limit: int?
+    }
+    AstNodeValue o-- SelectStatement
+
+    class InsertStatement {
+        table_name : SqlToken
+        schema_name : SqlToken
+        columns : List<SqlToken>?
+        data: AstNode
+    }
+    AstNodeValue o-- InsertStatement
+    InsertStatement -- AstNode
+
+    class UpdateStatement {
+        table_name : SqlToken
+        schema_name : SqlToken
+        assignments : List<BinaryExpr>
+        condition : BinaryExpr?
+    }
+    AstNodeValue o-- UpdateStatement
+    UpdateStatement -- BinaryExpr
+
+    class DeleteStatement {
+        table_name : SqlToken
+        schema_name : SqlToken
+        condition : BinaryExpr?
+    }
+    AstNodeValue o-- DeleteStatement
+    DeleteStatement -- BinaryExpr
+
+    class ColumnDefinition {
+        name : SqlToken
+        type : SqlToken
+        constraints : List<SqlToken>?
+    }
+
+    class CreateTableStatement {
+        table_name : SqlToken
+        schema_name : SqlToken
+        columns : List<ColumnDefinition>
+    }
+    AstNodeValue o-- CreateTableStatement
+    CreateTableStatement <-- ColumnDefinition
+
+    class CreateDbStatement {
+        name : SqlToken
+    }
+    AstNodeValue o-- CreateDbStatement
+
+    class CreateSchemaStatement {
+        name : SqlToken
+    }
+    AstNodeValue o-- CreateSchemaStatement
+    BinaryExpr -- AstNode
+
+    enum AstNodeType {
+        TableIdentifier
+        ColumnIdentifier
+        Literal
+        BinaryExpr
+        Select
+        Insert
+        Update
+        Delete
+        CreateTable
+        CreateDatabase
+        CreateSchema
+    }
+
+    class AstNode {
+        type: AstNodeType
+        value: AstNodeValue
+    }
+
+    AstNode <-- AstNodeType
+    AstNode <-- AstNodeValue
+}
+
+package "QueryPlan" {
+
+    interface IPlanNode {
+        +type(): Type
+    }
+
+    enum IPlanNode::Type {
+        Undefined
+        From
+        Filter
+        Project
+        Limit
+        Insert
+        Values
+        SeqScan
+        Update
+        Delete
+    }
+    IPlanNode -- IPlanNode::Type
+
+    class QueryPlan {
+        needs_stream : bool
+        type : Type
+        root : IPlanNode
+    }
+
+    enum QueryPlan::Type {
+        Undefined
+        Select
+        Insert
+        Update
+        Delete
+    }
+
+    QueryPlan o-- IPlanNode
+
+    interface UnaryPlanNode {
+        child : IPlanNode
+    }
+
+    interface LeafPlanNode {
+    }
+
+    IPlanNode <|.. UnaryPlanNode
+    IPlanNode <|.. LeafPlanNode
+
+    class SeqScanPlanNode {
+        table_name : string
+        schema_name : string
+    }
+
+    class ValuesPlanNode {
+        values : List<DataRow>
+    }
+
+    LeafPlanNode <|.. SeqScanPlanNode
+    LeafPlanNode <|.. ValuesPlanNode
+
+    class FromPlanNode {
+        table_name : string
+        schema_name : string
+    }
+
+    class FilterPlanNode {
+        where : BinaryExpr
+    }
+
+    class ProjectPlanNode {
+        columns : List<string>
+    }
+
+    class LimitPlanNode {
+        limit : uint64_t
+    }
+
+    class InsertPlanNode {
+        table_name : string
+        schema_name : string
+        column_names : List<string>?
+    }
+
+    class UpdatePlanNode {
+        assignments : List<Assignment>
+    }
+
+    class DeletePlanNode {
+    }
+
+    UnaryPlanNode <|.. FromPlanNode
+    UnaryPlanNode <|.. FilterPlanNode
+    UnaryPlanNode <|.. ProjectPlanNode
+    UnaryPlanNode <|.. LimitPlanNode
+    UnaryPlanNode <|.. InsertPlanNode
+    UnaryPlanNode <|.. UpdatePlanNode
+    UnaryPlanNode <|.. DeletePlanNode
+
+
+    class BinaryExpr
+    class Assignment {
+        <<variant>>
+    }
+
+    class AssignLiteral {
+        column : ColumnId
+        value : DataToken
+    }
+
+    class AssignColumn {
+        column : ColumnId
+        target_column : ColumnId
+    }
+
+    Assignment o-- AssignLiteral
+    Assignment o-- AssignColumn
+
+    FilterPlanNode *-- BinaryExpr
+    UpdatePlanNode *-- Assignment
+}
+
+package "Wal" {
+    interface IWalLog {
+        log_sequence_number : uint64_t
+    }
+
+    class InsertRowWalLog {
+        serialized_row : List<byte>
+    }
+
+    class UpdateRowWalLog {
+        old_row_id : uint64_t
+        new_row_serialized : List<byte>
+    }
+
+    class DeleteRowWalLog {
+        row_id : uint64_t
+    }
+
+    IWalLog <|.. InsertRowWalLog
+    IWalLog <|.. UpdateRowWalLog
+    IWalLog <|.. DeleteRowWalLog
+}
+@enduml
+
+
+

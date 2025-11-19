@@ -15,7 +15,7 @@ namespace exq
     {
         try
         {
-            if (plan.type == QueryPlanType::SELECT)
+            if (plan.type == QueryPlan::Type::SELECT)
             {
                 return execute_select(plan);
             }

@@ -18,19 +18,37 @@ namespace types
 
         enum class Type
         {
-            From,
-            Filter,
-            Project,
-            Limit,
-            Insert,
-            Values,
-            SeqScan,
-            Update,
-            Delete
+            UNDEFINED = 0,
+            FROM = 1,
+            FILTER,
+            PROJECT,
+            LIMIT,
+            INSERT,
+            VALUES,
+            SEQ_SCAN,
+            UPDATE,
+            DELETE
         };
 
         virtual Type
         type() const = 0;
+    };
+
+    struct QueryPlan
+    {
+        bool needs_stream = false;
+
+        enum class Type
+        {
+            UNDEFINED = 0,
+            SELECT,
+            INSERT,
+            UPDATE,
+            DELETE
+        };
+
+        Type type = Type::UNDEFINED;
+        std::unique_ptr<IPlanNode> root;
     };
 
     struct UnaryPlanNode : public IPlanNode
@@ -63,7 +81,23 @@ namespace types
         Type
         type() const override
         {
-            return Type::SeqScan;
+            return Type::SEQ_SCAN;
+        }
+    };
+
+    struct ValuesPlanNode final : LeafPlanNode
+    {
+        std::vector<DataRow> values;
+
+        explicit
+        ValuesPlanNode(std::vector<DataRow>&& values) : values(std::move(values))
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::VALUES;
         }
     };
 
@@ -83,7 +117,7 @@ namespace types
         Type
         type() const override
         {
-            return Type::From;
+            return Type::FROM;
         }
     };
 
@@ -101,7 +135,7 @@ namespace types
         Type
         type() const override
         {
-            return Type::Filter;
+            return Type::FILTER;
         }
     };
 
@@ -119,7 +153,7 @@ namespace types
         Type
         type() const override
         {
-            return Type::Project;
+            return Type::PROJECT;
         }
     };
 
@@ -137,7 +171,7 @@ namespace types
         Type
         type() const override
         {
-            return Type::Limit;
+            return Type::LIMIT;
         }
     };
 
@@ -162,7 +196,7 @@ namespace types
         Type
         type() const override
         {
-            return Type::Insert;
+            return Type::INSERT;
         }
     };
 
@@ -180,7 +214,7 @@ namespace types
         Type
         type() const override
         {
-            return Type::Update;
+            return Type::UPDATE;
         }
     };
 
@@ -195,11 +229,9 @@ namespace types
         Type
         type() const override
         {
-            return Type::Delete;
+            return Type::DELETE;
         }
     };
-
-
 }
 
 #endif //DELTABASE_QUERY_PLAN_HPP

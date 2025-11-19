@@ -33,7 +33,7 @@ namespace storage
         insert_row(types::MetaTable& table, const types::DataRow& row, types::Transaction txn) = 0;
 
         bool
-        needs_stream(types::QueryPlanNode& plan_node);
+        needs_stream(types::IPlanNode& plan_node);
     };
 }
 
