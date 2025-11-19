@@ -204,7 +204,7 @@ package "QueryPlan" {
         Update
         Delete
     }
-
+    QueryPlan <.. QueryPlan::Type
     QueryPlan o-- IPlanNode
 
     interface UnaryPlanNode {
