@@ -8,42 +8,9 @@ package "Engine" {
         +start_server(server : IInternetServer)
         +stop_server()
     }
-
-    package Server {
-        interface IInternetServer {
-            +start()
-            +stop()
-            +set_engine(engine : Engine)
-        }
-
-        class TcpServer {
-            -engine : Engine
-            -port : int
-            -running : bool
-            +start()
-            +stop()
-            +handle_client()
-            +process_request(query : String) : IExecutionResult
-        }
-        TcpServer ..|> IInternetServer
-        Engine.Engine <.. IInternetServer : uses
-        TcpServer ..> Engine.Engine : calls execute_query()
-
-        class ClientSession {
-            -engine : Engine&
-            -socket : TcpSocket
-            -server : TcpServer
-            +run()
-            +receive_query() : String
-            +send_result(result : IExecutionResult)
-        }
-        TcpServer --> ClientSession : creates
-        ClientSession --> Engine.Engine : execute_query()
-    }
     interface IDatabase {
         +execute_query(query : String) : IExecutionResult
     }
-    IDatabase ..> Engine
 
     class StdDatabase {
         -db_config : Configuration
@@ -55,141 +22,532 @@ package "Engine" {
         -storage : StdStorage
         +execute_query(query : String) : IExecutionResult
     }
-    StdDatabase <.. "Parser"
-    StdDatabase <.. "Executor"
-    StdDatabase <.. Storage.IStorage
 
     StdDatabase ..|> IDatabase
+    Engine <.. IDatabase
+}
 
-    package "Parser" {
-        class SqlParser {
-            -tokens : List<SqlToken>
-            -current : int
-            +parse(query : String) : AstNode
+package "Parser" {
+    class SqlParser {
+        -tokens : List<SqlToken>
+        -current : int
+        +parse(query : String) : AstNode
 
-            -parse_select() : SelectStatement
-            -parse_insert() : InsertStatement
-            -parse_update() : UpdateStatement
-            -parse_delete() : DeleteStatement
-            -parse_create_table() : CreateTableStatement
-            -parse_create_db() : CreateDbStatement
-            -parse_binary() : BinaryExpr
-            -parse_column_def() : ColumnDefinition
-        }
+        -parse_select() : SelectStatement
+        -parse_insert() : InsertStatement
+        -parse_update() : UpdateStatement
+        -parse_delete() : DeleteStatement
+        -parse_create_table() : CreateTableStatement
+        -parse_create_db() : CreateDbStatement
+        -parse_binary() : BinaryExpr
+        -parse_column_def() : ColumnDefinition
     }
 
-    package "Executor" {
-        class QueryPlanner {
-            +plan(node : AstNode) : QueryPlan
-            -plan_select(stmt : SelectStatement) : QueryPlan
-            -plan_insert(stmt : SelectStatement) : QueryPlan
-            -plan_update(stmt : SelectStatement) : QueryPlan
-            -plan_delete(stmt : SelectStatement) : QueryPlan
+    package AST {
+        class AstNode {
+            type: AstNodeType
+            value: AstNodeValue
         }
 
-        class SemanticAnalyzer {
-            +analyze(node : AstNode) : AnalysisResult
-            -analyze_select(stmt : SelectStatement) : AnalysisResult
-            -analyze_insert(stmt : InsertStatement) : AnalysisResult
-            -analyze_update(stmt : UpdateStatement) : AnalysisResult
-            -analyze_delete(stmt : DeleteStatement) : AnalysisResult
+        enum AstNodeType {
+            TableIdentifier
+            ColumnIdentifier
+            Literal
+            BinaryExpr
+            Select
+            Insert
+            Update
+            Delete
+            CreateTable
+            CreateDatabase
+            CreateSchema
         }
 
-        class PlanExecutor {
-            +execute(plan : QueryPlan) : IExecutionResult
-            -execute_select(plan : QueryPlan) : IExecutionResult
-            -execute_insert(plan : QueryPlan) : IExecutionResult
-            -execute_update(plan : QueryPlan) : IExecutionResult
-            -execute_delete(plan : QueryPlan) : IExecutionResult
+        class AstNodeValue {
+            variant<
+                SqlToken,
+                BinaryExpr,
+                SelectStatement,
+                InsertStatement,
+                UpdateStatement,
+                DeleteStatement,
+                CreateTableStatement,
+                CreateSchemaStatement,
+                CreateDbStatement,
+                ColumnDefinition
+            >
         }
+
+        enum SqlTokenType {
+            Identifier
+            Keyword
+            Operator
+            Symbol
+        }
+
+        class SqlToken {
+            value: String
+            type: SqlTokenType
+        }
+
+        enum SqlTokenType {
+            Identifier
+            Keyword
+            Operator
+            Symbol
+        }
+
+        class BinaryExpr {
+            left : AstNode
+            right : AstNode
+            op : String
+        }
+
+        class SelectStatement {
+            table_name : SqlToken
+            schema_name : SqlToken
+            columns : List<SqlToken>?
+            limit: int?
+        }
+
+        class InsertStatement {
+            table_name : SqlToken
+            schema_name : SqlToken
+            columns : List<SqlToken>?
+            data: AstNode
+        }
+
+        class UpdateStatement {
+            table_name : SqlToken
+            schema_name : SqlToken
+            assignments : List<BinaryExpr>
+            condition : BinaryExpr?
+        }
+
+        class DeleteStatement {
+            table_name : SqlToken
+            schema_name : SqlToken
+            condition : BinaryExpr?
+        }
+
+        class ColumnDefinition {
+            name : SqlToken
+            type : SqlToken
+            constraints : List<SqlToken>?
+        }
+
+        class CreateTableStatement {
+            table_name : SqlToken
+            schema_name : SqlToken
+            columns : List<ColumnDefinition>
+        }
+
+        class CreateDbStatement {
+            name : SqlToken
+        }
+
+        class CreateSchemaStatement {
+            name : SqlToken
+        }
+
+        SqlToken <-- SqlTokenType
+        AstNode <-- AstNodeValue
+        AstNodeValue *-- SqlToken
+        AstNodeValue *-- BinaryExpr
+        AstNodeValue *-- SelectStatement
+        AstNodeValue *-- InsertStatement
+        AstNodeValue *-- UpdateStatement
+        AstNodeValue *-- DeleteStatement
+        AstNodeValue *-- CreateTableStatement
+        AstNodeValue *-- CreateSchemaStatement
+        AstNodeValue *-- CreateDbStatement
+        AstNodeValue *-- ColumnDefinition
     }
 
-    package "Storage" {
-        interface IStorage {
-            +begin_txn() : Transaction
+    SqlParser <.. AST
+}
 
-            +get_table(table_name : String, schema_name : String) : MetaTable
-            +get_schema(schema_name : String) : MetaSchema
+package "Planner" {
+    class QueryPlanner {
+        +plan(node : AstNode) : QueryPlan
+        -plan_select(stmt : SelectStatement) : QueryPlan
+        -plan_insert(stmt : SelectStatement) : QueryPlan
+        -plan_update(stmt : SelectStatement) : QueryPlan
+        -plan_delete(stmt : SelectStatement) : QueryPlan
+    }
 
-            +seq_scan(table : MetaTable) : DataTable
-            +index_scan(index : MetaIndex ) : DataTable
-            +insert_row(row: DataRow, txn : Transaction)
-            +update_row(old: DataRow, new: DataRow, txn : Transaction)
-
-            +commit_txn(txn : Transaction)
+    package "PlanTree" {
+        interface IPlanNode {
+            +type(): Type
         }
 
-        class StdStorage {
-            -data_buffers : DataBuffers
-            -wal_manager : WalManager
-            -io_manager : IOManager
-
-            +begin_txn() : Transaction
-
-            +get_table(table_name : String, schema_name : String) : MetaTable
-            +get_schema(schema_name : String) : MetaSchema
-
-            +seq_scan(table : MetaTable) : DataTable
-            +index_scan(index : MetaIndex ) : DataTable
-            +insert_row(row: DataRow, txn : Transaction)
-            +update_row(old: DataRow, new: DataRow, txn : Transaction)
-
-            +commit_txn(txn : Transaction)
-        }
-        StdStorage ..|> IStorage
-
-        class Catalog {
-            -io_manager : IOManager&
-            +get_table(table_name : String, schema_name : String) : MetaTable
-            +get_schema(schema_name : String) : MetaSchema
-            +save_table(table : MetaTable)
-            +save_schema(schema : MetaSchema)
-        }
-        Catalog ..> StdStorage
-        Catalog <.. IOManager
-
-        interface IOManager {
-            +write_page(page : DataPage)
-            +read_page(id : uuid)
-
-            +read_table_meta(name : String)
-            +write_table_meta(table : MetaTable)
-
-            +read_schema_meta(name : String)
-            +write_schema_meta(schema : MetaSchema)
+        enum IPlanNode::Type {
+            Undefined
+            From
+            Filter
+            Project
+            Limit
+            Insert
+            Values
+            SeqScan
+            Update
+            Delete
         }
 
-        class FileIOManager {
-            -data_path : std::filesystem::path
-            +write_page(page : DataPage)
-            +read_page(id : uuid)
-
-            +read_table_meta(name : String)
-            +write_table_meta(table : MetaTable)
-
-            +read_schema_meta(name : String)
-            +write_schema_meta(schema : MetaSchema)
+        class QueryPlan {
+            needs_stream : bool
+            type : Type
+            root : IPlanNode
         }
-        IOManager <|.. FileIOManager
 
-        class DataBuffers {
-            -pages : List<DataPage>
-            -io_manager : IOManager&
-
-            +get_page(id : uuid) : DataPage&
-            +get_available_page(free_space : uint64_t) : DataPage&
-            +create_page() : DataPage&
-            +flush()
+        enum QueryPlan::Type {
+            Undefined
+            Select
+            Insert
+            Update
+            Delete
         }
-        DataBuffers <.. IOManager
 
-        StdStorage <.. DataBuffers
-        StdStorage <.. Transaction
+        interface UnaryPlanNode {
+            child : IPlanNode
+        }
 
-        class Transaction {
+        interface LeafPlanNode {
+        }
+
+        class SeqScanPlanNode {
+            table_name : string
+            schema_name : string
+        }
+
+        class ValuesPlanNode {
+            values : List<DataRow>
+        }
+
+        class FilterPlanNode {
+            where : BinaryExpr
+        }
+
+        class ProjectPlanNode {
+            columns : List<string>
+        }
+
+        class LimitPlanNode {
+            limit : uint64_t
+        }
+
+        class InsertPlanNode {
+            table_name : string
+            schema_name : string
+            column_names : List<string>?
+        }
+
+        class UpdatePlanNode {
+            assignments : List<Assignment>
+        }
+
+        class DeletePlanNode {
+        }
+
+        class Assignment {
+            <<variant>>
+        }
+
+        class AssignLiteral {
+            column : ColumnId
+            value : DataToken
+        }
+
+        class AssignColumn {
+            column : ColumnId
+            target_column : ColumnId
+        }
+
+        IPlanNode <|.. UnaryPlanNode
+        IPlanNode <|.. LeafPlanNode
+
+        LeafPlanNode <|.. SeqScanPlanNode
+        LeafPlanNode <|.. ValuesPlanNode
+
+        UnaryPlanNode <|.. FilterPlanNode
+        UnaryPlanNode <|.. UpdatePlanNode
+        UnaryPlanNode <|.. DeletePlanNode
+        UnaryPlanNode <|.. InsertPlanNode
+        UnaryPlanNode <|.. ProjectPlanNode
+        UnaryPlanNode <|.. LimitPlanNode
+        UnaryPlanNode <|.. ProjectPlanNode
+
+        Assignment *.. AssignColumn
+        Assignment *.. AssignLiteral
+
+        UpdatePlanNode <.. Assignment
+
+        QueryPlan <.. IPlanNode
+        IPlanNode <.. IPlanNode::Type
+        QueryPlan <.. QueryPlan::Type
+    }
+
+    QueryPlanner <.. "PlanTree"
+}
+
+package "Executor" {
+
+    class SemanticAnalyzer {
+        +analyze(node : AstNode) : AnalysisResult
+        -analyze_select(stmt : SelectStatement) : AnalysisResult
+        -analyze_insert(stmt : InsertStatement) : AnalysisResult
+        -analyze_update(stmt : UpdateStatement) : AnalysisResult
+        -analyze_delete(stmt : DeleteStatement) : AnalysisResult
+    }
+
+    class PlanExecutor {
+        +execute(plan : QueryPlan) : IExecutionResult
+        -execute_select(plan : QueryPlan) : IExecutionResult
+        -execute_insert(plan : QueryPlan) : IExecutionResult
+        -execute_update(plan : QueryPlan) : IExecutionResult
+        -execute_delete(plan : QueryPlan) : IExecutionResult
+    }
+
+    package "ExecutorTree" {
+        interface IExecutor {
+            +open()
+            +next(row : DataRow&) : bool
+            +close()
+        }
+
+        class SeqScanExecutor {
+            -node : SeqScanPlanNode
+            -storage : IStorage&
+            -table : DataTable
+            -index : uin64_t
+            +open()
+            +next(row : DataRow&) : bool
+            +close()
+        }
+
+        class ValuesExecutor {
+            -rows : List<DataRow>
+            -index : uint64_t
+            +open()
+            +next(row : DataRow&) : bool
+            +close()
+        }
+
+        class FilterExecutor {
+            -condition : BinaryExpr
+            -child : IExecutor
+            +open()
+            +next(row : DataRow&) : bool
+            +close()
+        }
+
+        class ProjectionExecutor {
+            -columns : List<String>
+            -child : IExecutor
+            +open()
+            +next(row : DataRow&) : bool
+            +close()
+        }
+
+        class LimitExecutor {
+            -current : uint64_t
+            -limit : uin64_t
+            -child : IExecutor
+            +open()
+            +next(row : DataRow&) : bool
+            +close()
+        }
+
+        class InsertExecutor {
+            -target : MetaTable
+            -storage : IStorage&
+            -child : IExecutor
+            +open()
+            +next(row : DataRow&) : bool
+            +close()
+        }
+
+        class UpdateExecutor {
+            -target : MetaTable
+            -storage : IStorage&
+            -child : IExecutor
+        }
+
+        IExecutor <|.. SeqScanExecutor
+        IExecutor <|.. UpdateExecutor
+        IExecutor <|.. LimitExecutor
+        IExecutor <|.. InsertExecutor
+        IExecutor <|.. ProjectionExecutor
+        IExecutor <|.. FilterExecutor
+        IExecutor <|.. ValuesExecutor
+    }
+    PlanExecutor <.. "ExecutorTree"
+}
+
+package "Storage" {
+    interface IStorage {
+        +begin_txn() : Transaction
+
+        +get_table(table_name : String, schema_name : String) : MetaTable
+        +get_schema(schema_name : String) : MetaSchema
+
+        +seq_scan(table : MetaTable) : DataTable
+        +index_scan(index : MetaIndex ) : DataTable
+        +insert_row(row: DataRow, txn : Transaction)
+        +update_row(old: DataRow, new: DataRow, txn : Transaction)
+
+        +commit_txn(txn : Transaction)
+    }
+
+    class StdStorage {
+        -data_buffers : DataBuffers
+        -wal_manager : WalManager
+        -io_manager : IOManager
+
+        +begin_txn() : Transaction
+
+        +get_table(table_name : String, schema_name : String) : MetaTable
+        +get_schema(schema_name : String) : MetaSchema
+
+        +seq_scan(table : MetaTable) : DataTable
+        +index_scan(index : MetaIndex ) : DataTable
+        +insert_row(row: DataRow, txn : Transaction)
+        +update_row(old: DataRow, new: DataRow, txn : Transaction)
+
+        +commit_txn(txn : Transaction)
+    }
+
+    class Catalog {
+        -io_manager : IOManager&
+        +get_table(table_name : String, schema_name : String) : MetaTable
+        +get_schema(schema_name : String) : MetaSchema
+        +save_table(table : MetaTable)
+        +save_schema(schema : MetaSchema)
+    }
+
+    interface IOManager {
+        +write_page(page : DataPage)
+        +read_page(id : uuid)
+
+        +read_table_meta(name : String)
+        +write_table_meta(table : MetaTable)
+
+        +read_schema_meta(name : String)
+        +write_schema_meta(schema : MetaSchema)
+    }
+
+    class FileIOManager {
+        -data_path : std::filesystem::path
+        +write_page(page : DataPage)
+        +read_page(id : uuid)
+
+        +read_table_meta(name : String)
+        +write_table_meta(table : MetaTable)
+
+        +read_schema_meta(name : String)
+        +write_schema_meta(schema : MetaSchema)
+    }
+
+    class DataBuffers {
+        -pages : List<DataPage>
+        -io_manager : IOManager&
+
+        +get_page(id : uuid) : DataPage&
+        +get_available_page(free_space : uint64_t) : DataPage&
+        +create_page() : DataPage&
+        +flush()
+    }
+
+    package WAL {
+        interface IWalLog {
+            log_sequence_number : uint64_t
+        }
+
+        class InsertRowWalLog {
+            serialized_row : List<byte>
+        }
+
+        class UpdateRowWalLog {
+            old_row_id : uint64_t
+            new_row_serialized : List<byte>
+        }
+
+        class DeleteRowWalLog {
+            row_id : uint64_t
+        }
+
+        class CreateTableWalLog {
+            name : String
+            schema_name : String
+            serialized_mt : List<byte>
+        }
+
+        IWalLog <|.. InsertRowWalLog
+        IWalLog <|.. UpdateRowWalLog
+        IWalLog <|.. DeleteRowWalLog
+        IWalLog <|.. CreateTableWalLog
+    }
+
+    package Meta {
+        class MetaSchema {
+            name : String
+            db_name : String
+        }
+
+        class MetaTable {
+            name : String
+            columns : List<MetaColumn>
+            rows : List<Row>
+        }
+
+        class MetaColumn {
+            name : String
+            type : DataType
+        }
+
+        class MetaIndex {
+            name : String
+            column : MetaColumn
+        }
+
+        MetaTable *-- MetaColumn
+        MetaIndex o-- MetaColumn
+    }
+
+    package Data {
+        class DataToken {
+            content : List<byte>
+            type : DataType
+        }
+
+        class DataRow {
+            rowid : uint64_t
+            values : List<DataToken>
+        }
+
+        class DataPage {
             id : uuid
-            logs : List<IWalLog>
+            first_lsn : uint64_t
+            last_lsn : uint64_t
+            dirty : bool
+            rows : List<DataRow>
         }
+
+        class DataTable {
+            name : String
+            rows: List<DataRow>
+        }
+
+        DataRow o-- DataToken
+        DataPage o-- DataRow
+        DataTable o-- DataRow
     }
+
+    class Transaction {
+        id : uuid
+        logs : List<IWalLog>
+    }
+
+    IOManager <|.. FileIOManager
 }
 @enduml

@@ -36,6 +36,13 @@ namespace exq
     std::unique_ptr<IExecutionResult>
     StdPlanExecutor::execute_select(const QueryPlan& plan)
     {
+        // иметь переменную со строками,
+        // спуститься вниз рекурсивно до leaf node
+        // rows = leaf_node()
+        // и поднимаясь вверх, rows = unary_node(rows)
+
+        std::vector<DataRow> rows;
+
 
     }
 }
