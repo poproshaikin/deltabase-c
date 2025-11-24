@@ -257,6 +257,9 @@ namespace types
         bool
         is_literal() const;
 
+        bool
+        is_identifier() const;
+
         template <typename TDetail>
         TDetail
         get_detail() const

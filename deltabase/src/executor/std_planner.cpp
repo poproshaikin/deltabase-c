@@ -70,6 +70,7 @@ namespace exq
         if (stmt.where)
         {
             auto filter = std::make_unique<FilterPlanNode>(
+                storage_.get_table(stmt.table),
                 std::move(*stmt.where),
                 std::move(node)
             );
@@ -84,6 +85,7 @@ namespace exq
                 cols.push_back(c.value);
 
             auto project = std::make_unique<ProjectPlanNode>(
+                storage_.get_table(stmt.table),
                 cols,
                 std::move(node)
             );
@@ -142,7 +144,7 @@ namespace exq
     QueryPlan
     StdPlanner::plan_update(UpdateStatement& stmt) const
     {
-        auto table = storage_.get_table(stmt.table);
+        const auto table = storage_.get_table(stmt.table);
 
         std::vector<Assignment> assignments;
         for (const auto& assignment : stmt.assignments)
@@ -150,7 +152,7 @@ namespace exq
             if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
                 assignment.right->type == AstNodeType::LITERAL)
             {
-                const auto& col_id = table->get_column(stmt.table.table_name).id;
+                const auto& col_id = table.get_column(stmt.table.table_name).id;
                 auto data_token = misc::convert(std::get<SqlToken>(assignment.right->value));
 
                 assignments.emplace_back(std::make_pair(col_id, data_token));
@@ -158,8 +160,8 @@ namespace exq
             if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
                 assignment.right->type == AstNodeType::COLUMN_IDENTIFIER)
             {
-                const auto& left = table->get_column(std::get<SqlToken>(assignment.left->value));
-                const auto& right = table->get_column(std::get<SqlToken>(assignment.right->value));
+                const auto& left = table.get_column(std::get<SqlToken>(assignment.left->value));
+                const auto& right = table.get_column(std::get<SqlToken>(assignment.right->value));
 
                 assignments.emplace_back(std::make_pair(left.id, right.id));
             }
@@ -176,6 +178,7 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
+                storage_.get_table(stmt.table),
                 std::move(*stmt.where),
                 std::move(root));
         }
@@ -206,6 +209,7 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
+                storage_.get_table(stmt.table),
                 std::move(*stmt.where),
                 std::move(root));
         }

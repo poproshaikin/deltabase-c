@@ -10,7 +10,7 @@
 
 namespace types
 {
-    class MetaSchema
+    struct MetaSchema
     {
         Uuid id;
         std::string name;

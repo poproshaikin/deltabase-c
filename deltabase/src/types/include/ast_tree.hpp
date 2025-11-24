@@ -31,7 +31,7 @@ namespace types
 
     enum class AstOperator
     {
-        NONE = 0,
+        UNDEFINED = 0,
         OR = 1,
         AND,
         NOT,

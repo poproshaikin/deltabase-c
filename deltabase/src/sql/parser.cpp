@@ -455,7 +455,7 @@ namespace sql
             return std::get<BinaryExpr>(std::move(left->value));
 
         BinaryExpr result;
-        result.op = AstOperator::NONE;
+        result.op = AstOperator::UNDEFINED;
         result.left = std::move(left);
         result.right = nullptr;
 

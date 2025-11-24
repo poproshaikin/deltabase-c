@@ -5,6 +5,8 @@
 #include "include/data_token.hpp"
 #include "../misc/include/convert.hpp"
 
+#include <assert.h>
+
 namespace types
 {
     DataToken::DataToken(const SqlToken& sql_token)
@@ -12,7 +14,7 @@ namespace types
         *this = misc::convert(sql_token);
     }
 
-    DataToken::DataToken(const Bytes& bytes, ValueType type)
+    DataToken::DataToken(const Bytes& bytes, DataType type)
         : bytes(bytes), type(type)
     {
     }

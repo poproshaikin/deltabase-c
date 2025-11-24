@@ -7,7 +7,7 @@
 #include "ast_tree.hpp"
 #include "typedefs.hpp"
 #include "uuid.hpp"
-#include "value_type.hpp"
+#include "data_type.hpp"
 
 #include <string>
 
@@ -35,7 +35,7 @@ namespace types
         Uuid id;
         Uuid table_id;
         std::string name;
-        ValueType type;
+        DataType type;
         MetaColumnFlags flags;
 
         explicit
@@ -43,7 +43,7 @@ namespace types
         explicit
         MetaColumn(const ColumnDefinition& def);
         explicit
-        MetaColumn(const std::string& name, ValueType type, MetaColumnFlags flags);
+        MetaColumn(const std::string& name, DataType type, MetaColumnFlags flags);
     };
 }
 

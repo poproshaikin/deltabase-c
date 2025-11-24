@@ -9,7 +9,7 @@
 
 namespace types
 {
-    enum class ValueType : uint64_t
+    enum class DataType : uint64_t
     {
         _NULL = 0,
         UNDEFINED = 0,

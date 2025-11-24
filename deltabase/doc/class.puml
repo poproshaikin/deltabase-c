@@ -402,7 +402,7 @@ package "Storage" {
     class StdStorage {
         -data_buffers : DataBuffers
         -wal_manager : WalManager
-        -io_manager : IOManager
+        -io_manager : IIOManager
 
         +begin_txn() : Transaction
 
@@ -425,7 +425,7 @@ package "Storage" {
         +save_schema(schema : MetaSchema)
     }
 
-    interface IOManager {
+    interface IIOManager {
         +write_page(page : DataPage)
         +read_page(id : uuid)
 
@@ -548,6 +548,17 @@ package "Storage" {
         logs : List<IWalLog>
     }
 
-    IOManager <|.. FileIOManager
+    IIOManager <|.. FileIOManager
+    StdStorage <.. IIOManager
+    StdStorage <.. Catalog
+    StdStorage <.. DataBuffers
+    StdStorage ..|> IStorage
+    DataBuffers <.. Data
+    Catalog <.. Meta
 }
+
+Engine <.. Storage
+Engine <.. Executor
+Engine <.. Parser
+Engine <.. Planner
 @enduml

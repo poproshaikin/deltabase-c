@@ -19,7 +19,6 @@ namespace types
         enum class Type
         {
             UNDEFINED = 0,
-            FROM = 1,
             FILTER,
             PROJECT,
             LIMIT,
@@ -101,34 +100,16 @@ namespace types
         }
     };
 
-    struct FromPlanNode final : UnaryPlanNode
-    {
-        std::string table_name;
-        std::string schema_name;
-
-        explicit
-        FromPlanNode(std::string table, std::string schema, std::unique_ptr<IPlanNode> child)
-            : UnaryPlanNode(std::move(child)),
-              table_name(std::move(table)),
-              schema_name(std::move(schema))
-        {
-        }
-
-        Type
-        type() const override
-        {
-            return Type::FROM;
-        }
-    };
-
     struct FilterPlanNode final : UnaryPlanNode
     {
         BinaryExpr where;
+        MetaTable table;
 
         explicit
-        FilterPlanNode(BinaryExpr expr, std::unique_ptr<IPlanNode> child)
+        FilterPlanNode(const MetaTable& table, BinaryExpr expr, std::unique_ptr<IPlanNode> child)
             : UnaryPlanNode(std::move(child)),
-              where(std::move(expr))
+              where(std::move(expr)),
+              table(table)
         {
         }
 
@@ -141,11 +122,13 @@ namespace types
 
     struct ProjectPlanNode final : UnaryPlanNode
     {
+        const MetaTable table;
         std::vector<std::string> columns;
 
         explicit
-        ProjectPlanNode(std::vector<std::string> cols, std::unique_ptr<IPlanNode> child)
+        ProjectPlanNode(const MetaTable& table, std::vector<std::string> cols, std::unique_ptr<IPlanNode> child)
             : UnaryPlanNode(std::move(child)),
+              table(table),
               columns(std::move(cols))
         {
         }

@@ -10,14 +10,19 @@ namespace exq
 {
     using namespace types;
 
+    StdPlanExecutor::StdPlanExecutor(storage::IStorage& storage)
+        : storage_(storage), node_executor_factory_(storage_)
+    {
+    }
+
     std::unique_ptr<IExecutionResult>
-    StdPlanExecutor::execute(const QueryPlan& plan)
+    StdPlanExecutor::execute(QueryPlan&& plan)
     {
         try
         {
             if (plan.type == QueryPlan::Type::SELECT)
             {
-                return execute_select(plan);
+                return execute_select(std::move(plan));
             }
         }
         catch (const std::exception& ex)
@@ -34,15 +39,41 @@ namespace exq
     }
 
     std::unique_ptr<IExecutionResult>
-    StdPlanExecutor::execute_select(const QueryPlan& plan)
+    StdPlanExecutor::execute_select(QueryPlan&& plan)
     {
-        // иметь переменную со строками,
-        // спуститься вниз рекурсивно до leaf node
-        // rows = leaf_node()
-        // и поднимаясь вверх, rows = unary_node(rows)
+        // TODO vymyslet stream mode;
 
-        std::vector<DataRow> rows;
+        auto root_exq = node_executor_factory_.from_plan(std::move(plan.root));
 
+        root_exq->open();
+        DataTable table;
+        table.output_schema = root_exq->output_schema();
 
+        while (true)
+        {
+            DataRow row;
+            if (!root_exq->next(row))
+                break;
+
+            table.rows.push_back(std::move(row));
+        }
+
+        return std::make_unique<MaterializedResult>(table);
+    }
+
+    std::unique_ptr<IExecutionResult>
+    StdPlanExecutor::execute_insert(QueryPlan&& plan)
+    {
+        auto root_exq = node_executor_factory_.from_plan(std::move(plan.root));
+
+        root_exq->open();
+        DataRow rows_affected;
+        root_exq->next(rows_affected);
+        root_exq->close();
+
+        DataTable table;
+        table.output_schema = root_exq->output_schema();
+        table.rows.emplace_back(std::move(rows_affected));
+        return std::make_unique<MaterializedResult>(table);
     }
 }

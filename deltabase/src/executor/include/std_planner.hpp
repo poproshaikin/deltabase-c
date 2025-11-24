@@ -15,7 +15,6 @@ namespace exq
         storage::IStorage& storage_;
         const types::DbConfig& db_config_;
 
-
         types::QueryPlan
         plan_select(types::SelectStatement& stmt) const;
 

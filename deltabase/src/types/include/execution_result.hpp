@@ -5,6 +5,7 @@
 #ifndef DELTABASE_EXECUTION_RESULT_HPP
 #define DELTABASE_EXECUTION_RESULT_HPP
 #include "data_row.hpp"
+#include "data_table.hpp"
 
 namespace types
 {
@@ -14,10 +15,18 @@ namespace types
         virtual ~IExecutionResult() = default;
 
         virtual bool
-        next() = 0;
+        next(DataRow& out) = 0;
+    };
 
-        virtual DataRow
-        get() = 0;
+    class MaterializedResult final : public IExecutionResult
+    {
+        DataTable table_;
+        uint64_t current_;
+    public:
+        MaterializedResult(const DataTable& table);
+
+        bool
+        next(DataRow& out) override;
     };
 }
 

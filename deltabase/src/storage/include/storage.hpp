@@ -5,6 +5,7 @@
 #ifndef DELTABASE_STORAGE_HPP
 #define DELTABASE_STORAGE_HPP
 #include "../../types/include/data_row.hpp"
+#include "../../types/include/data_table.hpp"
 #include "../../types/include/meta_table.hpp"
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/query_plan.hpp"
@@ -17,23 +18,32 @@ namespace storage
     public:
         virtual ~IStorage() = default;
 
-        virtual std::shared_ptr<types::MetaTable>
+        virtual types::MetaTable
         get_table(std::string table_name, std::string schema_name) = 0;
 
-        virtual std::shared_ptr<types::MetaTable>
+        virtual types::MetaTable
         get_table(types::TableIdentifier identifier) = 0;
 
-        virtual std::shared_ptr<types::MetaSchema>
+        virtual types::MetaSchema
         get_schema(std::string schema_name) = 0;
 
-        virtual uint64_t
-        insert_row(types::MetaTable& table, const types::DataRow& row) = 0;
+        virtual types::MetaSchema
+        get_schema_by_id(types::Uuid uuid) const = 0;
+
+        virtual bool
+        needs_stream(types::IPlanNode& plan_node) = 0;
+
+        virtual types::DataTable
+        seq_scan(const std::string& table_name, const std::string& schema_name) = 0;
+
+        virtual types::Transaction
+        begin_txn() = 0;
 
         virtual uint64_t
         insert_row(types::MetaTable& table, const types::DataRow& row, types::Transaction txn) = 0;
 
-        bool
-        needs_stream(types::IPlanNode& plan_node);
+        virtual void
+        commit_txn(types::Transaction txn) = 0;
     };
 }
 

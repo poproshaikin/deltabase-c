@@ -28,6 +28,10 @@ namespace types
 
         const MetaColumn&
         get_column(const std::string& name) const;
+
+        // -1 if not found
+        int64_t
+        get_column_idx(const std::string& name) const;
     };
 }
 
