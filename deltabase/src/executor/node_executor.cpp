@@ -45,7 +45,9 @@ namespace exq
     OutputSchema
     SeqScanNodeExecutor::output_schema()
     {
-        MetaTable mt = storage_.get_table(table_name_, schema_name_);
+        CatalogSnapshot catalog = storage_.get_catalog_snapshot();
+        MetaTable mt = catalog.get_table(table_name_, schema_name_);
+
         OutputSchema output_schema;
         output_schema.reserve(mt.columns.size());
 
@@ -211,7 +213,8 @@ namespace exq
         : table_name_(table_name),
           schema_name_(schema_name),
           storage_(storage),
-          child_(std::move(child))
+          child_(std::move(child)),
+          executed_(false)
     {
     }
 
@@ -228,7 +231,8 @@ namespace exq
             return false;
 
         int inserted_count = 0;
-        MetaTable table = storage_.get_table(table_name_, schema_name_);
+        auto catalog = storage_.get_catalog_snapshot();
+        auto table = catalog.get_table(table_name_, schema_name_);
         auto txn = storage_.begin_txn();
 
         while (true)
@@ -243,7 +247,7 @@ namespace exq
         storage_.commit_txn(txn);
 
         DataToken affected_rows_count(misc::convert(inserted_count), DataType::INTEGER);
-        out.tokens = { affected_rows_count };
+        out.tokens = {affected_rows_count};
         return true;
     }
 
@@ -256,7 +260,7 @@ namespace exq
     OutputSchema
     InsertNodeExecutor::output_schema()
     {
-        return { (OutputColumn){ .name = "affected_rows", .type = DataType::INTEGER } };
+        return {(OutputColumn){.name = "affected_rows", .type = DataType::INTEGER}};
     }
 
     NodeExecutorFactory::NodeExecutorFactory(storage::IStorage& storage) : storage_(storage)
@@ -309,7 +313,13 @@ namespace exq
         case IPlanNode::Type::INSERT:
         {
             auto& insert_node = static_cast<InsertPlanNode&>(*node);
-            InsertNodeExecutor
+            InsertNodeExecutor executor(
+                insert_node.table_name,
+                insert_node.schema_name,
+                storage_,
+                from_plan(std::move(insert_node.child))
+            );
+            return std::make_unique<InsertNodeExecutor>(std::move(executor));
         }
         default:
             throw std::runtime_error("NodeExecutorFactory::from_plan");

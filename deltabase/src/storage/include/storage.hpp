@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_STORAGE_HPP
 #define DELTABASE_STORAGE_HPP
+#include "../../types/include/catalog_snapshot.hpp"
 #include "../../types/include/data_row.hpp"
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/meta_table.hpp"
@@ -18,17 +19,8 @@ namespace storage
     public:
         virtual ~IStorage() = default;
 
-        virtual types::MetaTable
-        get_table(std::string table_name, std::string schema_name) = 0;
-
-        virtual types::MetaTable
-        get_table(types::TableIdentifier identifier) = 0;
-
-        virtual types::MetaSchema
-        get_schema(std::string schema_name) = 0;
-
-        virtual types::MetaSchema
-        get_schema_by_id(types::Uuid uuid) const = 0;
+        virtual types::CatalogSnapshot
+        get_catalog_snapshot() = 0;
 
         virtual bool
         needs_stream(types::IPlanNode& plan_node) = 0;

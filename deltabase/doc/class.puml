@@ -400,8 +400,9 @@ package "Storage" {
     }
 
     class StdStorage {
-        -data_buffers : DataBuffers
-        -wal_manager : WalManager
+        -data_buffers : IDataBuffers
+        -catalog : ICatalog
+        -wal_manager : IWalManager
         -io_manager : IIOManager
 
         +begin_txn() : Transaction
@@ -417,12 +418,27 @@ package "Storage" {
         +commit_txn(txn : Transaction)
     }
 
-    class Catalog {
+    interface IWalManager
+    {
+        +push_log(log : IWalLog)
+        +flush()
+    }
+
+    interface ICatalog {
+        +get_table(table_name : String, schema_name : String) : MetaTable
+        +get_schema(schema_name : String) : MetaSchema
+        +save_table(table : MetaTable)
+        +save_schema(schema : MetaSchema)
+        +flush()
+    }
+
+    class StdCatalog {
         -io_manager : IOManager&
         +get_table(table_name : String, schema_name : String) : MetaTable
         +get_schema(schema_name : String) : MetaSchema
         +save_table(table : MetaTable)
         +save_schema(schema : MetaSchema)
+        +flush()
     }
 
     interface IIOManager {
@@ -438,6 +454,7 @@ package "Storage" {
 
     class FileIOManager {
         -data_path : std::filesystem::path
+        -serializer : IBinarySerializer
         +write_page(page : DataPage)
         +read_page(id : uuid)
 
@@ -448,7 +465,15 @@ package "Storage" {
         +write_schema_meta(schema : MetaSchema)
     }
 
-    class DataBuffers {
+    interface IDataBuffers
+    {
+        +get_page(id : uuid) : DataPage&
+        +get_available_page(free_space : uint64_t) : DataPage&
+        +create_page() : DataPage&
+        +flush()
+    }
+
+    class StdDataBuffers {
         -pages : List<DataPage>
         -io_manager : IOManager&
 
@@ -456,6 +481,40 @@ package "Storage" {
         +get_available_page(free_space : uint64_t) : DataPage&
         +create_page() : DataPage&
         +flush()
+    }
+
+    interface ICheckpointManager
+    {
+        +start_bg_thread()
+    }
+
+    class StdCheckpointManager
+    {
+        -bg_thread : std::thread
+        -flush()
+        +start_bg_thread()
+    }
+
+    interface IBinarySerializer
+    {
+        +serialize_mt(table : MetaTable) : List<byte>
+        +serialize_ms(schema : MetaSchema) : List<byte>
+        +serialize_mc(column : MetaColumn) : List<byte>
+
+        +deserialize_mt(bytes : ReadOnlyMemoryStream) : MetaTable
+        +deserialize_ms(bytes : ReadOnlyMemoryStream) : MetaSchema
+        +deserialize_mc(bytes : ReadOnlyMemoryStream) : MetaColumn
+    }
+
+    class StdBinarySerializer
+    {
+        +serialize_mt(table : MetaTable) : List<byte>
+        +serialize_ms(schema : MetaSchema) : List<byte>
+        +serialize_mc(column : MetaColumn) : List<byte>
+
+        +deserialize_mt(bytes : ReadOnlyMemoryStream) : MetaTable
+        +deserialize_ms(bytes : ReadOnlyMemoryStream) : MetaSchema
+        +deserialize_mc(bytes : ReadOnlyMemoryStream) : MetaColumn
     }
 
     package WAL {
@@ -548,13 +607,25 @@ package "Storage" {
         logs : List<IWalLog>
     }
 
+    IBinarySerializer <|.. StdBinarySerializer
     IIOManager <|.. FileIOManager
+    FileIOManager <.. IBinarySerializer
     StdStorage <.. IIOManager
-    StdStorage <.. Catalog
-    StdStorage <.. DataBuffers
+    StdStorage <.. ICatalog
+    StdStorage <.. IDataBuffers
+    StdStorage <.. ICheckpointManager
+    StdStorage <.. IWalManager
+
+    ICheckpointManager <.. ICatalog
+    ICheckpointManager <.. IDataBuffers
+    ICheckpointManager <|.. StdCheckpointManager
+    ICatalog <|.. StdCatalog
+    IDataBuffers <|.. StdDataBuffers
     StdStorage ..|> IStorage
-    DataBuffers <.. Data
-    Catalog <.. Meta
+    StdDataBuffers <.. Data
+    StdCatalog <.. Meta
+    IWalManager <.. WAL
+
 }
 
 Engine <.. Storage

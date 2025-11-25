@@ -24,5 +24,8 @@ namespace engine
         auto ast = parser.parse();
 
         auto plan = planner_->plan(std::move(ast));
+        auto result = plan_executor_->execute(std::move(plan));
+
+        return result;
     }
 }

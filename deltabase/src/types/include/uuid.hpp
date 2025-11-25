@@ -23,9 +23,6 @@ namespace types
                 throw std::invalid_argument("Invalid UUID string: " + str);
         }
 
-        Uuid(const Uuid&) = default;
-        Uuid& operator=(const Uuid&) = default;
-
         operator std::string() const
         {
             char buffer[37];
@@ -51,6 +48,23 @@ namespace types
         static void generate(uuid_t& out)
         {
             uuid_generate_time_v6(out);
+        }
+    };
+}
+
+namespace std
+{
+    template<>
+    struct hash<types::Uuid>
+    {
+        size_t operator()(const types::Uuid& uuid) const noexcept
+        {
+            auto sv = std::string_view(
+                reinterpret_cast<const char*>(uuid.raw()),
+                16
+            );
+
+            return std::hash<std::string_view>{}(sv);
         }
     };
 }
