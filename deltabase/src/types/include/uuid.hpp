@@ -23,7 +23,7 @@ namespace types
                 throw std::invalid_argument("Invalid UUID string: " + str);
         }
 
-        operator std::string() const
+        std::string to_string() const
         {
             char buffer[37];
             uuid_unparse_lower(value_, buffer);

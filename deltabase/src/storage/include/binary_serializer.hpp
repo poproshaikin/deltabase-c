@@ -6,6 +6,7 @@
 #define DELTABASE_BINARY_SERIALIZER_HPP
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/meta_table.hpp"
+#include "../../types/include/data_page.hpp"
 
 namespace storage
 {
@@ -23,6 +24,9 @@ namespace storage
         virtual types::Bytes
         serialize_mc(const types::MetaColumn& column) = 0;
 
+        virtual types::Bytes
+        serialize_dp(const types::DataPage& page) = 0;
+
         virtual bool
         deserialize_mt(const types::Bytes& bytes, types::MetaTable& out) = 0;
 
@@ -31,6 +35,9 @@ namespace storage
 
         virtual bool
         deserialize_mc(const types::Bytes& bytes, types::MetaColumn& out) = 0;
+
+        virtual bool
+        deserialize_dp(const types::Bytes& bytes, types::DataPage& out) = 0;
     };
 }
 

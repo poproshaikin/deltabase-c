@@ -10,7 +10,13 @@ namespace types
 {
     struct DbConfig
     {
+        enum class IOSysType
+        {
+            File = 1,
+        };
+
         std::string default_schema = "common";
+        IOSysType io_system_type = IOSysType::File;
     };
 }
 

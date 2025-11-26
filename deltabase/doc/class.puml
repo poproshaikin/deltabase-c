@@ -24,7 +24,7 @@ package "Engine" {
     }
 
     StdDatabase ..|> IDatabase
-    Engine <.. IDatabase
+    Engine "1" o-- "1" IDatabase
 }
 
 package "Parser" {
@@ -150,21 +150,21 @@ package "Parser" {
             name : SqlToken
         }
 
-        SqlToken <-- SqlTokenType
-        AstNode <-- AstNodeValue
-        AstNodeValue *-- SqlToken
-        AstNodeValue *-- BinaryExpr
-        AstNodeValue *-- SelectStatement
-        AstNodeValue *-- InsertStatement
-        AstNodeValue *-- UpdateStatement
-        AstNodeValue *-- DeleteStatement
-        AstNodeValue *-- CreateTableStatement
-        AstNodeValue *-- CreateSchemaStatement
-        AstNodeValue *-- CreateDbStatement
-        AstNodeValue *-- ColumnDefinition
+        SqlToken "1" <-- "1" SqlTokenType
+        AstNode "1" <-- "1" AstNodeValue
+        AstNodeValue "1" *-- "0..*" SqlToken
+        AstNodeValue "1" *-- "0..1" BinaryExpr
+        AstNodeValue "1" *-- "0..1" SelectStatement
+        AstNodeValue "1" *-- "0..1" InsertStatement
+        AstNodeValue "1" *-- "0..1" UpdateStatement
+        AstNodeValue "1" *-- "0..1" DeleteStatement
+        AstNodeValue "1" *-- "0..1" CreateTableStatement
+        AstNodeValue "1" *-- "0..1" CreateSchemaStatement
+        AstNodeValue "1" *-- "0..1" CreateDbStatement
+        AstNodeValue "1" *-- "0..1" ColumnDefinition
     }
 
-    SqlParser <.. AST
+    SqlParser "1" <.. "1" AST
 }
 
 package "Planner" {
@@ -277,17 +277,17 @@ package "Planner" {
         UnaryPlanNode <|.. LimitPlanNode
         UnaryPlanNode <|.. ProjectPlanNode
 
-        Assignment *.. AssignColumn
-        Assignment *.. AssignLiteral
+        Assignment "1" *.. "1" AssignColumn
+        Assignment "1" *.. "1" AssignLiteral
 
-        UpdatePlanNode <.. Assignment
+        UpdatePlanNode "1" <.. "1..*" Assignment
 
-        QueryPlan <.. IPlanNode
-        IPlanNode <.. IPlanNode::Type
-        QueryPlan <.. QueryPlan::Type
+        QueryPlan "1" <.. "1" IPlanNode
+        IPlanNode "1" <.. "1" IPlanNode::Type
+        QueryPlan "1" <.. "1" QueryPlan::Type
     }
 
-    QueryPlanner <.. "PlanTree"
+    QueryPlanner "1" <.. "1" "PlanTree"
 }
 
 package "Executor" {
@@ -381,7 +381,7 @@ package "Executor" {
         IExecutor <|.. FilterExecutor
         IExecutor <|.. ValuesExecutor
     }
-    PlanExecutor <.. "ExecutorTree"
+    PlanExecutor "1" <.. "1" "ExecutorTree"
 }
 
 package "Storage" {
@@ -569,8 +569,8 @@ package "Storage" {
             column : MetaColumn
         }
 
-        MetaTable *-- MetaColumn
-        MetaIndex o-- MetaColumn
+        MetaTable "1" *-- "1..*" MetaColumn
+        MetaIndex "1" o-- "1" MetaColumn
     }
 
     package Data {
@@ -597,9 +597,9 @@ package "Storage" {
             rows: List<DataRow>
         }
 
-        DataRow o-- DataToken
-        DataPage o-- DataRow
-        DataTable o-- DataRow
+        DataRow "1" o-- "1..*" DataToken
+        DataPage "1" o-- "0..*" DataRow
+        DataTable "1" o-- "0..*" DataRow
     }
 
     class Transaction {
@@ -609,27 +609,24 @@ package "Storage" {
 
     IBinarySerializer <|.. StdBinarySerializer
     IIOManager <|.. FileIOManager
-    FileIOManager <.. IBinarySerializer
-    StdStorage <.. IIOManager
-    StdStorage <.. ICatalog
-    StdStorage <.. IDataBuffers
-    StdStorage <.. ICheckpointManager
-    StdStorage <.. IWalManager
+    FileIOManager "1" <.. "1" IBinarySerializer
+    StdStorage "1" <.. "1" IIOManager
+    StdStorage "1" <.. "1" ICatalog
+    StdStorage "1" <.. "1" IDataBuffers
+    StdStorage "1" <.. "1" ICheckpointManager
+    StdStorage "1" <.. "1" IWalManager
 
-    ICheckpointManager <.. ICatalog
-    ICheckpointManager <.. IDataBuffers
+    ICheckpointManager "1" <.. "1" ICatalog
+    ICheckpointManager "1" <.. "1" IDataBuffers
     ICheckpointManager <|.. StdCheckpointManager
     ICatalog <|.. StdCatalog
     IDataBuffers <|.. StdDataBuffers
     StdStorage ..|> IStorage
-    StdDataBuffers <.. Data
-    StdCatalog <.. Meta
-    IWalManager <.. WAL
 
 }
 
-Engine <.. Storage
-Engine <.. Executor
-Engine <.. Parser
-Engine <.. Planner
+Engine "1" --> "1" Storage
+Engine "1" --> "1" Executor
+Engine "1" --> "1" Parser
+Engine "1" --> "1" Planner
 @enduml

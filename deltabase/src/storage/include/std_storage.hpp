@@ -5,17 +5,24 @@
 #ifndef DELTABASE_STD_STORAGE_HPP
 #define DELTABASE_STD_STORAGE_HPP
 #include "catalog.hpp"
+#include "data_buffers.hpp"
 #include "io_manager.hpp"
 #include "storage.hpp"
+#include "../../types/include/db_cfg.hpp"
 
 namespace storage
 {
     class StdStorage final : public IStorage
     {
+        types::DbConfig cfg_;
         std::unique_ptr<IIOManager> io_manager_;
         std::unique_ptr<ICatalog> catalog_;
+        std::unique_ptr<IDataBuffers> buffers_;
 
     public:
+        explicit
+        StdStorage(const types::DbConfig& cfg);
+
         types::CatalogSnapshot
         get_catalog_snapshot() override;
 

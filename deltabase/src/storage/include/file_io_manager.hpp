@@ -50,10 +50,13 @@ namespace storage
         FileIOManager(std::unique_ptr<IBinarySerializer> serializer);
 
         std::vector<types::MetaTable>
-        load_tables() override;
+        load_tables_meta() override;
 
         std::vector<types::MetaSchema>
-        load_schemas() override;
+        load_schemas_meta() override;
+
+        std::vector<std::pair<types::Uuid, std::vector<types::DataPage>>>
+        load_tables_data() override;
     };
 }
 

@@ -1,20 +1,180 @@
 @startuml
-package "Storage"
-{
-class Database {
-    name : String
-}
+!pragma allowmixing
+!define ENTITY class
+!define VALUE_OBJECT class
+
+' Core Domain Entities
+
+package "Query Domain" {
+    ENTITY Query {
+        + text : String
+    }
+
+    VALUE_OBJECT QueryPlan {
+        + type : PlanType
+        + needs_stream : bool
+    }
+
+    VALUE_OBJECT ExecutionResult {
+        + rows : List<DataRow>
+        + affected_rows : int
+    }
+
+    Query --> QueryPlan : "produces"
+    QueryPlan --> ExecutionResult : "executes to"
 }
 
-package "Parser" {
+package "Schema Domain" {
+    ENTITY Database {
+        + name : String
+    }
+
+    ENTITY Schema {
+        + name : String
+        + db_name : String
+    }
+
+    ENTITY Table {
+        + name : String
+        + schema_name : String
+    }
+
+    ENTITY Column {
+        + name : String
+        + type : DataType
+    }
+
+    ENTITY Index {
+        + name : String
+    }
+
+    Database *-- "0..*" Schema : "contains"
+    Schema "1" *-- "0..*" Table : "contains"
+    Table "1" *-- "1..*" Column : "has"
+    Table "1" o-- "0..*" Index : "indexed by"
+    Index "1" --> "1" Column : "references"
 }
 
-package "QueryPlan" {
+package "Data Domain" {
+    VALUE_OBJECT DataToken {
+        + content : List<byte>
+        + type : DataType
+    }
+
+    VALUE_OBJECT DataRow {
+        + rowid : uint64_t
+    }
+
+    VALUE_OBJECT DataPage {
+        + id : uuid
+        + first_lsn : uint64_t
+        + last_lsn : uint64_t
+        + dirty : bool
+    }
+
+    VALUE_OBJECT DataTable {
+        + name : String
+    }
+
+    DataRow "1" *-- "1..*" DataToken : "contains"
+    DataPage "1" *-- "0..*" DataRow : "stores"
+    DataTable "1" *-- "0..*" DataRow : "contains"
+    
+    Table "1" --> "0..*" DataPage : "physically stored in"
+    Table "1" --> "1" DataTable : "logically represents"
 }
 
-package Wal {
+package "Transaction Domain" {
+    ENTITY Transaction {
+        + id : uuid
+        + status : TxnStatus
+    }
+
+    VALUE_OBJECT WalLog {
+        + lsn : uint64_t
+        + type : LogType
+    }
+
+    enum LogType {
+        Insert
+        Update
+        Delete
+        CreateTable
+    }
+
+    Transaction "1" *-- "0..*" WalLog : "generates"
+    WalLog --> LogType
 }
+
+package "AST Domain" {
+    VALUE_OBJECT AstNode {
+        + type : AstNodeType
+    }
+
+    VALUE_OBJECT SqlToken {
+        + value : String
+        + type : TokenType
+    }
+
+    VALUE_OBJECT BinaryExpr {
+        + operator : String
+    }
+
+    enum AstNodeType {
+        Select
+        Insert
+        Update
+        Delete
+        CreateTable
+        BinaryExpr
+        Literal
+    }
+
+    AstNode --> AstNodeType
+    AstNode "1" o-- "0..*" AstNode : "child nodes"
+    AstNode "1" *-- "0..*" SqlToken : "contains"
+    BinaryExpr "1" --> "2" AstNode : "left/right"
+}
+
+package "Execution Domain" {
+    VALUE_OBJECT PlanNode {
+        + type : PlanNodeType
+    }
+
+    enum PlanNodeType {
+        SeqScan
+        IndexScan
+        Filter
+        Project
+        Limit
+        Insert
+        Update
+        Delete
+    }
+
+    VALUE_OBJECT Executor {
+        + state : ExecutorState
+    }
+
+    PlanNode --> PlanNodeType
+    PlanNode "1" o-- "0..1" PlanNode : "child"
+    Executor "1" --> "1" PlanNode : "executes"
+}
+
+' Cross-domain relationships
+
+Query --> AstNode : "parsed to"
+AstNode --> QueryPlan : "analyzed to"
+QueryPlan "1" *-- "1" PlanNode : "root"
+
+Executor --> DataTable : "reads/writes"
+Executor --> Transaction : "within"
+
+WalLog --> DataRow : "records changes to"
+DataPage --> WalLog : "tracks via LSN"
+
+Table --> Column : "schema definition"
+DataRow --> Column : "values conform to"
+
 @enduml
-
-
 

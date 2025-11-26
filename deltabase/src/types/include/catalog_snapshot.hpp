@@ -6,7 +6,6 @@
 #define DELTABASE_CATALOG_SNAPSHOT_HPP
 #include "meta_table.hpp"
 #include "meta_schema.hpp"
-#include "std_catalog.hpp"
 #include "uuid.hpp"
 
 #include <unordered_map>
@@ -15,9 +14,23 @@ namespace types
 {
     struct CatalogSnapshot
     {
+        template <typename T>
+        struct Entry
+        {
+            uint64_t version;
+            T value;
+
+            Entry(T value) : version(last_version_++), value(value)
+            {
+            }
+
+        private:
+            static inline uint64_t last_version_ = 0;
+        };
+
         uint64_t version;
-        std::unordered_map<Uuid, MetaTable> tables;
-        std::unordered_map<Uuid, MetaSchema> schemas;
+        std::unordered_map<Uuid, Entry<MetaTable> > tables;
+        std::unordered_map<Uuid, Entry<MetaSchema> > schemas;
 
         CatalogSnapshot(
             const std::unordered_map<Uuid, MetaTable>& tables,

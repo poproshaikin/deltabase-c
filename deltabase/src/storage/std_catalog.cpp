@@ -56,6 +56,8 @@ namespace storage
     {
         if (stored_snapshot_ == actual_snapshot_)
             return;
+
+
     }
 
 }

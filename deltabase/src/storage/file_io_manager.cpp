@@ -124,7 +124,7 @@ namespace storage
     }
 
     std::vector<MetaSchema>
-    FileIOManager::load_schemas()
+    FileIOManager::load_schemas_meta()
     {
         std::vector<MetaSchema> schemas;
 
@@ -157,7 +157,7 @@ namespace storage
     }
 
     std::vector<MetaTable>
-    FileIOManager::load_tables()
+    FileIOManager::load_tables_meta()
     {
         std::vector<MetaTable> tables;
 
@@ -186,5 +186,38 @@ namespace storage
         });
 
         return tables;
+    }
+
+    std::vector<std::pair<Uuid, std::vector<DataPage> > >
+    FileIOManager::load_tables_data()
+    {
+        std::vector<std::pair<Uuid, std::vector<DataPage> > > tables;
+
+        for_each_table([&](const fs::directory_entry& table_dir)
+        {
+            std::string table_name = table_dir.path().filename();
+
+            MetaTable table;
+            std::vector<DataPage> data;
+
+            for (const auto& entry_in_table : fs::directory_iterator(table_dir.path()))
+            {
+                if (
+                    entry_in_table.is_directory() &&
+                    entry_in_table.path().filename().string() == PATH_DATA
+                )
+                {
+                    for (const auto& entry_in_data : fs::directory_iterator(entry_in_table.path()))
+                    {
+                        if (entry_in_data.is_directory())
+                            continue;
+
+                        DataPage page;
+                        if (!serializer_.deserialize_dp())
+                            throw std::runtime_error("FileIOManager::load_tables_data: failed to deserialize data page");
+                    }
+                }
+            }
+        });
     }
 }

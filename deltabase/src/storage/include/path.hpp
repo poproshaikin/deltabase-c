@@ -21,14 +21,14 @@ namespace storage
 {
     namespace fs = std::filesystem;
 
-    static const std::string data = "data";
-    static const std::string wal = "wal";
-    static const std::string meta = "meta";
+    static const std::string PATH_DATA = "data";
+    static const std::string PATH_WAL = "wal";
+    static const std::string PATH_META = "meta";
 
     inline fs::path
     path_db_wal(const fs::path& data_dir, const std::string& db_name)
     {
-        return data_dir / db_name / wal;
+        return data_dir / db_name / PATH_WAL;
     }
 
     inline fs::path
@@ -57,7 +57,7 @@ namespace storage
         const std::string& page_id
     )
     {
-        return data_dir / db_name / schema_name / table_name / data / page_id;
+        return data_dir / db_name / schema_name / table_name / PATH_DATA / page_id;
     }
 
     fs::path
@@ -101,7 +101,7 @@ namespace storage
     inline std::string
     make_meta_filename(const std::string& name)
     {
-        return name + "." + meta;
+        return name + "." + PATH_META;
     }
 } // namespace storage
 #endif //DELTABASE_PATH_HPP

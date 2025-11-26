@@ -8,7 +8,6 @@
 #include "../../types/include/data_row.hpp"
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/meta_table.hpp"
-#include "../../types/include/meta_schema.hpp"
 #include "../../types/include/query_plan.hpp"
 #include "../../types/include/transaction.hpp"
 
