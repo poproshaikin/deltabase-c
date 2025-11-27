@@ -18,8 +18,8 @@ namespace types
         Uuid schema_id;
         std::string name;
         std::vector<MetaColumn> columns;
-        uint64_t last_rid;
-        std::vector<std::string> pages_ids; // DO NOT SERIALIZE, RAM ONLY
+        RowId last_rid;
+        std::vector<Uuid> pages_ids; // DO NOT SERIALIZE, RAM ONLY
 
         MetaTable();
 

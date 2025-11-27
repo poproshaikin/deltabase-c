@@ -60,4 +60,9 @@ namespace storage
 
     }
 
+    void
+    StdCatalog::commit_snapshot(const types::CatalogSnapshot& snapshot)
+    {
+
+    }
 }

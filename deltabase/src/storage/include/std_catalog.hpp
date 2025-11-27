@@ -32,6 +32,9 @@ namespace storage
 
         void
         flush() override;
+
+        void
+        commit_snapshot(const types::CatalogSnapshot& snapshot) override;
     };
 }
 

@@ -18,7 +18,7 @@ namespace storage
     public:
         virtual ~IStorage() = default;
 
-        virtual types::CatalogSnapshot
+        virtual const types::CatalogSnapshot
         get_catalog_snapshot() = 0;
 
         virtual bool
@@ -31,7 +31,12 @@ namespace storage
         begin_txn() = 0;
 
         virtual uint64_t
-        insert_row(types::MetaTable& table, const types::DataRow& row, types::Transaction txn) = 0;
+        insert_row(
+            const std::string& table_name,
+            const std::string& schema_name,
+            types::DataRow& row,
+            types::Transaction txn
+        ) = 0;
 
         virtual void
         commit_txn(types::Transaction txn) = 0;

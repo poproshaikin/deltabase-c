@@ -8,15 +8,20 @@
 #include "meta_schema.hpp"
 #include "uuid.hpp"
 
+#include <cstring>
 #include <unordered_map>
 
 namespace types
 {
     struct CatalogSnapshot
     {
+        static inline uint64_t last_version_ = 0;
+
         template <typename T>
         struct Entry
         {
+            static inline uint64_t last_version_ = 0;
+
             uint64_t version;
             T value;
 
@@ -24,8 +29,6 @@ namespace types
             {
             }
 
-        private:
-            static inline uint64_t last_version_ = 0;
         };
 
         uint64_t version;
@@ -49,8 +52,6 @@ namespace types
         bool
         operator!=(const CatalogSnapshot& other) const;
 
-    private:
-        static inline uint64_t last_version_ = 0;
     };
 }
 

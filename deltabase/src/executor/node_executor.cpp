@@ -231,8 +231,6 @@ namespace exq
             return false;
 
         int inserted_count = 0;
-        auto catalog = storage_.get_catalog_snapshot();
-        auto table = catalog.get_table(table_name_, schema_name_);
         auto txn = storage_.begin_txn();
 
         while (true)
@@ -241,7 +239,7 @@ namespace exq
             if (!child_->next(row))
                 break;
 
-            storage_.insert_row(table, row, txn);
+            storage_.insert_row(, row, txn);
             inserted_count++;
         }
         storage_.commit_txn(txn);

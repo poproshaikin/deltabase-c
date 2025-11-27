@@ -35,7 +35,7 @@ namespace utils
         auto literal_type = sql_token.get_detail<SqlLiteral>();
 
         Bytes bytes;
-        auto val_type = ValueType::UNDEFINED;
+        auto val_type = DataType::UNDEFINED;
 
         switch (literal_type)
         {
@@ -43,36 +43,50 @@ namespace utils
         {
             int temp = std::stoi(sql_token.value);
             bytes = misc::convert(temp);
-            val_type = ValueType::INTEGER;
+            val_type = DataType::INTEGER;
             break;
         }
         case SqlLiteral::REAL:
         {
             double temp = std::stoi(sql_token.value);
             bytes = misc::convert(temp);
-            val_type = ValueType::REAL;
+            val_type = DataType::REAL;
             break;
         }
         case SqlLiteral::STRING:
         {
             bytes = misc::convert(sql_token.value);
-            val_type = ValueType::STRING;
+            val_type = DataType::STRING;
             break;
         }
         case SqlLiteral::BOOL:
         {
             bytes = misc::stob(sql_token.value);
-            val_type = ValueType::BOOL;
+            val_type = DataType::BOOL;
             break;
         }
         case SqlLiteral::CHAR:
+        {
             bytes = misc::convert(sql_token.value[0]);
-            val_type = ValueType::CHAR;
+            val_type = DataType::CHAR;
             break;
+        }
         default:
             throw std::invalid_argument("Cannot convert SQL token to a data token: invalid value type: " + sql_token.value);
         }
 
         return DataToken(bytes, val_type);
+    }
+
+    OutputSchema
+    convert(const MetaTable& meta)
+    {
+        OutputSchema schema;
+        schema.reserve(meta.columns.size());
+
+        for (const auto& column : meta.columns)
+            schema.emplace_back(column.name, column.type);
+
+        return schema;
     }
 }

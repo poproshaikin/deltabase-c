@@ -18,32 +18,41 @@ namespace storage
     void
     StdDataBuffers::init()
     {
-        std::vector<std::pair<Uuid, std::vector<DataPage> > > data = io_manager_.load_tables_data();
-
-        for (const auto& entry : data)
+        for (auto data = io_manager_.load_tables_data(); const auto& [fst, snd] : data)
         {
-            Uuid table_id = entry.first;
-            const std::vector<DataPage>& pages = entry.second;
+            const auto& table_id = fst;
+            const auto& pages = snd;
 
-            std::vector<Entry> entries;
-            entries.reserve(pages.size());
-
-            for (const auto& page : pages)
-            {
-                entries.emplace_back(Entry(page));
-            }
-
-            table_data_.emplace_back(table_id, entries);
+            pages_.emplace_back(table_id, pages);
         }
     }
 
-    StdDataBuffers::Entry
+    DataPage&
+    StdDataBuffers::create_page(const MetaTable& table)
+    {
+        DataPage page;
+        page.header.table_id = table.id;
+
+        pages_.push_back(std::move(page));
+        return pages_.back();
+    }
+
+    DataPage&
+    StdDataBuffers::get_available_page(const MetaTable& table, uint64_t size)
+    {
+        for (auto& page : pages_)
+            if (page.header.table_id == table.id && page.header.size + size <= DataPage::MAX_SIZE)
+                return page;
+
+        return create_page(table);
+    }
+
+    DataPage
     StdDataBuffers::get_page(Uuid page_id)
     {
-        for (const auto& table_entry : table_data_)
-            for (auto& page : table_entry.entries)
-                if (page.value.header.id == page_id)
-                    return page.value;
+        for (const auto& page : pages_)
+            if (page.header.table_id == page_id)
+                return page;
 
         throw std::runtime_error(
             "StdDataBuffers::get_page: page " + page_id.to_string() + " not found");
@@ -52,10 +61,24 @@ namespace storage
     std::vector<DataPage>
     StdDataBuffers::get_pages(const MetaTable& table)
     {
-        for (const auto& table_entry : table_data_)
-        {
-            if (table.id == table_entry.table_id)
-                return table_entry.entries;
-        }
+        std::vector<DataPage> pages;
+
+        for (const auto& page : pages_)
+            if (table.id == page.header.table_id)
+                pages.push_back(page);
+
+        return pages;
+    }
+
+    void
+    StdDataBuffers::insert_row(MetaTable& table, DataRow& row)
+    {
+        uint64_t size = row.estimate_size();
+
+        auto& page = get_available_page(table, size);
+        page.version += DataPage::last_version_++;
+        page.header.size += row.estimate_size();
+        page.header.max_rid += row.row_id += table.last_rid++;
+        page.rows.push_back(row);
     }
 }

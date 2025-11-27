@@ -21,6 +21,9 @@ namespace storage
 
         virtual void
         flush() = 0;
+
+        virtual void
+        commit_snapshot(const types::CatalogSnapshot& snapshot) = 0;
     };
 }
 

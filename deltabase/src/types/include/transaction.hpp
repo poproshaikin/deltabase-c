@@ -4,13 +4,13 @@
 
 #ifndef DELTABASE_TRANSACTION_HPP
 #define DELTABASE_TRANSACTION_HPP
-#include <string>
+#include "uuid.hpp"
 
 namespace types
 {
     struct Transaction
     {
-        std::string id;
+        Uuid id;
     };
 }
 

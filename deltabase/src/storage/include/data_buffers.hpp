@@ -21,6 +21,9 @@ namespace storage
 
         virtual std::vector<types::DataPage>
         get_pages(const types::MetaTable& table) = 0;
+
+        virtual void
+        insert_row(types::MetaTable &table, types::DataRow &row) = 0;
     };
 }
 

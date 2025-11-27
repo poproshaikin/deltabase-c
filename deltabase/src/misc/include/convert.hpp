@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_CONVERT_HPP
 #define DELTABASE_CONVERT_HPP
+#include "../../types/include/data_table.hpp"
 #include "../../types/include/data_token.hpp"
 
 #include <cstring>
@@ -27,6 +28,9 @@ namespace misc
 
     types::Bytes
     stob(const std::string& value);
+
+    types::OutputSchema
+    convert(const types::MetaTable& meta);
 }
 
 #endif //DELTABASE_CONVERT_HPP

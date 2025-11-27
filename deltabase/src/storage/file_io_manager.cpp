@@ -202,22 +202,38 @@ namespace storage
 
             for (const auto& entry_in_table : fs::directory_iterator(table_dir.path()))
             {
-                if (
-                    entry_in_table.is_directory() &&
-                    entry_in_table.path().filename().string() == PATH_DATA
-                )
+                if (entry_in_table.is_directory() &&
+                    entry_in_table.path().filename().string() == PATH_DATA)
                 {
                     for (const auto& entry_in_data : fs::directory_iterator(entry_in_table.path()))
                     {
                         if (entry_in_data.is_directory())
                             continue;
 
+                        auto content = read_file(entry_in_data.path());
+
                         DataPage page;
-                        if (!serializer_.deserialize_dp())
-                            throw std::runtime_error("FileIOManager::load_tables_data: failed to deserialize data page");
+                        if (!serializer_->deserialize_dp(content, page))
+                            throw std::runtime_error(
+                                "FileIOManager::load_tables_data: failed to deserialize data page");
+
+                        data.push_back(std::move(page));
                     }
                 }
+
+                if (entry_in_table.is_regular_file() &&
+                    entry_in_table.path().filename().string() == make_meta_filename(table_name))
+                {
+                    auto content = read_file(entry_in_table.path());
+
+                    if (!serializer_->deserialize_mt(content, table))
+                        throw std::runtime_error("FileIOManager::load_tables_data: failed to deserialize meta table");
+                }
             }
+
+            tables.emplace_back(std::make_pair(table.id, std::move(data)));
         });
+
+        return tables;
     }
 }
