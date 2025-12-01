@@ -24,6 +24,10 @@ namespace exq
             {
                 return execute_select(std::move(plan));
             }
+            if (plan.type == QueryPlan::Type::INSERT)
+            {
+                return execute_insert(std::move(plan));
+            }
         }
         catch (const std::exception& ex)
         {

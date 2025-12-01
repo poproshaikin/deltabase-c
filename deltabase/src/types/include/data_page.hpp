@@ -8,13 +8,14 @@
 #include "typedefs.hpp"
 #include "uuid.hpp"
 
+#include <filesystem>
+
 namespace types
 {
     struct DataPageHeader
     {
         Uuid id;
         Uuid table_id;
-        uint64_t size = 0;
         RowId min_rid = 0;
         RowId max_rid = 0;
         uint64_t rows_count = 0;
@@ -22,16 +23,15 @@ namespace types
 
     struct DataPage
     {
-        static inline uint64_t last_version_ = 0;
         static constexpr uint64_t MAX_SIZE = 1 * 1024 * 1024; // 1 MB
 
+        uint64_t size; // + do not serialize
+        fs::path path; // |
+
         DataPageHeader header;
-        uint64_t version;
         std::vector<DataRow> rows;
 
-        DataPage() : version(last_version_++)
-        {
-        }
+        DataPage() = default;
     };
 }
 

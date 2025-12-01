@@ -15,6 +15,12 @@ namespace sql
     {
     }
 
+    void
+    SqlParser::set_tokens(const std::vector<types::SqlToken>& tokens)
+    {
+        tokens_ = tokens;
+    }
+
     bool
     SqlParser::advance() noexcept
     {
@@ -86,6 +92,13 @@ namespace sql
         }
 
         throw std::runtime_error("Unsupported statement");
+    }
+
+    void
+    SqlParser::reset()
+    {
+        tokens_.clear();
+        current_ = 0;
     }
 
     SelectStatement

@@ -26,7 +26,9 @@ namespace types
             VALUES,
             SEQ_SCAN,
             UPDATE,
-            DELETE
+            DELETE,
+            CREATE_DB,
+            CREATE_TABLE
         };
 
         virtual Type
@@ -35,7 +37,8 @@ namespace types
 
     struct QueryPlan
     {
-        bool needs_stream = false;
+        bool needs_stream;
+        bool db_specific;
 
         enum class Type
         {
@@ -43,7 +46,8 @@ namespace types
             SELECT,
             INSERT,
             UPDATE,
-            DELETE
+            DELETE,
+            CREATE_DB
         };
 
         Type type = Type::UNDEFINED;
@@ -214,6 +218,28 @@ namespace types
         {
             return Type::DELETE;
         }
+    };
+
+    struct CreateDbPlanNode final : LeafPlanNode
+    {
+        std::string db_name;
+
+        explicit
+        CreateDbPlanNode(const std::string& db_name) : db_name(db_name)
+        {
+        }
+
+        Type
+        type() const override
+        {
+            return Type::CREATE_DB;
+        }
+    };
+
+    struct CreateTablePlanNode final : LeafPlanNode
+    {
+        std::string table_name;
+
     };
 }
 

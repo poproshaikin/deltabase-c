@@ -6,9 +6,11 @@
 #define DELTABASE_TYPEDEFS_HPP
 #include <cstdint>
 #include <vector>
+#include <filesystem>
 
 namespace types
 {
+    namespace fs = std::filesystem;
     using Bytes = std::vector<uint8_t>;
     using RowId = uint64_t;
 }

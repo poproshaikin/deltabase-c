@@ -41,13 +41,9 @@ namespace types
 
     struct DataRow
     {
-        // initialize only in the storage
-        RowId row_id;
+        RowId id;
         DataRowFlags flags;
         std::vector<DataToken> tokens;
-
-        uint64_t
-        estimate_size() const;
 
         DataRow
         update(const DataRowUpdate& update) const;

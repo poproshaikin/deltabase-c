@@ -5,15 +5,15 @@
 #ifndef DELTABASE_SIMPLE_PLANNER_HPP
 #define DELTABASE_SIMPLE_PLANNER_HPP
 #include "planner.hpp"
-#include "storage.hpp"
 #include "../../types/include/db_cfg.hpp"
+#include "../../storage/include/db_instance.hpp"
 
 namespace exq
 {
     class StdPlanner final : public IPlanner
     {
-        storage::IStorage& storage_;
-        const types::DbConfig& db_config_;
+        storage::IDbInstance& db_;
+        const types::Config& db_config_;
 
         types::QueryPlan
         plan_select(types::SelectStatement& stmt) const;
@@ -27,8 +27,12 @@ namespace exq
         types::QueryPlan
         plan_delete(types::DeleteStatement& stmt) const;
 
+        types::QueryPlan
+        plan_create_db(types::CreateDbStatement& stmt) const;
+
     public:
-        StdPlanner(const types::DbConfig& db_config, storage::IStorage& storage);
+        explicit
+        StdPlanner(const types::Config& db_config, storage::IDbInstance& db);
 
         types::QueryPlan
         plan(types::AstNode&& ast) override;

@@ -5,6 +5,7 @@
 #include "node_executor.hpp"
 
 #include "convert.hpp"
+#include "std_db_instance.hpp"
 
 #include <algorithm>
 
@@ -13,18 +14,18 @@ namespace exq
     using namespace types;
 
     SeqScanNodeExecutor::SeqScanNodeExecutor(
-        storage::IStorage& storage,
+        storage::IDbInstance& storage,
         const std::string& table_name,
         const std::string& schema_name
     )
-        : table_name_(table_name), schema_name_(schema_name), storage_(storage)
+        : table_name_(table_name), schema_name_(schema_name), db_(storage)
     {
     }
 
     void
     SeqScanNodeExecutor::open()
     {
-        table_ = storage_.seq_scan(table_name_, schema_name_);
+        table_ = db_.seq_scan(table_name_, schema_name_);
     }
 
     bool
@@ -45,8 +46,7 @@ namespace exq
     OutputSchema
     SeqScanNodeExecutor::output_schema()
     {
-        CatalogSnapshot catalog = storage_.get_catalog_snapshot();
-        MetaTable mt = catalog.get_table(table_name_, schema_name_);
+        MetaTable mt = db_.get_table(table_name_, schema_name_);
 
         OutputSchema output_schema;
         output_schema.reserve(mt.columns.size());
@@ -208,11 +208,11 @@ namespace exq
     InsertNodeExecutor::InsertNodeExecutor(
         const std::string& table_name,
         const std::string& schema_name,
-        storage::IStorage& storage,
+        storage::IDbInstance& storage,
         std::unique_ptr<INodeExecutor> child)
         : table_name_(table_name),
           schema_name_(schema_name),
-          storage_(storage),
+          db_(storage),
           child_(std::move(child)),
           executed_(false)
     {
@@ -231,7 +231,6 @@ namespace exq
             return false;
 
         int inserted_count = 0;
-        auto txn = storage_.begin_txn();
 
         while (true)
         {
@@ -239,10 +238,9 @@ namespace exq
             if (!child_->next(row))
                 break;
 
-            storage_.insert_row(, row, txn);
+            db_.insert_row(table_name_, schema_name_, row.tokens);
             inserted_count++;
         }
-        storage_.commit_txn(txn);
 
         DataToken affected_rows_count(misc::convert(inserted_count), DataType::INTEGER);
         out.tokens = {affected_rows_count};
@@ -261,7 +259,7 @@ namespace exq
         return {(OutputColumn){.name = "affected_rows", .type = DataType::INTEGER}};
     }
 
-    NodeExecutorFactory::NodeExecutorFactory(storage::IStorage& storage) : storage_(storage)
+    NodeExecutorFactory::NodeExecutorFactory(storage::IDbInstance& db) : db_(db)
     {
     }
 
@@ -274,7 +272,7 @@ namespace exq
         {
             const auto& seq_scan_node = static_cast<const SeqScanPlanNode&>(*node);
             SeqScanNodeExecutor executor(
-                storage_,
+                db_,
                 seq_scan_node.table_name,
                 seq_scan_node.schema_name
             );
@@ -314,13 +312,16 @@ namespace exq
             InsertNodeExecutor executor(
                 insert_node.table_name,
                 insert_node.schema_name,
-                storage_,
+                db_,
                 from_plan(std::move(insert_node.child))
             );
             return std::make_unique<InsertNodeExecutor>(std::move(executor));
         }
         default:
-            throw std::runtime_error("NodeExecutorFactory::from_plan");
+            throw std::runtime_error(
+                "NodeExecutorFactory::from_plan: failed to create executor tree for plan node of type "
+                + std::to_string(static_cast<int>(node->type()))
+            );
         }
     }
 

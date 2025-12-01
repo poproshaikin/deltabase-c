@@ -4,14 +4,18 @@
 
 #include "memory_stream.hpp"
 
+#include "../types/include/typedefs.hpp"
+
+#include <cstring>
+
 namespace misc
 {
-    MemoryStream::MemoryStream(std::vector<uint8_t>& buffer) : buffer_(buffer), position_(0)
+    MemoryStream::MemoryStream(const types::Bytes& buffer) : buffer_(buffer)
     {
     }
 
     size_t
-    MemoryStream::read(void* dest, size_t count) const
+    MemoryStream::read(void* dest, size_t count)
     {
         if (position_ + count > buffer_.size())
             count = buffer_.size() - position_;
@@ -22,17 +26,39 @@ namespace misc
     }
 
     void
-    MemoryStream::write(const void* src, size_t count) const
+    MemoryStream::write(const void* src, size_t count)
     {
         if (position_ + count > buffer_.size())
             buffer_.resize(position_ + count);
 
-        std::memcpy(buffer_.data() + position_, src, count);
+        std::memcpy(
+            buffer_.data() + position_,
+            src,
+            count
+        );
         position_ += count;
     }
 
     void
-    MemoryStream::seek(size_t pos) const
+    MemoryStream::append(MemoryStream& other, size_t count)
+    {
+        buffer_.insert(buffer_.end(), other.buffer_.begin(), other.buffer_.end());
+    }
+
+    const uint8_t*
+    MemoryStream::data() const noexcept
+    {
+        return buffer_.data();
+    }
+
+    uint8_t*
+    MemoryStream::data() noexcept
+    {
+        return buffer_.data();
+    }
+
+    void
+    MemoryStream::seek(size_t pos)
     {
         if (pos > buffer_.size())
             throw std::out_of_range("seek past end");
@@ -46,13 +72,25 @@ namespace misc
         return position_;
     }
 
+    types::Bytes
+    MemoryStream::to_vector() const
+    {
+        return buffer_;
+    }
+
+    size_t
+    MemoryStream::size() const
+    {
+        return buffer_.size();
+    }
+
     ReadOnlyMemoryStream::ReadOnlyMemoryStream(
-        const std::vector<uint8_t>& buffer) : buffer_(buffer), position_(0)
+        const std::vector<uint8_t>& buffer) : buffer_(buffer)
     {
     }
 
     uint64_t
-    ReadOnlyMemoryStream::read(void* dest, uint64_t count) const
+    ReadOnlyMemoryStream::read(void* dest, uint64_t count)
     {
         if (position_ + count > buffer_.size())
             count = buffer_.size() - position_;
@@ -63,7 +101,7 @@ namespace misc
     }
 
     uint64_t
-    ReadOnlyMemoryStream::read(std::string& out) const
+    ReadOnlyMemoryStream::read(std::string& out)
     {
         uint64_t len = 0;
         if (read(&len, sizeof(uint64_t)) != sizeof(uint64_t))
@@ -77,7 +115,7 @@ namespace misc
     }
 
     void
-    ReadOnlyMemoryStream::seek(size_t pos) const
+    ReadOnlyMemoryStream::seek(size_t pos)
     {
         if (pos > buffer_.size())
             throw std::out_of_range("seek past end");
@@ -101,5 +139,17 @@ namespace misc
     ReadOnlyMemoryStream::remaining() const
     {
         return buffer_.size() - position_;
+    }
+
+    std::vector<uint8_t>
+    ReadOnlyMemoryStream::to_vector() const
+    {
+        return buffer_;
+    }
+
+    const uint8_t*
+    ReadOnlyMemoryStream::current() const noexcept
+    {
+        return buffer_.data() + position_;
     }
 }

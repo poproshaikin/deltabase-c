@@ -4,52 +4,69 @@
 
 #ifndef DELTABASE_MEMORY_STREAM_HPP
 #define DELTABASE_MEMORY_STREAM_HPP
+#include "../../types/include/typedefs.hpp"
+
 #include <cstdint>
-#include <cstring>
-#include <stdexcept>
 #include <vector>
 
 namespace misc
 {
     class MemoryStream
     {
-        std::vector<uint8_t>& buffer_;
-        mutable size_t position_;
+        std::vector<uint8_t> buffer_;
+        size_t position_ = 0;
 
     public:
+        MemoryStream() = default;
+
         explicit
-        MemoryStream(std::vector<uint8_t>& buffer);
+        MemoryStream(const std::vector<uint8_t>& buffer);
 
         size_t
-        read(void* dest, size_t count) const;
+        read(void* dest, size_t count);
 
         void
-        write(const void* src, size_t count) const;
+        write(const void* src, size_t count);
 
         void
-        seek(size_t pos) const;
+        append(MemoryStream& other, size_t count);
+
+        const uint8_t*
+        data() const noexcept;
+
+        uint8_t*
+        data() noexcept;
+
+        void
+        seek(size_t pos);
 
         size_t
         tell() const;
+
+        types::Bytes
+        to_vector() const;
+
+        size_t
+        size() const;
     };
 
     class ReadOnlyMemoryStream
     {
-        const std::vector<uint8_t>& buffer_;
-        mutable uint64_t position_;
+        const std::vector<uint8_t> buffer_;
+        uint64_t position_ = 0;
 
     public:
         explicit
         ReadOnlyMemoryStream(const std::vector<uint8_t>& buffer);
 
         uint64_t
-        read(void* dest, uint64_t count) const;
+        read(void* dest, uint64_t count);
 
         uint64_t
-        read(std::string& out) const;
+        read(std::string& out);
 
         void
-        seek(size_t pos) const;
+        seek(size_t pos);
 
         uint64_t
         tell() const;
@@ -59,6 +76,12 @@ namespace misc
 
         size_t
         remaining() const;
+
+        std::vector<uint8_t>
+        to_vector() const;
+
+        const uint8_t*
+        current() const noexcept;
     };
 }
 

@@ -8,15 +8,36 @@
 
 namespace types
 {
-    struct DbConfig
+    struct Config
     {
-        enum class IOSysType
+        enum class IoType
         {
             File = 1,
         };
 
+        enum class PlannerType
+        {
+            Std = 1
+        };
+
+        enum class SerializerType
+        {
+            Std = 1
+        };
+
+        std::string name;
         std::string default_schema = "common";
-        IOSysType io_system_type = IOSysType::File;
+
+        std::filesystem::path db_path;
+
+        IoType io_type = IoType::File;
+        PlannerType planner_type = PlannerType::Std;
+        SerializerType serializer_type = SerializerType::Std;
+
+        Config() = default;
+        Config(const std::string& name) : name(name)
+        {
+        }
     };
 }
 

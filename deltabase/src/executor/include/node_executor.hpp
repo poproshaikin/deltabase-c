@@ -5,10 +5,10 @@
 #ifndef DELTABASE_NODE_EXECUTOR_HPP
 #define DELTABASE_NODE_EXECUTOR_HPP
 #include "evaluator.hpp"
-#include "storage.hpp"
 #include "../../types/include/data_row.hpp"
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/query_plan.hpp"
+#include "../../storage/include/db_instance.hpp"
 
 namespace exq
 {
@@ -28,21 +28,21 @@ namespace exq
         close() = 0;
 
         virtual types::OutputSchema
-        output_schema();
+        output_schema() = 0;
     };
 
     class SeqScanNodeExecutor final : public INodeExecutor
     {
         std::string table_name_;
         std::string schema_name_;
-        storage::IStorage& storage_;
+        storage::IDbInstance& db_;
         types::DataTable table_;
         uint64_t index_ = 0;
 
     public:
         explicit
         SeqScanNodeExecutor(
-            storage::IStorage& storage,
+            storage::IDbInstance& storage,
             const std::string& table_name,
             const std::string& schema_name
         );
@@ -143,7 +143,7 @@ namespace exq
     {
         std::string table_name_;
         std::string schema_name_;
-        storage::IStorage& storage_;
+        storage::IDbInstance& db_;
         std::unique_ptr<INodeExecutor> child_;
         bool executed_;
 
@@ -152,7 +152,7 @@ namespace exq
         InsertNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
-            storage::IStorage& storage,
+            storage::IDbInstance& storage,
             std::unique_ptr<INodeExecutor> child
         );
 
@@ -171,11 +171,11 @@ namespace exq
 
     class NodeExecutorFactory
     {
-        storage::IStorage& storage_;
+        storage::IDbInstance& db_;
 
     public:
         explicit
-        NodeExecutorFactory(storage::IStorage& storage);
+        NodeExecutorFactory(storage::IDbInstance& db);
 
         std::unique_ptr<INodeExecutor>
         from_plan(std::unique_ptr<types::IPlanNode>&& node);

@@ -13,8 +13,8 @@ namespace exq
 {
     using namespace types;
 
-    StdPlanner::StdPlanner(const DbConfig& db_config, storage::IStorage& storage)
-        : storage_(storage), db_config_(db_config)
+    StdPlanner::StdPlanner(const Config& db_config, storage::IDbInstance& db)
+        : db_(db), db_config_(db_config)
     {
     }
 
@@ -38,6 +38,10 @@ namespace exq
             if (ast.type == AstNodeType::DELETE)
             {
                 return plan_delete(std::get<DeleteStatement>(ast.value));
+            }
+            if (ast.type == AstNodeType::CREATE_DATABASE)
+            {
+                return plan_create_db(std::get<CreateDbStatement>(ast.value));
             }
         }
         catch (std::exception ex)
@@ -70,7 +74,7 @@ namespace exq
         if (stmt.where)
         {
             auto filter = std::make_unique<FilterPlanNode>(
-                storage_.get_table(stmt.table),
+                db_.get_table(stmt.table),
                 std::move(*stmt.where),
                 std::move(node)
             );
@@ -85,7 +89,7 @@ namespace exq
                 cols.push_back(c.value);
 
             auto project = std::make_unique<ProjectPlanNode>(
-                storage_.get_table(stmt.table),
+                db_.get_table(stmt.table),
                 cols,
                 std::move(node)
             );
@@ -101,8 +105,9 @@ namespace exq
 
         QueryPlan plan;
         plan.type = QueryPlan::Type::SELECT;
-        plan.needs_stream = storage_.needs_stream(*node);
+        plan.needs_stream = db_.needs_stream(*node);
         plan.root = std::move(node);
+        plan.db_specific = true;
         return plan;
     }
 
@@ -137,6 +142,7 @@ namespace exq
         plan.root = std::move(insert);
         plan.type = QueryPlan::Type::INSERT;
         plan.needs_stream = false;
+        plan.db_specific = true;
 
         return plan;
     }
@@ -144,7 +150,7 @@ namespace exq
     QueryPlan
     StdPlanner::plan_update(UpdateStatement& stmt) const
     {
-        const auto table = storage_.get_table(stmt.table);
+        const auto table = db_.get_table(stmt.table);
 
         std::vector<Assignment> assignments;
         for (const auto& assignment : stmt.assignments)
@@ -178,7 +184,7 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                storage_.get_table(stmt.table),
+                db_.get_table(stmt.table),
                 std::move(*stmt.where),
                 std::move(root));
         }
@@ -191,6 +197,7 @@ namespace exq
         plan.root = std::move(update);
         plan.type = QueryPlan::Type::UPDATE;
         plan.needs_stream = false;
+        plan.db_specific = true;
 
         return plan;
     }
@@ -209,7 +216,7 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                storage_.get_table(stmt.table),
+                db_.get_table(stmt.table),
                 std::move(*stmt.where),
                 std::move(root));
         }
@@ -220,7 +227,22 @@ namespace exq
         plan.root = std::move(del);
         plan.type = QueryPlan::Type::DELETE;
         plan.needs_stream = false;
+        plan.db_specific = true;
 
+        return plan;
+    }
+
+    QueryPlan
+    StdPlanner::plan_create_db(CreateDbStatement& stmt) const
+    {
+        std::unique_ptr<IPlanNode> root =
+            std::make_unique<CreateDbPlanNode>(stmt.name);
+
+        QueryPlan plan;
+        plan.root = std::move(root);
+        plan.type = QueryPlan::Type::CREATE_DB;
+        plan.needs_stream = false;
+        plan.db_specific = false;
         return plan;
     }
 }

@@ -25,6 +25,18 @@ namespace storage
     static const std::string PATH_WAL = "wal";
     static const std::string PATH_META = "meta";
 
+    inline std::string
+    make_meta_filename(const std::string& name)
+    {
+        return name + "." + PATH_META;
+    }
+
+    inline fs::path
+    path_db_meta(const fs::path& db_path, const std::string& db_name)
+    {
+        return db_path / db_name / make_meta_filename(db_name);
+    }
+
     inline fs::path
     path_db_wal(const fs::path& data_dir, const std::string& db_name)
     {
@@ -98,10 +110,5 @@ namespace storage
         const std::string& schema_name
     );
 
-    inline std::string
-    make_meta_filename(const std::string& name)
-    {
-        return name + "." + PATH_META;
-    }
 } // namespace storage
 #endif //DELTABASE_PATH_HPP

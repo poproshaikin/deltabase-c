@@ -98,11 +98,19 @@ namespace sql
         parse_table_identifier();
 
     public:
+        SqlParser() = default;
+
         explicit
         SqlParser(std::vector<types::SqlToken> tokens);
 
+        void
+        set_tokens(const std::vector<types::SqlToken>& tokens);
+
         types::AstNode
         parse();
+
+        void
+        reset();
     };
 }
 

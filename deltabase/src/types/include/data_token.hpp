@@ -16,24 +16,25 @@
 namespace types
 {
     template <typename T>
-    concept AllowedDataTypes_c = std::same_as<T, int> ||
-                                 std::same_as<T, double> ||
-                                 std::same_as<T, std::string> ||
-                                 std::same_as<T, bool> ||
-                                 std::same_as<T, char>;
+    concept AllowedDataTypes_c =
+        std::same_as<T, int> ||
+        std::same_as<T, double> ||
+        std::same_as<T, std::string> ||
+        std::same_as<T, bool> ||
+        std::same_as<T, char>;
 
     struct DataToken
     {
         Bytes bytes;
         DataType type;
 
+        DataToken() = default;
+
         explicit
         DataToken(const SqlToken& sql_token);
+
         explicit
         DataToken(const Bytes& bytes, DataType type);
-
-        uint64_t
-        estimate_size() const;
 
         template <AllowedDataTypes_c T>
         T
@@ -75,9 +76,6 @@ namespace types
                 return std::string(bytes.begin(), bytes.end());
             }
         }
-
-        Bytes
-        serialize() const;
     };
 
 }

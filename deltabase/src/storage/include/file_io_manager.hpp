@@ -6,6 +6,7 @@
 #define DELTABASE_FILEIOMANAGER_HPP
 #include "binary_serializer.hpp"
 #include "io_manager.hpp"
+#include "../../types/include/db_cfg.hpp"
 
 #include <filesystem>
 #include <functional>
@@ -22,6 +23,9 @@ namespace storage
 
         types::Bytes
         read_file(const fs::path& path) const;
+
+        void
+        write_file(const fs::path& path, const types::Bytes& content) const;
 
         void
         for_each_in_db(const std::function<void(fs::directory_entry)>& func) const;
@@ -45,9 +49,19 @@ namespace storage
             const std::function<void(fs::directory_entry)>& func
         ) const;
 
+        void
+        for_each_in_table_data(
+            const std::string& schema_name,
+            const std::string& table_name,
+            const std::function<void(fs::directory_entry)>& func
+        ) const;
+
     public:
         explicit
-        FileIOManager(std::unique_ptr<IBinarySerializer> serializer);
+        FileIOManager(const fs::path& db_path, types::Config::SerializerType serializer_type);
+
+        void
+        init() override;
 
         std::vector<types::MetaTable>
         load_tables_meta() override;
@@ -55,8 +69,29 @@ namespace storage
         std::vector<types::MetaSchema>
         load_schemas_meta() override;
 
-        std::vector<std::pair<types::Uuid, std::vector<types::DataPage>>>
+        std::vector<std::pair<types::Uuid, std::vector<types::DataPage> > >
         load_tables_data() override;
+
+        types::MetaTable
+        load_table_meta(const std::string& table_name, const std::string& schema_name) override;
+
+        std::vector<types::DataPage>
+        load_table_data(const std::string& table_name, const std::string& schema_name) override;
+
+        void
+        write_page(const types::DataPage& page) override;
+
+        uint64_t
+        estimate_size(const types::DataRow& row) override;
+
+        constexpr uint64_t
+        max_dp_size() override;
+
+        void
+        write_mt(const types::MetaTable& table, const std::string& schema_name) override;
+
+        void
+        write_cfg(const types::Config& db) override;
     };
 }
 
