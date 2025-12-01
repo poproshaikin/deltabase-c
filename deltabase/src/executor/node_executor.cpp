@@ -259,12 +259,8 @@ namespace exq
         return {(OutputColumn){.name = "affected_rows", .type = DataType::INTEGER}};
     }
 
-    NodeExecutorFactory::NodeExecutorFactory(storage::IDbInstance& db) : db_(db)
-    {
-    }
-
     std::unique_ptr<INodeExecutor>
-    NodeExecutorFactory::from_plan(std::unique_ptr<IPlanNode>&& node)
+    NodeExecutorFactory::from_plan(std::unique_ptr<IPlanNode>&& node, storage::IDbInstance& db)
     {
         switch (node->type())
         {
@@ -272,7 +268,7 @@ namespace exq
         {
             const auto& seq_scan_node = static_cast<const SeqScanPlanNode&>(*node);
             SeqScanNodeExecutor executor(
-                db_,
+                db,
                 seq_scan_node.table_name,
                 seq_scan_node.schema_name
             );
@@ -285,7 +281,7 @@ namespace exq
             FilterNodeExecutor executor(
                 filter_node.table,
                 std::move(filter_node.where),
-                from_plan(std::move(filter_node.child))
+                from_plan(std::move(filter_node.child), db)
             );
 
             return std::make_unique<FilterNodeExecutor>(std::move(executor));
@@ -296,14 +292,14 @@ namespace exq
             ProjectionNodeExecutor executor(
                 project_node.table,
                 project_node.columns,
-                from_plan(std::move(project_node.child))
+                from_plan(std::move(project_node.child), db)
             );
             return std::make_unique<ProjectionNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::LIMIT:
         {
             auto& limit_node = static_cast<LimitPlanNode&>(*node);
-            LimitNodeExecutor executor(limit_node.limit, from_plan(std::move(limit_node.child)));
+            LimitNodeExecutor executor(limit_node.limit, from_plan(std::move(limit_node.child), db));
             return std::make_unique<LimitNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::INSERT:
@@ -312,8 +308,8 @@ namespace exq
             InsertNodeExecutor executor(
                 insert_node.table_name,
                 insert_node.schema_name,
-                db_,
-                from_plan(std::move(insert_node.child))
+                db,
+                from_plan(std::move(insert_node.child), db)
             );
             return std::make_unique<InsertNodeExecutor>(std::move(executor));
         }

@@ -28,6 +28,13 @@ namespace types
         bool
         next(DataRow& out) override;
     };
+
+    class EmptyExecutionResult final : public IExecutionResult
+    {
+    public:
+        bool
+        next(DataRow& out) override;
+    };
 }
 
 #endif //DELTABASE_EXECUTION_RESULT_HPP

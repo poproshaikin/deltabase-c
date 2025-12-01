@@ -6,7 +6,7 @@
 #define DELTABASE_STORAGE_HPP
 #include "../../types/include/data_row.hpp"
 #include "../../types/include/data_table.hpp"
-#include "../../types/include/db_cfg.hpp"
+#include "../../types/include/config.hpp"
 #include "../../types/include/query_plan.hpp"
 
 namespace storage

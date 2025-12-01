@@ -171,14 +171,9 @@ namespace exq
 
     class NodeExecutorFactory
     {
-        storage::IDbInstance& db_;
-
     public:
-        explicit
-        NodeExecutorFactory(storage::IDbInstance& db);
-
         std::unique_ptr<INodeExecutor>
-        from_plan(std::unique_ptr<types::IPlanNode>&& node);
+        from_plan(std::unique_ptr<types::IPlanNode>&& node, storage::IDbInstance& db);
     };
 }
 

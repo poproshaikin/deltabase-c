@@ -9,7 +9,6 @@
 #include <fstream>
 
 #include "../misc/include/memory_stream.hpp"
-#include "../executor/include/std_planner.hpp"
 #include "../storage/include/std_db_instance.hpp"
 #include "../storage/include/std_binary_serializer.hpp"
 #include "../storage/include/path.hpp"
@@ -45,51 +44,75 @@ namespace engine
         return cfg;
     }
 
-
     void
-    Engine::init(const Config& cfg)
+    Engine::init_db(std::unique_ptr<IDbInstance> db)
     {
-        db_ = std::make_unique<StdDbInstance>(cfg);
-        executor_factory_ = exq::NodeExecutorFactory();
+        if (!db)
+            throw std::runtime_error("Engine::init_db: db cannot be null");
 
-        init_planner(cfg.planner_type);
+        if (db_)
+        {
+            planner_.reset();
+            db_.reset();
+        }
+
+        db_ = std::move(db);
+        planner_ = planner_factory_.make_planner(db_->get_config(), *db_);
     }
 
-    void
-    Engine::init_planner(Config::PlannerType planner_type)
+    std::unique_ptr<IExecutionResult>
+    Engine::execute_generic(QueryPlan&& plan)
     {
-        assert(db_ != nullptr);
-
-        switch (planner_type)
+        switch (plan.type)
         {
-        case Config::PlannerType::Std:
-            planner_ = std::make_unique<exq::StdPlanner>(exq::StdPlanner(db_->get_config(), *db_));
-            break;
+        case QueryPlan::Type::CREATE_DB:
+        {
+            const auto& create_db_node = static_cast<const CreateDbPlanNode&>(*plan.root);
+            create_db(Config(create_db_node.db_name));
+            return std::make_unique<EmptyExecutionResult>();
+        }
         default:
             throw std::runtime_error(
-                "Engine::Engine: unknown planner type: " + std::to_string(
-                    static_cast<int>(db_->get_config().planner_type)));
+                "Engine::execute_generic: unknown generic query " + std::to_string(
+                    static_cast<int>(plan.type)
+                )
+            );
         }
     }
 
-    Engine::Engine(const Config& cfg) : parser_()
+    Engine::Engine()
+        : parser_(),
+          planner_(nullptr),
+          db_(nullptr),
+          executor_factory_(),
+          planner_factory_()
     {
-        init(cfg);
     }
 
     void
     Engine::attach_db(const std::string& db_name)
     {
         std::filesystem::path current_path = std::filesystem::current_path();
-        init(load_config(db_name, current_path));
+
+        auto cfg = load_config(db_name, current_path);
+        auto db = std::make_unique<StdDbInstance>(cfg);
+        init_db(std::move(db));
     }
 
     void
     Engine::create_db(const Config& config)
     {
-        db_ = std::make_unique<StdDbInstance>(config);
-        init_planner(config.planner_type);
+        auto db = std::make_unique<StdDbInstance>(config);
+        init_db(std::move(db));
     }
+
+    void
+    Engine::detach_db()
+    {
+        planner_.reset();
+        db_.reset();
+    }
+
 
     std::unique_ptr<IExecutionResult>
     Engine::execute_query(const std::string& query)
@@ -104,9 +127,16 @@ namespace engine
         if (!plan.db_specific)
             return execute_generic(std::move(plan));
 
-        auto executor = executor_factory_.from_plan(std::move(plan.root));
+        auto executor = executor_factory_.from_plan(std::move(plan.root), *db_);
 
-        DataTable table;
-        while ()
+        DataTable result_table;
+        DataRow row;
+
+        executor->open();
+        while (executor->next(row))
+            result_table.rows.push_back(row);
+        executor->close();
+
+        return std::make_unique<MaterializedResult>(std::move(result_table));
     }
 }

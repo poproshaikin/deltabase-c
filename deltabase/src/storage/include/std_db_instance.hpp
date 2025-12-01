@@ -7,7 +7,7 @@
 
 #include "db_instance.hpp"
 #include "io_manager.hpp"
-#include "../../types/include/db_cfg.hpp"
+#include "../../types/include/config.hpp"
 
 namespace storage
 {

@@ -20,4 +20,10 @@ namespace types
         out = table_.rows[current_];
         return true;
     }
+
+    bool
+    EmptyExecutionResult::next(DataRow& out)
+    {
+        return false;
+    }
 }

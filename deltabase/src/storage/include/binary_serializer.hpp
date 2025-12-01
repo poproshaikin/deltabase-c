@@ -8,7 +8,7 @@
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/meta_table.hpp"
 #include "../../types/include/data_page.hpp"
-#include "../../types/include/db_cfg.hpp"
+#include "../../types/include/config.hpp"
 
 namespace storage
 {

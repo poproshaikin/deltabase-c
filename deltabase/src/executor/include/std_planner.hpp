@@ -5,7 +5,7 @@
 #ifndef DELTABASE_SIMPLE_PLANNER_HPP
 #define DELTABASE_SIMPLE_PLANNER_HPP
 #include "planner.hpp"
-#include "../../types/include/db_cfg.hpp"
+#include "../../types/include/config.hpp"
 #include "../../storage/include/db_instance.hpp"
 
 namespace exq
