@@ -5,7 +5,7 @@
 #ifndef DELTABASE_SEMANTIC_ANALYZER_HPP
 #define DELTABASE_SEMANTIC_ANALYZER_HPP
 #include "analysis_result.hpp"
-#include "db_instance.hpp"
+#include "../../storage/include/db_instance.hpp"
 
 namespace exq
 {

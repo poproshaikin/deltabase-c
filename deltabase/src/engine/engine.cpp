@@ -60,7 +60,7 @@ namespace engine
 
         db_ = std::move(db);
         planner_ = planner_factory_.make_planner(db_->get_config(), *db_);
-        analyzer_ = std::make_unique<exq::SemanticAnalyzer>(*db_);
+        analyzer_ = std::make_unique<exq::SemanticAnalyzer>(db_->get_config(), *db_);
     }
 
     std::unique_ptr<IExecutionResult>

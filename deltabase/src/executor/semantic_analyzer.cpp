@@ -4,7 +4,7 @@
 
 #include "semantic_analyzer.hpp"
 
-#include "exceptions.hpp"
+#include "../misc/include/exceptions.hpp"
 
 #include <format>
 
