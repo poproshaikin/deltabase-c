@@ -4,7 +4,7 @@
 
 #ifndef DELTABASE_BINARY_SERIALIZER_HPP
 #define DELTABASE_BINARY_SERIALIZER_HPP
-#include "memory_stream.hpp"
+#include "../../misc/include/memory_stream.hpp"
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/meta_table.hpp"
 #include "../../types/include/data_page.hpp"
@@ -64,6 +64,12 @@ namespace storage
 
         virtual bool
         deserialize_dt(misc::ReadOnlyMemoryStream& content, types::DataToken& out) = 0;
+
+        virtual uint64_t
+        estimate_size(const types::DataRow& row) = 0;
+
+        virtual uint64_t
+        estimate_size(const types::DataToken& token) = 0;
     };
 }
 

@@ -72,43 +72,58 @@ namespace storage
         return data_dir / db_name / schema_name / table_name / PATH_DATA / page_id;
     }
 
-    fs::path
+    inline fs::path
     path_db_schema_table(
         const fs::path& data_dir,
         const std::string& db_name,
         const std::string& schema_name,
         const std::string& table_name
-    );
+    )
+    {
+        return data_dir / db_name / schema_name / table_name;
+    }
 
-    fs::path
+    inline fs::path
     path_db_schema_table_data(
         const fs::path& data_dir,
         const std::string& db_name,
         const std::string& schema_name,
         const std::string& table_name
-    );
+    )
+    {
+        return data_dir / db_name / schema_name / table_name / PATH_DATA;
+    }
 
-    fs::path
+    inline fs::path
     path_db_schema_table_meta(
         const fs::path& data_dir,
         const std::string& db_name,
         const std::string& schema_name,
         const std::string& table_name
-    );
+    )
+    {
+        return data_dir / db_name / schema_name / table_name / make_meta_filename(table_name);
+    }
 
-    fs::path
+    inline fs::path
     path_db_schema(
         const fs::path& data_dir,
         const std::string& db_name,
         const std::string& schema_name
-    );
+    )
+    {
+        return data_dir / db_name / schema_name;
+    }
 
-    fs::path
+    inline fs::path
     path_db_schema_meta(
         const fs::path& data_dir,
         const std::string& db_name,
         const std::string& schema_name
-    );
+    )
+    {
+        return data_dir / db_name / schema_name / make_meta_filename(schema_name);
+    }
 
 } // namespace storage
 #endif //DELTABASE_PATH_HPP

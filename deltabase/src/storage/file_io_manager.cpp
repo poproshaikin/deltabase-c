@@ -188,8 +188,9 @@ namespace storage
 
                 auto content = read_file(entry_in_schema.path());
 
+                auto stream = misc::ReadOnlyMemoryStream(content);
                 MetaSchema out;
-                if (!serializer_->deserialize_ms(content, out))
+                if (!serializer_->deserialize_ms(stream, out))
                     throw std::runtime_error(
                         "FileIOManager::load_schemas: Error deserializing meta file: " +
                         path_db(db_path_, db_name_).string()
@@ -200,6 +201,13 @@ namespace storage
         });
 
         return schemas;
+    }
+
+    bool
+    FileIOManager::exists_table(const std::string& table_name, const std::string& schema_name)
+    {
+        auto path = path_db_schema_table_meta(db_path_, db_name_, schema_name, table_name);
+        return fs::exists(path);
     }
 
     std::vector<MetaTable>
@@ -222,7 +230,8 @@ namespace storage
                 auto content = read_file(entry_in_table.path());
 
                 MetaTable out;
-                if (!serializer_->deserialize_mt(content, out))
+                misc::ReadOnlyMemoryStream stream(content);
+                if (!serializer_->deserialize_mt(stream, out))
                     throw std::runtime_error(
                         "FileIOManager::load_tables: Error deserializing meta file: " +
                         path_db(db_path_, db_name_).string()
@@ -259,7 +268,8 @@ namespace storage
                         auto content = read_file(entry_in_data.path());
 
                         DataPage page;
-                        if (!serializer_->deserialize_dp(content, page))
+                        misc::ReadOnlyMemoryStream stream(content);
+                        if (!serializer_->deserialize_dp(stream, page))
                             throw std::runtime_error(
                                 "FileIOManager::load_tables_data: failed to deserialize data page");
                         page.path = entry_in_data.path();
@@ -273,7 +283,8 @@ namespace storage
                 {
                     auto content = read_file(entry_in_table.path());
 
-                    if (!serializer_->deserialize_mt(content, table))
+                    misc::ReadOnlyMemoryStream stream(content);
+                    if (!serializer_->deserialize_mt(stream, table))
                         throw std::runtime_error(
                             "FileIOManager::load_tables_data: failed to deserialize meta table");
                 }
@@ -292,7 +303,8 @@ namespace storage
         auto content = read_file(path);
 
         MetaTable table;
-        if (!serializer_->deserialize_mt(content, table))
+        misc::ReadOnlyMemoryStream stream(content);
+        if (!serializer_->deserialize_mt(stream, table))
             throw std::runtime_error(
                 "FileIOManager::load_table_meta: Error deserializing meta table " + path.string());
 
@@ -312,7 +324,8 @@ namespace storage
                 auto content = read_file(entry.path());
 
                 DataPage page;
-                if (!serializer_->deserialize_dp(content, page))
+                misc::ReadOnlyMemoryStream stream(content);
+                if (!serializer_->deserialize_dp(stream, page))
                     throw std::runtime_error(
                         "FileIoManager::load_table_data: failed to deserialize data page + "
                         + entry.path().filename().string());
@@ -329,7 +342,7 @@ namespace storage
     FileIOManager::write_page(const DataPage& page)
     {
         auto serialized = serializer_->serialize_dp(page);
-        write_file(page.path, serialized);
+        write_file(page.path, serialized.to_vector());
     }
 
     constexpr uint64_t
@@ -341,7 +354,7 @@ namespace storage
     uint64_t
     FileIOManager::estimate_size(const DataRow& row)
     {
-
+        return serializer_->estimate_size(row);
     }
 
     void
@@ -349,7 +362,7 @@ namespace storage
     {
         auto path = path_db_schema_table_meta(db_path_, db_name_, schema_name, table.name);
         auto serialized = serializer_->serialize_mt(table);
-        write_file(path, serialized);
+        write_file(path, serialized.to_vector());
     }
 
     void
@@ -357,6 +370,13 @@ namespace storage
     {
         auto path = path_db_meta(db_path_, db.name);
         auto serialized = serializer_->serialize_cfg(db);
-        write_file(path, serialized);
+        write_file(path, serialized.to_vector());
+    }
+
+    bool
+    FileIOManager::exists_db(const std::string& name)
+    {
+        auto path = path_db(db_path_, name);
+        return fs::exists(path) && fs::is_directory(path);
     }
 }

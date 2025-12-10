@@ -29,14 +29,23 @@ namespace storage
             std::vector<types::DataToken> row
         ) = 0;
 
+        virtual bool
+        exists_table(const std::string& table_name, const std::string& schema_name) = 0;
+
+        virtual bool
+        exists_table(const types::TableIdentifier& identifier) = 0;
+
         virtual types::MetaTable
         get_table(const std::string& table_name, const std::string& schema_name) = 0;
 
         virtual types::MetaTable
-        get_table(types::TableIdentifier identifier) = 0;
+        get_table(const types::TableIdentifier& identifier) = 0;
 
         virtual const types::Config&
         get_config() const = 0;
+
+        virtual bool
+        exists_db(const std::string& value) = 0;
     };
 }
 

@@ -5,15 +5,11 @@
 #ifndef DELTABASE_CONVERT_HPP
 #define DELTABASE_CONVERT_HPP
 #include "../../types/include/data_table.hpp"
-#include "../../types/include/data_token.hpp"
 
 #include <cstring>
 
 namespace misc
 {
-    types::DataToken
-    convert(const types::SqlToken&);
-
     template <typename T>
     types::Bytes
     convert(const T& value) requires(std::is_trivially_copyable_v<T>)
@@ -31,6 +27,15 @@ namespace misc
 
     types::OutputSchema
     convert(const types::MetaTable& meta);
+
+    types::MetaColumn
+    convert(const types::ColumnDefinition& column_def);
+
+    types::DataType
+    convert_to_dt(const types::SqlToken& token);
+
+    types::MetaColumnFlags
+    convert_to_mcf(const std::vector<types::SqlToken>& tokens);
 }
 
 #endif //DELTABASE_CONVERT_HPP

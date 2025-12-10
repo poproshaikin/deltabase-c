@@ -88,146 +88,22 @@ namespace types
 
     enum class SqlLiteral
     {
-        UNKNOWN = 0,
-
+        INTEGER = 0,
         STRING,
-        INTEGER,
         BOOL,
         CHAR,
-        REAL
+        REAL,
+
+        COUNT
     };
 
-    inline auto
-    keywords_map() -> const std::unordered_map<std::string, SqlKeyword>&
-    {
-        static const std::unordered_map<std::string, SqlKeyword> dictionary = {
-            {"select", SqlKeyword::SELECT},
-            {"from", SqlKeyword::FROM},
-            {"insert", SqlKeyword::INSERT},
-            {"into", SqlKeyword::INTO},
-            {"values", SqlKeyword::VALUES},
-            {"update", SqlKeyword::UPDATE},
-            {"set", SqlKeyword::SET},
-            {"delete", SqlKeyword::DELETE},
-            {"where", SqlKeyword::WHERE},
-            {"create", SqlKeyword::CREATE},
-            {"drop", SqlKeyword::DROP},
-            {"database", SqlKeyword::DATABASE},
-            {"table", SqlKeyword::TABLE},
-            {"string", SqlKeyword::STRING},
-            {"integer", SqlKeyword::INTEGER},
-            {"real", SqlKeyword::REAL},
-            {"char", SqlKeyword::CHAR},
-            {"bool", SqlKeyword::BOOL},
-            {"null", SqlKeyword::_NULL},
-            {"primary", SqlKeyword::PRIMARY},
-            {"key", SqlKeyword::KEY},
-            {"not", SqlKeyword::NOT},
-            {"autoincrement", SqlKeyword::AUTOINCREMENT},
-            {"unique", SqlKeyword::UNIQUE},
-            {"schema", SqlKeyword::SCHEMA}
-        };
-
-        return dictionary;
-    }
-
-    inline auto
-    data_types_map() -> const std::unordered_map<std::string, SqlKeyword>&
-    {
-        static const std::unordered_map<std::string, SqlKeyword> types_map = {
-            {"string", SqlKeyword::STRING},
-            {"integer", SqlKeyword::INTEGER},
-            {"real", SqlKeyword::REAL},
-            {"char", SqlKeyword::CHAR},
-            {"bool", SqlKeyword::BOOL},
-            {"null", SqlKeyword::_NULL}};
-
-        return types_map;
-    }
-
-    inline bool
-    is_data_type_kw(const SqlKeyword& kw)
-    {
-        const auto& types_map = data_types_map();
-        for (const auto& [key, value] : types_map)
-        {
-            if (value == kw)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    inline const std::unordered_map<std::string, SqlKeyword>&
-    constraints_map()
-    {
-        static const std::unordered_map<std::string, SqlKeyword> constraints_map = {
-            {"not", SqlKeyword::NOT},
-            {"null", SqlKeyword::_NULL},
-            {"primary", SqlKeyword::PRIMARY},
-            {"key", SqlKeyword::KEY},
-            {"autoincrement", SqlKeyword::AUTOINCREMENT},
-            {"unique", SqlKeyword::UNIQUE},
-        };
-
-        return constraints_map;
-    }
-
-    inline bool
-    is_constraint_kw(const SqlKeyword& kw)
-    {
-        const auto& constraints = constraints_map();
-        for (const auto& [key, value] : constraints)
-        {
-            if (value == kw)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    inline const std::unordered_map<std::string, SqlSymbol>&
-    symbols_map()
-    {
-        static const std::unordered_map<std::string, SqlSymbol> dictionary = {
-            {"(", SqlSymbol::LPAREN},
-            {")", SqlSymbol::RPAREN},
-            {",", SqlSymbol::COMMA},
-            {".", SqlSymbol::PERIOD},
-            {";", SqlSymbol::SEMICOLON}};
-        return dictionary;
-    }
-
-    inline const std::unordered_map<std::string, SqlOperator>&
-    operators_map()
-    {
-        static const std::unordered_map<std::string, SqlOperator> dictionary = {
-            {"==", SqlOperator::EQ},
-            {"!=", SqlOperator::NEQ},
-
-            {">", SqlOperator::GR},
-            {">=", SqlOperator::GRE},
-            {"<", SqlOperator::LT},
-            {"<=", SqlOperator::LTE},
-
-            {"and", SqlOperator::AND},
-            {"or", SqlOperator::OR},
-            {"not", SqlOperator::NOT},
-
-            {"+", SqlOperator::PLUS},
-            {"-", SqlOperator::MINUS},
-            {"*", SqlOperator::MUL},
-            {"/", SqlOperator::DIV},
-
-            {"=", SqlOperator::ASSIGN},
-        };
-        return dictionary;
-    }
-
-    using SqlTokenDetail = std::variant<std::monostate, SqlKeyword, SqlOperator, SqlSymbol,
-        SqlLiteral>;
+    using SqlTokenDetail = std::variant<
+        std::monostate,
+        SqlKeyword,
+        SqlOperator,
+        SqlSymbol,
+        SqlLiteral
+    >;
 
     struct SqlToken
     {

@@ -39,7 +39,7 @@ namespace types
         MetaColumnFlags flags;
 
         explicit
-        MetaColumn();
+        MetaColumn() = default;
         explicit
         MetaColumn(const ColumnDefinition& def);
         explicit

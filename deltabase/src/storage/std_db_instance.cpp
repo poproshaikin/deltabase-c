@@ -5,12 +5,10 @@
 #include "std_db_instance.hpp"
 
 #include "file_io_manager.hpp"
-#include "path.hpp"
 #include "std_binary_serializer.hpp"
 
-#include "../../misc/include/convert.hpp"
-#include "../../misc/include/memory_stream.hpp"
-#include "../types/include/db_cfg.hpp"
+#include "../misc/include/convert.hpp"
+#include "../types/include/config.hpp"
 
 #include <fstream>
 
@@ -35,10 +33,17 @@ namespace storage
         default:
             throw std::runtime_error(
                 "StdDbInstance::StdDbInstance: unknown IO type " + std::to_string(
-                    static_cast<int>(cfg.io_type)));
+                    static_cast<int>(cfg.io_type)
+                )
+            );
         }
 
         init();
+    }
+
+    StdDbInstance::~StdDbInstance()
+    {
+        io_manager_->write_cfg(cfg_);
     }
 
     bool
@@ -105,12 +110,12 @@ namespace storage
     }
 
     MetaTable
-    StdDbInstance::get_table(TableIdentifier identifier)
+    StdDbInstance::get_table(const TableIdentifier& identifier)
     {
         return get_table(
-            identifier.table_name,
+            identifier.table_name.value,
             identifier.schema_name.has_value()
-                ? identifier.schema_name.value()
+                ? identifier.schema_name.value().value
                 : cfg_.default_schema
         );
     }
@@ -121,8 +126,25 @@ namespace storage
         return cfg_;
     }
 
-    StdDbInstance::~StdDbInstance()
+    bool
+    StdDbInstance::exists_table(const std::string& table_name, const std::string& schema_name)
     {
-        io_manager_->write_cfg(cfg_);
+        return io_manager_->exists_table(table_name, schema_name);
+    }
+
+    bool
+    StdDbInstance::exists_table(const TableIdentifier& identifier)
+    {
+        std::string schema_name = identifier.schema_name.has_value()
+                                      ? identifier.schema_name.value().value
+                                      : cfg_.default_schema;
+
+        return exists_table(identifier.table_name.value, schema_name);
+    }
+
+    bool
+    StdDbInstance::exists_db(const std::string& name)
+    {
+        return io_manager_->exists_db(name);
     }
 }

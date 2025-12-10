@@ -3,11 +3,8 @@
 //
 
 #include "include/std_planner.hpp"
-#include "../misc/include/convert.hpp"
-#include "cli.hpp"
 
 #include <format>
-#include <functional>
 
 namespace exq
 {
@@ -159,7 +156,7 @@ namespace exq
                 assignment.right->type == AstNodeType::LITERAL)
             {
                 const auto& col_id = table.get_column(stmt.table.table_name).id;
-                auto data_token = misc::convert(std::get<SqlToken>(assignment.right->value));
+                auto data_token = DataToken(std::get<SqlToken>(assignment.right->value));
 
                 assignments.emplace_back(std::make_pair(col_id, data_token));
             }

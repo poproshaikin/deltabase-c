@@ -6,6 +6,7 @@
 #define DELTABASE_ENGINE_HPP
 
 #include "planner_factory.hpp"
+#include "semantic_analyzer.hpp"
 #include "../../sql/include/parser.hpp"
 #include "../../types/include/execution_result.hpp"
 #include "../../storage/include/db_instance.hpp"
@@ -18,6 +19,7 @@ namespace engine
     class Engine
     {
         sql::SqlParser parser_;
+        std::unique_ptr<exq::SemanticAnalyzer> analyzer_;
         std::unique_ptr<exq::IPlanner> planner_;
         std::unique_ptr<storage::IDbInstance> db_;
         exq::NodeExecutorFactory executor_factory_;

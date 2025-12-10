@@ -1,6 +1,5 @@
-#include "src/cli/include/cli.hpp"
+#include "src/engine/include/engine.hpp"
 
 int main() {
-    cli::SqlCli cli;
-    cli.run_query_console();
+
 }

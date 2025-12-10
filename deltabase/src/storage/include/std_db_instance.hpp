@@ -23,6 +23,8 @@ namespace storage
         explicit
         StdDbInstance(const types::Config& cfg);
 
+        ~StdDbInstance() override;
+
         bool
         needs_stream(types::IPlanNode& plan_node) override;
 
@@ -40,12 +42,20 @@ namespace storage
         get_table(const std::string& table_name, const std::string& schema_name) override;
 
         types::MetaTable
-        get_table(types::TableIdentifier identifier) override;
+        get_table(const types::TableIdentifier& identifier) override;
 
         const types::Config&
         get_config() const override;
 
-        ~StdDbInstance() override;
+
+        bool
+        exists_table(const std::string& table_name, const std::string& schema_name) override;
+
+        bool
+        exists_table(const types::TableIdentifier& identifier) override;
+
+        bool
+        exists_db(const std::string& name) override;
     };
 }
 

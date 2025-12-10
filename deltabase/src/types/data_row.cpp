@@ -6,7 +6,7 @@
 
 namespace types
 {
-    DataRow::DataRow(const std::vector<SqlToken>& sql_tokens) : row_id(0), flags()
+    DataRow::DataRow(const std::vector<SqlToken>& sql_tokens) : id(0), flags()
     {
         for (const auto& sql_token : sql_tokens)
         {

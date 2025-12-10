@@ -71,6 +71,12 @@ namespace storage
 
         bool
         deserialize_dt(misc::ReadOnlyMemoryStream& stream, types::DataToken& out) override;
+
+        uint64_t
+        estimate_size(const types::DataRow& row) override;
+
+        uint64_t
+        estimate_size(const types::DataToken& token) override;
     };
 }
 

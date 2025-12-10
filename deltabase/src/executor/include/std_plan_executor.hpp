@@ -6,13 +6,13 @@
 #define DELTABASE_STD_PLAN_EXECUTOR_HPP
 #include "node_executor.hpp"
 #include "plan_executor.hpp"
-#include "../../storage/include/storage.hpp"
+#include "../../storage/include/db_instance.hpp"
 
 namespace exq
 {
     class StdPlanExecutor final : public IPlanExecutor
     {
-        storage::IStorage& storage_;
+        storage::IDbInstance& db_;
         NodeExecutorFactory node_executor_factory_;
 
         std::unique_ptr<types::IExecutionResult>
@@ -23,7 +23,7 @@ namespace exq
 
     public:
         explicit
-        StdPlanExecutor(storage::IStorage& storage);
+        StdPlanExecutor(storage::IDbInstance& storage);
 
         std::unique_ptr<types::IExecutionResult>
         execute(types::QueryPlan&& plan) override;

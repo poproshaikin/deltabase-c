@@ -5,6 +5,7 @@
 #include "engine.hpp"
 
 #include "lexer.hpp"
+#include "semantic_analyzer.hpp"
 
 #include <fstream>
 
@@ -17,6 +18,7 @@ namespace engine
 {
     using namespace types;
     using namespace storage;
+    using namespace misc;
 
     static Bytes
     read_file(const std::filesystem::path& path)
@@ -35,7 +37,7 @@ namespace engine
     {
         auto cfg_path = path_db_meta(current_path, name);
 
-        misc::ReadOnlyMemoryStream stream(read_file(cfg_path));
+        ReadOnlyMemoryStream stream(read_file(cfg_path));
         Config cfg;
         if (StdBinarySerializer serializer; !serializer.deserialize_cfg(stream, cfg))
             throw std::runtime_error(
@@ -58,6 +60,7 @@ namespace engine
 
         db_ = std::move(db);
         planner_ = planner_factory_.make_planner(db_->get_config(), *db_);
+        analyzer_ = std::make_unique<exq::SemanticAnalyzer>(*db_);
     }
 
     std::unique_ptr<IExecutionResult>
@@ -111,6 +114,7 @@ namespace engine
     {
         planner_.reset();
         db_.reset();
+        analyzer_.reset();
     }
 
 
@@ -122,6 +126,9 @@ namespace engine
         parser_.reset();
         parser_.set_tokens(tokens);
         auto ast = parser_.parse();
+
+        auto analysis = analyzer_->analyze(ast);
+
         auto plan = planner_->plan(std::move(ast));
 
         if (!plan.db_specific)

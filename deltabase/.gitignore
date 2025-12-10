@@ -20,3 +20,6 @@ hello.txt
 .cmake
 .idea
 .cache
+
+.ninja_deps
+.ninja_log

@@ -190,7 +190,7 @@ namespace sql
             {
                 break;
             }
-            stmt.values.push_back(current());
+            stmt.values.push_back(ValuesExpr{.values = {current()}});
 
             if (!advance() || !match(SqlSymbol::COMMA))
             {

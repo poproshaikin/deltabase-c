@@ -36,34 +36,33 @@ function(add_cpp_module module_name)
     target_include_directories(${module_name} PUBLIC ${UUID_INCLUDE_DIRS})
     target_link_libraries(${module_name} PUBLIC ${UUID_LIBRARIES})
 
-    if (${module_name} STREQUAL "cli")
-        target_link_libraries(${module_name} PUBLIC sql executor engine )
-    endif()
-    
-    if (${module_name} STREQUAL "catalog")
-        target_link_libraries(${module_name} PUBLIC misc )
-    endif()
-    
-    if (${module_name} STREQUAL "converter")
-        target_link_libraries(${module_name} PUBLIC misc executor )
+    if (${module_name} STREQUAL "engine")
+        target_link_libraries(${module_name} PUBLIC misc storage executor sql types)
     endif()
 
-    if (${module_name} STREQUAL "engine")
-        target_link_libraries(${module_name} PUBLIC misc catalog executor sql )
+    if (${module_name} STREQUAL "storage")
+        target_link_libraries(${module_name} PUBLIC misc types)
     endif()
 
     if (${module_name} STREQUAL "executor")
-        target_link_libraries(${module_name} PUBLIC converter )
+        target_link_libraries(${module_name} PUBLIC types)
+    endif()
+
+    if (${module_name} STREQUAL "sql")
+        target_link_libraries(${module_name} PUBLIC types)
+    endif()
+
+    if (${module_name} STREQUAL "misc")
+        target_link_libraries(${module_name} PUBLIC types)
     endif()
 endfunction()
 
-add_cpp_module(storage)
-add_cpp_module(executor)
-add_cpp_module(sql)
-add_cpp_module(misc)
-add_cpp_module(cli)
-add_cpp_module(engine)
 add_cpp_module(types)
+add_cpp_module(misc)
+add_cpp_module(storage)
+add_cpp_module(sql)
+add_cpp_module(executor)
+add_cpp_module(engine)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
@@ -78,7 +77,6 @@ target_link_libraries(test.exe
     executor
     sql
     misc
-    cli
     engine
     types
 )
@@ -90,7 +88,6 @@ target_link_libraries(main.exe
     executor
     sql
     misc
-    cli
     engine
     types
 )

@@ -6,7 +6,7 @@
 #define DELTABASE_FILEIOMANAGER_HPP
 #include "binary_serializer.hpp"
 #include "io_manager.hpp"
-#include "../../types/include/db_cfg.hpp"
+#include "../../types/include/config.hpp"
 
 #include <filesystem>
 #include <functional>
@@ -69,6 +69,9 @@ namespace storage
         std::vector<types::MetaSchema>
         load_schemas_meta() override;
 
+        bool
+        exists_table(const std::string& string, const std::string& schema_name) override;
+
         std::vector<std::pair<types::Uuid, std::vector<types::DataPage> > >
         load_tables_data() override;
 
@@ -92,6 +95,9 @@ namespace storage
 
         void
         write_cfg(const types::Config& db) override;
+
+        bool
+        exists_db(const std::string& name) override;
     };
 }
 

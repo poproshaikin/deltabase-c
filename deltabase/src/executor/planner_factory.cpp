@@ -4,7 +4,7 @@
 
 #include "planner_factory.hpp"
 
-#include "std_db_instance.hpp"
+#include "../storage/include/std_db_instance.hpp"
 #include "std_planner.hpp"
 
 namespace exq

@@ -4,8 +4,8 @@
 
 #include "node_executor.hpp"
 
-#include "convert.hpp"
-#include "std_db_instance.hpp"
+#include "../misc/include/convert.hpp"
+#include "../storage/include/std_db_instance.hpp"
 
 #include <algorithm>
 

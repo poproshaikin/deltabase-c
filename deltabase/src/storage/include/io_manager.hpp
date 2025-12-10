@@ -26,11 +26,14 @@ namespace storage
         virtual std::vector<types::MetaSchema>
         load_schemas_meta() = 0;
 
+        virtual bool
+        exists_table(const std::string& string, const std::string& schema_name) = 0;
+
         virtual types::MetaTable
         load_table_meta(const std::string& table_name, const std::string& schema_name) = 0;
 
         virtual std::vector<types::DataPage>
-        load_table_data(const std::string& table_name, const std::string& schema_name);
+        load_table_data(const std::string& table_name, const std::string& schema_name) = 0;
 
         virtual std::vector<std::pair<types::Uuid, std::vector<types::DataPage> > >
         load_tables_data() = 0;
@@ -49,6 +52,9 @@ namespace storage
 
         virtual void
         write_cfg(const types::Config& cfg) = 0;
+
+        virtual bool
+        exists_db(const std::string& name) = 0;
     };
 }
 

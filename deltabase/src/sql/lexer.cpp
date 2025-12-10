@@ -1,7 +1,8 @@
 //
 // Created by poproshaikin on 12.11.25.
 //
-#include "include/lexer.hpp"
+#include "lexer.hpp"
+#include "dictionary.hpp"
 #include <sstream>
 
 namespace sql
@@ -62,7 +63,7 @@ namespace sql
     static
     starts_as_operator(char c)
     {
-        auto& operators = types::operators_map();
+        auto& operators = operators_map();
 
         for (const auto& op : operators)
             if (op.first[0] == c)

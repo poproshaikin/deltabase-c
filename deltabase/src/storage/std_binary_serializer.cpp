@@ -375,4 +375,25 @@ namespace storage
 
         return true;
     }
+
+    uint64_t
+    StdBinarySerializer::estimate_size(const DataRow& row)
+    {
+        uint64_t size = sizeof(row.id) + sizeof(row.flags) + sizeof(uint64_t);
+        for (const auto& token : row.tokens)
+            size += estimate_size(token);
+        return size;
+    }
+
+    uint64_t
+    StdBinarySerializer::estimate_size(const DataToken& token)
+    {
+        uint64_t size = sizeof(token.type);
+
+        if (has_dynamic_size(token.type))
+            size += sizeof(uint64_t); // bytes count
+        size += token.bytes.size();
+
+        return size;
+    }
 }

@@ -6,6 +6,7 @@
 #define DELTABASE_UUID_HPP
 #include <stdexcept>
 #include <string>
+#include <cstring>
 #include <uuid.h>
 
 namespace types

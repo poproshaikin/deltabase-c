@@ -10,8 +10,8 @@ namespace exq
 {
     using namespace types;
 
-    StdPlanExecutor::StdPlanExecutor(storage::IStorage& storage)
-        : storage_(storage), node_executor_factory_(storage_)
+    StdPlanExecutor::StdPlanExecutor(storage::IDbInstance& storage)
+        : db_(storage)
     {
     }
 
@@ -47,7 +47,7 @@ namespace exq
     {
         // TODO vymyslet stream mode;
 
-        auto root_exq = node_executor_factory_.from_plan(std::move(plan.root));
+        auto root_exq = node_executor_factory_.from_plan(std::move(plan.root), db_);
 
         root_exq->open();
         DataTable table;
@@ -68,7 +68,7 @@ namespace exq
     std::unique_ptr<IExecutionResult>
     StdPlanExecutor::execute_insert(QueryPlan&& plan)
     {
-        auto root_exq = node_executor_factory_.from_plan(std::move(plan.root));
+        auto root_exq = node_executor_factory_.from_plan(std::move(plan.root), db_);
 
         root_exq->open();
         DataRow rows_affected;
