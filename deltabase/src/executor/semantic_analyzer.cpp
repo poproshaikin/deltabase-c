@@ -39,6 +39,9 @@ namespace exq
         case AstNodeType::CREATE_DATABASE:
             return analyze_create_db(std::get<CreateDbStatement>(node.value));
 
+        case AstNodeType::CREATE_TABLE:
+            return analyze_create_table(std::get<CreateTableStatement>(node.value));
+
         default:
             throw std::runtime_error(
                 "SemanticAnalyzer::analyze: Unsupported AST node type for semantic analysis"
@@ -170,6 +173,15 @@ namespace exq
             if (!where_result.is_valid)
                 return AnalysisResult(where_result.err.value());
         }
+
+        return AnalysisResult(true);
+    }
+
+    AnalysisResult
+    SemanticAnalyzer::analyze_create_table(const CreateTableStatement& stmt) const
+    {
+        if (db_.exists_table(stmt.table))
+            return AnalysisResult(TableExists(stmt.table.table_name.value));
 
         return AnalysisResult(true);
     }

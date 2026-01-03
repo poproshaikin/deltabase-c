@@ -15,6 +15,10 @@ namespace types
         Uuid id;
         std::string name;
         std::string db_name;
+
+    public:
+        bool operator==(const MetaSchema& other) const = default;
+        bool operator!=(const MetaSchema& other) const = default;
     };
 }
 

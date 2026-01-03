@@ -63,11 +63,17 @@ namespace storage
         void
         init() override;
 
+        constexpr uint64_t
+        max_dp_size() override;
+
         std::vector<types::MetaTable>
         load_tables_meta() override;
 
         std::vector<types::MetaSchema>
         load_schemas_meta() override;
+
+        types::MetaSchema
+        load_schema_meta(const std::string& target_schema) override;
 
         bool
         exists_table(const std::string& string, const std::string& schema_name) override;
@@ -86,9 +92,6 @@ namespace storage
 
         uint64_t
         estimate_size(const types::DataRow& row) override;
-
-        constexpr uint64_t
-        max_dp_size() override;
 
         void
         write_mt(const types::MetaTable& table, const std::string& schema_name) override;

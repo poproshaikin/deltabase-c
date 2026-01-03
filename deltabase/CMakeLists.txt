@@ -55,6 +55,10 @@ function(add_cpp_module module_name)
     if (${module_name} STREQUAL "misc")
         target_link_libraries(${module_name} PUBLIC types)
     endif()
+
+    if (${module_name} STREQUAL "cli")
+        target_link_libraries(${module_name} PUBLIC engine)
+    endif()
 endfunction()
 
 add_cpp_module(types)
@@ -63,6 +67,7 @@ add_cpp_module(storage)
 add_cpp_module(sql)
 add_cpp_module(executor)
 add_cpp_module(engine)
+add_cpp_module(cli)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
@@ -79,6 +84,7 @@ target_link_libraries(test.exe
     misc
     engine
     types
+    cli
 )
 
 # --- main ---
@@ -90,4 +96,5 @@ target_link_libraries(main.exe
     misc
     engine
     types
+    cli
 )

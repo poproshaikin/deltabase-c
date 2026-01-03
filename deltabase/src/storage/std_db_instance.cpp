@@ -5,6 +5,8 @@
 #include "std_db_instance.hpp"
 
 #include "file_io_manager.hpp"
+#include "logger.hpp"
+#include "path.hpp"
 #include "std_binary_serializer.hpp"
 
 #include "../misc/include/convert.hpp"
@@ -25,6 +27,11 @@ namespace storage
 
     StdDbInstance::StdDbInstance(const Config& cfg) : cfg_(cfg)
     {
+        Logger::info("Initializing database instance");
+
+        if (!std::filesystem::exists(cfg.db_path))
+            std::filesystem::create_directories(cfg.db_path);
+
         switch (cfg.io_type)
         {
         case Config::IoType::File:
@@ -39,11 +46,13 @@ namespace storage
         }
 
         init();
+        Logger::info("Initialization of a database instance completed");
     }
 
     StdDbInstance::~StdDbInstance()
     {
         io_manager_->write_cfg(cfg_);
+        Logger::info("Destruction of a database instance completed");
     }
 
     bool
@@ -126,6 +135,12 @@ namespace storage
         return cfg_;
     }
 
+    MetaSchema
+    StdDbInstance::get_schema(const std::string& name)
+    {
+        return io_manager_->load_schema_meta(name);
+    }
+
     bool
     StdDbInstance::exists_table(const std::string& table_name, const std::string& schema_name)
     {
@@ -146,5 +161,24 @@ namespace storage
     StdDbInstance::exists_db(const std::string& name)
     {
         return io_manager_->exists_db(name);
+    }
+
+    void
+    StdDbInstance::create_table(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const std::vector<ColumnDefinition>& columns)
+    {
+        auto schema = io_manager_->load_schema_meta(schema_name);
+
+        MetaTable mt;
+        mt.name = table_name;
+        mt.schema_id = schema.id;
+        mt.last_rid = 0;
+        mt.columns.reserve(columns.size());
+        for (const auto& column : columns)
+            mt.columns.emplace_back(MetaColumn(column));
+
+        io_manager_->write_mt(mt, schema.name);
     }
 }

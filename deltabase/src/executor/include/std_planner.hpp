@@ -30,6 +30,9 @@ namespace exq
         types::QueryPlan
         plan_create_db(types::CreateDbStatement& stmt) const;
 
+        types::QueryPlan
+        plan_create_table(const types::CreateTableStatement& table) const;
+
     public:
         explicit
         StdPlanner(const types::Config& db_config, storage::IDbInstance& db);

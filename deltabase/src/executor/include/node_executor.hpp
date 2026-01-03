@@ -169,6 +169,35 @@ namespace exq
         output_schema() override;
     };
 
+    class CreateTableNodeExecutor final : public INodeExecutor
+    {
+        std::string table_name_;
+        types::MetaSchema schema_;
+        std::vector<types::ColumnDefinition> columns_;
+        storage::IDbInstance& db_;
+
+    public:
+        explicit
+        CreateTableNodeExecutor(
+            const std::string& table_name,
+            const types::MetaSchema& schema,
+            std::vector<types::ColumnDefinition> columns,
+            storage::IDbInstance& db
+        );
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
     class NodeExecutorFactory
     {
     public:

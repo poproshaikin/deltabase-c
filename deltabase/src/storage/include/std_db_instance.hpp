@@ -47,6 +47,8 @@ namespace storage
         const types::Config&
         get_config() const override;
 
+        types::MetaSchema
+        get_schema(const std::string& name) override;
 
         bool
         exists_table(const std::string& table_name, const std::string& schema_name) override;
@@ -56,6 +58,14 @@ namespace storage
 
         bool
         exists_db(const std::string& name) override;
+
+        void
+        create_table(
+            const std::string& table_name,
+            const std::string& schema_name,
+            const std::vector<types::ColumnDefinition>& columns
+        ) override;
+
     };
 }
 

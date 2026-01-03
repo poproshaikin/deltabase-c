@@ -5,6 +5,7 @@
 #ifndef DELTABASE_DB_CFG_HPP
 #define DELTABASE_DB_CFG_HPP
 #include <string>
+#include <filesystem>
 
 namespace types
 {
@@ -35,8 +36,14 @@ namespace types
         SerializerType serializer_type = SerializerType::Std;
 
         Config() = default;
-        Config(const std::string& name) : name(name)
+
+        Config(
+            const std::string& name,
+            const std::filesystem::path& executable_dir
+        ) : name(name),
+            db_path(executable_dir / "data")
         {
+
         }
     };
 }

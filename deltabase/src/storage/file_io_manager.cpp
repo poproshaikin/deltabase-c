@@ -60,8 +60,11 @@ namespace storage
     }
 
     void
-    FileIOManager::write_file(const fs::path& path, const types::Bytes& content) const
+    FileIOManager::write_file(const fs::path& path, const Bytes& content) const
     {
+        if (!fs::exists(path.parent_path()))
+            fs::create_directories(path.parent_path());
+
         std::ofstream file(path, std::ios::binary);
         file.write(reinterpret_cast<const char*>(content.data()), content.size());
         file.close();
@@ -201,6 +204,35 @@ namespace storage
         });
 
         return schemas;
+    }
+
+    MetaSchema
+    FileIOManager::load_schema_meta(const std::string& target_schema)
+    {
+        MetaSchema schema;
+        for_each_schema([&](const fs::directory_entry& schema_entry)
+        {
+            const auto& schema_name = schema_entry.path().filename();
+            if (schema_name == target_schema)
+            {
+                auto path = path_db_schema_meta(db_path_, db_name_, schema_name);
+                auto content = read_file(path);
+                auto stream = misc::ReadOnlyMemoryStream(content);
+
+                if (!serializer_->deserialize_ms(stream, schema))
+                    throw std::runtime_error(
+                        "FileIOManager::load_schemas: Error deserializing meta file: " +
+                        path_db(db_path_, db_name_).string()
+                    );
+
+            }
+        });
+        if (schema == MetaSchema{})
+            throw std::runtime_error(
+                "FileIOManager::load_schemas: Schema " + target_schema + " not found"
+            );
+
+        return MetaSchema{};
     }
 
     bool

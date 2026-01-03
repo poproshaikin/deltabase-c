@@ -259,6 +259,41 @@ namespace exq
         return {(OutputColumn){.name = "affected_rows", .type = DataType::INTEGER}};
     }
 
+    CreateTableNodeExecutor::CreateTableNodeExecutor(
+        const std::string& table_name,
+        const MetaSchema& schema,
+        std::vector<ColumnDefinition> columns,
+        storage::IDbInstance& db
+    ) : table_name_(table_name),
+        schema_(schema),
+        columns_(columns),
+        db_(db)
+    {
+    }
+
+    void
+    CreateTableNodeExecutor::open()
+    {
+    }
+
+    bool
+    CreateTableNodeExecutor::next(DataRow& out)
+    {
+        db_.create_table(table_name_, schema_.name, columns_);
+        return false;
+    }
+
+    void
+    CreateTableNodeExecutor::close()
+    {
+    }
+
+    OutputSchema
+    CreateTableNodeExecutor::output_schema()
+    {
+        return OutputSchema{};
+    }
+
     std::unique_ptr<INodeExecutor>
     NodeExecutorFactory::from_plan(std::unique_ptr<IPlanNode>&& node, storage::IDbInstance& db)
     {
@@ -299,7 +334,8 @@ namespace exq
         case IPlanNode::Type::LIMIT:
         {
             auto& limit_node = static_cast<LimitPlanNode&>(*node);
-            LimitNodeExecutor executor(limit_node.limit, from_plan(std::move(limit_node.child), db));
+            LimitNodeExecutor executor(limit_node.limit,
+                                       from_plan(std::move(limit_node.child), db));
             return std::make_unique<LimitNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::INSERT:
@@ -312,6 +348,16 @@ namespace exq
                 from_plan(std::move(insert_node.child), db)
             );
             return std::make_unique<InsertNodeExecutor>(std::move(executor));
+        }
+        case IPlanNode::Type::CREATE_TABLE:
+        {
+            auto& create_table_node = static_cast<CreateTablePlanNode&>(*node);
+            CreateTableNodeExecutor executor(
+                create_table_node.table_name,
+                create_table_node.schema,
+                create_table_node.columns,
+                db
+            );
         }
         default:
             throw std::runtime_error(

@@ -5,7 +5,9 @@
 #include "engine.hpp"
 
 #include "lexer.hpp"
+#include "logger.hpp"
 #include "semantic_analyzer.hpp"
+#include "static_storage.hpp"
 
 #include <fstream>
 
@@ -61,6 +63,7 @@ namespace engine
         db_ = std::move(db);
         planner_ = planner_factory_.make_planner(db_->get_config(), *db_);
         analyzer_ = std::make_unique<exq::SemanticAnalyzer>(db_->get_config(), *db_);
+        Logger::info("Engine initialized with a database instance " + db_->get_config().name);
     }
 
     std::unique_ptr<IExecutionResult>
@@ -71,7 +74,7 @@ namespace engine
         case QueryPlan::Type::CREATE_DB:
         {
             const auto& create_db_node = static_cast<const CreateDbPlanNode&>(*plan.root);
-            create_db(Config(create_db_node.db_name));
+            create_db(Config(create_db_node.db_name, StaticStorage::executable_path));
             return std::make_unique<EmptyExecutionResult>();
         }
         default:
@@ -105,6 +108,7 @@ namespace engine
     void
     Engine::create_db(const Config& config)
     {
+        Logger::info("Start creating a new database");
         auto db = std::make_unique<StdDbInstance>(config);
         init_db(std::move(db));
     }
@@ -117,19 +121,24 @@ namespace engine
         analyzer_.reset();
     }
 
-
     std::unique_ptr<IExecutionResult>
     Engine::execute_query(const std::string& query)
     {
+        Logger::info("Start executing query " + query);
         auto tokens = sql::lex(query);
 
         parser_.reset();
         parser_.set_tokens(tokens);
         auto ast = parser_.parse();
+        Logger::info("Built AST tree successfully");
 
         auto analysis = analyzer_->analyze(ast);
+        if (!analysis.is_valid)
+            throw std::runtime_error(std::string("Analysis failed: ") + analysis.err->what());
+        Logger::info("Analysis successful");
 
         auto plan = planner_->plan(std::move(ast));
+        Logger::info("Built execution plan successfully");
 
         if (!plan.db_specific)
             return execute_generic(std::move(plan));

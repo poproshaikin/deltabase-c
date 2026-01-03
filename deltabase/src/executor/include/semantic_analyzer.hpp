@@ -27,6 +27,9 @@ namespace exq
         analyze_delete(const types::DeleteStatement& stmt);
 
         types::AnalysisResult
+        analyze_create_table(const types::CreateTableStatement& stmt) const;
+
+        types::AnalysisResult
         analyze_create_db(const types::CreateDbStatement& stmt) const;
 
         types::AnalysisResult

@@ -4,6 +4,8 @@
 
 #include "include/std_planner.hpp"
 
+#include "meta_schema.hpp"
+
 #include <format>
 
 namespace exq
@@ -39,6 +41,10 @@ namespace exq
             if (ast.type == AstNodeType::CREATE_DATABASE)
             {
                 return plan_create_db(std::get<CreateDbStatement>(ast.value));
+            }
+            if (ast.type == AstNodeType::CREATE_TABLE)
+            {
+                return plan_create_table(std::get<CreateTableStatement>(ast.value));
             }
         }
         catch (std::exception ex)
@@ -240,6 +246,26 @@ namespace exq
         plan.type = QueryPlan::Type::CREATE_DB;
         plan.needs_stream = false;
         plan.db_specific = false;
+        return plan;
+    }
+
+    QueryPlan
+    StdPlanner::plan_create_table(const CreateTableStatement& table) const
+    {
+        MetaSchema schema = db_.get_schema(
+            table.table.schema_name.has_value()
+                ? table.table.schema_name.value().value
+                : db_config_.default_schema
+        );
+
+        std::unique_ptr<IPlanNode> root =
+            std::make_unique<CreateTablePlanNode>(table.table.table_name.value, schema, table.columns);
+
+        QueryPlan plan;
+        plan.root = std::move(root);
+        plan.type = QueryPlan::Type::CREATE_TABLE;
+        plan.needs_stream = false;
+        plan.db_specific = true;
         return plan;
     }
 }

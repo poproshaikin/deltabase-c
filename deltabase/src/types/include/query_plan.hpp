@@ -6,6 +6,7 @@
 #define DELTABASE_QUERY_PLAN_HPP
 #include "ast_tree.hpp"
 #include "data_row.hpp"
+#include "meta_schema.hpp"
 
 #include <string>
 #include <variant>
@@ -31,7 +32,7 @@ namespace types
             CREATE_TABLE
         };
 
-        virtual Type
+        virtual constexpr Type
         type() const = 0;
     };
 
@@ -47,7 +48,7 @@ namespace types
             INSERT,
             UPDATE,
             DELETE,
-            CREATE_DB
+            CREATE_DB, CREATE_TABLE
         };
 
         Type type = Type::UNDEFINED;
@@ -81,7 +82,7 @@ namespace types
         {
         }
 
-        Type
+        constexpr Type
         type() const override
         {
             return Type::SEQ_SCAN;
@@ -97,7 +98,7 @@ namespace types
         {
         }
 
-        Type
+        constexpr Type
         type() const override
         {
             return Type::VALUES;
@@ -117,7 +118,7 @@ namespace types
         {
         }
 
-        Type
+        constexpr Type
         type() const override
         {
             return Type::FILTER;
@@ -130,14 +131,16 @@ namespace types
         std::vector<std::string> columns;
 
         explicit
-        ProjectPlanNode(const MetaTable& table, std::vector<std::string> cols, std::unique_ptr<IPlanNode> child)
+        ProjectPlanNode(const MetaTable& table,
+                        std::vector<std::string> cols,
+                        std::unique_ptr<IPlanNode> child)
             : UnaryPlanNode(std::move(child)),
               table(table),
               columns(std::move(cols))
         {
         }
 
-        Type
+        constexpr Type
         type() const override
         {
             return Type::PROJECT;
@@ -155,7 +158,7 @@ namespace types
         {
         }
 
-        Type
+        constexpr Type
         type() const override
         {
             return Type::LIMIT;
@@ -169,18 +172,19 @@ namespace types
         std::optional<std::vector<std::string> > column_names;
 
         explicit
-        InsertPlanNode(std::string table,
-                       std::string schema,
-                       std::optional<std::vector<std::string> > cols,
-                       std::unique_ptr<IPlanNode> child)
-            : UnaryPlanNode(std::move(child)),
-              table_name(std::move(table)),
-              schema_name(std::move(schema)),
-              column_names(std::move(cols))
+        InsertPlanNode(
+            std::string table,
+            std::string schema,
+            std::optional<std::vector<std::string> > cols,
+            std::unique_ptr<IPlanNode> child
+        ) : UnaryPlanNode(std::move(child)),
+            table_name(std::move(table)),
+            schema_name(std::move(schema)),
+            column_names(std::move(cols))
         {
         }
 
-        Type
+        constexpr Type
         type() const override
         {
             return Type::INSERT;
@@ -198,7 +202,7 @@ namespace types
         {
         }
 
-        Type
+        constexpr Type
         type() const override
         {
             return Type::UPDATE;
@@ -213,7 +217,7 @@ namespace types
         {
         }
 
-        Type
+        constexpr Type
         type() const override
         {
             return Type::DELETE;
@@ -229,7 +233,7 @@ namespace types
         {
         }
 
-        Type
+        constexpr Type
         type() const override
         {
             return Type::CREATE_DB;
@@ -239,7 +243,25 @@ namespace types
     struct CreateTablePlanNode final : LeafPlanNode
     {
         std::string table_name;
+        MetaSchema schema;
+        std::vector<ColumnDefinition> columns;
 
+        explicit
+        CreateTablePlanNode(
+            const std::string& table_name,
+            const MetaSchema& schema,
+            const std::vector<ColumnDefinition>& columns)
+            : table_name(table_name),
+              schema(schema),
+              columns(columns)
+        {
+        }
+
+        constexpr Type
+        type() const override
+        {
+            return Type::CREATE_TABLE;
+        }
     };
 }
 
