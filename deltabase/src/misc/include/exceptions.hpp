@@ -36,7 +36,9 @@ class SchemaDoesntExist : public std::runtime_error
     public:
     explicit
     SchemaDoesntExist(const std::string& schema_name)
-        : std::runtime_error("Schema '" + schema_name + "' doesnt exist");
+        : std::runtime_error("Schema '" + schema_name + "' doesnt exist")
+    {
+    }
 };
 
 class ColumnDoesntExists : public std::runtime_error

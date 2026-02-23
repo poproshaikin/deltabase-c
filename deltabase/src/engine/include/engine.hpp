@@ -1,37 +1,51 @@
-#ifndef ENGINE_HPP
-#define ENGINE_HPP
+//
+// Created by poproshaikin on 09.11.25.
+//
 
-#include "../../executor/include/executor.hpp"
-#include "../../executor/include/semantic_analyzer.hpp"
-#include "config.hpp"
-#include <string>
+#ifndef DELTABASE_ENGINE_HPP
+#define DELTABASE_ENGINE_HPP
 
-namespace engine {
+#include "planner_factory.hpp"
+#include "semantic_analyzer.hpp"
+#include "../../sql/include/parser.hpp"
+#include "../../types/include/execution_result.hpp"
+#include "../../storage/include/db_instance.hpp"
+#include "../../types/include/config.hpp"
+#include "../../executor/include/node_executor.hpp"
+#include "../../executor/include/planner.hpp"
 
-    struct ExecutionResult {
+namespace engine
+{
+    class Engine
+    {
+        sql::SqlParser parser_;
+        std::unique_ptr<exq::SemanticAnalyzer> analyzer_;
+        std::unique_ptr<exq::IPlanner> planner_;
+        std::unique_ptr<storage::IDbInstance> db_;
+        exq::NodeExecutorFactory executor_factory_;
+        exq::PlannerFactory planner_factory_;
 
-        exe::IntOrDataTable result;
-        long execution_time_ns;
+        types::Config
+        load_config(const std::string& name, const std::filesystem::path& executable_path) const;
 
-        ExecutionResult(exe::IntOrDataTable&& result, long execution_time_ns)
-            : result(std::move(result)), execution_time_ns(execution_time_ns) {
-        }
-    };
-
-    class DltEngine {
-        exe::SemanticAnalyzer semantic_analyzer_;
-        catalog::MetaRegistry registry_;
-        EngineConfig cfg_;
-
-        auto
-        execute(const sql::AstNode& node) -> exe::IntOrDataTable;
+        void
+        set_db_instance(std::unique_ptr<storage::IDbInstance> db = nullptr);
 
     public:
-        DltEngine(EngineConfig cfg_ = {});
+        Engine();
 
-        auto
-        run_query(const std::string& sql) -> ExecutionResult;
+        void
+        attach_db(const std::string& db_name);
+
+        void
+        create_db(const types::Config& config);
+
+        void
+        detach_db();
+
+        std::unique_ptr<types::IExecutionResult>
+        execute_query(const std::string& query);
     };
-} // namespace engine
+}
 
-#endif
+#endif //DELTABASE_ENGINE_HPP

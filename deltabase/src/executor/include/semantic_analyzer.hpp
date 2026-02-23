@@ -1,119 +1,96 @@
-#pragma once
+//
+// Created by poproshaikin on 03.12.25.
+//
 
-#include "../../storage/include/storage.hpp"
-#include "../../engine/include/config.hpp"
-#include <optional>
-#include <set>
+#ifndef DELTABASE_SEMANTIC_ANALYZER_HPP
+#define DELTABASE_SEMANTIC_ANALYZER_HPP
+#include "generic_query_validator.hpp"
+#include "../../types/include/analysis_result.hpp"
+#include "../../storage/include/db_instance.hpp"
 
-namespace exe
+namespace exq
 {
-    inline auto
-    get_compatibility_table() -> const std::set<std::pair<sql::SqlLiteral, storage::ValueType> >&
-    {
-        static std::set<std::pair<sql::SqlLiteral, storage::ValueType> > map = {
-            {sql::SqlLiteral::STRING, storage::ValueType::STRING},
-            {sql::SqlLiteral::INTEGER, storage::ValueType::INTEGER},
-            {sql::SqlLiteral::INTEGER, storage::ValueType::REAL},
-            {sql::SqlLiteral::REAL, storage::ValueType::REAL},
-            {sql::SqlLiteral::CHAR, storage::ValueType::CHAR},
-            {sql::SqlLiteral::CHAR, storage::ValueType::STRING},
-            {sql::SqlLiteral::BOOL, storage::ValueType::BOOL},
-        };
-        return map;
-    }
-
-    inline auto
-    is_literal_assignable_to(sql::SqlLiteral literal_type, storage::ValueType column_type) -> bool
-    {
-        return get_compatibility_table().count(std::make_pair(literal_type, column_type)) > 0;
-    }
-
-    struct AnalysisResult
-    {
-        bool is_valid;
-        std::optional<std::runtime_error> err;
-
-        std::optional<bool> is_system_query;
-
-        AnalysisResult(bool is_valid) : is_valid(is_valid)
-        {
-        }
-
-        AnalysisResult(std::runtime_error err) : is_valid(false), err(err)
-        {
-        }
-
-        AnalysisResult(std::runtime_error err, bool is_system_query)
-            : is_valid(false), err(err), is_system_query(is_system_query)
-        {
-        }
-
-        AnalysisResult(bool is_valid,
-                       std::optional<std::runtime_error> err,
-                       std::optional<bool> is_system_query)
-            : is_valid(is_valid), err(std::move(err)), is_system_query(is_system_query)
-        {
-        }
-    };
-
     class SemanticAnalyzer
     {
-        storage::Storage& storage_;
-        std::optional<std::string> db_name_;
-        std::string def_schema_;
+        storage::IDbInstance& db_;
+        GenericQueryValidator generic_validator_;
+        types::Config config_;
 
-        AnalysisResult
-        analyze_select(sql::SelectStatement& stmt) const;
+        types::AnalysisResult
+        analyze_select(const types::SelectStatement& stmt);
 
-        AnalysisResult
-        analyze_insert(const sql::InsertStatement& stmt) const;
+        types::AnalysisResult
+        analyze_insert(const types::InsertStatement& stmt) const;
 
-        AnalysisResult
-        analyze_update(sql::UpdateStatement& stmt) const;
+        types::AnalysisResult
+        analyze_update(const types::UpdateStatement& stmt);
 
-        AnalysisResult
-        analyze_delete(sql::DeleteStatement& stmt) const;
+        types::AnalysisResult
+        analyze_delete(const types::DeleteStatement& stmt);
 
-        AnalysisResult
-        analyze_create_table(const sql::CreateTableStatement& stmt) const;
+        types::AnalysisResult
+        analyze_create_table(const types::CreateTableStatement& stmt) const;
 
-        AnalysisResult
-        analyze_create_db(const sql::CreateDbStatement& stmt) const;
+        types::AnalysisResult
+        analyze_create_db(const types::CreateDbStatement& stmt) const;
 
-        AnalysisResult
-        analyze_create_schema(sql::CreateSchemaStatement& stmt) const;
+        types::AnalysisResult
+        analyze_where(const types::BinaryExpr& where, const types::MetaTable& table);
 
-        static AnalysisResult
-        analyze_where(const sql::BinaryExpr& where,
-                      const storage::MetaTable& table);
+        types::AnalysisResult
+        analyze_column_assignment(
+            const types::BinaryExpr &expr,
+            const types::MetaTable& table
+        ) const;
 
-        static AnalysisResult
-        validate_column_comparison(
-            const std::unique_ptr<sql::AstNode>& left,
-            const std::unique_ptr<sql::AstNode>& right,
-            const storage::MetaTable& table
-        );
+        types::AnalysisResult
+        analyze_column_comparison(
+            const std::unique_ptr<types::AstNode>& left,
+            const std::unique_ptr<types::AstNode>& right,
+            const types::MetaTable& table
+        ) const;
 
-        static AnalysisResult
-        validate_column_assignment(
-            const sql::AstNode& assignment,
-            const storage::MetaTable& table
-        );
+        static const std::unordered_map<types::DataType, std::vector<types::DataType> >&
+        compat_table()
+        {
+            static const std::unordered_map<types::DataType, std::vector<types::DataType> >
+                table =
+                {
+                    { types::DataType::INTEGER, { types::DataType::INTEGER } },
+                    { types::DataType::REAL, { types::DataType::REAL, types::DataType::INTEGER } },
+                    { types::DataType::STRING, { types::DataType::STRING, types::DataType::CHAR } },
+                    { types::DataType::CHAR, { types::DataType::CHAR } },
+                    { types::DataType::BOOL, { types::DataType::BOOL } }
+                };
 
-        void
-        ensure_db_exists() const;
+            return table;
+        }
 
-        void
-        ensure_db_exists(const std::string& name) const;
+        static const std::unordered_map<types::SqlLiteral, types::DataType>&
+        literal_to_data_type_table()
+        {
+            static const std::unordered_map<types::SqlLiteral, types::DataType> data_type_table =
+            {
+                { types::SqlLiteral::INTEGER, types::DataType::INTEGER },
+                { types::SqlLiteral::STRING, types::DataType::STRING },
+                { types::SqlLiteral::CHAR, types::DataType::CHAR },
+                { types::SqlLiteral::BOOL, types::DataType::BOOL },
+                { types::SqlLiteral::REAL, types::DataType::REAL },
+            };
+            return data_type_table;
+        }
+
+
+        bool
+        is_compatible(types::SqlLiteral lit, types::DataType col) const;
 
     public:
-        SemanticAnalyzer(storage::Storage& storage);
+        explicit
+        SemanticAnalyzer(const types::Config& config, storage::IDbInstance& db);
 
-        SemanticAnalyzer(storage::Storage& storage, std::string db_name);
-
-        SemanticAnalyzer(storage::Storage& storage, engine::EngineConfig cfg);
-
-        AnalysisResult
-        analyze(sql::AstNode& ast) ;
+        types::AnalysisResult
+        analyze(const types::AstNode& node);
     };
-}; // namespace exe
+}
+
+#endif //DELTABASE_SEMANTIC_ANALYZER_HPP

@@ -1,253 +1,231 @@
-#include "include/lexer.hpp"
-#include <cctype>
+//
+// Created by poproshaikin on 12.11.25.
+//
+#include "lexer.hpp"
+#include "dictionary.hpp"
+
 #include <iostream>
 #include <sstream>
-#include <stdexcept>
 
-using namespace sql;
+namespace sql
+{
+    using namespace types;
 
-SqlToken::SqlToken(
-    SqlTokenType type, std::string value, size_t line, size_t pos, SqlTokenDetail detail)
-    : type(type), line(line), value(std::move(value)), pos(pos), detail(detail) {
-}
+    std::string
+    static
+    to_lower(const std::string& str)
+    {
+        std::stringstream sb;
+        for (char c : str)
+            sb << static_cast<char>(std::tolower(c));
 
-auto
-SqlToken::is_data_type() const -> bool {
-    if (std::holds_alternative<SqlKeyword>(this->detail)) {
-        return is_data_type_kw(std::get<SqlKeyword>(this->detail));
+        return sb.str();
     }
 
-    return false;
-}
+    size_t
+    static
+    get_word_length(const char* str)
+    {
+        const char* p = str;
 
-auto
-SqlToken::is_keyword() const -> bool {
-    return std::holds_alternative<SqlKeyword>(this->detail);
-}
+        while (*p != '\0' && (isalnum(*p) || *p == '_'))
+            ++p;
 
-auto
-SqlToken::is_constraint() const -> bool {
-    if (this->is_keyword()) {
-        return is_constraint_kw(std::get<SqlKeyword>(this->detail));
+        return p - str;
     }
 
-    return false;
-}
+    size_t
+    static
+    get_number_length(const char* str)
+    {
+        const char* p = str;
+        bool dot_found = false;
 
-auto
-to_lower(const std::string& str) -> std::string {
-    std::stringstream sb;
-    for (char c : str) {
-        sb << (char)std::tolower(c);
-    }
-    return sb.str();
-}
-
-auto
-get_word_length(const char* str) -> size_t {
-    const char* p = str;
-
-    while (*p != '\0' && (isalnum(*p) || *p == '_')) {
-        ++p;
-    }
-
-    return p - str;
-}
-
-auto
-get_number_length(const char* str) -> size_t {
-    const char* p = str;
-    bool dot_found = false;
-
-    while (isdigit(*p) || (!dot_found && *p == '.')) {
-        if (*p == '.')
-            dot_found = true;
-        ++p;
-    }
-
-    return p - str;
-}
-
-auto
-read_next_word(const std::string& sql, size_t i) -> std::string {
-    size_t word_start = i;
-    size_t word_len = get_word_length(&sql[i]);
-
-    return sql.substr(word_start, word_len);
-}
-
-auto
-starts_as_operator(char c) -> bool {
-    auto& operators = operators_map();
-
-    for (const auto& op : operators) {
-        if (op.first[0] == c) {
-            return true;
+        while (isdigit(*p) || (!dot_found && *p == '.'))
+        {
+            if (*p == '.')
+                dot_found = true;
+            ++p;
         }
+
+        return p - str;
     }
 
-    return false;
-}
+    std::string
+    static
+    read_next_word(const std::string& sql, size_t i)
+    {
+        size_t word_start = i;
+        size_t word_len = get_word_length(&sql[i]);
 
-auto
-SqlTokenizer::tokenize(const std::string& sql) -> std::vector<SqlToken> {
-    auto isalpha = [](char c) { return std::isalpha((unsigned char)c) || (unsigned char)c == '_'; };
-    auto isdigit = [](char c) { return std::isdigit((unsigned char)c); };
-    auto isspace = [](char c) { return std::isspace((unsigned char)c); };
+        return sql.substr(word_start, word_len);
+    }
 
-    const auto& keywords = keywords_map();
-    const auto& operators = operators_map();
-    const auto& symbols = symbols_map();
+    bool
+    static
+    starts_as_operator(char c)
+    {
+        auto& operators = operators_map();
 
-    size_t line = 1;
-    size_t pos = 0;
+        for (const auto& op : operators)
+            if (op.first[0] == c)
+                return true;
 
-    std::vector<SqlToken> result;
+        return false;
+    }
 
-    size_t i = 0;
-    while (i < sql.length()) {
-        char c = sql[i];
+    std::vector<SqlToken>
+    lex(const std::string& query)
+    {
+        auto isalpha = [](char c)
+        {
+            return std::isalpha(
+                       static_cast<unsigned char>(c)) || static_cast<unsigned char>(c) == '_';
+        };
+        auto isdigit = [](char c)
+        {
+            return std::isdigit(static_cast<unsigned char>(c));
+        };
+        auto isspace = [](char c)
+        {
+            return std::isspace(static_cast<unsigned char>(c));
+        };
 
-        if (std::isspace((unsigned char)c)) {
-            if (c == '\n') {
-                line++;
-                pos = 0;
-            } else {
+        const auto& keywords = keywords_map();
+        const auto& operators = operators_map();
+        const auto& symbols = symbols_map();
+
+        size_t line = 1;
+        size_t pos = 0;
+
+        std::vector<SqlToken> result;
+
+        size_t i = 0;
+        while (i < query.length())
+        {
+            char c = query[i];
+
+            if (isspace(c))
+            {
+                if (c == '\n')
+                {
+                    line++;
+                    pos = 0;
+                }
+                else
+                {
+                    pos++;
+                }
+                i++;
+            }
+            else if (isalpha(c))
+            {
+                std::string word = to_lower(read_next_word(query, i));
+                SqlToken token(SqlTokenType::IDENTIFIER, word, line, pos);
+
+                auto it = keywords.find(word);
+                if (it != keywords.end())
+                {
+                    token.type = SqlTokenType::KEYWORD;
+                    token.detail = it->second;
+                }
+
+                result.push_back(token);
+
+                pos += word.length();
+                i += word.length();
+            }
+            else if (c == '\'')
+            {
+                size_t word_start = i + 1;
+                size_t word_end = query.find('\'', word_start);
+
+                if (word_end == std::string::npos)
+                {
+                    throw std::runtime_error("Unterminated string literal");
+                }
+
+                std::string word = query.substr(word_start, word_end - word_start);
+                SqlToken token(SqlTokenType::LITERAL, word, line, pos, SqlLiteral::STRING);
+
+                result.push_back(token);
+
+                size_t consumed = (word_end + 1) - i;
+                i += consumed;
+                pos += consumed;
+            }
+            else if (isdigit(c))
+            {
+                size_t word_start = i;
+                size_t word_len = get_number_length(&query[i]);
+
+                std::string word = query.substr(word_start, word_len);
+
+                SqlToken token(SqlTokenType::LITERAL, word, line, pos);
+
+                if (word.find('.') != std::string::npos || word.find('e') != std::string::npos ||
+                    word.find('E') != std::string::npos)
+                {
+                    token.detail = SqlLiteral::REAL;
+                }
+                else
+                {
+                    token.detail = SqlLiteral::INTEGER;
+                }
+
+                result.push_back(token);
+
+                i += word_len;
+                pos += word_len;
+            }
+            else if (starts_as_operator(c))
+            {
+                std::string op;
+                size_t op_start = i;
+
+                size_t max_len = 3;
+                while (max_len > 0 && op_start + max_len <= query.length())
+                {
+                    std::string candidate = to_lower(query.substr(op_start, max_len));
+                    if (operators.find(candidate) != operators.end())
+                    {
+                        op = candidate;
+                        break;
+                    }
+                    max_len--;
+                }
+
+                if (op.empty())
+                {
+                    throw std::runtime_error("Unknown operator at position " + std::to_string(pos));
+                }
+
+                SqlToken token(SqlTokenType::OPERATOR, op, line, pos, operators.find(op)->second);
+                result.push_back(token);
+
+                i += op.length();
+                pos += op.length();
+            }
+            else if (symbols.contains(std::string(1, c)))
+            {
+                std::string sym_str(1, c);
+                SqlToken token(SqlTokenType::SYMBOL, sym_str, line, pos, symbols.at(sym_str));
+                result.push_back(token);
+
+                i++;
                 pos++;
             }
-            i++;
-            continue;
-        } else if (isalpha(c)) {
-            std::string word = to_lower(read_next_word(sql, i));
-            SqlToken token(SqlTokenType::IDENTIFIER, word, line, pos);
+            else if (c == '.')
+            {
+                std::string sym_str(1, c);
+                SqlToken token(SqlTokenType::SYMBOL, sym_str, line, pos, SqlSymbol::PERIOD);
+                result.push_back(token);
 
-            auto it = keywords.find(word);
-            if (it != keywords.end()) {
-                token.type = SqlTokenType::KEYWORD;
-                token.detail = it->second;
+                i++;
+                pos++;
             }
-
-            result.push_back(token);
-
-            pos += word.length();
-            i += word.length();
-        } else if (c == '\'') {
-            size_t word_start = i + 1;
-            size_t word_end = sql.find('\'', word_start);
-
-            if (word_end == std::string::npos) {
-                throw std::runtime_error("Unterminated string literal");
-            }
-
-            std::string word = sql.substr(word_start, word_end - word_start);
-            SqlToken token(SqlTokenType::LITERAL, word, line, pos, SqlLiteral::STRING);
-
-            result.push_back(token);
-
-            size_t consumed = (word_end + 1) - i;
-            i += consumed;
-            pos += consumed;
-        } else if (isdigit(c)) {
-            size_t word_start = i;
-            size_t word_len = get_number_length(&sql[i]);
-
-            std::string word = sql.substr(word_start, word_len);
-
-            SqlToken token(SqlTokenType::LITERAL, word, line, pos);
-
-            if (word.find('.') != std::string::npos || word.find('e') != std::string::npos ||
-                word.find('E') != std::string::npos) {
-                token.detail = SqlLiteral::REAL;
-            } else {
-                token.detail = SqlLiteral::INTEGER;
-            }
-
-            result.push_back(token);
-
-            i += word_len;
-            pos += word_len;
-        } else if (starts_as_operator(c)) {
-            std::string op;
-            size_t op_start = i;
-
-            size_t max_len = 3;
-            while (max_len > 0 && op_start + max_len <= sql.length()) {
-                std::string candidate = to_lower(sql.substr(op_start, max_len));
-                if (operators.find(candidate) != operators.end()) {
-                    op = candidate;
-                    break;
-                }
-                max_len--;
-            }
-
-            if (op.empty()) {
-                throw std::runtime_error("Unknown operator at position " + std::to_string(pos));
-            }
-
-            SqlToken token(SqlTokenType::OPERATOR, op, line, pos, operators.find(op)->second);
-            result.push_back(token);
-
-            i += op.length();
-            pos += op.length();
-        } else if (symbols.find(std::string(1, c)) != symbols.end()) {
-            std::string sym_str(1, c);
-            SqlToken token(SqlTokenType::SYMBOL, sym_str, line, pos, symbols.at(sym_str));
-            result.push_back(token);
-
-            i++;
-            pos++;
-        } else if (c == '.') {
-            std::string sym_str(1, c);
-            SqlToken token(SqlTokenType::SYMBOL, sym_str, line, pos, SqlSymbol::PERIOD);
-            result.push_back(token);
-
-            i++;
-            pos++;
         }
+
+        return result;
     }
-
-    return result;
-}
-
-auto
-SqlToken::to_string(int indent) const -> std::string {
-    auto indent_fn = [indent]() {
-        for (int i = 0; i < indent; i++) {
-            std::cout << ' ';
-        }
-    };
-
-    std::ostringstream result;
-    result << "Token:\n";
-    indent_fn();
-    result << "Type: " << utils::to_string(type) << "\n";
-    indent_fn();
-    result << "Value: " << value << "\n";
-    indent_fn();
-    result << "Line: " << line << "\n";
-    indent_fn();
-    result << "Pos: " << pos << "\n";
-
-    switch (type) {
-    case SqlTokenType::KEYWORD:
-        indent_fn();
-        result << "Keyword: " << utils::to_string(std::get<SqlKeyword>(detail)) << "\n";
-        break;
-    case SqlTokenType::OPERATOR:
-        indent_fn();
-        result << "Operator: " << utils::to_string(std::get<SqlOperator>(detail)) << "\n";
-        break;
-    case SqlTokenType::LITERAL:
-        indent_fn();
-        result << "Literal: " << utils::to_string(std::get<SqlLiteral>(detail), value) << "\n";
-        break;
-    case SqlTokenType::SYMBOL:
-        indent_fn();
-        result << "Symbol: " << utils::to_string(std::get<SqlSymbol>(detail)) << "\n";
-        break;
-    default:
-        break;
-    }
-
-    return result.str();
 }

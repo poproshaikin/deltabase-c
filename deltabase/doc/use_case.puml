@@ -1,0 +1,22 @@
+@startuml
+left to right direction
+
+actor "TCP Client" as TCP
+actor "CLI Client" as CLI
+actor "Backup System" as Backup
+
+TCP --> (Connect to Database)
+TCP --> (Execute SELECT Query)
+TCP --> (Execute Modify Query)
+TCP --> (Disconnect)
+
+CLI --> (Create Database)
+CLI --> (Create Table)
+CLI --> (Drop Database)
+CLI --> (Execute SELECT Query)
+CLI --> (Execute Modify Query)
+
+Backup --> (Perform Backup)
+Backup --> (Restore Backup)
+
+@enduml
