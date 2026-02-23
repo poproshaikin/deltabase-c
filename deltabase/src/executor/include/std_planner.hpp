@@ -13,7 +13,7 @@ namespace exq
     class StdPlanner final : public IPlanner
     {
         storage::IDbInstance& db_;
-        const types::Config& db_config_;
+        types::Config db_config_;
 
         types::QueryPlan
         plan_select(types::SelectStatement& stmt) const;

@@ -23,14 +23,14 @@ namespace types
         MetaTable();
 
         bool
-        has_column(const std::string& name) const;
+        has_column(const std::string& col_name) const;
 
         const MetaColumn&
-        get_column(const std::string& name) const;
+        get_column(const std::string& col_name) const;
 
         // -1 if not found
         int64_t
-        get_column_idx(const std::string& name) const;
+        get_column_idx(const std::string& col_name) const;
     };
 }
 

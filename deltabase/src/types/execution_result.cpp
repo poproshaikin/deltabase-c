@@ -14,10 +14,10 @@ namespace types
     bool
     MaterializedResult::next(DataRow& out)
     {
-        if (current_++ >= table_.rows.size())
+        if (current_ >= table_.rows.size())
             return false;
 
-        out = table_.rows[current_];
+        out = table_.rows[current_++];
         return true;
     }
 

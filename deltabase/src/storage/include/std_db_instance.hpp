@@ -19,6 +19,9 @@ namespace storage
         void
         init();
 
+        ssize_t
+        has_available_page(const std::vector<types::DataPage>& vec, size_t size) const;
+
     public:
         explicit
         StdDbInstance(const types::Config& cfg);
@@ -66,6 +69,11 @@ namespace storage
             const std::vector<types::ColumnDefinition>& columns
         ) override;
 
+        void
+        create_schema(const std::string& schema_name) override;
+
+        bool
+        exists_schema(const std::string& schema_name) override;
     };
 }
 

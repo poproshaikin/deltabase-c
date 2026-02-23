@@ -107,4 +107,21 @@ namespace misc
 
         return flags;
     }
-}
+
+    DataRow
+    convert(const ValuesExpr& values_expr)
+    {
+        std::vector<DataToken> tokens(values_expr.values.size());
+
+        for (const auto& sql_token : values_expr.values)
+        {
+            tokens.emplace_back(DataToken(sql_token));
+        }
+
+        DataRow row;
+        row.id = 0;
+        row.flags = DataRowFlags::NONE;
+        row.tokens = std::move(tokens);
+        return row;
+    }
+} // namespace misc

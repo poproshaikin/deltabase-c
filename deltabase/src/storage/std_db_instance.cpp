@@ -5,8 +5,8 @@
 #include "std_db_instance.hpp"
 
 #include "file_io_manager.hpp"
+#include "io_manager_factory.hpp"
 #include "logger.hpp"
-#include "path.hpp"
 #include "std_binary_serializer.hpp"
 
 #include "../misc/include/convert.hpp"
@@ -27,26 +27,13 @@ namespace storage
 
     StdDbInstance::StdDbInstance(const Config& cfg) : cfg_(cfg)
     {
-        Logger::info("Initializing database instance");
-
         if (!std::filesystem::exists(cfg.db_path))
             std::filesystem::create_directories(cfg.db_path);
 
-        switch (cfg.io_type)
-        {
-        case Config::IoType::File:
-            io_manager_ = std::make_unique<FileIOManager>(cfg.db_path, cfg.serializer_type);
-            break;
-        default:
-            throw std::runtime_error(
-                "StdDbInstance::StdDbInstance: unknown IO type " + std::to_string(
-                    static_cast<int>(cfg.io_type)
-                )
-            );
-        }
+        IOManagerFactory io_factory;
+        io_manager_ = io_factory.make_io_manager(cfg);
 
         init();
-        Logger::info("Initialization of a database instance completed");
     }
 
     StdDbInstance::~StdDbInstance()
@@ -84,6 +71,19 @@ namespace storage
         return dt;
     }
 
+    ssize_t
+    StdDbInstance::has_available_page(const std::vector<DataPage>& vec, size_t size) const
+    {
+        if (vec.size() == 0)
+            return -1;
+
+        for (size_t i = 0; i < vec.size(); i++)
+            if (vec[i].size + size <= DataPage::MAX_SIZE)
+                return i;
+
+        return -1;
+    }
+
     void
     StdDbInstance::insert_row(
         const std::string& table_name,
@@ -98,16 +98,17 @@ namespace storage
         data_row.id = table.last_rid++;
         data_row.tokens = std::move(row);
 
-        for (auto& page : pages)
-        {
-            if (page.size + io_manager_->estimate_size(data_row) > io_manager_->max_dp_size())
-                continue;
+        size_t row_size = io_manager_->estimate_size(data_row);
 
-            page.rows.push_back(data_row);
+        if (int idx = has_available_page(pages, row_size); idx == -1)
+            pages.emplace_back(io_manager_->create_page(table));
 
-            io_manager_->write_page(page);
-            break;
-        }
+        int idx = has_available_page(pages, row_size);
+        if (idx == -1)
+            throw std::runtime_error("StdDbInstance::insert_row: Failed to create new data page");
+
+        pages[idx].rows.push_back(data_row);
+        io_manager_->write_page(pages[idx]);
 
         io_manager_->write_mt(table, schema_name);
     }
@@ -172,13 +173,37 @@ namespace storage
         auto schema = io_manager_->load_schema_meta(schema_name);
 
         MetaTable mt;
+        mt.id = Uuid::make();
         mt.name = table_name;
         mt.schema_id = schema.id;
         mt.last_rid = 0;
         mt.columns.reserve(columns.size());
-        for (const auto& column : columns)
-            mt.columns.emplace_back(MetaColumn(column));
+        for (const auto& col_def : columns)
+        {
+            MetaColumn column(col_def);
+            std::cout << "column name: " << column.name << std::endl;
+            std::cout << "column type: " << static_cast<int>(column.type) << std::endl;
+            mt.columns.emplace_back(column);
 
-        io_manager_->write_mt(mt, schema.name);
+        }
+
+        io_manager_->write_mt(mt, schema_name);
     }
-}
+
+    void
+    StdDbInstance::create_schema(const std::string& schema_name)
+    {
+        MetaSchema ms;
+        ms.id = Uuid::make();
+        ms.name = schema_name;
+        ms.db_name = cfg_.db_name.value();
+
+        io_manager_->write_ms(ms);
+    }
+
+    bool
+    StdDbInstance::exists_schema(const std::string& schema_name)
+    {
+        return io_manager_->exists_schema(schema_name);
+    }
+} // namespace storage

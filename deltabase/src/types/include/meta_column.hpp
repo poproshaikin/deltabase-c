@@ -40,8 +40,10 @@ namespace types
 
         explicit
         MetaColumn() = default;
+
         explicit
         MetaColumn(const ColumnDefinition& def);
+
         explicit
         MetaColumn(const std::string& name, DataType type, MetaColumnFlags flags);
     };

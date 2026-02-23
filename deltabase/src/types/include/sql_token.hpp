@@ -5,6 +5,8 @@
 #ifndef DELTABASE_SQL_TOKEN_HPP
 #define DELTABASE_SQL_TOKEN_HPP
 
+#include <iostream>
+#include <ostream>
 #include <stdexcept>
 #include <unordered_map>
 #include <variant>
@@ -88,7 +90,7 @@ namespace types
 
     enum class SqlLiteral
     {
-        INTEGER = 0,
+        INTEGER = 1,
         STRING,
         BOOL,
         CHAR,
@@ -97,13 +99,8 @@ namespace types
         COUNT
     };
 
-    using SqlTokenDetail = std::variant<
-        std::monostate,
-        SqlKeyword,
-        SqlOperator,
-        SqlSymbol,
-        SqlLiteral
-    >;
+    using SqlTokenDetail =
+        std::variant<std::monostate, SqlKeyword, SqlOperator, SqlSymbol, SqlLiteral>;
 
     struct SqlToken
     {
@@ -115,11 +112,13 @@ namespace types
 
         SqlToken() = default;
 
-        SqlToken(SqlTokenType type,
-                 std::string value,
-                 size_t line,
-                 size_t position,
-                 SqlTokenDetail detail = std::monostate());
+        SqlToken(
+            SqlTokenType type,
+            std::string value,
+            size_t line,
+            size_t position,
+            SqlTokenDetail detail = std::monostate()
+        );
 
         bool
         is_data_type() const;
@@ -140,9 +139,9 @@ namespace types
         TDetail
         get_detail() const
         {
-            if constexpr (
-                std::is_same_v<TDetail, SqlKeyword> || std::is_same_v<TDetail, SqlOperator> ||
-                std::is_same_v<TDetail, SqlSymbol> || std::is_same_v<TDetail, SqlLiteral>)
+            if constexpr (std::is_same_v<TDetail, SqlKeyword> ||
+                          std::is_same_v<TDetail, SqlOperator> ||
+                          std::is_same_v<TDetail, SqlSymbol> || std::is_same_v<TDetail, SqlLiteral>)
             {
                 if (std::holds_alternative<TDetail>(detail))
                 {
@@ -165,6 +164,6 @@ namespace types
             return this->value;
         }
     };
-}
+} // namespace types
 
-#endif //DELTABASE_SQL_TOKEN_HPP
+#endif // DELTABASE_SQL_TOKEN_HPP

@@ -7,16 +7,19 @@
 
 #include "cli_context.hpp"
 #include "cli_command.hpp"
+#include "../../engine/include/engine.hpp"
+
 
 namespace cli
 {
     class MetaExecutor
     {
         CliContext& ctx_;
+        engine::Engine& engine_;
 
     public:
         explicit
-        MetaExecutor(CliContext& ctx);
+        MetaExecutor(CliContext& ctx, engine::Engine& engine);
 
         void
         execute(const CliCommand& command) const;

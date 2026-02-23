@@ -8,8 +8,10 @@ namespace cli
 {
     using namespace types;
 
-    Cli::Cli(const CliContext& ctx) : ctx_(ctx), io_(ctx_), meta_exq_(ctx_)
+    Cli::Cli(const CliContext& ctx) : ctx_(ctx), io_(ctx_), meta_exq_(ctx_, engine_)
     {
+        if (!ctx_.attached_db.empty())
+            engine_.attach_db(ctx_.attached_db);
     }
 
     void
@@ -37,7 +39,13 @@ namespace cli
             std::string cmd = io_.get_command();
             CliCommand command = parser_.parse(cmd);
 
-            auto type = std::visit([](auto&& cmd){ return cmd.type; }, command);
+            auto type = std::visit(
+                [](auto&& cmd)
+                {
+                    return cmd.type;
+                },
+                command
+            );
             if (is_meta_command(type))
             {
                 meta_exq_.execute(command);

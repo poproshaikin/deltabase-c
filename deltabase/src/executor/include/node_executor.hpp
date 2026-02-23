@@ -4,11 +4,11 @@
 
 #ifndef DELTABASE_NODE_EXECUTOR_HPP
 #define DELTABASE_NODE_EXECUTOR_HPP
-#include "evaluator.hpp"
+#include "../../storage/include/db_instance.hpp"
 #include "../../types/include/data_row.hpp"
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/query_plan.hpp"
-#include "../../storage/include/db_instance.hpp"
+#include "evaluator.hpp"
 
 namespace exq
 {
@@ -40,8 +40,7 @@ namespace exq
         uint64_t index_ = 0;
 
     public:
-        explicit
-        SeqScanNodeExecutor(
+        explicit SeqScanNodeExecutor(
             storage::IDbInstance& storage,
             const std::string& table_name,
             const std::string& schema_name
@@ -68,8 +67,7 @@ namespace exq
         std::unique_ptr<INodeExecutor> child_;
 
     public:
-        explicit
-        FilterNodeExecutor(
+        explicit FilterNodeExecutor(
             const types::MetaTable& table,
             types::BinaryExpr&& condition,
             std::unique_ptr<INodeExecutor> child
@@ -96,8 +94,7 @@ namespace exq
         std::unique_ptr<INodeExecutor> child_;
 
     public:
-        explicit
-        ProjectionNodeExecutor(
+        explicit ProjectionNodeExecutor(
             const types::MetaTable& table,
             const std::vector<std::string>& columns,
             std::unique_ptr<INodeExecutor> child
@@ -123,8 +120,7 @@ namespace exq
         std::unique_ptr<INodeExecutor> child_;
 
     public:
-        explicit
-        LimitNodeExecutor(uint64_t limit, std::unique_ptr<INodeExecutor> child);
+        explicit LimitNodeExecutor(uint64_t limit, std::unique_ptr<INodeExecutor> child);
 
         void
         open() override;
@@ -148,13 +144,33 @@ namespace exq
         bool executed_;
 
     public:
-        explicit
-        InsertNodeExecutor(
+        explicit InsertNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
             storage::IDbInstance& storage,
             std::unique_ptr<INodeExecutor> child
         );
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
+    class ValuesNodeExecutor final : public INodeExecutor
+    {
+        std::vector<types::DataRow> rows_;
+        size_t idx_ = 0;
+
+    public:
+        explicit ValuesNodeExecutor(const std::vector<types::DataRow>& rows);
 
         void
         open() override;
@@ -177,13 +193,32 @@ namespace exq
         storage::IDbInstance& db_;
 
     public:
-        explicit
-        CreateTableNodeExecutor(
+        explicit CreateTableNodeExecutor(
             const std::string& table_name,
             const types::MetaSchema& schema,
             std::vector<types::ColumnDefinition> columns,
             storage::IDbInstance& db
         );
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
+    class CreateDbNodeExecutor final : public INodeExecutor
+    {
+        std::string db_name_;
+
+    public:
+        explicit CreateDbNodeExecutor(const std::string& db_name);
 
         void
         open() override;
@@ -204,6 +239,6 @@ namespace exq
         std::unique_ptr<INodeExecutor>
         from_plan(std::unique_ptr<types::IPlanNode>&& node, storage::IDbInstance& db);
     };
-}
+} // namespace exq
 
-#endif //DELTABASE_NODE_EXECUTOR_HPP
+#endif // DELTABASE_NODE_EXECUTOR_HPP

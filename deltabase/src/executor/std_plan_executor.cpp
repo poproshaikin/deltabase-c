@@ -49,10 +49,10 @@ namespace exq
 
         auto root_exq = node_executor_factory_.from_plan(std::move(plan.root), db_);
 
-        root_exq->open();
         DataTable table;
         table.output_schema = root_exq->output_schema();
 
+        root_exq->open();
         while (true)
         {
             DataRow row;

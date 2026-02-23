@@ -11,9 +11,9 @@ namespace types
 {
     enum class DataType : uint64_t
     {
-        _NULL = 0,
         UNDEFINED = 0,
-        INTEGER = 1,
+        _NULL = 1,
+        INTEGER = 2,
         REAL,
         CHAR,
         BOOL,

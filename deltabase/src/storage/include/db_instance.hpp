@@ -4,7 +4,7 @@
 
 #ifndef DELTABASE_STORAGE_HPP
 #define DELTABASE_STORAGE_HPP
-#include "meta_schema.hpp"
+#include "../../types/include/meta_schema.hpp"
 #include "../../types/include/data_row.hpp"
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/config.hpp"
@@ -53,10 +53,16 @@ namespace storage
 
         virtual void
         create_table(
-            const std::string& string,
+            const std::string& table_name,
             const std::string& schema_name,
             const std::vector<types::ColumnDefinition>& vector
         ) = 0;
+
+        virtual void
+        create_schema(const std::string& schema_name) = 0;
+
+        virtual bool
+        exists_schema(const std::string& schema_name) = 0;
     };
 }
 

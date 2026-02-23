@@ -26,16 +26,12 @@ namespace engine
         exq::PlannerFactory planner_factory_;
 
         types::Config
-        load_config(const std::string& name, const std::filesystem::path& current_path) const;
+        load_config(const std::string& name, const std::filesystem::path& executable_path) const;
 
         void
-        init_db(std::unique_ptr<storage::IDbInstance> db);
-
-        std::unique_ptr<types::IExecutionResult>
-        execute_generic(types::QueryPlan&& plan);
+        set_db_instance(std::unique_ptr<storage::IDbInstance> db = nullptr);
 
     public:
-        explicit
         Engine();
 
         void

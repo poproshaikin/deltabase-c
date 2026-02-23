@@ -7,15 +7,14 @@
 #include "../misc/include/exceptions.hpp"
 
 #include <format>
+#include <iostream>
 
 namespace exq
 {
     using namespace types;
 
-    SemanticAnalyzer::SemanticAnalyzer(
-        const Config& config,
-        storage::IDbInstance& db
-    ) : db_(db), config_(config)
+    SemanticAnalyzer::SemanticAnalyzer(const Config& config, storage::IDbInstance& db)
+        : db_(db), config_(config), generic_validator_(config)
     {
     }
 
@@ -89,13 +88,15 @@ namespace exq
             if (!table.has_column(col.value))
                 return AnalysisResult(ColumnDoesntExists(col.value));
 
-        auto get_column = [&stmt, &table](int value_idx)
-            -> std::optional<std::reference_wrapper<const MetaColumn> >
+        auto get_column = [&stmt, &table](
+                              int value_idx
+                          ) -> std::optional<std::reference_wrapper<const MetaColumn>>
         {
             const auto& name = stmt.columns.at(value_idx);
-            return table.has_column(name.value)
-                       ? std::optional(table.get_column(name.value))
-                       : std::nullopt;
+            if (!table.has_column(name.value))
+                return std::nullopt;
+
+            return std::cref(table.get_column(name.value));
         };
 
         for (const auto& values : stmt.values)
@@ -114,11 +115,15 @@ namespace exq
                 auto column_type = column.value().get().type;
 
                 if (!is_compatible(literal_type, column_type))
-                    return AnalysisResult(std::runtime_error(std::format(
-                        "Incompatible types conversion: {} to {}",
-                        static_cast<int>(literal_type),
-                        static_cast<int>(column_type)
-                    )));
+                    return AnalysisResult(
+                        std::runtime_error(
+                            std::format(
+                                "Incompatible types conversion: {} to {}",
+                                static_cast<int>(literal_type),
+                                static_cast<int>(column_type)
+                            )
+                        )
+                    );
             }
         }
 
@@ -227,29 +232,29 @@ namespace exq
         return AnalysisResult(true);
     }
 
-
     AnalysisResult
     SemanticAnalyzer::analyze_create_db(const CreateDbStatement& stmt) const
     {
-        if (db_.exists_db(stmt.name.value))
+        if (generic_validator_.exists_db(stmt.name.value))
             return AnalysisResult(static_cast<std::runtime_error>(DbExists(stmt.name.value)), true);
 
         return AnalysisResult(true, true);
     }
 
-
     AnalysisResult
     SemanticAnalyzer::analyze_column_assignment(
-        const BinaryExpr& expr,
-        const MetaTable& table) const
+        const BinaryExpr& expr, const MetaTable& table
+    ) const
     {
         if (expr.op != AstOperator::ASSIGN)
             return AnalysisResult(std::runtime_error("Invalid assignment: expected '='"));
 
-        if (expr.left->type != AstNodeType::IDENTIFIER ||
-            expr.right->type != AstNodeType::LITERAL)
-            return AnalysisResult(std::runtime_error(
-                "Invalid assignment: you can assign only literal to a identifier"));
+        if (expr.left->type != AstNodeType::IDENTIFIER || expr.right->type != AstNodeType::LITERAL)
+            return AnalysisResult(
+                std::runtime_error(
+                    "Invalid assignment: you can assign only literal to a identifier"
+                )
+            );
 
         const AstNode* column_node = expr.left.get();
         const AstNode* value_node = expr.right.get();
@@ -264,7 +269,8 @@ namespace exq
         auto literal_type = std::get<SqlLiteral>(value_token.detail);
         if (!is_compatible(literal_type, column.type))
             return AnalysisResult(
-                std::runtime_error("Incompatible types conversion in assignment"));
+                std::runtime_error("Incompatible types conversion in assignment")
+            );
 
         return AnalysisResult(true);
     }
@@ -273,26 +279,28 @@ namespace exq
     SemanticAnalyzer::analyze_column_comparison(
         const std::unique_ptr<AstNode>& left,
         const std::unique_ptr<AstNode>& right,
-        const MetaTable& table) const
+        const MetaTable& table
+    ) const
     {
         const AstNode* column_node = nullptr;
         const AstNode* value_node = nullptr;
 
-        if (left->type == AstNodeType::IDENTIFIER &&
-            right->type == AstNodeType::LITERAL)
+        if (left->type == AstNodeType::IDENTIFIER && right->type == AstNodeType::LITERAL)
         {
             column_node = left.get();
             value_node = right.get();
         }
-        else if (right->type == AstNodeType::IDENTIFIER &&
-                 left->type == AstNodeType::LITERAL)
+        else if (right->type == AstNodeType::IDENTIFIER && left->type == AstNodeType::LITERAL)
         {
             column_node = right.get();
             value_node = left.get();
         }
         else
-            return AnalysisResult(std::runtime_error(
-                "Invalid WHERE expression: comparison must be between column and literal"));
+            return AnalysisResult(
+                std::runtime_error(
+                    "Invalid WHERE expression: comparison must be between column and literal"
+                )
+            );
 
         const auto& column_token = std::get<SqlToken>(column_node->value);
         const auto& value_token = std::get<SqlToken>(value_node->value);
@@ -337,5 +345,4 @@ namespace exq
         return false;
     }
 
-
-}
+} // namespace exq

@@ -28,7 +28,7 @@ namespace cli
         Cli(const CliContext& ctx);
 
         void
-        execute_query(const CliCommand& command);
+        execute_query(const CliCommand& command) noexcept(false);
 
         void
         run();

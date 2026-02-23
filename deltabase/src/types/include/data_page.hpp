@@ -19,6 +19,8 @@ namespace types
         RowId min_rid = 0;
         RowId max_rid = 0;
         uint64_t rows_count = 0;
+
+        static constexpr uint64_t SIZE = sizeof(uuid_t) * 2 + sizeof(RowId) * 2 + sizeof(uint64_t);
     };
 
     struct DataPage
@@ -32,6 +34,17 @@ namespace types
         std::vector<DataRow> rows;
 
         DataPage() = default;
+
+        static DataPage
+        make(const fs::path& base_path, const Uuid& table_id)
+        {
+            DataPage page;
+            page.header.id = Uuid::make();
+            page.header.table_id = table_id;
+            page.size = DataPageHeader::SIZE;
+            page.path = base_path / page.header.id.to_string();
+            return page;
+        }
     };
 }
 

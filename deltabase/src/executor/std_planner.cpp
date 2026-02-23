@@ -53,9 +53,9 @@ namespace exq
         }
 
         throw std::runtime_error(
-            std::format("Unsupported query in StdPlanner::plan: {}",
-                        static_cast<std::underlying_type_t<decltype(ast.type)>>
-                        (ast.type)
+            std::format(
+                "Unsupported query in StdPlanner::plan: {}",
+                static_cast<std::underlying_type_t<decltype(ast.type)>>(ast.type)
             )
         );
     }
@@ -66,9 +66,8 @@ namespace exq
         // 1. SEQ SCAN
         auto scan = std::make_unique<SeqScanPlanNode>(
             stmt.table.table_name.value,
-            stmt.table.schema_name.has_value()
-                ? stmt.table.schema_name.value().value
-                : db_config_.default_schema
+            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
+                                               : db_config_.default_schema
         );
 
         std::unique_ptr<IPlanNode> node = std::move(scan);
@@ -77,9 +76,7 @@ namespace exq
         if (stmt.where)
         {
             auto filter = std::make_unique<FilterPlanNode>(
-                db_.get_table(stmt.table),
-                std::move(*stmt.where),
-                std::move(node)
+                db_.get_table(stmt.table), std::move(*stmt.where), std::move(node)
             );
             node = std::move(filter);
         }
@@ -91,11 +88,8 @@ namespace exq
             for (auto& c : stmt.columns)
                 cols.push_back(c.value);
 
-            auto project = std::make_unique<ProjectPlanNode>(
-                db_.get_table(stmt.table),
-                cols,
-                std::move(node)
-            );
+            auto project =
+                std::make_unique<ProjectPlanNode>(db_.get_table(stmt.table), cols, std::move(node));
             node = std::move(project);
         }
 
@@ -123,7 +117,7 @@ namespace exq
 
         auto values_node = std::make_unique<ValuesPlanNode>(std::move(rows));
 
-        std::optional<std::vector<std::string> > cols{};
+        std::optional<std::vector<std::string>> cols{};
         if (!stmt.columns.empty())
         {
             std::vector<std::string> col_names;
@@ -134,9 +128,8 @@ namespace exq
 
         auto insert = std::make_unique<InsertPlanNode>(
             stmt.table.table_name.value,
-            stmt.table.schema_name.has_value()
-                ? stmt.table.schema_name.value().value
-                : db_config_.default_schema,
+            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
+                                               : db_config_.default_schema,
             cols,
             std::move(values_node)
         );
@@ -176,25 +169,20 @@ namespace exq
             }
         }
 
-        std::unique_ptr<IPlanNode> root =
-            std::make_unique<SeqScanPlanNode>(
-                stmt.table.table_name,
-                stmt.table.schema_name.has_value()
-                    ? stmt.table.schema_name.value().value
-                    : db_config_.default_schema
-            );
+        std::unique_ptr<IPlanNode> root = std::make_unique<SeqScanPlanNode>(
+            stmt.table.table_name,
+            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
+                                               : db_config_.default_schema
+        );
 
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                db_.get_table(stmt.table),
-                std::move(*stmt.where),
-                std::move(root));
+                db_.get_table(stmt.table), std::move(*stmt.where), std::move(root)
+            );
         }
 
-        auto update = std::make_unique<UpdatePlanNode>(
-            std::move(assignments),
-            std::move(root));
+        auto update = std::make_unique<UpdatePlanNode>(std::move(assignments), std::move(root));
 
         QueryPlan plan;
         plan.root = std::move(update);
@@ -208,20 +196,17 @@ namespace exq
     QueryPlan
     StdPlanner::plan_delete(DeleteStatement& stmt) const
     {
-        std::unique_ptr<IPlanNode> root =
-            std::make_unique<SeqScanPlanNode>(
-                stmt.table.table_name,
-                stmt.table.schema_name.has_value()
-                    ? stmt.table.schema_name.value().value
-                    : db_config_.default_schema
-            );
+        std::unique_ptr<IPlanNode> root = std::make_unique<SeqScanPlanNode>(
+            stmt.table.table_name,
+            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
+                                               : db_config_.default_schema
+        );
 
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                db_.get_table(stmt.table),
-                std::move(*stmt.where),
-                std::move(root));
+                db_.get_table(stmt.table), std::move(*stmt.where), std::move(root)
+            );
         }
 
         auto del = std::make_unique<DeletePlanNode>(std::move(root));
@@ -238,8 +223,7 @@ namespace exq
     QueryPlan
     StdPlanner::plan_create_db(CreateDbStatement& stmt) const
     {
-        std::unique_ptr<IPlanNode> root =
-            std::make_unique<CreateDbPlanNode>(stmt.name);
+        std::unique_ptr<IPlanNode> root = std::make_unique<CreateDbPlanNode>(stmt.name);
 
         QueryPlan plan;
         plan.root = std::move(root);
@@ -252,14 +236,14 @@ namespace exq
     QueryPlan
     StdPlanner::plan_create_table(const CreateTableStatement& table) const
     {
-        MetaSchema schema = db_.get_schema(
-            table.table.schema_name.has_value()
-                ? table.table.schema_name.value().value
-                : db_config_.default_schema
-        );
+        auto name = table.table.schema_name.has_value() ? table.table.schema_name.value().value
+                                                        : db_config_.default_schema;
 
-        std::unique_ptr<IPlanNode> root =
-            std::make_unique<CreateTablePlanNode>(table.table.table_name.value, schema, table.columns);
+        MetaSchema schema = db_.get_schema(name);
+
+        std::unique_ptr<IPlanNode> root = std::make_unique<CreateTablePlanNode>(
+            table.table.table_name.value, schema, table.columns
+        );
 
         QueryPlan plan;
         plan.root = std::move(root);
@@ -268,4 +252,4 @@ namespace exq
         plan.db_specific = true;
         return plan;
     }
-}
+} // namespace exq

@@ -21,12 +21,6 @@ namespace storage
         fs::path db_path_;
         std::unique_ptr<IBinarySerializer> serializer_;
 
-        types::Bytes
-        read_file(const fs::path& path) const;
-
-        void
-        write_file(const fs::path& path, const types::Bytes& content) const;
-
         void
         for_each_in_db(const std::function<void(fs::directory_entry)>& func) const;
 
@@ -58,13 +52,10 @@ namespace storage
 
     public:
         explicit
-        FileIOManager(const fs::path& db_path, types::Config::SerializerType serializer_type);
+        FileIOManager(const fs::path& db_path, const std::string& db_name, types::Config::SerializerType serializer_type);
 
         void
         init() override;
-
-        constexpr uint64_t
-        max_dp_size() override;
 
         std::vector<types::MetaTable>
         load_tables_meta() override;
@@ -75,8 +66,11 @@ namespace storage
         types::MetaSchema
         load_schema_meta(const std::string& target_schema) override;
 
+        types::MetaSchema
+        load_schema_meta(const types::Uuid& schema_id) override;
+
         bool
-        exists_table(const std::string& string, const std::string& schema_name) override;
+        exists_table(const std::string& table_name, const std::string& schema_name) override;
 
         std::vector<std::pair<types::Uuid, std::vector<types::DataPage> > >
         load_tables_data() override;
@@ -97,10 +91,19 @@ namespace storage
         write_mt(const types::MetaTable& table, const std::string& schema_name) override;
 
         void
-        write_cfg(const types::Config& db) override;
+        write_cfg(const types::Config& cfg) override;
 
         bool
         exists_db(const std::string& name) override;
+
+        void
+        write_ms(const types::MetaSchema& ms) override;
+
+        types::DataPage
+        create_page(const types::MetaTable& id) override;
+
+        bool
+        exists_schema(const std::string& schema_name) override;
     };
 }
 

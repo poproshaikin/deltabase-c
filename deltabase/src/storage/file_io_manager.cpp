@@ -3,31 +3,27 @@
 //
 
 #include "include/file_io_manager.hpp"
+
+#include "binary_serializer_factory.hpp"
+#include "file_utils.hpp"
 #include "path.hpp"
 #include "std_binary_serializer.hpp"
 
 #include <chrono>
 #include <fstream>
+#include <iostream>
 
 namespace storage
 {
     using namespace types;
 
     FileIOManager::FileIOManager(
-        const fs::path& db_path,
-        Config::SerializerType serializer_type
-    ) : db_path_(db_path)
+        const fs::path& db_path, const std::string& db_name, Config::SerializerType serializer_type
+    )
+        : db_path_(db_path), db_name_(db_name)
     {
-        switch (serializer_type)
-        {
-        case Config::SerializerType::Std:
-            serializer_ = std::make_unique<StdBinarySerializer>(StdBinarySerializer());
-            break;
-        default:
-            throw std::runtime_error(
-                "FileIOManager::FileIOManager: unknown serializer type " + std::to_string(
-                    static_cast<int>(serializer_type)));
-        }
+        BinarySerializerFactory factory;
+        serializer_ = factory.make_binary_serializer(serializer_type);
     }
 
     void
@@ -37,37 +33,6 @@ namespace storage
 
         if (!fs::exists(path))
             fs::create_directories(path);
-    }
-
-    Bytes
-    FileIOManager::read_file(const fs::path& path) const
-    {
-        std::ifstream file(path, std::ios::binary | std::ios::ate);
-        if (!file)
-            throw std::runtime_error("Cannot open file: " + std::string(path));
-
-        std::streamsize size = file.tellg(); // file size
-        file.seekg(0, std::ios::beg); // return to start
-
-        std::vector<uint8_t> buffer(size);
-
-        if (!file.read(reinterpret_cast<char*>(buffer.data()), size))
-        {
-            throw std::runtime_error("Error reading file: " + std::string(path));
-        }
-
-        return buffer;
-    }
-
-    void
-    FileIOManager::write_file(const fs::path& path, const Bytes& content) const
-    {
-        if (!fs::exists(path.parent_path()))
-            fs::create_directories(path.parent_path());
-
-        std::ofstream file(path, std::ios::binary);
-        file.write(reinterpret_cast<const char*>(content.data()), content.size());
-        file.close();
     }
 
     void
@@ -84,49 +49,54 @@ namespace storage
     void
     FileIOManager::for_each_schema(const std::function<void(fs::directory_entry)>& func) const
     {
-        for_each_in_db([&](const fs::directory_entry& entry_in_db)
-        {
-            if (!entry_in_db.is_directory())
-                return;
+        for_each_in_db(
+            [&](const fs::directory_entry& entry_in_db)
+            {
+                if (!entry_in_db.is_directory())
+                    return;
 
-            func(entry_in_db);
-        });
+                func(entry_in_db);
+            }
+        );
     }
 
     void
     FileIOManager::for_each_in_schema(
-        const std::string& schema_name,
-        const std::function<void(fs::directory_entry)>& func
+        const std::string& schema_name, const std::function<void(fs::directory_entry)>& func
     ) const
     {
-        for_each_in_db([&](const fs::directory_entry& entry)
-        {
-            if (entry.path().filename() != schema_name)
-                return;
-
-            for (const auto& schema_entry : fs::directory_iterator(entry.path()))
+        for_each_in_db(
+            [&](const fs::directory_entry& entry)
             {
-                func(schema_entry);
+                if (entry.path().filename() != schema_name)
+                    return;
+
+                for (const auto& schema_entry : fs::directory_iterator(entry.path()))
+                {
+                    func(schema_entry);
+                }
             }
-        });
+        );
     }
 
     void
     FileIOManager::for_each_table(const std::function<void(fs::directory_entry)>& func) const
     {
-        for_each_in_db([&](const fs::directory_entry& schema_entry)
-        {
-            if (!schema_entry.is_directory())
-                return;
-
-            for (const auto& dir_in_schema : fs::directory_iterator(schema_entry.path()))
+        for_each_in_db(
+            [&](const fs::directory_entry& schema_entry)
             {
-                if (!dir_in_schema.is_directory())
-                    continue;
+                if (!schema_entry.is_directory())
+                    return;
 
-                func(dir_in_schema);
+                for (const auto& dir_in_schema : fs::directory_iterator(schema_entry.path()))
+                {
+                    if (!dir_in_schema.is_directory())
+                        continue;
+
+                    func(dir_in_schema);
+                }
             }
-        });
+        );
     }
 
     void
@@ -163,6 +133,12 @@ namespace storage
     {
         auto path = path_db_schema_table_data(db_path_, db_name_, schema_name, table_name);
 
+        if (!fs::exists(path))
+        {
+            fs::create_directories(path);
+            return;
+        }
+
         for (const auto& entry : fs::directory_iterator(path))
         {
             if (entry.is_directory())
@@ -177,31 +153,33 @@ namespace storage
     {
         std::vector<MetaSchema> schemas;
 
-        for_each_schema([&](const fs::directory_entry& dir_in_db)
-        {
-            std::string schema_name = dir_in_db.path().filename();
-
-            for (const auto& entry_in_schema : fs::directory_iterator(dir_in_db.path()))
+        for_each_schema(
+            [&](const fs::directory_entry& dir_in_db)
             {
-                if (entry_in_schema.is_directory())
-                    continue;
+                std::string schema_name = dir_in_db.path().filename();
 
-                if (make_meta_filename(schema_name) != entry_in_schema.path().filename())
-                    continue;
+                for (const auto& entry_in_schema : fs::directory_iterator(dir_in_db.path()))
+                {
+                    if (entry_in_schema.is_directory())
+                        continue;
 
-                auto content = read_file(entry_in_schema.path());
+                    if (make_meta_filename(schema_name) != entry_in_schema.path().filename())
+                        continue;
 
-                auto stream = misc::ReadOnlyMemoryStream(content);
-                MetaSchema out;
-                if (!serializer_->deserialize_ms(stream, out))
-                    throw std::runtime_error(
-                        "FileIOManager::load_schemas: Error deserializing meta file: " +
-                        path_db(db_path_, db_name_).string()
-                    );
+                    auto content = read_file(entry_in_schema.path());
 
-                schemas.push_back(std::move(out));
+                    auto stream = misc::ReadOnlyMemoryStream(content);
+                    MetaSchema out;
+                    if (!serializer_->deserialize_ms(stream, out))
+                        throw std::runtime_error(
+                            "FileIOManager::load_schemas: Error deserializing meta file: " +
+                            path_db(db_path_, db_name_).string()
+                        );
+
+                    schemas.push_back(std::move(out));
+                }
             }
-        });
+        );
 
         return schemas;
     }
@@ -209,30 +187,66 @@ namespace storage
     MetaSchema
     FileIOManager::load_schema_meta(const std::string& target_schema)
     {
-        MetaSchema schema;
-        for_each_schema([&](const fs::directory_entry& schema_entry)
-        {
-            const auto& schema_name = schema_entry.path().filename();
-            if (schema_name == target_schema)
+        MetaSchema schema{};
+        for_each_schema(
+            [&](const fs::directory_entry& schema_entry)
             {
-                auto path = path_db_schema_meta(db_path_, db_name_, schema_name);
-                auto content = read_file(path);
-                auto stream = misc::ReadOnlyMemoryStream(content);
+                const auto& schema_name = schema_entry.path().filename();
+                if (schema_name == target_schema)
+                {
+                    auto path = path_db_schema_meta(db_path_, db_name_, schema_name);
+                    auto content = read_file(path);
+                    auto stream = misc::ReadOnlyMemoryStream(content);
 
-                if (!serializer_->deserialize_ms(stream, schema))
-                    throw std::runtime_error(
-                        "FileIOManager::load_schemas: Error deserializing meta file: " +
-                        path_db(db_path_, db_name_).string()
-                    );
-
+                    if (!serializer_->deserialize_ms(stream, schema))
+                        throw std::runtime_error(
+                            "FileIOManager::load_schemas: Error deserializing meta file: " +
+                            path_db(db_path_, db_name_).string()
+                        );
+                }
             }
-        });
+        );
         if (schema == MetaSchema{})
             throw std::runtime_error(
                 "FileIOManager::load_schemas: Schema " + target_schema + " not found"
             );
 
-        return MetaSchema{};
+        return schema;
+    }
+
+    MetaSchema
+    FileIOManager::load_schema_meta(const Uuid& schema_id)
+    {
+        MetaSchema schema{};
+
+        for_each_schema(
+            [&](const fs::directory_entry& schema_entry)
+            {
+                const auto& schema_name = schema_entry.path().filename();
+                auto path = path_db_schema_meta(db_path_, db_name_, schema_name);
+
+                auto content = read_file(path);
+                auto stream = misc::ReadOnlyMemoryStream(content);
+
+                MetaSchema deserialized;
+                if (!serializer_->deserialize_ms(stream, deserialized))
+                    throw std::runtime_error(
+                        "FileIOManager::load_schema_meta: Error deserializing meta file: " +
+                        path_db(db_path_, db_name_).string()
+                    );
+
+                if (deserialized.id == schema_id)
+                    schema = std::move(deserialized);
+            }
+        );
+
+        if (schema.id != schema_id)
+            throw std::runtime_error(
+                "FileIOManager::load_schema_meta: Failed to find schema with id " +
+                schema_id.to_string()
+            );
+
+        return schema;
     }
 
     bool
@@ -247,83 +261,91 @@ namespace storage
     {
         std::vector<MetaTable> tables;
 
-        for_each_table([&](const fs::directory_entry& table_dir)
-        {
-            std::string table_name = table_dir.path().filename();
-
-            for (const auto& entry_in_table : fs::directory_iterator(table_dir.path()))
+        for_each_table(
+            [&](const fs::directory_entry& table_dir)
             {
-                if (entry_in_table.is_directory())
-                    continue;
+                std::string table_name = table_dir.path().filename();
 
-                if (make_meta_filename(table_name) != entry_in_table.path().filename())
-                    continue;
+                for (const auto& entry_in_table : fs::directory_iterator(table_dir.path()))
+                {
+                    if (entry_in_table.is_directory())
+                        continue;
 
-                auto content = read_file(entry_in_table.path());
+                    if (make_meta_filename(table_name) != entry_in_table.path().filename())
+                        continue;
 
-                MetaTable out;
-                misc::ReadOnlyMemoryStream stream(content);
-                if (!serializer_->deserialize_mt(stream, out))
-                    throw std::runtime_error(
-                        "FileIOManager::load_tables: Error deserializing meta file: " +
-                        path_db(db_path_, db_name_).string()
-                    );
-                tables.push_back(std::move(out));
+                    auto content = read_file(entry_in_table.path());
+
+                    MetaTable out;
+                    misc::ReadOnlyMemoryStream stream(content);
+                    if (!serializer_->deserialize_mt(stream, out))
+                        throw std::runtime_error(
+                            "FileIOManager::load_tables: Error deserializing meta file: " +
+                            path_db(db_path_, db_name_).string()
+                        );
+                    tables.push_back(std::move(out));
+                }
             }
-        });
+        );
 
         return tables;
     }
 
-    std::vector<std::pair<Uuid, std::vector<DataPage> > >
+    std::vector<std::pair<Uuid, std::vector<DataPage>>>
     FileIOManager::load_tables_data()
     {
-        std::vector<std::pair<Uuid, std::vector<DataPage> > > tables;
+        std::vector<std::pair<Uuid, std::vector<DataPage>>> tables;
 
-        for_each_table([&](const fs::directory_entry& table_dir)
-        {
-            std::string table_name = table_dir.path().filename();
-
-            MetaTable table;
-            std::vector<DataPage> data;
-
-            for (const auto& entry_in_table : fs::directory_iterator(table_dir.path()))
+        for_each_table(
+            [&](const fs::directory_entry& table_dir)
             {
-                if (entry_in_table.is_directory() &&
-                    entry_in_table.path().filename().string() == PATH_DATA)
+                std::string table_name = table_dir.path().filename();
+
+                MetaTable table;
+                std::vector<DataPage> data;
+
+                for (const auto& entry_in_table : fs::directory_iterator(table_dir.path()))
                 {
-                    for (const auto& entry_in_data : fs::directory_iterator(entry_in_table.path()))
+                    if (entry_in_table.is_directory() &&
+                        entry_in_table.path().filename().string() == PATH_DATA)
                     {
-                        if (entry_in_data.is_directory())
-                            continue;
+                        for (const auto& entry_in_data :
+                             fs::directory_iterator(entry_in_table.path()))
+                        {
+                            if (entry_in_data.is_directory())
+                                continue;
 
-                        auto content = read_file(entry_in_data.path());
+                            auto content = read_file(entry_in_data.path());
 
-                        DataPage page;
+                            DataPage page;
+                            misc::ReadOnlyMemoryStream stream(content);
+                            if (!serializer_->deserialize_dp(stream, page))
+                                throw std::runtime_error(
+                                    "FileIOManager::load_tables_data: failed to deserialize data "
+                                    "page"
+                                );
+                            page.path = entry_in_data.path();
+
+                            data.push_back(std::move(page));
+                        }
+                    }
+
+                    if (entry_in_table.is_regular_file() &&
+                        entry_in_table.path().filename().string() == make_meta_filename(table_name))
+                    {
+                        auto content = read_file(entry_in_table.path());
+
                         misc::ReadOnlyMemoryStream stream(content);
-                        if (!serializer_->deserialize_dp(stream, page))
+                        if (!serializer_->deserialize_mt(stream, table))
                             throw std::runtime_error(
-                                "FileIOManager::load_tables_data: failed to deserialize data page");
-                        page.path = entry_in_data.path();
-
-                        data.push_back(std::move(page));
+                                "FileIOManager::load_tables_data: failed to deserialize meta table"
+                            );
                     }
                 }
 
-                if (entry_in_table.is_regular_file() &&
-                    entry_in_table.path().filename().string() == make_meta_filename(table_name))
-                {
-                    auto content = read_file(entry_in_table.path());
-
-                    misc::ReadOnlyMemoryStream stream(content);
-                    if (!serializer_->deserialize_mt(stream, table))
-                        throw std::runtime_error(
-                            "FileIOManager::load_tables_data: failed to deserialize meta table");
-                }
+                tables.emplace_back(std::make_pair(table.id, std::move(data)));
             }
-
-            tables.emplace_back(std::make_pair(table.id, std::move(data)));
-        });
+        );
 
         return tables;
     }
@@ -338,7 +360,8 @@ namespace storage
         misc::ReadOnlyMemoryStream stream(content);
         if (!serializer_->deserialize_mt(stream, table))
             throw std::runtime_error(
-                "FileIOManager::load_table_meta: Error deserializing meta table " + path.string());
+                "FileIOManager::load_table_meta: Error deserializing meta table " + path.string()
+            );
 
         return table;
     }
@@ -359,9 +382,12 @@ namespace storage
                 misc::ReadOnlyMemoryStream stream(content);
                 if (!serializer_->deserialize_dp(stream, page))
                     throw std::runtime_error(
-                        "FileIoManager::load_table_data: failed to deserialize data page + "
-                        + entry.path().filename().string());
+                        "FileIoManager::load_table_data: failed to deserialize data page " +
+                        entry.path().filename().string()
+                    );
+
                 page.path = entry.path();
+                page.size = content.size();
 
                 pages.push_back(std::move(page));
             }
@@ -375,12 +401,6 @@ namespace storage
     {
         auto serialized = serializer_->serialize_dp(page);
         write_file(page.path, serialized.to_vector());
-    }
-
-    constexpr uint64_t
-    FileIOManager::max_dp_size()
-    {
-        return 16 * 1024; // 16 Kb
     }
 
     uint64_t
@@ -398,10 +418,18 @@ namespace storage
     }
 
     void
-    FileIOManager::write_cfg(const Config& db)
+    FileIOManager::write_ms(const MetaSchema& ms)
     {
-        auto path = path_db_meta(db_path_, db.name);
-        auto serialized = serializer_->serialize_cfg(db);
+        auto path = path_db_schema_meta(db_path_, db_name_, ms.name);
+        auto serialized = serializer_->serialize_ms(ms);
+        write_file(path, serialized.to_vector());
+    }
+
+    void
+    FileIOManager::write_cfg(const Config& cfg)
+    {
+        auto path = path_db_meta(db_path_, cfg.db_name.value());
+        auto serialized = serializer_->serialize_cfg(cfg);
         write_file(path, serialized.to_vector());
     }
 
@@ -411,4 +439,19 @@ namespace storage
         auto path = path_db(db_path_, name);
         return fs::exists(path) && fs::is_directory(path);
     }
-}
+
+    DataPage
+    FileIOManager::create_page(const MetaTable& mt)
+    {
+        auto ms = load_schema_meta(mt.schema_id);
+        auto data_path = path_db_schema_table_data(db_path_, db_name_, ms.name, mt.name);
+        return DataPage::make(data_path, mt.id);
+    }
+
+    bool
+    FileIOManager::exists_schema(const std::string& schema_name)
+    {
+        auto path = path_db_schema_meta(db_path_, db_name_, schema_name);
+        return fs::exists(path) && fs::is_regular_file(path);
+    }
+} // namespace storage

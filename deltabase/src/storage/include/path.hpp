@@ -32,6 +32,12 @@ namespace storage
     }
 
     inline fs::path
+    path_data(const fs::path& data_dir)
+    {
+        return data_dir / PATH_DATA;
+    }
+
+    inline fs::path
     path_db_meta(const fs::path& db_path, const std::string& db_name)
     {
         return db_path / db_name / make_meta_filename(db_name);

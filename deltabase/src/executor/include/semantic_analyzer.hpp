@@ -4,7 +4,8 @@
 
 #ifndef DELTABASE_SEMANTIC_ANALYZER_HPP
 #define DELTABASE_SEMANTIC_ANALYZER_HPP
-#include "analysis_result.hpp"
+#include "generic_query_validator.hpp"
+#include "../../types/include/analysis_result.hpp"
 #include "../../storage/include/db_instance.hpp"
 
 namespace exq
@@ -12,6 +13,7 @@ namespace exq
     class SemanticAnalyzer
     {
         storage::IDbInstance& db_;
+        GenericQueryValidator generic_validator_;
         types::Config config_;
 
         types::AnalysisResult

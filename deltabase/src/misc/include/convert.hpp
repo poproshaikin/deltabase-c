@@ -36,6 +36,9 @@ namespace misc
 
     types::MetaColumnFlags
     convert_to_mcf(const std::vector<types::SqlToken>& tokens);
+
+    types::DataRow
+    convert(const types::ValuesExpr& values_expr);
 }
 
 #endif //DELTABASE_CONVERT_HPP

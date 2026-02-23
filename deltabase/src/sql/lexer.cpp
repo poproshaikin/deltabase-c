@@ -3,6 +3,8 @@
 //
 #include "lexer.hpp"
 #include "dictionary.hpp"
+
+#include <iostream>
 #include <sstream>
 
 namespace sql

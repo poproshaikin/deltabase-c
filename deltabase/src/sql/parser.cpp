@@ -183,14 +183,14 @@ namespace sql
         advance_or_throw();
         match_or_throw(SqlSymbol::LPAREN, "Expected left parenthesis");
 
+        ValuesExpr values{};
         while (true)
         {
             advance_or_throw("Invalid statement syntax");
             if (!match(SqlTokenType::LITERAL))
-            {
                 break;
-            }
-            stmt.values.push_back(ValuesExpr{.values = {current()}});
+
+            values.values.push_back(current());
 
             if (!advance() || !match(SqlSymbol::COMMA))
             {
@@ -198,6 +198,7 @@ namespace sql
                 break;
             }
         }
+        stmt.values.push_back(values);
 
         advance_or_throw();
         match_or_throw(SqlSymbol::RPAREN, "Expected right parenthesis");
@@ -324,8 +325,7 @@ namespace sql
     }
 
     std::vector<AstNode>
-    SqlParser::parse_tokens_list(SqlTokenType tokenType,
-                                 AstNodeType nodeType)
+    SqlParser::parse_tokens_list(SqlTokenType tokenType, AstNodeType nodeType)
     {
         std::vector<AstNode> tokens;
 
@@ -458,10 +458,8 @@ namespace sql
             expr.right =
                 std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, AstNodeValue(std::move(right)));
 
-            left = std::make_unique<AstNode>(
-                AstNodeType::BINARY_EXPR,
-                AstNodeValue(std::move(expr))
-            );
+            left =
+                std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, AstNodeValue(std::move(expr)));
         }
 
         if (left->type == AstNodeType::BINARY_EXPR)
@@ -514,12 +512,13 @@ namespace sql
         {
             advance();
             SqlToken copy = token;
-            return std::make_unique<
-                AstNode>(AstNodeType::IDENTIFIER, AstNodeValue(std::move(copy)));
+            return std::make_unique<AstNode>(
+                AstNodeType::IDENTIFIER, AstNodeValue(std::move(copy))
+            );
         }
 
         char buffer[256];
         snprintf(buffer, 256, "Unexpected token in expression: %s", token.to_string().data());
         throw std::runtime_error(buffer);
     }
-}
+} // namespace sql

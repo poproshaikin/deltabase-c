@@ -4,31 +4,41 @@
 
 #ifndef DELTABASE_UUID_HPP
 #define DELTABASE_UUID_HPP
+#include <cstring>
 #include <stdexcept>
 #include <string>
-#include <cstring>
 #include <uuid.h>
 
 namespace types
 {
     struct Uuid
     {
-        Uuid()
-        {
-            generate(value_);
-        }
+        Uuid() = default;
 
-        explicit
-        Uuid(uuid_t other)
+        explicit Uuid(uuid_t other)
         {
             std::memcpy(&value_, &other, sizeof(uuid_t));
         }
 
-        explicit
-        Uuid(const std::string& str)
+        explicit Uuid(const std::string& str)
         {
             if (uuid_parse(str.c_str(), value_) != 0)
                 throw std::invalid_argument("Invalid UUID string: " + str);
+        }
+
+        static Uuid
+        make()
+        {
+            Uuid uuid;
+            generate(uuid.value_);
+            return uuid;
+        }
+
+        static Uuid
+        null()
+        {
+            Uuid uuid{};
+            return uuid;
         }
 
         std::string
@@ -72,24 +82,20 @@ namespace types
             uuid_generate_time_v6(out);
         }
     };
-}
+} // namespace types
 
 namespace std
 {
-    template <>
-    struct hash<types::Uuid>
+    template <> struct hash<types::Uuid>
     {
         size_t
         operator()(const types::Uuid& uuid) const noexcept
         {
-            auto sv = std::string_view(
-                reinterpret_cast<const char*>(uuid.raw()),
-                16
-            );
+            auto sv = std::string_view(reinterpret_cast<const char*>(uuid.raw()), 16);
 
             return std::hash<std::string_view>{}(sv);
         }
     };
-}
+} // namespace std
 
-#endif //DELTABASE_UUID_HPP
+#endif // DELTABASE_UUID_HPP
