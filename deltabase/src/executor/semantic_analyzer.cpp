@@ -249,6 +249,9 @@ namespace exq
         if (expr.op != AstOperator::ASSIGN)
             return AnalysisResult(std::runtime_error("Invalid assignment: expected '='"));
 
+        std::cout << "left " << static_cast<int>(expr.left->type) << std::endl;
+        std::cout << "right " << static_cast<int>(expr.right->type) << std::endl;
+
         if (expr.left->type != AstNodeType::IDENTIFIER || expr.right->type != AstNodeType::LITERAL)
             return AnalysisResult(
                 std::runtime_error(

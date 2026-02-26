@@ -41,12 +41,9 @@ namespace types
 
     struct DataRow
     {
-        RowId id;
-        DataRowFlags flags;
+        RowId id{};
+        DataRowFlags flags{};
         std::vector<DataToken> tokens;
-
-        DataRow
-        update(const DataRowUpdate& update) const;
 
         DataRow() = default;
         explicit

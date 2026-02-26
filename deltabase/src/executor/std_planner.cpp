@@ -148,6 +148,10 @@ namespace exq
     {
         const auto table = db_.get_table(stmt.table);
 
+        const std::string schema_name = stmt.table.schema_name.has_value()
+                                            ? stmt.table.schema_name.value().value
+                                            : db_config_.default_schema;
+
         std::vector<Assignment> assignments;
         for (const auto& assignment : stmt.assignments)
         {
@@ -169,11 +173,8 @@ namespace exq
             }
         }
 
-        std::unique_ptr<IPlanNode> root = std::make_unique<SeqScanPlanNode>(
-            stmt.table.table_name,
-            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                               : db_config_.default_schema
-        );
+        std::unique_ptr<IPlanNode> root =
+            std::make_unique<SeqScanPlanNode>(stmt.table.table_name, schema_name);
 
         if (stmt.where)
         {
@@ -182,7 +183,9 @@ namespace exq
             );
         }
 
-        auto update = std::make_unique<UpdatePlanNode>(std::move(assignments), std::move(root));
+        auto update = std::make_unique<UpdatePlanNode>(
+            stmt.table.table_name, schema_name, std::move(assignments), std::move(root)
+        );
 
         QueryPlan plan;
         plan.root = std::move(update);

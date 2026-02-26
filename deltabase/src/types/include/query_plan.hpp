@@ -7,6 +7,7 @@
 #include "ast_tree.hpp"
 #include "data_row.hpp"
 #include "meta_schema.hpp"
+#include "meta_table.hpp"
 
 #include <string>
 #include <variant>
@@ -48,7 +49,8 @@ namespace types
             INSERT,
             UPDATE,
             DELETE,
-            CREATE_DB, CREATE_TABLE
+            CREATE_DB,
+            CREATE_TABLE
         };
 
         Type type = Type::UNDEFINED;
@@ -59,11 +61,7 @@ namespace types
     {
         std::unique_ptr<IPlanNode> child;
 
-        explicit
-        UnaryPlanNode(std::unique_ptr<IPlanNode> child)
-            : child(std::move(child))
-        {
-        };
+        explicit UnaryPlanNode(std::unique_ptr<IPlanNode> child) : child(std::move(child)) {};
     };
 
     struct LeafPlanNode : public IPlanNode
@@ -75,10 +73,8 @@ namespace types
         std::string table_name;
         std::string schema_name;
 
-        explicit
-        SeqScanPlanNode(std::string table, std::string schema)
-            : table_name(std::move(table)),
-              schema_name(std::move(schema))
+        explicit SeqScanPlanNode(std::string table, std::string schema)
+            : table_name(std::move(table)), schema_name(std::move(schema))
         {
         }
 
@@ -93,8 +89,7 @@ namespace types
     {
         std::vector<DataRow> values;
 
-        explicit
-        ValuesPlanNode(std::vector<DataRow>&& values) : values(std::move(values))
+        explicit ValuesPlanNode(std::vector<DataRow>&& values) : values(std::move(values))
         {
         }
 
@@ -110,11 +105,10 @@ namespace types
         BinaryExpr where;
         MetaTable table;
 
-        explicit
-        FilterPlanNode(const MetaTable& table, BinaryExpr expr, std::unique_ptr<IPlanNode> child)
-            : UnaryPlanNode(std::move(child)),
-              where(std::move(expr)),
-              table(table)
+        explicit FilterPlanNode(
+            const MetaTable& table, BinaryExpr expr, std::unique_ptr<IPlanNode> child
+        )
+            : UnaryPlanNode(std::move(child)), where(std::move(expr)), table(table)
         {
         }
 
@@ -130,13 +124,10 @@ namespace types
         const MetaTable table;
         std::vector<std::string> columns;
 
-        explicit
-        ProjectPlanNode(const MetaTable& table,
-                        std::vector<std::string> cols,
-                        std::unique_ptr<IPlanNode> child)
-            : UnaryPlanNode(std::move(child)),
-              table(table),
-              columns(std::move(cols))
+        explicit ProjectPlanNode(
+            const MetaTable& table, std::vector<std::string> cols, std::unique_ptr<IPlanNode> child
+        )
+            : UnaryPlanNode(std::move(child)), table(table), columns(std::move(cols))
         {
         }
 
@@ -151,10 +142,8 @@ namespace types
     {
         uint64_t limit;
 
-        explicit
-        LimitPlanNode(uint64_t limit, std::unique_ptr<IPlanNode> child)
-            : UnaryPlanNode(std::move(child)),
-              limit(limit)
+        explicit LimitPlanNode(uint64_t limit, std::unique_ptr<IPlanNode> child)
+            : UnaryPlanNode(std::move(child)), limit(limit)
         {
         }
 
@@ -169,18 +158,16 @@ namespace types
     {
         std::string table_name;
         std::string schema_name;
-        std::optional<std::vector<std::string> > column_names;
+        std::optional<std::vector<std::string>> column_names;
 
-        explicit
-        InsertPlanNode(
+        explicit InsertPlanNode(
             std::string table,
             std::string schema,
-            std::optional<std::vector<std::string> > cols,
+            std::optional<std::vector<std::string>> cols,
             std::unique_ptr<IPlanNode> child
-        ) : UnaryPlanNode(std::move(child)),
-            table_name(std::move(table)),
-            schema_name(std::move(schema)),
-            column_names(std::move(cols))
+        )
+            : UnaryPlanNode(std::move(child)), table_name(std::move(table)),
+              schema_name(std::move(schema)), column_names(std::move(cols))
         {
         }
 
@@ -193,11 +180,17 @@ namespace types
 
     struct UpdatePlanNode final : UnaryPlanNode
     {
+        std::string table_name;
+        std::string schema_name;
         std::vector<Assignment> assignments;
 
-        explicit
-        UpdatePlanNode(std::vector<Assignment> asg, std::unique_ptr<IPlanNode> child)
-            : UnaryPlanNode(std::move(child)),
+        explicit UpdatePlanNode(
+            const std::string& table_name,
+            const std::string& schema_name,
+            std::vector<Assignment> asg,
+            std::unique_ptr<IPlanNode> child
+        )
+            : UnaryPlanNode(std::move(child)), table_name(table_name), schema_name(schema_name),
               assignments(std::move(asg))
         {
         }
@@ -211,9 +204,7 @@ namespace types
 
     struct DeletePlanNode final : UnaryPlanNode
     {
-        explicit
-        DeletePlanNode(std::unique_ptr<IPlanNode> child)
-            : UnaryPlanNode(std::move(child))
+        explicit DeletePlanNode(std::unique_ptr<IPlanNode> child) : UnaryPlanNode(std::move(child))
         {
         }
 
@@ -228,8 +219,7 @@ namespace types
     {
         std::string db_name;
 
-        explicit
-        CreateDbPlanNode(const std::string& db_name) : db_name(db_name)
+        explicit CreateDbPlanNode(const std::string& db_name) : db_name(db_name)
         {
         }
 
@@ -246,14 +236,12 @@ namespace types
         MetaSchema schema;
         std::vector<ColumnDefinition> columns;
 
-        explicit
-        CreateTablePlanNode(
+        explicit CreateTablePlanNode(
             const std::string& table_name,
             const MetaSchema& schema,
-            const std::vector<ColumnDefinition>& columns)
-            : table_name(table_name),
-              schema(schema),
-              columns(columns)
+            const std::vector<ColumnDefinition>& columns
+        )
+            : table_name(table_name), schema(schema), columns(columns)
         {
         }
 
@@ -263,6 +251,6 @@ namespace types
             return Type::CREATE_TABLE;
         }
     };
-}
+} // namespace types
 
-#endif //DELTABASE_QUERY_PLAN_HPP
+#endif // DELTABASE_QUERY_PLAN_HPP

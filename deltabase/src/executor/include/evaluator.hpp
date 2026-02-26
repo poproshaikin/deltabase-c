@@ -5,6 +5,7 @@
 #ifndef DELTABASE_EVALUATOR_HPP
 #define DELTABASE_EVALUATOR_HPP
 #include "../../types/include/data_row.hpp"
+#include "meta_table.hpp"
 
 namespace exq
 {

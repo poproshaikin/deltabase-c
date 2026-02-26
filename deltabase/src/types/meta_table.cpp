@@ -3,6 +3,8 @@
 //
 
 #include "include/meta_table.hpp"
+
+
 #include <stdexcept>
 
 namespace types
@@ -40,6 +42,17 @@ namespace types
         for (size_t i = 0; i < columns.size(); ++i)
         {
             if (columns[i].name == col_name)
+                return static_cast<int64_t>(i);
+        }
+        return -1;
+    }
+
+    int64_t
+    MetaTable::get_column_idx(const ColumnId& col_id) const
+    {
+        for (size_t i = 0; i < columns.size(); ++i)
+        {
+            if (columns[i].id == col_id)
                 return static_cast<int64_t>(i);
         }
         return -1;

@@ -13,6 +13,7 @@
 #include "../types/include/config.hpp"
 
 #include <fstream>
+#include <unordered_set>
 
 namespace storage
 {
@@ -56,7 +57,7 @@ namespace storage
         auto pages = io_manager_->load_table_data(table_name, schema_name);
 
         DataTable dt;
-        dt.output_schema = misc::convert(mt);
+        dt.output_schema = convert(mt);
 
         uint64_t rows_count = 0;
         for (const auto& page : pages)
@@ -86,9 +87,7 @@ namespace storage
 
     void
     StdDbInstance::insert_row(
-        const std::string& table_name,
-        const std::string& schema_name,
-        std::vector<DataToken> row
+        const std::string& table_name, const std::string& schema_name, std::vector<DataToken> row
     )
     {
         auto table = io_manager_->load_table_meta(table_name, schema_name);
@@ -113,6 +112,62 @@ namespace storage
         io_manager_->write_mt(table, schema_name);
     }
 
+    void
+    StdDbInstance::update_row(
+        const std::string& table_name,
+        const std::string& schema_name,
+        RowUpdate update,
+        const std::vector<DataRow>& rows
+    )
+    {
+        auto table = io_manager_->load_table_meta(table_name, schema_name);
+        std::vector<DataPage> pages = io_manager_->load_table_data(table_name, schema_name);
+
+        std::unordered_set<RowId> ids;
+        for (const auto& row : rows)
+            ids.insert(row.id);
+
+        for (auto& page : pages)
+        {
+            bool updated = false;
+
+            for (auto& row : page.rows)
+            {
+                if (!ids.contains(row.id))
+                    continue;
+
+                DataRow new_row = row;
+                new_row.id = ++table.last_rid;
+
+                row.flags |= DataRowFlags::OBSOLETE;
+
+                for (const auto& assignment : update)
+                {
+                    Uuid col_id = std::visit([](auto& a){ return a.first; }, assignment);
+                    int col_idx = table.get_column_idx(col_id);
+
+                    if (auto* lit = std::get_if<AssignLiteral>(&assignment))
+                        new_row.tokens[col_idx] = lit->second;
+                    else
+                    {
+                        auto* col = std::get_if<AssignColumn>(&assignment);
+                        int src_idx = table.get_column_idx(col->second);
+                        new_row.tokens[col_idx] = row.tokens[src_idx];
+                    }
+                }
+
+                page.rows.push_back(new_row);
+                page.header.max_rid = std::max(page.header.max_rid, new_row.id);
+                updated = true;
+            }
+
+            if (updated)
+                io_manager_->write_page(page);
+        }
+
+        io_manager_->write_mt(table, schema_name);
+    }
+
     MetaTable
     StdDbInstance::get_table(const std::string& table_name, const std::string& schema_name)
     {
@@ -124,9 +179,8 @@ namespace storage
     {
         return get_table(
             identifier.table_name.value,
-            identifier.schema_name.has_value()
-                ? identifier.schema_name.value().value
-                : cfg_.default_schema
+            identifier.schema_name.has_value() ? identifier.schema_name.value().value
+                                               : cfg_.default_schema
         );
     }
 
@@ -168,7 +222,8 @@ namespace storage
     StdDbInstance::create_table(
         const std::string& table_name,
         const std::string& schema_name,
-        const std::vector<ColumnDefinition>& columns)
+        const std::vector<ColumnDefinition>& columns
+    )
     {
         auto schema = io_manager_->load_schema_meta(schema_name);
 
@@ -184,7 +239,6 @@ namespace storage
             std::cout << "column name: " << column.name << std::endl;
             std::cout << "column type: " << static_cast<int>(column.type) << std::endl;
             mt.columns.emplace_back(column);
-
         }
 
         io_manager_->write_mt(mt, schema_name);

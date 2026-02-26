@@ -62,6 +62,14 @@ namespace storage
 
         bool
         exists_schema(const std::string& schema_name) override;
+
+        void
+        update_row(
+            const std::string& table_name,
+            const std::string& schema_name,
+            types::RowUpdate update,
+            const std::vector<types::DataRow>& rows
+        ) override;
     };
 }
 

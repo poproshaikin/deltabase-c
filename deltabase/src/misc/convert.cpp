@@ -3,8 +3,9 @@
 //
 
 #include "include/convert.hpp"
-#include "../types/include/data_token.hpp"
+
 #include "../sql/include/dictionary.hpp"
+#include "../types/include/data_token.hpp"
 
 namespace misc
 {

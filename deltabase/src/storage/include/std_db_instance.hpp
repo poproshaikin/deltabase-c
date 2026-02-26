@@ -41,6 +41,14 @@ namespace storage
             std::vector<types::DataToken> row
         ) override;
 
+        void
+        update_row(
+            const std::string& table_name,
+            const std::string& schema_name,
+            types::RowUpdate update,
+            const std::vector<types::DataRow>& rows
+        ) override;
+
         types::MetaTable
         get_table(const std::string& table_name, const std::string& schema_name) override;
 
