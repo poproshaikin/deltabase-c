@@ -21,6 +21,9 @@ namespace exq
         std::unique_ptr<types::IExecutionResult>
         execute_insert(types::QueryPlan&& plan);
 
+        std::unique_ptr<types::IExecutionResult>
+        execute_update(types::QueryPlan&& plan);
+
     public:
         explicit
         StdPlanExecutor(storage::IDbInstance& storage);

@@ -15,7 +15,7 @@ namespace types
     {
         Uuid() = default;
 
-        explicit Uuid(uuid_t other)
+        Uuid(uuid_t other)
         {
             std::memcpy(&value_, &other, sizeof(uuid_t));
         }

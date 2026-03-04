@@ -5,23 +5,20 @@
 #ifndef DELTABASE_DATA_ROW_UPDATE_HPP
 #define DELTABASE_DATA_ROW_UPDATE_HPP
 #include "data_token.hpp"
-#include "meta_table.hpp"
 #include "typedefs.hpp"
+#include "uuid.hpp"
 
 #include <utility>
 
 namespace types
 {
     using ColumnId = Uuid;
+
     using AssignLiteral = std::pair<ColumnId, DataToken>;
     using AssignColumn = std::pair<ColumnId, ColumnId>;
     using Assignment = std::variant<AssignLiteral, AssignColumn>;
 
-    struct DataRowUpdate
-    {
-        const MetaTable& table;
-        std::vector<Assignment> assignments;
-    };
+    using RowUpdate = std::vector<Assignment>;
 }
 
 #endif //DELTABASE_DATA_ROW_UPDATE_HPP

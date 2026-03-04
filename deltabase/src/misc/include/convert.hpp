@@ -5,6 +5,8 @@
 #ifndef DELTABASE_CONVERT_HPP
 #define DELTABASE_CONVERT_HPP
 #include "../../types/include/data_table.hpp"
+#include "ast_tree.hpp"
+#include "meta_table.hpp"
 
 #include <cstring>
 

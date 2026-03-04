@@ -81,7 +81,7 @@ namespace exq
             if (!child_->next(row))
                 break;
 
-            if (!evaluator_.evaluate(row, condition_))
+            if (!evaluator_.evaluate(table_, row, condition_))
                 continue;
 
             out = std::move(row);
@@ -280,10 +280,71 @@ namespace exq
         return OutputSchema{};
     }
 
+    UpdateNodeExecutor::UpdateNodeExecutor(
+        const std::string& table_name,
+        const std::string& schema_name,
+        storage::IDbInstance& db,
+        const std::vector<Assignment>& asg,
+        std::unique_ptr<INodeExecutor> child
+    )
+        : table_name_(table_name), schema_name_(schema_name), db_(db), assignments_(asg),
+          child_(std::move(child)), executed_(false)
+    {
+    }
+
+    void
+    UpdateNodeExecutor::open()
+    {
+        child_->open();
+    }
+
+    bool
+    UpdateNodeExecutor::next(DataRow& out)
+    {
+        if (executed_)
+            return false;
+
+        int updated_count = 0;
+        std::vector<DataRow> rows;
+
+        while (true)
+        {
+            DataRow row;
+            if (!child_->next(row))
+                break;
+
+            if (row.id == 0)
+                throw std::runtime_error(
+                    "UpdateNodeExecutor::next: received a data row without an id"
+                );
+
+            rows.push_back(std::move(row));
+            updated_count++;
+        }
+
+        db_.update_row(table_name_, schema_name_, assignments_, rows);
+
+        DataToken affected_rows_count(misc::convert(updated_count), DataType::INTEGER);
+        out.tokens = {affected_rows_count};
+        return false;
+    }
+
+    void
+    UpdateNodeExecutor::close()
+    {
+        child_->close();
+    }
+
+    OutputSchema
+    UpdateNodeExecutor::output_schema()
+    {
+        return {(OutputColumn){"affected rows", DataType::INTEGER}};
+    }
+
     CreateTableNodeExecutor::CreateTableNodeExecutor(
         const std::string& table_name,
         const MetaSchema& schema,
-        std::vector<ColumnDefinition> columns,
+        const std::vector<ColumnDefinition>& columns,
         storage::IDbInstance& db
     )
         : table_name_(table_name), schema_(schema), columns_(columns), db_(db)
@@ -398,6 +459,18 @@ namespace exq
             auto& values_node = static_cast<ValuesPlanNode&>(*node);
             ValuesNodeExecutor executor(values_node.values);
             return std::make_unique<ValuesNodeExecutor>(std::move(executor));
+        }
+        case IPlanNode::Type::UPDATE:
+        {
+            auto& update_node = static_cast<UpdatePlanNode&>(*node);
+            UpdateNodeExecutor executor(
+                update_node.table_name,
+                update_node.schema_name,
+                db,
+                update_node.assignments,
+                from_plan(std::move(update_node.child), db)
+            );
+            return std::make_unique<UpdateNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::CREATE_TABLE:
         {

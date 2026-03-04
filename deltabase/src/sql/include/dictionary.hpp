@@ -134,19 +134,19 @@ namespace sql
     inline const std::unordered_map<std::string, SqlSymbol>&
     symbols_map()
     {
-        static const std::unordered_map<std::string, SqlSymbol> dictionary = {
+        static const std::unordered_map<std::string, SqlSymbol> DICTIONARY = {
             {"(", SqlSymbol::LPAREN},
             {")", SqlSymbol::RPAREN},
             {",", SqlSymbol::COMMA},
             {".", SqlSymbol::PERIOD},
             {";", SqlSymbol::SEMICOLON}};
-        return dictionary;
+        return DICTIONARY;
     }
 
     inline const std::unordered_map<std::string, SqlOperator>&
     operators_map()
     {
-        static const std::unordered_map<std::string, SqlOperator> dictionary = {
+        static const std::unordered_map<std::string, SqlOperator> DICTIONARY = {
             {"==", SqlOperator::EQ},
             {"!=", SqlOperator::NEQ},
 
@@ -166,7 +166,7 @@ namespace sql
 
             {"=", SqlOperator::ASSIGN},
         };
-        return dictionary;
+        return DICTIONARY;
     }
 }
 

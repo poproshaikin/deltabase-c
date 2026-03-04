@@ -27,7 +27,7 @@ namespace cli
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error("Cli::execute_query failed: " + std::string(e.what()));
+            std::cerr << "Executing query failed: " << e.what() << std::endl;
         }
     }
 

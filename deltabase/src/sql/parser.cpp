@@ -5,6 +5,7 @@
 #include "parser.hpp"
 
 #include "../misc/include/exceptions.hpp"
+#include "../misc/include/logger.hpp"
 
 using namespace types;
 
@@ -129,10 +130,10 @@ namespace sql
         advance_or_throw();
         stmt.table = parse_table_identifier();
 
-        if (advance() && match(SqlKeyword::WHERE))
+        if (match(SqlKeyword::WHERE))
         {
             advance_or_throw();
-            stmt.where = parse_binary(0);
+            stmt.where = parse_binary_expr(0);
         }
 
         return stmt;
@@ -219,10 +220,13 @@ namespace sql
         while (true)
         {
             advance_or_throw();
-            BinaryExpr expr = parse_binary(0);
+            BinaryExpr expr = parse_binary_expr(0);
 
             if (expr.op != AstOperator::ASSIGN)
+            {
+                misc::Logger::warn("[parse_update] ERROR: Expected assignment expression (col = value)");
                 throw std::runtime_error("Expected assignment expression (col = value)");
+            }
 
             stmt.assignments.emplace_back(std::move(expr));
 
@@ -233,7 +237,7 @@ namespace sql
         if (match(SqlKeyword::WHERE))
         {
             advance();
-            stmt.where = parse_binary(0);
+            stmt.where = parse_binary_expr(0);
         }
 
         return stmt;
@@ -253,7 +257,7 @@ namespace sql
         if (match(SqlKeyword::WHERE))
         {
             advance();
-            stmt.where = parse_binary(0);
+            stmt.where = parse_binary_expr(0);
         }
 
         return stmt;
@@ -428,10 +432,10 @@ namespace sql
         }
     }
 
-    BinaryExpr
-    SqlParser::parse_binary(int min_priority)
+    std::unique_ptr<AstNode>
+    SqlParser::parse_binary_tree(int min_priority)
     {
-        std::unique_ptr<AstNode> left = parse_primary();
+        auto left = parse_primary();
 
         while (true)
         {
@@ -444,33 +448,40 @@ namespace sql
                 break;
 
             int priority = ast_operators_priorities().at(*op_opt);
+
             if (priority < min_priority)
                 break;
 
             AstOperator op = *op_opt;
             advance();
 
-            BinaryExpr right = parse_binary(priority + 1);
+            auto right = parse_binary_tree(priority + 1);
 
             BinaryExpr expr;
             expr.op = op;
             expr.left = std::move(left);
-            expr.right =
-                std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, AstNodeValue(std::move(right)));
+            expr.right = std::move(right);
 
             left =
                 std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, AstNodeValue(std::move(expr)));
+
         }
 
-        if (left->type == AstNodeType::BINARY_EXPR)
-            return std::get<BinaryExpr>(std::move(left->value));
+        return left;
+    }
 
-        BinaryExpr result;
-        result.op = AstOperator::UNDEFINED;
-        result.left = std::move(left);
-        result.right = nullptr;
+    BinaryExpr
+    SqlParser::parse_binary_expr(int min_priority)
+    {
+        auto node = parse_binary_tree(min_priority);
 
-        return result;
+        if (!node)
+            throw std::runtime_error("Expected binary expression, got null node");
+
+        if (node->type != AstNodeType::BINARY_EXPR)
+            throw std::runtime_error("Expected binary expression");
+
+        return std::get<BinaryExpr>(std::move(node->value));
     }
 
     std::unique_ptr<AstNode>
@@ -481,7 +492,7 @@ namespace sql
         if (match(SqlSymbol::LPAREN))
         {
             advance();
-            auto node = parse_binary(0);
+            auto node = parse_binary_expr(0);
             if (!match(SqlSymbol::RPAREN))
                 throw std::runtime_error("Expected right parenthesis");
 

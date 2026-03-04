@@ -102,4 +102,11 @@ namespace misc
     print_ram_usage();
 }
 
+template <typename E>
+bool has_flag(E value, E flag)
+{
+    using T = std::underlying_type_t<E>;
+    return (static_cast<T>(value) & static_cast<T>(flag)) != 0;
+}
+
 #endif

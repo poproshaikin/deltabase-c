@@ -20,36 +20,29 @@ namespace exq
     QueryPlan
     StdPlanner::plan(AstNode&& ast)
     {
-        try
+        if (ast.type == AstNodeType::SELECT)
         {
-            if (ast.type == AstNodeType::SELECT)
-            {
-                return plan_select(std::get<SelectStatement>(ast.value));
-            }
-            if (ast.type == AstNodeType::INSERT)
-            {
-                return plan_insert(std::get<InsertStatement>(ast.value));
-            }
-            if (ast.type == AstNodeType::UPDATE)
-            {
-                return plan_update(std::get<UpdateStatement>(ast.value));
-            }
-            if (ast.type == AstNodeType::DELETE)
-            {
-                return plan_delete(std::get<DeleteStatement>(ast.value));
-            }
-            if (ast.type == AstNodeType::CREATE_DATABASE)
-            {
-                return plan_create_db(std::get<CreateDbStatement>(ast.value));
-            }
-            if (ast.type == AstNodeType::CREATE_TABLE)
-            {
-                return plan_create_table(std::get<CreateTableStatement>(ast.value));
-            }
+            return plan_select(std::get<SelectStatement>(ast.value));
         }
-        catch (std::exception ex)
+        if (ast.type == AstNodeType::INSERT)
         {
-            throw std::runtime_error("StdPlanner::plan: " + std::string(ex.what()));
+            return plan_insert(std::get<InsertStatement>(ast.value));
+        }
+        if (ast.type == AstNodeType::UPDATE)
+        {
+            return plan_update(std::get<UpdateStatement>(ast.value));
+        }
+        if (ast.type == AstNodeType::DELETE)
+        {
+            return plan_delete(std::get<DeleteStatement>(ast.value));
+        }
+        if (ast.type == AstNodeType::CREATE_DATABASE)
+        {
+            return plan_create_db(std::get<CreateDbStatement>(ast.value));
+        }
+        if (ast.type == AstNodeType::CREATE_TABLE)
+        {
+            return plan_create_table(std::get<CreateTableStatement>(ast.value));
         }
 
         throw std::runtime_error(
@@ -75,6 +68,7 @@ namespace exq
         // 2. WHERE
         if (stmt.where)
         {
+            std::cout << "creating filter node " << std::endl;
             auto filter = std::make_unique<FilterPlanNode>(
                 db_.get_table(stmt.table), std::move(*stmt.where), std::move(node)
             );
@@ -148,13 +142,19 @@ namespace exq
     {
         const auto table = db_.get_table(stmt.table);
 
+        const std::string schema_name = stmt.table.schema_name.has_value()
+                                            ? stmt.table.schema_name.value().value
+                                            : db_config_.default_schema;
+
         std::vector<Assignment> assignments;
         for (const auto& assignment : stmt.assignments)
         {
+            std::cout << "assign ment " << static_cast<int>(assignment.left->type) << " "
+                      << static_cast<int>(assignment.right->type) << std::endl;
             if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
                 assignment.right->type == AstNodeType::LITERAL)
             {
-                const auto& col_id = table.get_column(stmt.table.table_name).id;
+                const auto& col_id = table.get_column(std::get<SqlToken>(assignment.left->value)).id;
                 auto data_token = DataToken(std::get<SqlToken>(assignment.right->value));
 
                 assignments.emplace_back(std::make_pair(col_id, data_token));
@@ -169,11 +169,8 @@ namespace exq
             }
         }
 
-        std::unique_ptr<IPlanNode> root = std::make_unique<SeqScanPlanNode>(
-            stmt.table.table_name,
-            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                               : db_config_.default_schema
-        );
+        std::unique_ptr<IPlanNode> root =
+            std::make_unique<SeqScanPlanNode>(stmt.table.table_name, schema_name);
 
         if (stmt.where)
         {
@@ -182,7 +179,9 @@ namespace exq
             );
         }
 
-        auto update = std::make_unique<UpdatePlanNode>(std::move(assignments), std::move(root));
+        auto update = std::make_unique<UpdatePlanNode>(
+            stmt.table.table_name, schema_name, assignments, std::move(root)
+        );
 
         QueryPlan plan;
         plan.root = std::move(update);

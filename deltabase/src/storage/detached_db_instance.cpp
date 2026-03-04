@@ -98,4 +98,15 @@ namespace storage
     {
         throw std::logic_error("DetachedDbInstance::exists_schema: this method is not supported");
     }
+
+    void
+    DetachedDbInstance::update_row(
+        const std::string& table_name,
+        const std::string& schema_name,
+        types::RowUpdate update,
+        const std::vector<types::DataRow>& rows
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::update_row: this method is not supported");
+    }
 } // namespace storage

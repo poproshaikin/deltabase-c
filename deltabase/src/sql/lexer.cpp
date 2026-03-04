@@ -154,6 +154,24 @@ namespace sql
                 i += consumed;
                 pos += consumed;
             }
+            else if (c == '"')
+            {
+                size_t word_start = i + 1;
+                size_t word_end = query.find('"', word_start);
+
+                if (word_end == std::string::npos)
+                    throw std::runtime_error("Unterminated quoted identifier");
+
+                std::string word = query.substr(word_start, word_end - word_start);
+
+                SqlToken token(SqlTokenType::IDENTIFIER, word, line, pos);
+
+                result.push_back(token);
+
+                size_t consumed = (word_end + 1) - i;
+                i += consumed;
+                pos += consumed;
+            }
             else if (isdigit(c))
             {
                 size_t word_start = i;

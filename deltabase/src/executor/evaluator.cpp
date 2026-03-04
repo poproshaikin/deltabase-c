@@ -15,29 +15,42 @@ namespace exq
     }
 
     bool
-    Evaluator::evaluate(const DataRow& row, const BinaryExpr& expr) const
+    Evaluator::evaluate(const MetaTable& table, const DataRow& row, const BinaryExpr& expr) const
     {
         auto left = std::get<SqlToken>(expr.left->value);
         auto right = std::get<SqlToken>(expr.right->value);
 
-        if (right.is_literal())
+        std::cout << "evaluator left " << left.value << std::endl;
+        std::cout << "evaluator right " << right.value << std::endl;
+
+        if (left.is_identifier() && right.is_literal())
+        {
+            int64_t col_idx = table.get_column_idx(left);
+
+            DataToken left_value(row.tokens[col_idx]);
+            DataToken right_literal(right);
+
+            return evaluate(left_value, right_literal, expr.op);
+        }
+        if (left.is_identifier() && right.is_identifier())
+        {
+            int64_t left_col_idx = table_.get_column_idx(left);
+            int64_t right_col_idx = table_.get_column_idx(right);
+
+            DataToken left_value(row.tokens[left_col_idx]);
+            DataToken right_value(row.tokens[right_col_idx]);
+
+            return evaluate(left_value, right_value, expr.op);
+        }
+        if (left.is_literal() && right.is_literal())
         {
             DataToken left_literal(left);
             DataToken right_literal(right);
 
             return evaluate(left_literal, right_literal, expr.op);
         }
-        if (right.is_identifier())
-        {
-            int64_t col_idx = table_.get_column_idx(right);
 
-            DataToken left_literal(left);
-            DataToken right_literal(row.tokens[col_idx]);
-
-            return evaluate(left_literal, right_literal, expr.op);
-        }
-
-        return false;
+        throw std::runtime_error("Evaluator::evaluate: Invalid comparation");
     }
 
     bool

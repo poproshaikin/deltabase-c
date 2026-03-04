@@ -39,8 +39,11 @@ namespace sql
         types::CreateSchemaStatement
         parse_create_schema();
 
+        std::unique_ptr<types::AstNode>
+        parse_binary_tree(int min_priority);
+
         types::BinaryExpr
-        parse_binary(int min_priority);
+        parse_binary_expr(int min_priority);
 
         template <typename TEnum>
         bool

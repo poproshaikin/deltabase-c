@@ -12,6 +12,7 @@ namespace types
     struct AnalysisResult
     {
         bool is_valid;
+
         std::optional<std::runtime_error> err;
 
         std::optional<bool> is_system_query;

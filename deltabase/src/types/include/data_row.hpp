@@ -19,16 +19,14 @@ namespace types
         OBSOLETE = 1 << 0
     };
 
-    DataRowFlags
-    inline
+    DataRowFlags inline
     operator|(DataRowFlags left, DataRowFlags right)
     {
         using T = std::underlying_type_t<DataRowFlags>;
         return static_cast<DataRowFlags>(static_cast<T>(left) | static_cast<T>(right));
     }
 
-    DataRowFlags
-    inline
+    DataRowFlags inline
     operator|=(DataRowFlags& left, DataRowFlags right)
     {
         using T = std::underlying_type_t<DataRowFlags>;
@@ -37,21 +35,33 @@ namespace types
         return value;
     }
 
+    DataRowFlags
+    inline
+    operator&(DataRowFlags left, DataRowFlags right)
+    {
+        using T = std::underlying_type_t<DataRowFlags>;
+        return static_cast<DataRowFlags>(
+            static_cast<T>(left) & static_cast<T>(right)
+        );
+    }
+
+    DataRowFlags inline
+    operator&=(DataRowFlags& left, const DataRowFlags right)
+    {
+        return left = left & right;
+    }
+
     using RowId = uint64_t;
 
     struct DataRow
     {
-        RowId id;
-        DataRowFlags flags;
+        RowId id{};
+        DataRowFlags flags{};
         std::vector<DataToken> tokens;
 
-        DataRow
-        update(const DataRowUpdate& update) const;
-
         DataRow() = default;
-        explicit
-        DataRow(const std::vector<SqlToken>& sql_tokens);
+        explicit DataRow(const std::vector<SqlToken>& sql_tokens);
     };
-}
+} // namespace types
 
-#endif //DELTABASE_DATA_ROW_HPP
+#endif // DELTABASE_DATA_ROW_HPP

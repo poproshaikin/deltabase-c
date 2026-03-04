@@ -9,10 +9,10 @@
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/query_plan.hpp"
 #include "evaluator.hpp"
+#include "meta_table.hpp"
 
 namespace exq
 {
-
     class INodeExecutor
     {
     public:
@@ -185,6 +185,37 @@ namespace exq
         output_schema() override;
     };
 
+    class UpdateNodeExecutor final : public INodeExecutor
+    {
+        std::string table_name_;
+        std::string schema_name_;
+        storage::IDbInstance& db_;
+        std::vector<types::Assignment> assignments_;
+        std::unique_ptr<INodeExecutor> child_;
+        bool executed_;
+
+    public:
+        explicit UpdateNodeExecutor(
+            const std::string& table_name,
+            const std::string& schema_name,
+            storage::IDbInstance& db,
+            const std::vector<types::Assignment>& asg,
+            std::unique_ptr<INodeExecutor> child
+        );
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
     class CreateTableNodeExecutor final : public INodeExecutor
     {
         std::string table_name_;
@@ -196,7 +227,7 @@ namespace exq
         explicit CreateTableNodeExecutor(
             const std::string& table_name,
             const types::MetaSchema& schema,
-            std::vector<types::ColumnDefinition> columns,
+            const std::vector<types::ColumnDefinition>& columns,
             storage::IDbInstance& db
         );
 

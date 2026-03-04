@@ -44,7 +44,7 @@ namespace storage
     }
 
     uint64_t
-    StdBinarySerializer::get_data_type_size(types::DataType data_type) const
+    StdBinarySerializer::get_data_type_size(DataType data_type) const
     {
         switch (data_type)
         {
@@ -128,9 +128,6 @@ namespace storage
     MemoryStream
     StdBinarySerializer::serialize_dt(const DataToken& token)
     {
-        std::cout << "    [serialize_dt] type=" << static_cast<int>(token.type) 
-                  << ", bytes_size=" << token.bytes.size() << std::endl;
-        
         MemoryStream stream;
         stream.write(&token.type, sizeof(token.type));
         uint64_t size = token.bytes.size();
@@ -144,8 +141,6 @@ namespace storage
     MemoryStream
     StdBinarySerializer::serialize_dp(const DataPage& page)
     {
-        std::cout << "[serialize_dp] page with rows_count=" << page.rows.size() << std::endl;
-        
         MemoryStream stream;
 
         // Create header copy with correct rows_count
@@ -168,13 +163,9 @@ namespace storage
     MemoryStream
     StdBinarySerializer::serialize_dr(const DataRow& row)
     {
-        std::cout << "  [serialize_dr] row_id=" << row.id 
-                  << ", tokens_count=" << row.tokens.size() << std::endl;
-        
         MemoryStream stream;
         stream.write(&row.id, sizeof(row.id));
         stream.write(&row.flags, sizeof(row.flags));
-        std::cout << "row flags " << static_cast<int>(row.flags) << std::endl;
 
         uint64_t tokens_count = row.tokens.size();
         stream.write(&tokens_count, sizeof(uint64_t));
@@ -270,21 +261,17 @@ namespace storage
     bool
     StdBinarySerializer::deserialize_dp(ReadOnlyMemoryStream& stream, DataPage& out)
     {
-        std::cout << "    [deserialize_dp] Starting DataPage deserialization" << std::endl;
-        
         if (!deserialize_dph(stream, out.header))
             return false;
 
         // rows_count already read in header
         uint64_t rows_count = out.header.rows_count;
-        std::cout << "    [deserialize_dp] rows_count: " << rows_count << std::endl;
 
         out.rows.clear();
         out.rows.reserve(rows_count);
 
         for (size_t i = 0; i < rows_count; ++i)
         {
-            std::cout << "    [deserialize_dp] Deserializing row " << i << std::endl;
             DataRow row;
             if (!deserialize_dr(stream, row))
                 return false;
@@ -292,7 +279,6 @@ namespace storage
             out.rows.push_back(std::move(row));
         }
 
-        std::cout << "    [deserialize_dp] DataPage deserialization complete" << std::endl;
         return true;
     }
 
@@ -350,8 +336,6 @@ namespace storage
     bool
     StdBinarySerializer::deserialize_dr(ReadOnlyMemoryStream& stream, DataRow& out)
     {
-        std::cout << "  [deserialize_dr] Starting row deserialization" << std::endl;
-        
         if (stream.read(&out.id, sizeof(out.id)) != sizeof(out.id))
             return false;
 
@@ -362,25 +346,19 @@ namespace storage
         if (stream.read(&tokens_count, sizeof(uint64_t)) != sizeof(uint64_t))
             return false;
 
-        std::cout << "  [deserialize_dr] row_id=" << out.id 
-                  << ", tokens_count=" << tokens_count << std::endl;
-
         out.tokens.clear();
         out.tokens.reserve(tokens_count);
 
         for (uint64_t i = 0; i < tokens_count; ++i)
         {
-            std::cout << "  [deserialize_dr] Reading token " << i << "/" << tokens_count << std::endl;
             DataToken token;
             if (!deserialize_dt(stream, token))
             {
-                std::cout << "  [deserialize_dr] ERROR: Failed to deserialize token " << i << std::endl;
                 return false;
             }
             out.tokens.push_back(std::move(token));
         }
 
-        std::cout << "  [deserialize_dr] Row deserialization complete" << std::endl;
         return true;
     }
 
@@ -393,15 +371,12 @@ namespace storage
             return false;
         }
 
-        std::cout << "    [deserialize_dt] type=" << static_cast<int>(out.type) << std::endl;
-
         uint64_t size = 0;
         if (stream.read(&size, sizeof(uint64_t)) != sizeof(uint64_t))
         {
             std::cout << "    [deserialize_dt] ERROR: Failed to read size" << std::endl;
             return false;
         }
-        std::cout << "    [deserialize_dt] size: " << size << std::endl;
 
         out.bytes.resize(size);
         if (stream.read(out.bytes.data(), size) != size)
@@ -409,7 +384,6 @@ namespace storage
             std::cout << "    [deserialize_dt] ERROR: failed to read " << size << " bytes" << std::endl;
             return false;
         }
-        std::cout << "    [deserialize_dt] read " << size << " bytes successfully" << std::endl;
 
         return true;
     }

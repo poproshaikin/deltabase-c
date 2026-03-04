@@ -5,6 +5,7 @@
 #ifndef DELTABASE_EVALUATOR_HPP
 #define DELTABASE_EVALUATOR_HPP
 #include "../../types/include/data_row.hpp"
+#include "meta_table.hpp"
 
 namespace exq
 {
@@ -80,8 +81,9 @@ namespace exq
         Evaluator(const types::MetaTable& table);
 
         bool
-        evaluate(const types::DataRow& row,
-                 const types::BinaryExpr& expr) const;
+        evaluate(
+            const types::MetaTable& table, const types::DataRow& row, const types::BinaryExpr& expr
+        ) const;
     };
 }
 
