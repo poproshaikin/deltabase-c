@@ -32,6 +32,10 @@ namespace exq
             {
                 return execute_update(std::move(plan));
             }
+            if (plan.type == QueryPlan::Type::DELETE)
+            {
+                return execute_delete(std::move(plan));
+            }
         }
         catch (const std::exception& ex)
         {
@@ -87,6 +91,21 @@ namespace exq
 
     std::unique_ptr<IExecutionResult>
     StdPlanExecutor::execute_update(QueryPlan&& plan)
+    {
+        auto root_exq = node_executor_factory_.from_plan(std::move(plan.root), db_);
+        root_exq->open();
+        DataRow rows_affected;
+        root_exq->next(rows_affected);
+        root_exq->close();
+
+        DataTable table;
+        table.output_schema = root_exq->output_schema();
+        table.rows.emplace_back(std::move(rows_affected));
+        return std::make_unique<MaterializedResult>(table);
+    }
+
+    std::unique_ptr<IExecutionResult>
+    StdPlanExecutor::execute_delete(QueryPlan&& plan)
     {
         auto root_exq = node_executor_factory_.from_plan(std::move(plan.root), db_);
         root_exq->open();

@@ -7,10 +7,8 @@
 #include "detached_db_instance.hpp"
 #include "lexer.hpp"
 #include "logger.hpp"
-#include "semantic_analyzer.hpp"
 #include "static_storage.hpp"
 
-#include <fstream>
 
 #include "../misc/include/memory_stream.hpp"
 #include "../storage/include/file_utils.hpp"

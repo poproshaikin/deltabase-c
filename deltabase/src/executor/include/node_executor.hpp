@@ -216,6 +216,35 @@ namespace exq
         output_schema() override;
     };
 
+    class DeleteNodeExecutor final : public INodeExecutor
+    {
+        std::string table_name_;
+        std::string schema_name_;
+        storage::IDbInstance& db_;
+        std::unique_ptr<INodeExecutor> child_;
+        bool executed_;
+
+    public:
+        explicit DeleteNodeExecutor(
+            const std::string& table_name,
+            const std::string& schema_name,
+            storage::IDbInstance& db,
+            std::unique_ptr<INodeExecutor> child
+        );
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
     class CreateTableNodeExecutor final : public INodeExecutor
     {
         std::string table_name_;

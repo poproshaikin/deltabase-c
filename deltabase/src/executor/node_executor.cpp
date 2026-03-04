@@ -323,6 +323,7 @@ namespace exq
         }
 
         db_.update_row(table_name_, schema_name_, assignments_, rows);
+        executed_ = true;
 
         DataToken affected_rows_count(misc::convert(updated_count), DataType::INTEGER);
         out.tokens = {affected_rows_count};
@@ -337,6 +338,67 @@ namespace exq
 
     OutputSchema
     UpdateNodeExecutor::output_schema()
+    {
+        return {(OutputColumn){"affected rows", DataType::INTEGER}};
+    }
+
+    DeleteNodeExecutor::DeleteNodeExecutor(
+        const std::string& table_name,
+        const std::string& schema_name,
+        storage::IDbInstance& db,
+        std::unique_ptr<INodeExecutor> child
+    )
+        : table_name_(table_name), schema_name_(schema_name), db_(db), child_(std::move(child)),
+          executed_(false)
+    {
+    }
+
+    void
+    DeleteNodeExecutor::open()
+    {
+        child_->open();
+    }
+
+    bool
+    DeleteNodeExecutor::next(DataRow& out)
+    {
+        if (executed_)
+            return false;
+
+        int deleted_count = 0;
+        std::vector<DataRow> rows;
+
+        while (true)
+        {
+            DataRow row;
+            if (!child_->next(row))
+                break;
+
+            if (row.id == 0)
+                throw std::runtime_error(
+                    "DeleteNodeExecutor::next: received a data row without an id"
+                );
+
+            rows.push_back(std::move(row));
+            deleted_count++;
+        }
+
+        db_.delete_rows(table_name_, schema_name_, rows);
+        executed_ = true;
+
+        DataToken affected_rows_count(misc::convert(deleted_count), DataType::INTEGER);
+        out.tokens = {affected_rows_count};
+        return false;
+    }
+
+    void
+    DeleteNodeExecutor::close()
+    {
+        child_->close();
+    }
+
+    OutputSchema
+    DeleteNodeExecutor::output_schema()
     {
         return {(OutputColumn){"affected rows", DataType::INTEGER}};
     }
@@ -471,6 +533,17 @@ namespace exq
                 from_plan(std::move(update_node.child), db)
             );
             return std::make_unique<UpdateNodeExecutor>(std::move(executor));
+        }
+        case IPlanNode::Type::DELETE:
+        {
+            auto& delete_node = static_cast<DeletePlanNode&>(*node);
+            DeleteNodeExecutor executor(
+                delete_node.table_name,
+                delete_node.schema_name,
+                db,
+                from_plan(std::move(delete_node.child), db)
+            );
+            return std::make_unique<DeleteNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::CREATE_TABLE:
         {

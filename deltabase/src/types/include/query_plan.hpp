@@ -204,7 +204,15 @@ namespace types
 
     struct DeletePlanNode final : UnaryPlanNode
     {
-        explicit DeletePlanNode(std::unique_ptr<IPlanNode> child) : UnaryPlanNode(std::move(child))
+        std::string table_name;
+        std::string schema_name;
+
+        explicit DeletePlanNode(
+            const std::string& table_name,
+            const std::string& schema_name,
+            std::unique_ptr<IPlanNode> child
+        )
+            : UnaryPlanNode(std::move(child)), table_name(table_name), schema_name(schema_name)
         {
         }
 

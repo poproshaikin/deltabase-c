@@ -20,9 +20,6 @@ namespace exq
         auto left = std::get<SqlToken>(expr.left->value);
         auto right = std::get<SqlToken>(expr.right->value);
 
-        std::cout << "evaluator left " << left.value << std::endl;
-        std::cout << "evaluator right " << right.value << std::endl;
-
         if (left.is_identifier() && right.is_literal())
         {
             int64_t col_idx = table.get_column_idx(left);

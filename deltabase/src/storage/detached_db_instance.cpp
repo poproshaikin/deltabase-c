@@ -6,6 +6,8 @@
 
 #include "io_manager_factory.hpp"
 
+#include <math.h>
+
 namespace storage
 {
     using namespace types;
@@ -108,5 +110,14 @@ namespace storage
     )
     {
         throw std::logic_error("DetachedDbInstance::update_row: this method is not supported");
+    }
+    void
+    DetachedDbInstance::delete_rows(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const std::vector<types::DataRow>& rows
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::delete_row: this method is not supported");
     }
 } // namespace storage

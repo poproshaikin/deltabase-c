@@ -195,10 +195,13 @@ namespace exq
     QueryPlan
     StdPlanner::plan_delete(DeleteStatement& stmt) const
     {
+        std::string schema_name =
+            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
+                                               : db_config_.default_schema;
+
         std::unique_ptr<IPlanNode> root = std::make_unique<SeqScanPlanNode>(
             stmt.table.table_name,
-            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                               : db_config_.default_schema
+            schema_name
         );
 
         if (stmt.where)
@@ -208,7 +211,7 @@ namespace exq
             );
         }
 
-        auto del = std::make_unique<DeletePlanNode>(std::move(root));
+        auto del = std::make_unique<DeletePlanNode>(stmt.table.table_name, schema_name, std::move(root));
 
         QueryPlan plan;
         plan.root = std::move(del);

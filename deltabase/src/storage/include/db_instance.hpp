@@ -38,6 +38,13 @@ namespace storage
             const std::vector<types::DataRow>& rows
         ) = 0;
 
+        virtual void
+        delete_rows(
+            const std::string& table_name,
+            const std::string& schema_name,
+            const std::vector<types::DataRow>& rows
+        ) = 0;
+
         virtual bool
         exists_table(const std::string& table_name, const std::string& schema_name) = 0;
 

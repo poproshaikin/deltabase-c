@@ -144,6 +144,9 @@ namespace storage
                 if (!ids.contains(row.id))
                     continue;
 
+                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    continue;
+
                 DataRow new_row = row;
                 new_row.id = ++table.last_rid;
 
@@ -178,6 +181,42 @@ namespace storage
         }
 
         io_manager_->write_mt(table, schema_name);
+    }
+
+    void
+    StdDbInstance::delete_rows(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const std::vector<DataRow>& rows
+    )
+    {
+        auto table = io_manager_->load_table_meta(table_name, schema_name);
+        std::vector<DataPage> pages = io_manager_->load_table_data(table_name, schema_name);
+
+        std::unordered_set<RowId> ids;
+        for (const auto& row : rows)
+            ids.insert(row.id);
+
+        for (auto& page : pages)
+        {
+            bool deleted = false;
+
+            for (auto& row : page.rows)
+            {
+                if (!ids.contains(row.id))
+                    continue;
+
+                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    continue;
+
+                deleted = true;
+
+                row.flags |= DataRowFlags::OBSOLETE;
+            }
+
+            if (deleted)
+                io_manager_->write_page(page);
+        }
     }
 
     MetaTable
