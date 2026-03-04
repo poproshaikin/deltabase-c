@@ -249,15 +249,14 @@ namespace exq
         if (expr.op != AstOperator::ASSIGN)
             return AnalysisResult(std::runtime_error("Invalid assignment: expected '='"));
 
-        std::cout << "left " << static_cast<int>(expr.left->type) << std::endl;
-        std::cout << "right " << static_cast<int>(expr.right->type) << std::endl;
-
         if (expr.left->type != AstNodeType::IDENTIFIER || expr.right->type != AstNodeType::LITERAL)
             return AnalysisResult(
                 std::runtime_error(
                     "Invalid assignment: you can assign only literal to a identifier"
                 )
             );
+
+        expr.left->type = AstNodeType::COLUMN_IDENTIFIER;
 
         const AstNode* column_node = expr.left.get();
         const AstNode* value_node = expr.right.get();
@@ -268,6 +267,7 @@ namespace exq
 
         const auto& column = table.get_column(col_name);
 
+        // TODO add support of assigning the value of an other column
         const auto& value_token = std::get<SqlToken>(value_node->value);
         auto literal_type = std::get<SqlLiteral>(value_token.detail);
         if (!is_compatible(literal_type, column.type))

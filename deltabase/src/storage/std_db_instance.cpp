@@ -8,6 +8,7 @@
 #include "io_manager_factory.hpp"
 #include "logger.hpp"
 #include "std_binary_serializer.hpp"
+#include "utils.hpp"
 
 #include "../misc/include/convert.hpp"
 #include "../types/include/config.hpp"
@@ -66,8 +67,15 @@ namespace storage
         dt.rows.reserve(rows_count);
 
         for (const auto& page : pages)
+        {
             for (const auto& row : page.rows)
+            {
+                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    continue;
+
                 dt.rows.push_back(row);
+            }
+        }
 
         return dt;
     }
@@ -143,11 +151,15 @@ namespace storage
 
                 for (const auto& assignment : update)
                 {
-                    Uuid col_id = std::visit([](auto& a){ return a.first; }, assignment);
-                    int col_idx = table.get_column_idx(col_id);
+                    ColumnId col_id = std::visit([](auto& a){ return a.first; }, assignment);
+                    int64_t col_idx = table.get_column_idx(col_id);
+
+                    MetaColumn cola = table.get_column(col_idx);
 
                     if (auto* lit = std::get_if<AssignLiteral>(&assignment))
+                    {
                         new_row.tokens[col_idx] = lit->second;
+                    }
                     else
                     {
                         auto* col = std::get_if<AssignColumn>(&assignment);
@@ -236,8 +248,8 @@ namespace storage
         for (const auto& col_def : columns)
         {
             MetaColumn column(col_def);
-            std::cout << "column name: " << column.name << std::endl;
-            std::cout << "column type: " << static_cast<int>(column.type) << std::endl;
+            column.id = Uuid::make();
+            column.table_id = mt.id;
             mt.columns.emplace_back(column);
         }
 

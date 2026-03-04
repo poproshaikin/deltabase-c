@@ -81,7 +81,7 @@ namespace exq
             if (!child_->next(row))
                 break;
 
-            if (!evaluator_.evaluate(row, condition_))
+            if (!evaluator_.evaluate(table_, row, condition_))
                 continue;
 
             out = std::move(row);
@@ -295,6 +295,7 @@ namespace exq
     void
     UpdateNodeExecutor::open()
     {
+        child_->open();
     }
 
     bool
@@ -331,6 +332,7 @@ namespace exq
     void
     UpdateNodeExecutor::close()
     {
+        child_->close();
     }
 
     OutputSchema

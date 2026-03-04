@@ -81,8 +81,9 @@ namespace exq
         Evaluator(const types::MetaTable& table);
 
         bool
-        evaluate(const types::DataRow& row,
-                 const types::BinaryExpr& expr) const;
+        evaluate(
+            const types::MetaTable& table, const types::DataRow& row, const types::BinaryExpr& expr
+        ) const;
     };
 }
 

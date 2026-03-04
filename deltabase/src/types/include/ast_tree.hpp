@@ -79,6 +79,9 @@ namespace types
         BinaryExpr() = default;
         BinaryExpr(BinaryExpr&&) = default;
         BinaryExpr& operator=(BinaryExpr&&) = default;
+
+        std::string
+        to_string() const;
     };
 
     struct TableIdentifier

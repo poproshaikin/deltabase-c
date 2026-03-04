@@ -187,11 +187,11 @@ namespace types
         explicit UpdatePlanNode(
             const std::string& table_name,
             const std::string& schema_name,
-            std::vector<Assignment> asg,
+            const std::vector<Assignment>& asg,
             std::unique_ptr<IPlanNode> child
         )
             : UnaryPlanNode(std::move(child)), table_name(table_name), schema_name(schema_name),
-              assignments(std::move(asg))
+              assignments(asg)
         {
         }
 

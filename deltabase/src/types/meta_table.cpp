@@ -4,7 +4,6 @@
 
 #include "include/meta_table.hpp"
 
-
 #include <stdexcept>
 
 namespace types
@@ -36,6 +35,15 @@ namespace types
         throw std::runtime_error("MetaTable::get_column: column '" + col_name + "' not found");
     }
 
+    const MetaColumn&
+    MetaTable::get_column(const int64_t& col_pos) const
+    {
+        if (col_pos < 0 || col_pos >= columns.size())
+            throw std::runtime_error("MetaTable::get_column: column at pos '" + std::to_string(col_pos) + "' not found");
+
+        return columns[col_pos];
+    }
+
     int64_t
     MetaTable::get_column_idx(const std::string& col_name) const
     {
@@ -55,6 +63,7 @@ namespace types
             if (columns[i].id == col_id)
                 return static_cast<int64_t>(i);
         }
-        return -1;
+
+        throw std::runtime_error("MetaTable::get_column_idx: column " + col_id.to_string() + " doesnt exist");
     }
-}
+} // namespace types
