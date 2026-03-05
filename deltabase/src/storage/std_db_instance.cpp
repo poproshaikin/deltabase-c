@@ -33,7 +33,7 @@ namespace storage
             std::filesystem::create_directories(cfg.db_path);
 
         IOManagerFactory io_factory;
-        io_manager_ = io_factory.make_io_manager(cfg);
+        io_manager_ = io_factory.make(cfg);
 
         init();
     }

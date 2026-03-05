@@ -42,7 +42,9 @@ namespace misc
     void
     MemoryStream::append(MemoryStream& other, size_t count)
     {
-        buffer_.insert(buffer_.end(), other.buffer_.begin(), other.buffer_.end());
+        size_t n = std::min(count, other.buffer_.size());
+        buffer_.insert(buffer_.end(), other.buffer_.begin(), other.buffer_.begin() + n);
+        position_ += n;
     }
 
     const uint8_t*

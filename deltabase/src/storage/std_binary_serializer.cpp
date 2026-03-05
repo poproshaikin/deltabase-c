@@ -65,7 +65,7 @@ namespace storage
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_mt(const MetaTable& table)
+    StdBinarySerializer::serialize_mt(const MetaTable& table) const
     {
         MemoryStream stream;
         // Write UUID bytes directly (libuuid already stores in network byte order)
@@ -88,7 +88,7 @@ namespace storage
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_ms(const MetaSchema& schema)
+    StdBinarySerializer::serialize_ms(const MetaSchema& schema) const
     {
         MemoryStream stream;
         stream.write(schema.id.raw(), sizeof(uuid_t));
@@ -99,7 +99,7 @@ namespace storage
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_mc(const MetaColumn& column)
+    StdBinarySerializer::serialize_mc(const MetaColumn& column) const
     {
         MemoryStream stream;
         stream.write(column.id.raw(), sizeof(uuid_t));
@@ -112,7 +112,7 @@ namespace storage
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_dph(const DataPageHeader& header)
+    StdBinarySerializer::serialize_dph(const DataPageHeader& header) const
     {
         MemoryStream stream;
         stream.write(header.id.raw(), sizeof(uuid_t));
@@ -126,7 +126,7 @@ namespace storage
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_dt(const DataToken& token)
+    StdBinarySerializer::serialize_dt(const DataToken& token) const
     {
         MemoryStream stream;
         stream.write(&token.type, sizeof(token.type));
@@ -139,7 +139,7 @@ namespace storage
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_dp(const DataPage& page)
+    StdBinarySerializer::serialize_dp(const DataPage& page) const
     {
         MemoryStream stream;
 
@@ -161,7 +161,7 @@ namespace storage
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_dr(const DataRow& row)
+    StdBinarySerializer::serialize_dr(const DataRow& row) const
     {
         MemoryStream stream;
         stream.write(&row.id, sizeof(row.id));
@@ -181,7 +181,7 @@ namespace storage
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_cfg(const Config& db)
+    StdBinarySerializer::serialize_cfg(const Config& db) const
     {
         MemoryStream stream;
         write_str(db.db_name.value_or(""), stream);
@@ -195,7 +195,7 @@ namespace storage
     }
 
     bool
-    StdBinarySerializer::deserialize_mt(ReadOnlyMemoryStream& stream, MetaTable& out)
+    StdBinarySerializer::deserialize_mt(ReadOnlyMemoryStream& stream, MetaTable& out) const
     {
         stream.read(out.id.raw(), sizeof(uuid_t));
         stream.read(out.schema_id.raw(), sizeof(uuid_t));
@@ -226,7 +226,7 @@ namespace storage
     }
 
     bool
-    StdBinarySerializer::deserialize_ms(ReadOnlyMemoryStream& stream, MetaSchema& out)
+    StdBinarySerializer::deserialize_ms(ReadOnlyMemoryStream& stream, MetaSchema& out) const
     {
         stream.read(out.id.raw(), sizeof(uuid_t));
 
@@ -240,7 +240,7 @@ namespace storage
     }
 
     bool
-    StdBinarySerializer::deserialize_mc(ReadOnlyMemoryStream& stream, MetaColumn& out)
+    StdBinarySerializer::deserialize_mc(ReadOnlyMemoryStream& stream, MetaColumn& out) const
     {
         if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
             return false;
@@ -259,7 +259,7 @@ namespace storage
     }
 
     bool
-    StdBinarySerializer::deserialize_dp(ReadOnlyMemoryStream& stream, DataPage& out)
+    StdBinarySerializer::deserialize_dp(ReadOnlyMemoryStream& stream, DataPage& out) const
     {
         if (!deserialize_dph(stream, out.header))
             return false;
@@ -283,7 +283,7 @@ namespace storage
     }
 
     bool
-    StdBinarySerializer::deserialize_dph(ReadOnlyMemoryStream& stream, DataPageHeader& out)
+    StdBinarySerializer::deserialize_dph(ReadOnlyMemoryStream& stream, DataPageHeader& out) const
     {
         if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
             return false;
@@ -304,7 +304,7 @@ namespace storage
     }
 
     bool
-    StdBinarySerializer::deserialize_cfg(ReadOnlyMemoryStream& stream, Config& out)
+    StdBinarySerializer::deserialize_cfg(ReadOnlyMemoryStream& stream, Config& out) const
     {
         std::string db_name;
         if (!read_str(db_name, stream))
@@ -334,7 +334,7 @@ namespace storage
     }
 
     bool
-    StdBinarySerializer::deserialize_dr(ReadOnlyMemoryStream& stream, DataRow& out)
+    StdBinarySerializer::deserialize_dr(ReadOnlyMemoryStream& stream, DataRow& out) const
     {
         if (stream.read(&out.id, sizeof(out.id)) != sizeof(out.id))
             return false;
@@ -363,7 +363,7 @@ namespace storage
     }
 
     bool
-    StdBinarySerializer::deserialize_dt(ReadOnlyMemoryStream& stream, DataToken& out)
+    StdBinarySerializer::deserialize_dt(ReadOnlyMemoryStream& stream, DataToken& out) const
     {
         if (stream.read(&out.type, sizeof(out.type)) != sizeof(out.type))
         {
@@ -389,7 +389,7 @@ namespace storage
     }
 
     uint64_t
-    StdBinarySerializer::estimate_size(const DataRow& row)
+    StdBinarySerializer::estimate_size(const DataRow& row) const
     {
         uint64_t size = sizeof(row.id) + sizeof(row.flags) + sizeof(uint64_t);
         for (const auto& token : row.tokens)
@@ -398,7 +398,7 @@ namespace storage
     }
 
     uint64_t
-    StdBinarySerializer::estimate_size(const DataToken& token)
+    StdBinarySerializer::estimate_size(const DataToken& token) const
     {
         uint64_t size = sizeof(token.type);
 

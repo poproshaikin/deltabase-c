@@ -14,7 +14,7 @@ namespace exq
     GenericQueryValidator::GenericQueryValidator(const types::Config& cfg) : cfg_(cfg)
     {
         IOManagerFactory factory;
-        io_manager_ = factory.make_io_manager(cfg);
+        io_manager_ = factory.make(cfg);
     }
 
     bool

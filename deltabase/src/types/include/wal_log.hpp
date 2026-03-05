@@ -6,6 +6,7 @@
 #define DELTABASE_WAL_LOG_HPP
 #include "data_row.hpp"
 #include "meta_schema.hpp"
+#include "meta_table.hpp"
 #include "typedefs.hpp"
 
 #include <cstdint>
@@ -19,19 +20,18 @@ namespace types
     enum class WalRecordType : uint64_t
     {
         INSERT = 1,
-        UPDATE_BY_FILTER,
-        DELETE_BY_FILTER,
+        UPDATE,
+        DELETE,
         CREATE_TABLE,
         CREATE_SCHEMA,
-        DROP_TABLE,
-        DROP_SCHEMA,
-        BEGIN_TRANSACTION
+        BEGIN_TRANSACTION,
+        COMMIT_TRANSACTION
     };
 
     namespace detail
     {
         template <typename T>
-        concept Wal_c = requires(const T x, const Bytes& content, T& out) {
+        concept Wal_c = requires(const T x) {
             T::type;
             x.lsn;
 
@@ -39,9 +39,8 @@ namespace types
             requires std::same_as<decltype(x.lsn), uint64_t>;
         };
 
-        template <Wal_c... Ts>
-        using WalRecordVariant = std::variant<Ts...>;
-    };
+        template <Wal_c... Ts> using WalRecordVariant = std::variant<Ts...>;
+    }; // namespace detail
 
     struct InsertRecord
     {
@@ -53,23 +52,38 @@ namespace types
         DataRow row;
     };
 
+    struct UpdateRecord
+    {
+        static constexpr auto type = WalRecordType::UPDATE;
+
+        Lsn lsn;
+        Uuid txn_id;
+
+        Uuid table_id;
+
+        DataRow old_row;
+        DataRow new_row;
+    };
+
+    struct DeleteRecord
+    {
+        static constexpr auto type = WalRecordType::DELETE;
+
+        Lsn lsn;
+        Uuid txn_id;
+
+        Uuid table_id;
+
+        DataRow row;
+    };
+
     struct CreateSchemaRecord
     {
         static constexpr auto type = WalRecordType::CREATE_SCHEMA;
 
         Lsn lsn;
         Uuid txn_id;
-        Uuid schema_id;
         MetaSchema schema;
-    };
-
-    struct DropSchemaRecord
-    {
-        static constexpr auto type = WalRecordType::DROP_SCHEMA;
-
-        Lsn lsn;
-        Uuid txn_id;
-        Uuid schema_id;
     };
 
     struct CreateTableRecord
@@ -78,7 +92,6 @@ namespace types
 
         Lsn lsn;
         Uuid txn_id;
-        Uuid table_id;
         MetaTable table;
     };
 
@@ -90,13 +103,22 @@ namespace types
         Uuid txn_id;
     };
 
+    struct CommitTransactionRecord
+    {
+        static constexpr auto type = WalRecordType::COMMIT_TRANSACTION;
+
+        Lsn lsn;
+        Uuid txn_id;
+    };
+
     using WalRecord = detail::WalRecordVariant<
         InsertRecord,
+        UpdateRecord,
+        DeleteRecord,
         CreateSchemaRecord,
-        DropSchemaRecord,
         CreateTableRecord,
-        BeginTransactionRecord
-    >;
-}
+        BeginTransactionRecord,
+        CommitTransactionRecord>;
+} // namespace types
 
-#endif //DELTABASE_WAL_LOG_HPP
+#endif // DELTABASE_WAL_LOG_HPP

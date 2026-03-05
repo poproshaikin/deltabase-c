@@ -15,7 +15,7 @@ namespace storage
     DetachedDbInstance::DetachedDbInstance(const Config& config) : config_(config)
     {
         IOManagerFactory io_factory;
-        io_manager_ = io_factory.make_io_manager(config);
+        io_manager_ = io_factory.make(config);
         io_manager_->init();
     }
 

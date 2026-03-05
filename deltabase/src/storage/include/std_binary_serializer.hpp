@@ -25,58 +25,58 @@ namespace storage
 
     public:
         misc::MemoryStream
-        serialize_mt(const types::MetaTable& table) override;
+        serialize_mt(const types::MetaTable& table) const override;
 
         misc::MemoryStream
-        serialize_ms(const types::MetaSchema& schema) override;
+        serialize_ms(const types::MetaSchema& schema) const override;
 
         misc::MemoryStream
-        serialize_mc(const types::MetaColumn& column) override;
+        serialize_mc(const types::MetaColumn& column) const override;
 
         misc::MemoryStream
-        serialize_dp(const types::DataPage& page) override;
+        serialize_dp(const types::DataPage& page) const override;
 
         misc::MemoryStream
-        serialize_dr(const types::DataRow& row) override;
+        serialize_dr(const types::DataRow& row) const override;
 
         misc::MemoryStream
-        serialize_dph(const types::DataPageHeader& header) override;
+        serialize_dph(const types::DataPageHeader& header) const override;
 
         misc::MemoryStream
-        serialize_dt(const types::DataToken& token) override;
+        serialize_dt(const types::DataToken& token) const override;
 
         misc::MemoryStream
-        serialize_cfg(const types::Config& db) override;
+        serialize_cfg(const types::Config& db) const override;
 
         bool
-        deserialize_mt(misc::ReadOnlyMemoryStream &content, types::MetaTable &out) override;
+        deserialize_mt(misc::ReadOnlyMemoryStream &content, types::MetaTable &out) const override;
 
         bool
-        deserialize_ms(misc::ReadOnlyMemoryStream& content, types::MetaSchema& out) override;
+        deserialize_ms(misc::ReadOnlyMemoryStream& content, types::MetaSchema& out) const override;
 
         bool
-        deserialize_mc(misc::ReadOnlyMemoryStream& content, types::MetaColumn& out) override;
+        deserialize_mc(misc::ReadOnlyMemoryStream& content, types::MetaColumn& out) const override;
 
         bool
-        deserialize_dp(misc::ReadOnlyMemoryStream& stream, types::DataPage& out) override;
+        deserialize_dp(misc::ReadOnlyMemoryStream& stream, types::DataPage& out) const override;
 
         bool
-        deserialize_dph(misc::ReadOnlyMemoryStream& content, types::DataPageHeader& out) override;
+        deserialize_dph(misc::ReadOnlyMemoryStream& content, types::DataPageHeader& out) const override;
 
         bool
-        deserialize_cfg(misc::ReadOnlyMemoryStream& stream, types::Config& out) override;
+        deserialize_cfg(misc::ReadOnlyMemoryStream& stream, types::Config& out) const override;
 
         bool
-        deserialize_dr(misc::ReadOnlyMemoryStream& stream, types::DataRow& out) override;
+        deserialize_dr(misc::ReadOnlyMemoryStream& stream, types::DataRow& out) const override;
 
         bool
-        deserialize_dt(misc::ReadOnlyMemoryStream& stream, types::DataToken& out) override;
+        deserialize_dt(misc::ReadOnlyMemoryStream& stream, types::DataToken& out) const override;
 
         uint64_t
-        estimate_size(const types::DataRow& row) override;
+        estimate_size(const types::DataRow& row) const override;
 
         uint64_t
-        estimate_size(const types::DataToken& token) override;
+        estimate_size(const types::DataToken& token) const override;
     };
 }
 

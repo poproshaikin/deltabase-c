@@ -15,8 +15,6 @@ compile_commands.json
 build/
 build.ninja
 
-hello.txt
-
 .cmake
 .idea
 .cache
