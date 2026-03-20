@@ -4,7 +4,6 @@
 
 #include "std_db_instance.hpp"
 
-#include "file_io_manager.hpp"
 #include "io_manager_factory.hpp"
 #include "logger.hpp"
 #include "std_binary_serializer.hpp"
@@ -12,8 +11,8 @@
 
 #include "../misc/include/convert.hpp"
 #include "../types/include/config.hpp"
+#include "../wal/include/wal_manager_factory.hpp"
 
-#include <fstream>
 #include <unordered_set>
 
 namespace storage
@@ -35,13 +34,17 @@ namespace storage
         IOManagerFactory io_factory;
         io_manager_ = io_factory.make(cfg);
 
+        wal::WalManagerFactory factory;
+        wal_manager_ = factory.make(cfg);
+
+        txn_manager_ = std::make_unique<txn::TransactionManager>(*wal_manager_);
+
         init();
     }
 
     StdDbInstance::~StdDbInstance()
     {
         io_manager_->write_cfg(cfg_);
-        Logger::info("Destruction of a database instance completed");
     }
 
     bool
@@ -80,6 +83,12 @@ namespace storage
         return dt;
     }
 
+    txn::Transaction
+    StdDbInstance::make_transaction()
+    {
+        return txn_manager_->make_transaction();
+    }
+
     ssize_t
     StdDbInstance::has_available_page(const std::vector<DataPage>& vec, size_t size) const
     {
@@ -95,7 +104,10 @@ namespace storage
 
     void
     StdDbInstance::insert_row(
-        const std::string& table_name, const std::string& schema_name, std::vector<DataToken> row
+        const std::string& table_name,
+        const std::string& schema_name,
+        std::vector<DataToken> row,
+        txn::Transaction& txn
     )
     {
         auto table = io_manager_->load_table_meta(table_name, schema_name);
@@ -115,8 +127,15 @@ namespace storage
             throw std::runtime_error("StdDbInstance::insert_row: Failed to create new data page");
 
         pages[idx].rows.push_back(data_row);
-        io_manager_->write_page(pages[idx]);
 
+        InsertRecord record {
+            .table_id = table.id,
+            .row = data_row,
+        };
+
+        txn.append_log(record);
+
+        io_manager_->write_page(pages[idx]);
         io_manager_->write_mt(table, schema_name);
     }
 

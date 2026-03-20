@@ -14,6 +14,8 @@ namespace wal
     {
         storage::StdBinarySerializer binary_serializer_;
 
+        // ---
+
         misc::MemoryStream
         serialize(const types::BeginTransactionRecord& record) const;
 
@@ -35,9 +37,14 @@ namespace wal
         misc::MemoryStream
         serialize(const types::CreateTableRecord& record) const;
 
+        // ---
+
     public:
         misc::MemoryStream
         serialize(const types::WalRecord& record) const override;
+
+        bool
+        deserialize(misc::ReadOnlyMemoryStream& stream, types::WalRecord& out) override;
     };
 } // namespace wal
 

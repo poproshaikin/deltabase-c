@@ -5,9 +5,11 @@
 #ifndef DELTABASE_STD_DB_INSTANCE_HPP
 #define DELTABASE_STD_DB_INSTANCE_HPP
 
+#include "../../transactions/include/transaction_manager.hpp"
+#include "../../types/include/config.hpp"
+#include "../../wal/include/wal_manager.hpp"
 #include "db_instance.hpp"
 #include "io_manager.hpp"
-#include "../../types/include/config.hpp"
 
 namespace storage
 {
@@ -15,6 +17,8 @@ namespace storage
     {
         types::Config cfg_;
         std::unique_ptr<IIOManager> io_manager_;
+        std::unique_ptr<wal::IWalManager> wal_manager_;
+        std::unique_ptr<txn::TransactionManager> txn_manager_;
 
         void
         init();
@@ -34,11 +38,15 @@ namespace storage
         types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) override;
 
+        txn::Transaction
+        make_transaction() override;
+
         void
         insert_row(
             const std::string& table_name,
             const std::string& schema_name,
-            std::vector<types::DataToken> row
+            std::vector<types::DataToken> row,
+            txn::Transaction& txn
         ) override;
 
         void

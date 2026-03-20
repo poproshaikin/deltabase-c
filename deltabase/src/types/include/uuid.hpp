@@ -13,11 +13,37 @@ namespace types
 {
     struct Uuid
     {
+    private:
+        uuid_t value_{};
+
+        static void
+        generate(uuid_t& out)
+        {
+            uuid_generate_time_v6(out);
+        }
+
+    public:
         Uuid() = default;
 
         Uuid(uuid_t other)
         {
             std::memcpy(&value_, &other, sizeof(uuid_t));
+        }
+
+        Uuid(const Uuid& other)
+        {
+            std::memcpy(&value_, &other.value_, sizeof(uuid_t));
+        }
+
+        Uuid&
+        operator=(const Uuid& other)
+        {
+            if (this != &other)
+            {
+                std::memcpy(&value_, &other.value_, sizeof(uuid_t));
+            }
+
+            return *this;
         }
 
         explicit Uuid(const std::string& str)
@@ -37,7 +63,8 @@ namespace types
         static Uuid
         null()
         {
-            Uuid uuid{};
+            Uuid uuid;
+            uuid_clear(*uuid.raw());
             return uuid;
         }
 
@@ -71,15 +98,6 @@ namespace types
         raw() const noexcept
         {
             return &value_;
-        }
-
-    private:
-        uuid_t value_{};
-
-        static void
-        generate(uuid_t& out)
-        {
-            uuid_generate_time_v6(out);
         }
     };
 } // namespace types

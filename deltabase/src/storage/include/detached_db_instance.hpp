@@ -32,10 +32,16 @@ namespace storage
         types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) override;
 
+    txn::Transaction
+    make_transaction() override;
+
         void
-        insert_row(const std::string& table_name,
+        insert_row(
+            const std::string& table_name,
             const std::string& schema_name,
-            std::vector<types::DataToken> row) override;
+            std::vector<types::DataToken> row,
+            txn::Transaction& txn
+        ) override;
 
         bool
         exists_table(const std::string& table_name, const std::string& schema_name) override;

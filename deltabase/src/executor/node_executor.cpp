@@ -223,15 +223,20 @@ namespace exq
 
         int inserted_count = 0;
 
+        auto txn = db_.make_transaction();
+        txn.begin();
+
         while (true)
         {
             DataRow row;
             if (!child_->next(row))
                 break;
 
-            db_.insert_row(table_name_, schema_name_, row.tokens);
+            db_.insert_row(table_name_, schema_name_, row.tokens, txn);
             inserted_count++;
         }
+
+        txn.commit();
 
         DataToken affected_rows_count(misc::convert(inserted_count), DataType::INTEGER);
         out.tokens = {affected_rows_count};

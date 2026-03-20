@@ -43,10 +43,19 @@ namespace storage
         throw std::logic_error("DetachedDbInstance::seq_scan: this method is not supported");
     }
 
+    txn::Transaction
+    DetachedDbInstance::make_transaction()
+    {
+        throw std::logic_error("DetachedDbInstance::make_transaction: this method is not supported");
+    }
+
     void
-    DetachedDbInstance::insert_row(const std::string& table_name,
+    DetachedDbInstance::insert_row(
+        const std::string& table_name,
         const std::string& schema_name,
-        std::vector<DataToken> row)
+        std::vector<DataToken> row,
+        txn::Transaction& txn
+    )
     {
         throw std::logic_error("DetachedDbInstance::insert_row: this method is not supported");
     }

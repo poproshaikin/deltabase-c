@@ -34,9 +34,11 @@ namespace types
         concept Wal_c = requires(const T x) {
             T::type;
             x.lsn;
+            x.txn_id;
 
             requires std::same_as<decltype(T::type), const WalRecordType>;
             requires std::same_as<decltype(x.lsn), uint64_t>;
+            requires std::same_as<decltype(x.txn_id), Uuid>;
         };
 
         template <Wal_c... Ts> using WalRecordVariant = std::variant<Ts...>;

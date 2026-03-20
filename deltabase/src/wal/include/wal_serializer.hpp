@@ -4,8 +4,8 @@
 
 #ifndef DELTABASE_WAL_SERIALIZER_HPP
 #define DELTABASE_WAL_SERIALIZER_HPP
-#include "file_wal_io_manager.hpp"
 #include "memory_stream.hpp"
+#include "../../types/include/wal_log.hpp"
 
 namespace wal
 {
@@ -16,6 +16,9 @@ namespace wal
 
         virtual misc::MemoryStream
         serialize(const types::WalRecord& record) const = 0;
+
+        virtual bool
+        deserialize(misc::ReadOnlyMemoryStream& stream, types::WalRecord& out) = 0;
     };
 }
 

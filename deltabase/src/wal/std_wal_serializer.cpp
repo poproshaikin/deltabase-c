@@ -76,7 +76,7 @@ namespace wal
         stream.write(&record.lsn, sizeof(record.lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
 
-        auto serialized_schema = binary_serializer_.serialize_ms(record.schema);
+    auto serialized_schema = binary_serializer_.serialize_ms(record.schema);
         stream.append(serialized_schema, serialized_schema.size());
 
         return stream;
@@ -90,7 +90,7 @@ namespace wal
         stream.write(&record.lsn, sizeof(record.lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
 
-        auto serialized_table = binary_serializer_.serialize_mt(record.table);
+    auto serialized_table = binary_serializer_.serialize_mt(record.table);
         stream.append(serialized_table, serialized_table.size());
 
         return stream;
@@ -127,6 +127,136 @@ namespace wal
             return serialize(std::get<CommitTransactionRecord>(record));
         default:
             throw std::runtime_error("StdWalSerializer::serialize: Unknown WAL record type " + std::to_string(static_cast<int>(type)));
+        }
+    }
+
+    bool
+    StdWalSerializer::deserialize(ReadOnlyMemoryStream& stream, WalRecord& out)
+    {
+        WalRecordType type;
+        if (!stream.read(&type, sizeof(type)))
+            return false;
+        
+        switch (type)
+        {
+        case WalRecordType::BEGIN_TRANSACTION:
+            {
+                BeginTransactionRecord record;
+
+                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                    return false;
+                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                    return false;
+                
+                out = record;
+                return true;
+            }
+            
+        case WalRecordType::COMMIT_TRANSACTION:
+            {
+                CommitTransactionRecord record;
+
+                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                    return false;
+                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                    return false;
+                
+                out = record;
+                return true;
+            }
+            
+        case WalRecordType::INSERT:
+            {
+                InsertRecord record;
+
+                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                    return false;
+                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&record.table_id, sizeof(uuid_t)))
+                    return false;
+                
+                // Десериализовать DataRow
+                if (!binary_serializer_.deserialize_dr(stream, record.row))
+                    return false;
+                
+                out = record;
+                return true;
+            }
+            
+        case WalRecordType::UPDATE:
+            {
+                UpdateRecord record;
+
+                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                    return false;
+                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&record.table_id, sizeof(uuid_t)))
+                    return false;
+                
+                if (!binary_serializer_.deserialize_dr(stream, record.old_row))
+                    return false;
+                
+                if (!binary_serializer_.deserialize_dr(stream, record.new_row))
+                    return false;
+                
+                out = record;
+                return true;
+            }
+            
+        case WalRecordType::DELETE:
+            {
+                DeleteRecord record;
+
+                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                    return false;
+                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&record.table_id, sizeof(uuid_t)))
+                    return false;
+                
+                if (!binary_serializer_.deserialize_dr(stream, record.row))
+                    return false;
+                
+                out = record;
+                return true;
+            }
+            
+        case WalRecordType::CREATE_SCHEMA:
+            {
+                CreateSchemaRecord record;
+
+                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                    return false;
+                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                    return false;
+                
+                if (!binary_serializer_.deserialize_ms(stream, record.schema))
+                    return false;
+                
+                out = record;
+                return true;
+            }
+            
+        case WalRecordType::CREATE_TABLE:
+            {
+                CreateTableRecord record;
+
+                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                    return false;
+                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                    return false;
+                
+                if (!binary_serializer_.deserialize_mt(stream, record.table))
+                    return false;
+                
+                out = record;
+                return true;
+            }
+            
+        default:
+            return false;
         }
     }
 } // namespace wal

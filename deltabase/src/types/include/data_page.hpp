@@ -7,6 +7,7 @@
 #include "data_row.hpp"
 #include "typedefs.hpp"
 #include "uuid.hpp"
+#include "wal_log.hpp"
 
 #include <filesystem>
 
@@ -19,13 +20,14 @@ namespace types
         RowId min_rid = 0;
         RowId max_rid = 0;
         uint64_t rows_count = 0;
+    types::Lsn last_lsn = 0;
 
-        static constexpr uint64_t SIZE = sizeof(uuid_t) * 2 + sizeof(RowId) * 2 + sizeof(uint64_t);
+    static constexpr uint64_t SIZE = sizeof(uuid_t) * 2 + sizeof(RowId) * 2 + sizeof(uint64_t) + sizeof(types::Lsn);
     };
 
     struct DataPage
     {
-        static constexpr uint64_t MAX_SIZE = 1 * 1024 * 1024; // 1 MB
+        static constexpr uint64_t MAX_SIZE = 32 * 1024; // 32 kB
 
         uint64_t size; // + do not serialize
         fs::path path; // |

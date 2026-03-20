@@ -9,6 +9,7 @@
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/query_plan.hpp"
+#include "../../transactions/include/transaction.hpp"
 
 namespace storage
 {
@@ -23,11 +24,15 @@ namespace storage
         virtual types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) = 0;
 
+        virtual txn::Transaction
+        make_transaction() = 0;
+
         virtual void
         insert_row(
             const std::string& table_name,
             const std::string& schema_name,
-            std::vector<types::DataToken> row
+            std::vector<types::DataToken> row,
+            txn::Transaction& txn
         ) = 0;
 
         virtual void
