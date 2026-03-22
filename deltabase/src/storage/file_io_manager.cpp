@@ -55,6 +55,9 @@ namespace storage
                 if (!entry_in_db.is_directory())
                     return;
 
+                if (entry_in_db.path().filename() == PATH_WAL)
+                    return;
+
                 func(entry_in_db);
             }
         );
@@ -86,6 +89,9 @@ namespace storage
             [&](const fs::directory_entry& schema_entry)
             {
                 if (!schema_entry.is_directory())
+                    return;
+
+                if (schema_entry.path().filename() == PATH_WAL)
                     return;
 
                 for (const auto& dir_in_schema : fs::directory_iterator(schema_entry.path()))

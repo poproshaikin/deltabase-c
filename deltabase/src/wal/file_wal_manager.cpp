@@ -29,7 +29,23 @@ namespace wal
         // Create WAL directory if it doesn't exist
         auto wal_dir = storage::path_db_wal(db_path_, db_name_);
         if (!fs::exists(wal_dir))
+        {
             fs::create_directories(wal_dir);
+        }
+
+        // Ensure a first WAL file exists for an empty WAL directory.
+        if (fs::is_empty(wal_dir))
+        {
+            auto first_file_path = storage::path_db_wal_logfile(
+                db_path_, db_name_, 1, MAX_RECORDS_PER_LOGFILE
+            );
+
+            int fd = open(first_file_path.c_str(), O_WRONLY | O_CREAT, 0644);
+            if (fd < 0)
+                throw std::runtime_error("Failed to create first WAL log file");
+
+            close(fd);
+        }
 
         // Hydrate cache: load all existing WAL records into memory
         hydrate_cache();
@@ -82,6 +98,18 @@ namespace wal
                     next_lsn_ = record_lsn + 1;
             }
         }
+
+        // Trust record payload LSNs over filenames to keep correct logical order.
+        std::sort(
+            flushed_.begin(),
+            flushed_.end(),
+            [](const WalRecord& lhs, const WalRecord& rhs)
+            {
+                auto l_lsn = std::visit([](const auto& rec) { return rec.lsn; }, lhs);
+                auto r_lsn = std::visit([](const auto& rec) { return rec.lsn; }, rhs);
+                return l_lsn < r_lsn;
+            }
+        );
     }
 
     void
@@ -179,64 +207,35 @@ namespace wal
         if (!fs::exists(dir))
             fs::create_directories(dir);
 
-        uint64_t last_file_first_lsn = 0;
-        uint64_t last_file_last_lsn = 0;
-        size_t records_in_last_file = 0;
-
-        if (fs::exists(dir) && !fs::is_empty(dir))
-        {
-            for (const auto& entry : fs::directory_iterator(dir))
-            {
-                if (!entry.is_regular_file())
-                    continue;
-
-                auto filename = entry.path().filename().string();
-                auto underscore_pos = filename.find('_');
-                if (underscore_pos == std::string::npos)
-                    continue;
-
-                uint64_t first_lsn = std::stoull(filename.substr(0, underscore_pos));
-                uint64_t last_lsn = std::stoull(filename.substr(underscore_pos + 1));
-
-                if (first_lsn > last_file_first_lsn)
-                {
-                    last_file_first_lsn = first_lsn;
-                    last_file_last_lsn = last_lsn;
-                    records_in_last_file = last_lsn - first_lsn + 1;
-                }
-            }
-        }
-
-        uint64_t current_lsn = last_file_last_lsn + 1;
-
-        int fd;
-        uint64_t current_file_first_lsn = last_file_first_lsn;
-
-        if (records_in_last_file == 0 || records_in_last_file >= MAX_RECORDS_PER_LOGFILE)
-        {
-            current_file_first_lsn = current_lsn;
-            uint64_t expected_last_lsn = current_lsn + MAX_RECORDS_PER_LOGFILE - 1;
-
-            auto new_file_path = storage::path_db_wal_logfile(
-                db_path_, db_name_, current_file_first_lsn, expected_last_lsn
-            );
-
-            fd = open(new_file_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        }
-        else
-        {
-            auto existing_file_path = storage::path_db_wal_logfile(
-                db_path_, db_name_, last_file_first_lsn, last_file_last_lsn
-            );
-
-            fd = open(existing_file_path.c_str(), O_WRONLY | O_APPEND);
-        }
-
-        if (fd < 0)
-            throw std::runtime_error("Failed to open WAL log file");
+        int fd = -1;
+        uint64_t opened_first_lsn = 0;
 
         for (const auto& record : logs)
         {
+            auto record_lsn = std::visit([](const auto& rec) { return rec.lsn; }, record);
+            uint64_t file_first_lsn = ((record_lsn - 1) / MAX_RECORDS_PER_LOGFILE)
+                * MAX_RECORDS_PER_LOGFILE + 1;
+            uint64_t file_last_lsn = file_first_lsn + MAX_RECORDS_PER_LOGFILE - 1;
+
+            if (fd < 0 || opened_first_lsn != file_first_lsn)
+            {
+                if (fd >= 0)
+                {
+                    fsync(fd);
+                    close(fd);
+                }
+
+                auto file_path = storage::path_db_wal_logfile(
+                    db_path_, db_name_, file_first_lsn, file_last_lsn
+                );
+
+                fd = open(file_path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+                if (fd < 0)
+                    throw std::runtime_error("Failed to open WAL log file");
+
+                opened_first_lsn = file_first_lsn;
+            }
+
             auto serialized = serializer_->serialize(record);
 
             uint64_t record_size = serialized.size();
@@ -246,32 +245,13 @@ namespace wal
 
             if (write(fd, serialized.data(), serialized.size()) != (ssize_t)serialized.size())
                 throw std::runtime_error("Failed to write WAL record");
-
-            current_lsn++;
-            records_in_last_file++;
-
-            if (records_in_last_file >= MAX_RECORDS_PER_LOGFILE)
-            {
-                fsync(fd);
-                close(fd);
-
-                current_file_first_lsn = current_lsn;
-                uint64_t expected_last_lsn = current_lsn + MAX_RECORDS_PER_LOGFILE - 1;
-
-                auto new_file_path = storage::path_db_wal_logfile(
-                    db_path_, db_name_, current_file_first_lsn, expected_last_lsn
-                );
-
-                fd = open(new_file_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                if (fd < 0)
-                    throw std::runtime_error("Failed to create new WAL file");
-
-                records_in_last_file = 0;
-            }
         }
 
-        fsync(fd);
-        close(fd);
+        if (fd >= 0)
+        {
+            fsync(fd);
+            close(fd);
+        }
     }
 
     std::vector<WalRecord>

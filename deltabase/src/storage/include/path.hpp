@@ -57,7 +57,8 @@ namespace storage
         uint64_t last_lsn
     )
     {
-        return data_dir / db_name / (std::to_string(first_lsn) + "_" + std::to_string(last_lsn));
+        return data_dir / db_name / PATH_WAL
+            / (std::to_string(first_lsn) + "_" + std::to_string(last_lsn));
     }
 
     inline fs::path

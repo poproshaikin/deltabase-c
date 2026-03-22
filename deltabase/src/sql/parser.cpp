@@ -17,7 +17,7 @@ namespace sql
     }
 
     void
-    SqlParser::set_tokens(const std::vector<types::SqlToken>& tokens)
+    SqlParser::set_tokens(const std::vector<SqlToken>& tokens)
     {
         tokens_ = tokens;
     }
