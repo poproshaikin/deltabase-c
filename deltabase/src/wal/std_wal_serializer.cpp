@@ -9,7 +9,7 @@ namespace wal
     using namespace misc;
 
     MemoryStream
-    StdWalSerializer::serialize(const BeginTransactionRecord& record) const
+    StdWalSerializer::serialize(const BeginTxnRecord& record) const
     {
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
@@ -27,7 +27,7 @@ namespace wal
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
 
-        auto serialized_row = binary_serializer_.serialize_dr(record.row);
+        auto serialized_row = binary_serializer_.serialize_dr(record.after);
         stream.append(serialized_row, serialized_row.size());
 
         return stream;
@@ -43,11 +43,11 @@ namespace wal
         stream.write(&record.table_id, sizeof(uuid_t));
 
         // Сериализуем old_row
-        auto serialized_old_row = binary_serializer_.serialize_dr(record.old_row);
+        auto serialized_old_row = binary_serializer_.serialize_dr(record.before);
         stream.append(serialized_old_row, serialized_old_row.size());
 
         // Сериализуем new_row
-        auto serialized_new_row = binary_serializer_.serialize_dr(record.new_row);
+        auto serialized_new_row = binary_serializer_.serialize_dr(record.after);
         stream.append(serialized_new_row, serialized_new_row.size());
 
         return stream;
@@ -62,7 +62,7 @@ namespace wal
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
 
-        auto serialized_row = binary_serializer_.serialize_dr(record.row);
+        auto serialized_row = binary_serializer_.serialize_dr(record.before);
         stream.append(serialized_row, serialized_row.size());
 
         return stream;
@@ -97,7 +97,7 @@ namespace wal
     }
 
     MemoryStream
-    StdWalSerializer::serialize(const CommitTransactionRecord& record) const
+    StdWalSerializer::serialize(const CommitTxnRecord& record) const
     {
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
@@ -107,151 +107,182 @@ namespace wal
     }
 
     MemoryStream
-    StdWalSerializer::serialize(const WalRecord& record) const
+    StdWalSerializer::serialize(const WALRecord& record) const
     {
-        switch (WalRecordType type = std::visit([](const auto& rec) { return rec.type; }, record))
+        switch (WALRecordType type = std::visit([](const auto& rec) { return rec.type; }, record))
         {
-        case WalRecordType::INSERT:
+        case WALRecordType::INSERT:
             return serialize(std::get<InsertRecord>(record));
-        case WalRecordType::UPDATE:
+        case WALRecordType::UPDATE:
             return serialize(std::get<UpdateRecord>(record));
-        case WalRecordType::DELETE:
+        case WALRecordType::DELETE:
             return serialize(std::get<DeleteRecord>(record));
-        case WalRecordType::CREATE_TABLE:
+        case WALRecordType::CREATE_TABLE:
             return serialize(std::get<CreateTableRecord>(record));
-        case WalRecordType::CREATE_SCHEMA:
+        case WALRecordType::CREATE_SCHEMA:
             return serialize(std::get<CreateSchemaRecord>(record));
-        case WalRecordType::BEGIN_TRANSACTION:
-            return serialize(std::get<BeginTransactionRecord>(record));
-        case WalRecordType::COMMIT_TRANSACTION:
-            return serialize(std::get<CommitTransactionRecord>(record));
+        case WALRecordType::BEGIN_TXN:
+            return serialize(std::get<BeginTxnRecord>(record));
+        case WALRecordType::COMMIT_TXN:
+            return serialize(std::get<CommitTxnRecord>(record));
+        case WALRecordType::ROLLBACK_TXN:
+            throw std::runtime_error("StdWalSerializer::serialize: rollback serialization is not implemented yet");
         default:
             throw std::runtime_error("StdWalSerializer::serialize: Unknown WAL record type " + std::to_string(static_cast<int>(type)));
         }
     }
 
     bool
-    StdWalSerializer::deserialize(ReadOnlyMemoryStream& stream, WalRecord& out)
+    StdWalSerializer::deserialize(ReadOnlyMemoryStream& stream, WALRecord& out)
     {
-        WalRecordType type;
+        WALRecordType type;
         if (!stream.read(&type, sizeof(type)))
             return false;
         
         switch (type)
         {
-        case WalRecordType::BEGIN_TRANSACTION:
+        case WALRecordType::BEGIN_TXN:
             {
-                BeginTransactionRecord record;
+                LSN lsn;
+                Uuid txn_id;
 
-                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
-                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
                 
-                out = record;
+                out = BeginTxnRecord(lsn, 0, txn_id);
                 return true;
             }
             
-        case WalRecordType::COMMIT_TRANSACTION:
+        case WALRecordType::COMMIT_TXN:
             {
-                CommitTransactionRecord record;
+                LSN lsn;
+                Uuid txn_id;
 
-                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
-                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
                 
-                out = record;
+                out = CommitTxnRecord(lsn, 0, txn_id);
+                return true;
+            }
+
+        case WALRecordType::ROLLBACK_TXN:
+            {
+                LSN lsn;
+                Uuid txn_id;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+
+                out = RollbackTxnRecord(lsn, 0, txn_id);
                 return true;
             }
             
-        case WalRecordType::INSERT:
+        case WALRecordType::INSERT:
             {
-                InsertRecord record;
+                LSN lsn;
+                Uuid txn_id;
+                Uuid table_id;
+                DataRow after;
 
-                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
-                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
-                if (!stream.read(&record.table_id, sizeof(uuid_t)))
-                    return false;
-                
-                // Десериализовать DataRow
-                if (!binary_serializer_.deserialize_dr(stream, record.row))
+                if (!stream.read(table_id.raw(), sizeof(uuid_t)))
                     return false;
                 
-                out = record;
+                if (!binary_serializer_.deserialize_dr(stream, after))
+                    return false;
+                
+                out = InsertRecord(lsn, 0, txn_id, table_id, Uuid{}, std::move(after));
                 return true;
             }
             
-        case WalRecordType::UPDATE:
+        case WALRecordType::UPDATE:
             {
-                UpdateRecord record;
+                LSN lsn;
+                Uuid txn_id;
+                Uuid table_id;
+                DataRow before;
+                DataRow after;
 
-                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
-                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
-                if (!stream.read(&record.table_id, sizeof(uuid_t)))
-                    return false;
-                
-                if (!binary_serializer_.deserialize_dr(stream, record.old_row))
+                if (!stream.read(table_id.raw(), sizeof(uuid_t)))
                     return false;
                 
-                if (!binary_serializer_.deserialize_dr(stream, record.new_row))
+                if (!binary_serializer_.deserialize_dr(stream, before))
                     return false;
                 
-                out = record;
+                if (!binary_serializer_.deserialize_dr(stream, after))
+                    return false;
+                
+                out = UpdateRecord(lsn, 0, txn_id, table_id, Uuid{}, std::move(before), std::move(after));
                 return true;
             }
             
-        case WalRecordType::DELETE:
+        case WALRecordType::DELETE:
             {
-                DeleteRecord record;
+                LSN lsn;
+                Uuid txn_id;
+                Uuid table_id;
+                DataRow before;
 
-                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
-                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
-                if (!stream.read(&record.table_id, sizeof(uuid_t)))
-                    return false;
-                
-                if (!binary_serializer_.deserialize_dr(stream, record.row))
+                if (!stream.read(table_id.raw(), sizeof(uuid_t)))
                     return false;
                 
-                out = record;
+                if (!binary_serializer_.deserialize_dr(stream, before))
+                    return false;
+                
+                out = DeleteRecord(lsn, 0, txn_id, table_id, Uuid{}, std::move(before));
                 return true;
             }
             
-        case WalRecordType::CREATE_SCHEMA:
+        case WALRecordType::CREATE_SCHEMA:
             {
-                CreateSchemaRecord record;
+                LSN lsn;
+                Uuid txn_id;
+                MetaSchema schema;
 
-                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
-                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
-                    return false;
-                
-                if (!binary_serializer_.deserialize_ms(stream, record.schema))
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
                 
-                out = record;
+                if (!binary_serializer_.deserialize_ms(stream, schema))
+                    return false;
+                
+                out = CreateSchemaRecord(lsn, 0, txn_id, std::move(schema));
                 return true;
             }
             
-        case WalRecordType::CREATE_TABLE:
+        case WALRecordType::CREATE_TABLE:
             {
-                CreateTableRecord record;
+                LSN lsn;
+                Uuid txn_id;
+                MetaTable table;
 
-                if (!stream.read(&record.lsn, sizeof(record.lsn)))
+                if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
-                if (!stream.read(&record.txn_id, sizeof(uuid_t)))
-                    return false;
-                
-                if (!binary_serializer_.deserialize_mt(stream, record.table))
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
                 
-                out = record;
+                if (!binary_serializer_.deserialize_mt(stream, table))
+                    return false;
+                
+                out = CreateTableRecord(lsn, 0, txn_id, std::move(table));
                 return true;
             }
             

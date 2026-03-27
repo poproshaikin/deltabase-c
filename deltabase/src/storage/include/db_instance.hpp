@@ -25,7 +25,7 @@ namespace storage
         seq_scan(const std::string& table_name, const std::string& schema_name) = 0;
 
         virtual txn::Transaction
-        make_transaction() = 0;
+        make_txn() = 0;
 
         virtual void
         insert_row(

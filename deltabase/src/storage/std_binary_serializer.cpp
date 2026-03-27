@@ -146,7 +146,7 @@ namespace storage
         // Create header copy with correct rows_count
         DataPageHeader header = page.header;
         header.rows_count = page.rows.size();
-        
+
         auto serialized_header = serialize_dph(header);
         stream.append(serialized_header, serialized_header.size());
 
@@ -190,6 +190,7 @@ namespace storage
         stream.write(&db.io_type, sizeof(db.io_type));
         stream.write(&db.planner_type, sizeof(db.planner_type));
         stream.write(&db.serializer_type, sizeof(db.serializer_type));
+        stream.write(&db.last_checkpoint_lsn, sizeof(db.last_checkpoint_lsn));
         stream.seek(0);
         return stream;
     }
@@ -330,6 +331,10 @@ namespace storage
             sizeof(out.serializer_type))
             return false;
 
+        if (stream.read(&out.last_checkpoint_lsn, sizeof(out.last_checkpoint_lsn)) !=
+            sizeof(out.last_checkpoint_lsn))
+            return false;
+
         return true;
     }
 
@@ -341,7 +346,7 @@ namespace storage
 
         if (stream.read(&out.flags, sizeof(out.flags)) != sizeof(out.flags))
             return false;
-        
+
         uint64_t tokens_count = 0;
         if (stream.read(&tokens_count, sizeof(uint64_t)) != sizeof(uint64_t))
             return false;
@@ -381,7 +386,8 @@ namespace storage
         out.bytes.resize(size);
         if (stream.read(out.bytes.data(), size) != size)
         {
-            std::cout << "    [deserialize_dt] ERROR: failed to read " << size << " bytes" << std::endl;
+            std::cout << "    [deserialize_dt] ERROR: failed to read " << size << " bytes"
+                      << std::endl;
             return false;
         }
 

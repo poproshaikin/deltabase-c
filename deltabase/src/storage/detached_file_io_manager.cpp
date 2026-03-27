@@ -26,19 +26,19 @@ namespace storage
     }
 
     std::vector<types::MetaTable>
-    DetachedFileIOManager::load_tables_meta()
+    DetachedFileIOManager::read_tables_meta()
     {
         throw std::logic_error("DetachedFileIOManager::load_tables_meta: unsupported method");
     }
 
     std::vector<types::MetaSchema>
-    DetachedFileIOManager::load_schemas_meta()
+    DetachedFileIOManager::read_schemas_meta()
     {
         throw std::logic_error("DetachedFileIOManager::load_schemas_meta: unsupported method");
     }
 
     types::MetaSchema
-    DetachedFileIOManager::load_schema_meta(const std::string& schema_name)
+    DetachedFileIOManager::read_schema_meta(const std::string& schema_name)
     {
         throw std::logic_error("DetachedFileIOManager::load_schema_meta: unsupported method");
     }
@@ -52,14 +52,14 @@ namespace storage
     }
 
     types::MetaTable
-    DetachedFileIOManager::load_table_meta(
+    DetachedFileIOManager::read_table_meta(
         const std::string& table_name, const std::string& schema_name
     )
     {
         throw std::logic_error("DetachedFileIOManager::load_table_meta: unsupported method");
     }
     std::vector<types::DataPage>
-    DetachedFileIOManager::load_table_data(
+    DetachedFileIOManager::read_table_data(
         const std::string& table_name, const std::string& schema_name
     )
     {
@@ -67,7 +67,7 @@ namespace storage
     }
 
     std::vector<std::pair<types::Uuid, std::vector<types::DataPage>>>
-    DetachedFileIOManager::load_tables_data()
+    DetachedFileIOManager::read_tables_data()
     {
         throw std::logic_error("DetachedFileIOManager::load_tables_data: unsupported method");
     }
@@ -91,6 +91,12 @@ namespace storage
     }
 
     void
+    DetachedFileIOManager::write_mt(const types::MetaTable& table)
+    {
+        throw std::logic_error("DetachedFileIOManager::write_mt: unsupported method");
+    }
+
+    void
     DetachedFileIOManager::write_cfg(const types::Config& cfg)
     {
         throw std::logic_error("DetachedFileIOManager::write_cfg: unsupported method");
@@ -103,7 +109,7 @@ namespace storage
     }
 
     types::MetaSchema
-    DetachedFileIOManager::load_schema_meta(const types::Uuid& schema_id)
+    DetachedFileIOManager::read_schema_meta(const types::Uuid& schema_id)
     {
         throw std::logic_error("DetachedFileIOManager::load_schema_meta: unsupported method");
     }

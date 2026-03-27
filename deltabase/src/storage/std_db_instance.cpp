@@ -20,12 +20,6 @@ namespace storage
     using namespace types;
     using namespace misc;
 
-    void
-    StdDbInstance::init()
-    {
-        io_manager_->init();
-    }
-
     StdDbInstance::StdDbInstance(const Config& cfg) : cfg_(cfg)
     {
         if (!std::filesystem::exists(cfg.db_path))
@@ -33,13 +27,19 @@ namespace storage
 
         IOManagerFactory io_factory;
         io_manager_ = io_factory.make(cfg);
-
-        wal::WalManagerFactory factory;
-        wal_manager_ = factory.make(cfg);
-
+        wal::WalManagerFactory wal_factory;
+        wal_manager_ = wal_factory.make(cfg);
         txn_manager_ = std::make_unique<txn::TransactionManager>(*wal_manager_);
+        recovery_manager_ = std::make_unique<recovery::RecoveryManager>(cfg_, *wal_manager_, *io_manager_);
 
         init();
+    }
+
+    void
+    StdDbInstance::init()
+    {
+        io_manager_->init();
+        recovery_manager_->recover();
     }
 
     StdDbInstance::~StdDbInstance()
@@ -57,8 +57,8 @@ namespace storage
     DataTable
     StdDbInstance::seq_scan(const std::string& table_name, const std::string& schema_name)
     {
-        auto mt = io_manager_->load_table_meta(table_name, schema_name);
-        auto pages = io_manager_->load_table_data(table_name, schema_name);
+        auto mt = io_manager_->read_table_meta(table_name, schema_name);
+        auto pages = io_manager_->read_table_data(table_name, schema_name);
 
         DataTable dt;
         dt.output_schema = convert(mt);
@@ -84,7 +84,7 @@ namespace storage
     }
 
     txn::Transaction
-    StdDbInstance::make_transaction()
+    StdDbInstance::make_txn()
     {
         return txn_manager_->make_transaction();
     }
@@ -110,8 +110,8 @@ namespace storage
         txn::Transaction& txn
     )
     {
-        auto table = io_manager_->load_table_meta(table_name, schema_name);
-        auto pages = io_manager_->load_table_data(table_name, schema_name);
+        auto table = io_manager_->read_table_meta(table_name, schema_name);
+        auto pages = io_manager_->read_table_data(table_name, schema_name);
 
         DataRow data_row;
         data_row.id = table.last_rid++;
@@ -128,11 +128,7 @@ namespace storage
 
         pages[idx].rows.push_back(data_row);
 
-        InsertRecord record {
-            .table_id = table.id,
-            .row = data_row,
-        };
-
+        InsertRecord record(0, 0, Uuid{}, table.id, pages[idx].header.id, data_row);
         txn.append_log(record);
 
         io_manager_->write_page(pages[idx]);
@@ -147,8 +143,8 @@ namespace storage
         const std::vector<DataRow>& rows
     )
     {
-        auto table = io_manager_->load_table_meta(table_name, schema_name);
-        std::vector<DataPage> pages = io_manager_->load_table_data(table_name, schema_name);
+        auto table = io_manager_->read_table_meta(table_name, schema_name);
+        std::vector<DataPage> pages = io_manager_->read_table_data(table_name, schema_name);
 
         std::unordered_set<RowId> ids;
         for (const auto& row : rows)
@@ -209,8 +205,8 @@ namespace storage
         const std::vector<DataRow>& rows
     )
     {
-        auto table = io_manager_->load_table_meta(table_name, schema_name);
-        std::vector<DataPage> pages = io_manager_->load_table_data(table_name, schema_name);
+        auto table = io_manager_->read_table_meta(table_name, schema_name);
+        std::vector<DataPage> pages = io_manager_->read_table_data(table_name, schema_name);
 
         std::unordered_set<RowId> ids;
         for (const auto& row : rows)
@@ -241,7 +237,7 @@ namespace storage
     MetaTable
     StdDbInstance::get_table(const std::string& table_name, const std::string& schema_name)
     {
-        return io_manager_->load_table_meta(table_name, schema_name);
+        return io_manager_->read_table_meta(table_name, schema_name);
     }
 
     MetaTable
@@ -263,7 +259,7 @@ namespace storage
     MetaSchema
     StdDbInstance::get_schema(const std::string& name)
     {
-        return io_manager_->load_schema_meta(name);
+        return io_manager_->read_schema_meta(name);
     }
 
     bool
@@ -295,7 +291,7 @@ namespace storage
         const std::vector<ColumnDefinition>& columns
     )
     {
-        auto schema = io_manager_->load_schema_meta(schema_name);
+        auto schema = io_manager_->read_schema_meta(schema_name);
 
         MetaTable mt;
         mt.id = Uuid::make();

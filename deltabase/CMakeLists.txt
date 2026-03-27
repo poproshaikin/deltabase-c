@@ -63,6 +63,10 @@ function(add_cpp_module module_name)
     if (${module_name} STREQUAL "wal")
         target_link_libraries(${module_name} PUBLIC storage types misc)
     endif()
+
+    if (${module_name} STREQUAL "recovery")
+        target_link_libraries(${module_name} PUBLIC wal)
+    endif()
 endfunction()
 
 add_cpp_module(types)
@@ -74,6 +78,7 @@ add_cpp_module(sql)
 add_cpp_module(executor)
 add_cpp_module(engine)
 add_cpp_module(cli)
+add_cpp_module(recovery)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
@@ -103,4 +108,5 @@ target_link_libraries(main.exe
     engine
     types
     cli
+    recovery
 )

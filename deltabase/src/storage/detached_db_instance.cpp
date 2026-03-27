@@ -44,7 +44,7 @@ namespace storage
     }
 
     txn::Transaction
-    DetachedDbInstance::make_transaction()
+    DetachedDbInstance::make_txn()
     {
         throw std::logic_error("DetachedDbInstance::make_transaction: this method is not supported");
     }

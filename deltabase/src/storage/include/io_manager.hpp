@@ -21,28 +21,34 @@ namespace storage
         init() = 0;
 
         virtual std::vector<types::MetaTable>
-        load_tables_meta() = 0;
+        read_tables_meta() = 0;
 
         virtual std::vector<types::MetaSchema>
-        load_schemas_meta() = 0;
+        read_schemas_meta() = 0;
 
         virtual types::MetaSchema
-        load_schema_meta(const std::string& schema_name) = 0;
+        read_schema_meta(const std::string& schema_name) = 0;
 
         virtual types::MetaSchema
-        load_schema_meta(const types::Uuid& schema_id) = 0;
+        read_schema_meta(const types::Uuid& schema_id) = 0;
 
         virtual bool
         exists_table(const std::string& table_name, const std::string& schema_name) = 0;
 
         virtual types::MetaTable
-        load_table_meta(const std::string& table_name, const std::string& schema_name) = 0;
+        read_table_meta(const types::Uuid& table_id) = 0;
+
+        virtual types::MetaTable
+        read_table_meta(const std::string& table_name, const std::string& schema_name) = 0;
 
         virtual std::vector<types::DataPage>
-        load_table_data(const std::string& table_name, const std::string& schema_name) = 0;
+        read_table_data(const std::string& table_name, const std::string& schema_name) = 0;
 
         virtual std::vector<std::pair<types::Uuid, std::vector<types::DataPage> > >
-        load_tables_data() = 0;
+        read_tables_data() = 0;
+
+        virtual std::unique_ptr<types::DataPage>
+        read_data_page(types::PageId id) = 0;
 
         virtual uint64_t
         estimate_size(const types::DataRow& row) = 0;
@@ -52,6 +58,9 @@ namespace storage
 
         virtual void
         write_mt(const types::MetaTable& table, const std::string& schema_name) = 0;
+
+        virtual void
+        write_mt(const types::MetaTable& table) = 0;
 
         virtual void
         write_cfg(const types::Config& cfg) = 0;

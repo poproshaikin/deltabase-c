@@ -5,7 +5,7 @@
 #include "include/transaction_manager.hpp"
 namespace txn
 {
-    TransactionManager::TransactionManager(wal::IWalManager& wal_manager) : wal_manager_(wal_manager)
+    TransactionManager::TransactionManager(wal::IWALManager& wal_manager) : wal_manager_(wal_manager)
     {
     }
 

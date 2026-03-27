@@ -103,7 +103,7 @@ namespace wal
         std::sort(
             flushed_.begin(),
             flushed_.end(),
-            [](const WalRecord& lhs, const WalRecord& rhs)
+            [](const WALRecord& lhs, const WALRecord& rhs)
             {
                 auto l_lsn = std::visit([](const auto& rec) { return rec.lsn; }, lhs);
                 auto r_lsn = std::visit([](const auto& rec) { return rec.lsn; }, rhs);
@@ -113,13 +113,15 @@ namespace wal
     }
 
     void
-    FileWalManager::append_log(const WalRecord& record)
+    FileWalManager::append_log(const WALRecord& record)
     {
+        auto prev_lsn = std::visit([](const auto& rec) { return rec.lsn; }, record);
         auto lsn = next_lsn_++;
 
         auto record_with_lsn = std::visit(
-            [lsn](auto rec) -> WalRecord
+            [prev_lsn, lsn](auto rec) -> WALRecord
             {
+                rec.prev_lsn = prev_lsn;
                 rec.lsn = lsn;
                 return rec;
             },
@@ -130,7 +132,7 @@ namespace wal
     }
 
     void
-    FileWalManager::append_log(const std::vector<WalRecord>& records)
+    FileWalManager::append_log(const std::vector<WALRecord>& records)
     {
         for (const auto& record : records)
         {
@@ -138,8 +140,8 @@ namespace wal
         }
     }
 
-    WalRecord
-    FileWalManager::read_log(Lsn lsn)
+    WALRecord
+    FileWalManager::read_log(LSN lsn)
     {
         // Check dirty buffer first (most recent records)
         for (const auto& record : dirty_)
@@ -178,11 +180,11 @@ namespace wal
         flush();
     }
 
-    std::vector<WalRecord>
+    std::vector<WALRecord>
     FileWalManager::read_all_logs()
     {
         // Return all cached records (flushed from disk + dirty in memory)
-        std::vector<WalRecord> all_logs;
+        std::vector<WALRecord> all_logs;
         all_logs.reserve(flushed_.size() + dirty_.size());
 
         // Add all flushed records (already on disk, loaded at startup)
@@ -194,14 +196,14 @@ namespace wal
         return all_logs;
     }
 
-    Lsn
+    LSN
     FileWalManager::get_next_lsn() const
     {
         return next_lsn_;
     }
 
     void
-    FileWalManager::write_logs(const std::vector<WalRecord>& logs)
+    FileWalManager::write_logs(const std::vector<WALRecord>& logs)
     {
         auto dir = storage::path_db_wal(db_path_, db_name_);
         if (!fs::exists(dir))
@@ -254,10 +256,10 @@ namespace wal
         }
     }
 
-    std::vector<WalRecord>
+    std::vector<WALRecord>
     FileWalManager::read_logs_from_file(const fs::path& file_path)
     {
-        std::vector<WalRecord> logs;
+        std::vector<WALRecord> logs;
 
         std::ifstream file(file_path, std::ios::binary);
         if (!file.is_open())
@@ -287,7 +289,7 @@ namespace wal
                 break;
 
             // Десериализовать запись
-            WalRecord record;
+            WALRecord record;
             if (serializer_->deserialize(stream, record))
             {
                 logs.push_back(std::move(record));

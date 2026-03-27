@@ -223,7 +223,7 @@ namespace exq
 
         int inserted_count = 0;
 
-        auto txn = db_.make_transaction();
+        auto txn = db_.make_txn();
         txn.begin();
 
         while (true)

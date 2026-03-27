@@ -15,10 +15,10 @@ namespace wal
         virtual ~IWalSerializer() = default;
 
         virtual misc::MemoryStream
-        serialize(const types::WalRecord& record) const = 0;
+        serialize(const types::WALRecord& record) const = 0;
 
         virtual bool
-        deserialize(misc::ReadOnlyMemoryStream& stream, types::WalRecord& out) = 0;
+        deserialize(misc::ReadOnlyMemoryStream& stream, types::WALRecord& out) = 0;
     };
 }
 

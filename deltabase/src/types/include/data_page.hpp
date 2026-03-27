@@ -7,22 +7,27 @@
 #include "data_row.hpp"
 #include "typedefs.hpp"
 #include "uuid.hpp"
-#include "wal_log.hpp"
 
 #include <filesystem>
 
 namespace types
 {
+
+    using PageId = Uuid;
+    using LSN = uint64_t;
+
+    // DTO which is serialized for storing in a page
     struct DataPageHeader
     {
-        Uuid id;
+        PageId id;
         Uuid table_id;
         RowId min_rid = 0;
         RowId max_rid = 0;
         uint64_t rows_count = 0;
-    types::Lsn last_lsn = 0;
+        LSN last_lsn = 0;
 
-    static constexpr uint64_t SIZE = sizeof(uuid_t) * 2 + sizeof(RowId) * 2 + sizeof(uint64_t) + sizeof(types::Lsn);
+        static constexpr uint64_t SIZE =
+            sizeof(uuid_t) * 2 + sizeof(RowId) * 2 + sizeof(uint64_t) + sizeof(LSN);
     };
 
     struct DataPage
@@ -48,6 +53,6 @@ namespace types
             return page;
         }
     };
-}
+} // namespace types
 
-#endif //DELTABASE_DATA_PAGE_HPP
+#endif // DELTABASE_DATA_PAGE_HPP

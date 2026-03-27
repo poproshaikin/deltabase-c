@@ -17,10 +17,10 @@ namespace wal
         // ---
 
         misc::MemoryStream
-        serialize(const types::BeginTransactionRecord& record) const;
+        serialize(const types::BeginTxnRecord& record) const;
 
         misc::MemoryStream
-        serialize(const types::CommitTransactionRecord& record) const;
+        serialize(const types::CommitTxnRecord& record) const;
 
         misc::MemoryStream
         serialize(const types::InsertRecord& record) const;
@@ -41,10 +41,10 @@ namespace wal
 
     public:
         misc::MemoryStream
-        serialize(const types::WalRecord& record) const override;
+        serialize(const types::WALRecord& record) const override;
 
         bool
-        deserialize(misc::ReadOnlyMemoryStream& stream, types::WalRecord& out) override;
+        deserialize(misc::ReadOnlyMemoryStream& stream, types::WALRecord& out) override;
     };
 } // namespace wal
 

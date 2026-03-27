@@ -13,7 +13,7 @@ namespace wal
     class WalManagerFactory
     {
     public:
-        std::unique_ptr<IWalManager>
+        std::unique_ptr<IWALManager>
         make(const types::Config& cfg) const
         {
             switch (cfg.io_type)

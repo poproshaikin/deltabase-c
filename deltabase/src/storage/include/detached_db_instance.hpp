@@ -33,7 +33,7 @@ namespace storage
         seq_scan(const std::string& table_name, const std::string& schema_name) override;
 
     txn::Transaction
-    make_transaction() override;
+    make_txn() override;
 
         void
         insert_row(

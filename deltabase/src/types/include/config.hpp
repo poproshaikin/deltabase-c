@@ -5,6 +5,7 @@
 #ifndef DELTABASE_DB_CFG_HPP
 #define DELTABASE_DB_CFG_HPP
 #include "../../misc/include/static_storage.hpp"
+#include "data_page.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -73,6 +74,8 @@ namespace types
         IoType io_type;
         PlannerType planner_type;
         SerializerType serializer_type;
+
+        LSN last_checkpoint_lsn = 0;
 
         static Config
         detached()

@@ -10,10 +10,10 @@ namespace txn
 {
     class TransactionManager
     {
-        wal::IWalManager& wal_manager_;
+        wal::IWALManager& wal_manager_;
 
     public:
-        TransactionManager(wal::IWalManager& wal_manager);
+        TransactionManager(wal::IWALManager& wal_manager);
 
         Transaction
         make_transaction() const;

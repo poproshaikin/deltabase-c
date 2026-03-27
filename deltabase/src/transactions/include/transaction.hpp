@@ -27,11 +27,11 @@ namespace txn
     class Transaction
     {
         TxnId id_;
-        wal::IWalManager& wal_manager_;
+        wal::IWALManager& wal_manager_;
         TransactionState state_;
-        std::vector<types::WalRecord> log_records_;
+        std::vector<types::WALRecord> log_records_;
 
-        Transaction(const TxnId& id, wal::IWalManager& wal_manager)
+        Transaction(const TxnId& id, wal::IWALManager& wal_manager)
             : id_(id), wal_manager_(wal_manager), state_(TransactionState::IDLE)
         {
         }
@@ -51,22 +51,20 @@ namespace txn
             if (state_ != TransactionState::IDLE)
                 throw std::runtime_error("Transaction::begin: transaction state not idle");
 
-            types::BeginTransactionRecord record{
-                .lsn = 0, // will be assigned in IWalManager
-                .txn_id = id_
-            };
+            // lsn/prev_lsn will be assigned in the WAL manager
+            types::BeginTxnRecord record(0, 0, id_);
 
             log_records_.push_back(record);
             state_ = TransactionState::ACTIVE;
         }
 
         void
-        append_log(const types::WalRecord& record)
+        append_log(const types::WALRecord& record)
         {
             if (state_ != TransactionState::ACTIVE)
                 throw std::runtime_error("Transaction::append_log: transaction state not active");
 
-            types::WalRecord record_with_txn_id = std::visit([this](auto rec) -> types::WalRecord
+            types::WALRecord record_with_txn_id = std::visit([this](auto rec) -> types::WALRecord
             {
                 rec.txn_id = id_;
                 return rec;
@@ -81,10 +79,7 @@ namespace txn
             if (state_ != TransactionState::ACTIVE)
                 throw std::runtime_error("Transaction::commit: transaction state not active");
 
-            types::CommitTransactionRecord commit_record{
-                .lsn = 0, // will be assigned in IWalManager
-                .txn_id = id_
-            };
+            types::CommitTxnRecord commit_record(0, 0, id_); // lsn/prev_lsn assigned in WAL manager
 
             log_records_.push_back(commit_record);
 

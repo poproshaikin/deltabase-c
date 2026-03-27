@@ -5,6 +5,7 @@
 #ifndef DELTABASE_STD_DB_INSTANCE_HPP
 #define DELTABASE_STD_DB_INSTANCE_HPP
 
+#include "../../recovery/include/recovery_manager.hpp"
 #include "../../transactions/include/transaction_manager.hpp"
 #include "../../types/include/config.hpp"
 #include "../../wal/include/wal_manager.hpp"
@@ -17,8 +18,9 @@ namespace storage
     {
         types::Config cfg_;
         std::unique_ptr<IIOManager> io_manager_;
-        std::unique_ptr<wal::IWalManager> wal_manager_;
+        std::unique_ptr<wal::IWALManager> wal_manager_;
         std::unique_ptr<txn::TransactionManager> txn_manager_;
+        std::unique_ptr<recovery::RecoveryManager> recovery_manager_;
 
         void
         init();
@@ -39,7 +41,7 @@ namespace storage
         seq_scan(const std::string& table_name, const std::string& schema_name) override;
 
         txn::Transaction
-        make_transaction() override;
+        make_txn() override;
 
         void
         insert_row(

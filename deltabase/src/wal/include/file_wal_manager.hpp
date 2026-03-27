@@ -17,25 +17,25 @@ namespace wal
 {
     namespace fs = std::filesystem;
 
-    class FileWalManager : public IWalManager
+    class FileWalManager : public IWALManager
     {
         fs::path db_path_;
         std::string db_name_;
-        types::Lsn next_lsn_;
+        types::LSN next_lsn_;
 
         std::unique_ptr<IWalSerializer> serializer_;
 
         // Cache for performance: flushed records already on disk, dirty records in memory
-        std::vector<types::WalRecord> flushed_;
-        std::vector<types::WalRecord> dirty_;
+        std::vector<types::WALRecord> flushed_;
+        std::vector<types::WALRecord> dirty_;
 
         static constexpr uint64_t MAX_RECORDS_PER_LOGFILE = 1000;
 
         // Helper methods
         void
-        write_logs(const std::vector<types::WalRecord>& logs);
+        write_logs(const std::vector<types::WALRecord>& logs);
 
-        std::vector<types::WalRecord>
+        std::vector<types::WALRecord>
         read_logs_from_file(const fs::path& file_path);
 
         // Load all existing WAL records from disk into flushed_ cache
@@ -51,13 +51,13 @@ namespace wal
 
         // IWalManager interface
         void
-        append_log(const types::WalRecord& record) override;
+        append_log(const types::WALRecord& record) override;
 
         void
-        append_log(const std::vector<types::WalRecord>& records) override;
+        append_log(const std::vector<types::WALRecord>& records) override;
 
-        types::WalRecord
-        read_log(types::Lsn lsn) override;
+        types::WALRecord
+        read_log(types::LSN lsn) override;
 
         void
         flush() override;
@@ -65,10 +65,10 @@ namespace wal
         void
         sync() override;
 
-        std::vector<types::WalRecord>
+        std::vector<types::WALRecord>
         read_all_logs() override;
 
-        types::Lsn
+        types::LSN
         get_next_lsn() const override;
     };
 } // namespace wal

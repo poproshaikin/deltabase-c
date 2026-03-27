@@ -155,7 +155,7 @@ namespace storage
     }
 
     std::vector<MetaSchema>
-    FileIOManager::load_schemas_meta()
+    FileIOManager::read_schemas_meta()
     {
         std::vector<MetaSchema> schemas;
 
@@ -191,7 +191,7 @@ namespace storage
     }
 
     MetaSchema
-    FileIOManager::load_schema_meta(const std::string& target_schema)
+    FileIOManager::read_schema_meta(const std::string& target_schema)
     {
         MetaSchema schema{};
         for_each_schema(
@@ -221,7 +221,7 @@ namespace storage
     }
 
     MetaSchema
-    FileIOManager::load_schema_meta(const Uuid& schema_id)
+    FileIOManager::read_schema_meta(const Uuid& schema_id)
     {
         MetaSchema schema{};
 
@@ -263,7 +263,7 @@ namespace storage
     }
 
     std::vector<MetaTable>
-    FileIOManager::load_tables_meta()
+    FileIOManager::read_tables_meta()
     {
         std::vector<MetaTable> tables;
 
@@ -298,7 +298,7 @@ namespace storage
     }
 
     std::vector<std::pair<Uuid, std::vector<DataPage>>>
-    FileIOManager::load_tables_data()
+    FileIOManager::read_tables_data()
     {
         std::vector<std::pair<Uuid, std::vector<DataPage>>> tables;
 
@@ -355,9 +355,49 @@ namespace storage
 
         return tables;
     }
+    MetaTable
+    FileIOManager::read_table_meta(const Uuid& table_id)
+    {
+        std::unique_ptr<MetaTable> result;
+
+        for_each_table(
+            [this, &table_id, &result](const fs::directory_entry& table_dir)
+            {
+                if (result)
+                    return;
+
+                const auto table_name = table_dir.path().filename().string();
+                const auto meta_path = table_dir.path() / make_meta_filename(table_name);
+
+                if (!fs::exists(meta_path) || !fs::is_regular_file(meta_path))
+                    return;
+
+                auto content = read_file(meta_path);
+
+                MetaTable table;
+                misc::ReadOnlyMemoryStream stream(content);
+                if (!serializer_->deserialize_mt(stream, table))
+                    throw std::runtime_error(
+                        "FileIOManager::read_table_meta: failed to deserialize meta table " +
+                        meta_path.string()
+                    );
+
+                if (table.id == table_id)
+                    result = std::make_unique<MetaTable>(std::move(table));
+            }
+        );
+
+        if (result)
+            return *result;
+
+        throw std::runtime_error(
+            "FileIOManager::read_table_meta: table with id " + table_id.to_string() +
+            " not found"
+        );
+    }
 
     MetaTable
-    FileIOManager::load_table_meta(const std::string& table_name, const std::string& schema_name)
+    FileIOManager::read_table_meta(const std::string& table_name, const std::string& schema_name)
     {
         auto path = path_db_schema_table_meta(db_path_, db_name_, schema_name, table_name);
         auto content = read_file(path);
@@ -373,7 +413,7 @@ namespace storage
     }
 
     std::vector<DataPage>
-    FileIOManager::load_table_data(const std::string& table_name, const std::string& schema_name)
+    FileIOManager::read_table_data(const std::string& table_name, const std::string& schema_name)
     {
         std::vector<DataPage> pages;
 
@@ -402,6 +442,65 @@ namespace storage
         return pages;
     }
 
+    std::unique_ptr<DataPage>
+    FileIOManager::read_data_page(PageId id)
+    {
+        const auto page_filename = id.to_string();
+        std::unique_ptr<DataPage> result;
+
+        for_each_table(
+            [this, &id, &page_filename, &result](const fs::directory_entry& table_dir)
+            {
+                if (result)
+                    return;
+
+                auto data_dir = table_dir.path() / PATH_DATA;
+                if (!fs::exists(data_dir) || !fs::is_directory(data_dir))
+                    return;
+
+                for (const auto& page_entry : fs::directory_iterator(data_dir))
+                {
+                    if (result)
+                        return;
+
+                    if (!page_entry.is_regular_file())
+                        continue;
+
+                    if (page_entry.path().filename().string() != page_filename)
+                        continue;
+
+                    auto content = read_file(page_entry.path());
+                    DataPage page;
+                    misc::ReadOnlyMemoryStream stream(content);
+                    if (!serializer_->deserialize_dp(stream, page))
+                        throw std::runtime_error(
+                            "FileIOManager::load_data_page: failed to deserialize data page " +
+                            page_entry.path().filename().string()
+                        );
+
+                    page.path = page_entry.path();
+                    page.size = content.size();
+
+                    if (page.header.id != id)
+                        throw std::runtime_error(
+                            "FileIOManager::load_data_page: page id mismatch for " +
+                            page_entry.path().string()
+                        );
+
+                    result = std::make_unique<DataPage>(std::move(page));
+                    return;
+                }
+            }
+        );
+
+        if (result)
+            return result;
+
+        throw std::runtime_error(
+            "FileIOManager::load_data_page: page " + id.to_string() + " not found"
+        );
+    }
+
     void
     FileIOManager::write_page(const DataPage& page)
     {
@@ -421,6 +520,13 @@ namespace storage
         auto path = path_db_schema_table_meta(db_path_, db_name_, schema_name, table.name);
         auto serialized = serializer_->serialize_mt(table);
         write_file(path, serialized.to_vector());
+    }
+
+    void
+    FileIOManager::write_mt(const MetaTable& table)
+    {
+        auto schema = read_schema_meta(table.schema_id);
+        write_mt(table, schema.name);
     }
 
     void
@@ -449,7 +555,7 @@ namespace storage
     DataPage
     FileIOManager::create_page(const MetaTable& mt)
     {
-        auto ms = load_schema_meta(mt.schema_id);
+        auto ms = read_schema_meta(mt.schema_id);
         auto data_path = path_db_schema_table_data(db_path_, db_name_, ms.name, mt.name);
         return DataPage::make(data_path, mt.id);
     }

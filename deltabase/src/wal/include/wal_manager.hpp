@@ -10,19 +10,19 @@
 
 namespace wal
 {
-    class IWalManager
+    class IWALManager
     {
     public:
-        virtual ~IWalManager() = default;
+        virtual ~IWALManager() = default;
 
         virtual void
-        append_log(const types::WalRecord& record) = 0;
+        append_log(const types::WALRecord& record) = 0;
 
         virtual void
-    append_log(const std::vector<types::WalRecord>& records) = 0;
+        append_log(const std::vector<types::WALRecord>& records) = 0;
 
-        virtual types::WalRecord
-        read_log(types::Lsn lsn) = 0;
+        virtual types::WALRecord
+        read_log(types::LSN lsn) = 0;
 
         virtual void
         flush() = 0;
@@ -30,10 +30,10 @@ namespace wal
         virtual void
         sync() = 0;
 
-        virtual std::vector<types::WalRecord>
+        virtual std::vector<types::WALRecord>
         read_all_logs() = 0;
 
-        virtual types::Lsn
+        virtual types::LSN
         get_next_lsn() const = 0;
     };
 } // namespace wal
