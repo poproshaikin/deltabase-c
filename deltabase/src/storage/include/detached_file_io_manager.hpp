@@ -66,11 +66,20 @@ namespace storage
         void
         write_ms(const types::MetaSchema& ms) override;
 
+        void
+        delete_mt(const types::MetaTable& table) override;
+
+        void
+        delete_ms(const types::MetaSchema& schema) override;
+
         types::MetaSchema
         read_schema_meta(const types::Uuid& schema_id) override;
 
         types::DataPage
-        create_page(const types::MetaTable& id) override;
+        create_page(const types::MetaTable& mt) override;
+
+        types::DataPage
+        create_page(const types::MetaTable& mt, const types::PageId& page_id) override;
 
         bool
         exists_schema(const std::string& schema_name) override;

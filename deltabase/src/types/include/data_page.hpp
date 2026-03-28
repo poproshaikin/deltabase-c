@@ -43,10 +43,10 @@ namespace types
         DataPage() = default;
 
         static DataPage
-        make(const fs::path& base_path, const Uuid& table_id)
+        make(const fs::path& base_path, const Uuid& table_id, const Uuid& page_id)
         {
             DataPage page;
-            page.header.id = Uuid::make();
+            page.header.id = page_id;
             page.header.table_id = table_id;
             page.size = DataPageHeader::SIZE;
             page.path = base_path / page.header.id.to_string();

@@ -56,14 +56,16 @@ namespace storage
             const std::string& table_name,
             const std::string& schema_name,
             types::RowUpdate update,
-            const std::vector<types::DataRow>& rows
+            const std::vector<types::DataRow>& rows,
+            txn::Transaction& txn
         ) override;
 
         void
         delete_rows(
             const std::string& table_name,
             const std::string& schema_name,
-            const std::vector<types::DataRow>& rows
+            const std::vector<types::DataRow>& rows,
+            txn::Transaction& txn
         ) override;
 
         types::MetaTable

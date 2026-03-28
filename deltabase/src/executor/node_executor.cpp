@@ -327,7 +327,7 @@ namespace exq
             updated_count++;
         }
 
-        db_.update_row(table_name_, schema_name_, assignments_, rows);
+        db_.update_row(table_name_, schema_name_, assignments_, rows, TODO);
         executed_ = true;
 
         DataToken affected_rows_count(misc::convert(updated_count), DataType::INTEGER);
@@ -388,7 +388,7 @@ namespace exq
             deleted_count++;
         }
 
-        db_.delete_rows(table_name_, schema_name_, rows);
+        db_.delete_rows(table_name_, schema_name_, rows, TODO);
         executed_ = true;
 
         DataToken affected_rows_count(misc::convert(deleted_count), DataType::INTEGER);

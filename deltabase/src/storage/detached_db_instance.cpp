@@ -115,7 +115,8 @@ namespace storage
         const std::string& table_name,
         const std::string& schema_name,
         types::RowUpdate update,
-        const std::vector<types::DataRow>& rows
+        const std::vector<types::DataRow>& rows,
+        txn::Transaction& txn
     )
     {
         throw std::logic_error("DetachedDbInstance::update_row: this method is not supported");
@@ -124,7 +125,8 @@ namespace storage
     DetachedDbInstance::delete_rows(
         const std::string& table_name,
         const std::string& schema_name,
-        const std::vector<types::DataRow>& rows
+        const std::vector<types::DataRow>& rows,
+        txn::Transaction& txn
     )
     {
         throw std::logic_error("DetachedDbInstance::delete_row: this method is not supported");

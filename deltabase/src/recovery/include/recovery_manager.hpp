@@ -67,6 +67,18 @@ namespace recovery
         undo_record(const types::UpdateRecord& record, types::DataPage& page);
         void
         undo_record(const types::DeleteRecord& record, types::DataPage& page);
+        void
+        undo_record(const types::CreateSchemaRecord& record);
+        void
+        undo_record(const types::UpdateSchemaRecord& record);
+        void
+        undo_record(const types::DeleteSchemaRecord& record);
+        void
+        undo_record(const types::CreateTableRecord& record);
+        void
+        undo_record(const types::UpdateTableRecord& record);
+        void
+        undo_record(const types::DeleteTableRecord& record);
 
     public:
         explicit

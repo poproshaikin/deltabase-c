@@ -538,6 +538,21 @@ namespace storage
     }
 
     void
+    FileIOManager::delete_mt(const MetaTable& table)
+    {
+        auto schema = read_schema_meta(table.schema_id);
+        auto path = path_db_schema_table(db_path_, db_name_, schema.name, table.name);
+        fs::remove_all(path);
+    }
+
+    void
+    FileIOManager::delete_ms(const MetaSchema& schema)
+    {
+        auto path = path_db_schema(db_path_, db_name_, schema.name);
+        fs::remove_all(path);
+    }
+
+    void
     FileIOManager::write_cfg(const Config& cfg)
     {
         auto path = path_db_meta(db_path_, cfg.db_name.value());
@@ -555,9 +570,15 @@ namespace storage
     DataPage
     FileIOManager::create_page(const MetaTable& mt)
     {
+        return create_page(mt, PageId::make());
+    }
+
+    DataPage
+    FileIOManager::create_page(const MetaTable& mt, const PageId& page_id)
+    {
         auto ms = read_schema_meta(mt.schema_id);
         auto data_path = path_db_schema_table_data(db_path_, db_name_, ms.name, mt.name);
-        return DataPage::make(data_path, mt.id);
+        return DataPage::make(data_path, mt.id, page_id);
     }
 
     bool

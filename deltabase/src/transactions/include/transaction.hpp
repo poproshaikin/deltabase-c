@@ -29,7 +29,6 @@ namespace txn
         TxnId id_;
         wal::IWALManager& wal_manager_;
         TransactionState state_;
-        std::vector<types::WALRecord> log_records_;
 
         Transaction(const TxnId& id, wal::IWALManager& wal_manager)
             : id_(id), wal_manager_(wal_manager), state_(TransactionState::IDLE)
@@ -54,7 +53,8 @@ namespace txn
             // lsn/prev_lsn will be assigned in the WAL manager
             types::BeginTxnRecord record(0, 0, id_);
 
-            log_records_.push_back(record);
+            wal_manager_.append_log(record);
+            wal_manager_.flush();
             state_ = TransactionState::ACTIVE;
         }
 
@@ -70,7 +70,8 @@ namespace txn
                 return rec;
             }, record);
 
-            log_records_.push_back(record_with_txn_id);
+            wal_manager_.append_log(record_with_txn_id);
+            wal_manager_.flush();
         }
 
         void
@@ -81,9 +82,7 @@ namespace txn
 
             types::CommitTxnRecord commit_record(0, 0, id_); // lsn/prev_lsn assigned in WAL manager
 
-            log_records_.push_back(commit_record);
-
-            wal_manager_.append_log(log_records_);
+            wal_manager_.append_log(commit_record);
             wal_manager_.flush();
             state_ = TransactionState::COMMITTED;
         }

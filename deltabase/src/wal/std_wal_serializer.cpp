@@ -14,6 +14,7 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         return stream;
     }
@@ -24,6 +25,7 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
 
@@ -39,6 +41,7 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
 
@@ -59,6 +62,7 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
 
@@ -74,6 +78,7 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
         stream.write(&record.page_id, sizeof(uuid_t));
@@ -91,6 +96,7 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
         stream.write(&record.page_id, sizeof(uuid_t));
@@ -111,6 +117,7 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
         stream.write(&record.page_id, sizeof(uuid_t));
@@ -128,10 +135,44 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
 
-    auto serialized_schema = binary_serializer_.serialize_ms(record.schema);
+        auto serialized_schema = binary_serializer_.serialize_ms(record.schema);
         stream.append(serialized_schema, serialized_schema.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const UpdateSchemaRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+
+        auto serialized_before = binary_serializer_.serialize_ms(record.before);
+        stream.append(serialized_before, serialized_before.size());
+
+        auto serialized_after = binary_serializer_.serialize_ms(record.after);
+        stream.append(serialized_after, serialized_after.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const DeleteSchemaRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+
+        auto serialized_before = binary_serializer_.serialize_ms(record.before);
+        stream.append(serialized_before, serialized_before.size());
 
         return stream;
     }
@@ -142,10 +183,44 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
 
-    auto serialized_table = binary_serializer_.serialize_mt(record.table);
+        auto serialized_table = binary_serializer_.serialize_mt(record.after);
         stream.append(serialized_table, serialized_table.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const UpdateTableRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+
+        auto serialized_before = binary_serializer_.serialize_mt(record.before);
+        stream.append(serialized_before, serialized_before.size());
+
+        auto serialized_after = binary_serializer_.serialize_mt(record.after);
+        stream.append(serialized_after, serialized_after.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const DeleteTableRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+
+        auto serialized_before = binary_serializer_.serialize_mt(record.before);
+        stream.append(serialized_before, serialized_before.size());
 
         return stream;
     }
@@ -156,6 +231,7 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         return stream;
     }
@@ -166,6 +242,7 @@ namespace wal
         MemoryStream stream;
         stream.write(&record.type, sizeof(record.type));
         stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         return stream;
     }
@@ -189,8 +266,16 @@ namespace wal
             return serialize(std::get<CLRDeleteRecord>(record));
         case WALRecordType::CREATE_TABLE:
             return serialize(std::get<CreateTableRecord>(record));
+        case WALRecordType::UPDATE_TABLE:
+            return serialize(std::get<UpdateTableRecord>(record));
+        case WALRecordType::DELETE_TABLE:
+            return serialize(std::get<DeleteTableRecord>(record));
         case WALRecordType::CREATE_SCHEMA:
             return serialize(std::get<CreateSchemaRecord>(record));
+        case WALRecordType::UPDATE_SCHEMA:
+            return serialize(std::get<UpdateSchemaRecord>(record));
+        case WALRecordType::DELETE_SCHEMA:
+            return serialize(std::get<DeleteSchemaRecord>(record));
         case WALRecordType::BEGIN_TXN:
             return serialize(std::get<BeginTxnRecord>(record));
         case WALRecordType::COMMIT_TXN:
@@ -214,53 +299,65 @@ namespace wal
         case WALRecordType::BEGIN_TXN:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
                 
-                out = BeginTxnRecord(lsn, 0, txn_id);
+                out = BeginTxnRecord(lsn, prev_lsn, txn_id);
                 return true;
             }
             
         case WALRecordType::COMMIT_TXN:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
                 
-                out = CommitTxnRecord(lsn, 0, txn_id);
+                out = CommitTxnRecord(lsn, prev_lsn, txn_id);
                 return true;
             }
 
         case WALRecordType::ROLLBACK_TXN:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
                     return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
 
-                out = RollbackTxnRecord(lsn, 0, txn_id);
+                out = RollbackTxnRecord(lsn, prev_lsn, txn_id);
                 return true;
             }
             
         case WALRecordType::INSERT:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
                 Uuid table_id;
                 DataRow after;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
                     return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
@@ -270,19 +367,22 @@ namespace wal
                 if (!binary_serializer_.deserialize_dr(stream, after))
                     return false;
                 
-                out = InsertRecord(lsn, 0, txn_id, table_id, Uuid{}, std::move(after));
+                out = InsertRecord(lsn, prev_lsn, txn_id, table_id, Uuid{}, std::move(after));
                 return true;
             }
             
         case WALRecordType::UPDATE:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
                 Uuid table_id;
                 DataRow before;
                 DataRow after;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
                     return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
@@ -295,18 +395,29 @@ namespace wal
                 if (!binary_serializer_.deserialize_dr(stream, after))
                     return false;
                 
-                out = UpdateRecord(lsn, 0, txn_id, table_id, Uuid{}, std::move(before), std::move(after));
+                out = UpdateRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    table_id,
+                    Uuid{},
+                    std::move(before),
+                    std::move(after)
+                );
                 return true;
             }
             
         case WALRecordType::DELETE:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
                 Uuid table_id;
                 DataRow before;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
                     return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
@@ -316,17 +427,20 @@ namespace wal
                 if (!binary_serializer_.deserialize_dr(stream, before))
                     return false;
                 
-                out = DeleteRecord(lsn, 0, txn_id, table_id, Uuid{}, std::move(before));
+                out = DeleteRecord(lsn, prev_lsn, txn_id, table_id, Uuid{}, std::move(before));
                 return true;
             }
             
         case WALRecordType::CREATE_SCHEMA:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
                 MetaSchema schema;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
                     return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
@@ -334,17 +448,71 @@ namespace wal
                 if (!binary_serializer_.deserialize_ms(stream, schema))
                     return false;
                 
-                out = CreateSchemaRecord(lsn, 0, txn_id, std::move(schema));
+                out = CreateSchemaRecord(lsn, prev_lsn, txn_id, std::move(schema));
+                return true;
+            }
+
+        case WALRecordType::UPDATE_SCHEMA:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                MetaSchema before;
+                MetaSchema after;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+
+                if (!binary_serializer_.deserialize_ms(stream, before))
+                    return false;
+                if (!binary_serializer_.deserialize_ms(stream, after))
+                    return false;
+
+                out = UpdateSchemaRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    std::move(before),
+                    std::move(after)
+                );
+                return true;
+            }
+
+        case WALRecordType::DELETE_SCHEMA:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                MetaSchema before;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+
+                if (!binary_serializer_.deserialize_ms(stream, before))
+                    return false;
+
+                out = DeleteSchemaRecord(lsn, prev_lsn, txn_id, std::move(before));
                 return true;
             }
             
         case WALRecordType::CREATE_TABLE:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
                 MetaTable table;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
                     return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
@@ -352,13 +520,65 @@ namespace wal
                 if (!binary_serializer_.deserialize_mt(stream, table))
                     return false;
                 
-                out = CreateTableRecord(lsn, 0, txn_id, std::move(table));
+                out = CreateTableRecord(lsn, prev_lsn, txn_id, std::move(table));
+                return true;
+            }
+
+        case WALRecordType::UPDATE_TABLE:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                MetaTable before;
+                MetaTable after;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+
+                if (!binary_serializer_.deserialize_mt(stream, before))
+                    return false;
+                if (!binary_serializer_.deserialize_mt(stream, after))
+                    return false;
+
+                out = UpdateTableRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    std::move(before),
+                    std::move(after)
+                );
+                return true;
+            }
+
+        case WALRecordType::DELETE_TABLE:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                MetaTable before;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+
+                if (!binary_serializer_.deserialize_mt(stream, before))
+                    return false;
+
+                out = DeleteTableRecord(lsn, prev_lsn, txn_id, std::move(before));
                 return true;
             }
 
         case WALRecordType::CLR_INSERT:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
                 Uuid table_id;
                 Uuid page_id;
@@ -366,6 +586,8 @@ namespace wal
                 DataRow after;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
                     return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
@@ -379,7 +601,13 @@ namespace wal
                     return false;
 
                 out = CLRInsertRecord(
-                    lsn, 0, txn_id, table_id, page_id, undo_next_lsn, std::move(after)
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    table_id,
+                    page_id,
+                    undo_next_lsn,
+                    std::move(after)
                 );
                 return true;
             }
@@ -387,6 +615,7 @@ namespace wal
         case WALRecordType::CLR_UPDATE:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
                 Uuid table_id;
                 Uuid page_id;
@@ -395,6 +624,8 @@ namespace wal
                 DataRow after;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
                     return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
@@ -411,7 +642,7 @@ namespace wal
 
                 out = CLRUpdateRecord(
                     lsn,
-                    0,
+                    prev_lsn,
                     txn_id,
                     table_id,
                     page_id,
@@ -425,6 +656,7 @@ namespace wal
         case WALRecordType::CLR_DELETE:
             {
                 LSN lsn;
+                LSN prev_lsn;
                 Uuid txn_id;
                 Uuid table_id;
                 Uuid page_id;
@@ -432,6 +664,8 @@ namespace wal
                 DataRow before;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
                     return false;
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
@@ -445,7 +679,13 @@ namespace wal
                     return false;
 
                 out = CLRDeleteRecord(
-                    lsn, 0, txn_id, table_id, page_id, undo_next_lsn, std::move(before)
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    table_id,
+                    page_id,
+                    undo_next_lsn,
+                    std::move(before)
                 );
                 return true;
             }

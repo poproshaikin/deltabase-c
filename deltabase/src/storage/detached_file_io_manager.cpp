@@ -108,6 +108,18 @@ namespace storage
         throw std::logic_error("DetachedFileIOManager::write_ms: unsupported method");
     }
 
+    void
+    DetachedFileIOManager::delete_mt(const types::MetaTable& table)
+    {
+        throw std::logic_error("DetachedFileIOManager::delete_mt: unsupported method");
+    }
+
+    void
+    DetachedFileIOManager::delete_ms(const types::MetaSchema& schema)
+    {
+        throw std::logic_error("DetachedFileIOManager::delete_ms: unsupported method");
+    }
+
     types::MetaSchema
     DetachedFileIOManager::read_schema_meta(const types::Uuid& schema_id)
     {
@@ -115,7 +127,13 @@ namespace storage
     }
 
     types::DataPage
-    DetachedFileIOManager::create_page(const types::MetaTable& id)
+    DetachedFileIOManager::create_page(const types::MetaTable& mt)
+    {
+        throw std::logic_error("DetachedFileIOManager::create_page: unsupported method");
+    }
+
+    types::DataPage
+    DetachedFileIOManager::create_page(const types::MetaTable& mt, const types::PageId& page_id)
     {
         throw std::logic_error("DetachedFileIOManager::create_page: unsupported method");
     }

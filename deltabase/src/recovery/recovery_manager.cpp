@@ -22,16 +22,14 @@ namespace recovery
         auto rollback_lsns = get_rollback_lsns(wal);
         auto last_lsn_per_txn = get_last_lsns(wal);
 
-        // ### REDO ###
         for (const auto& record : wal)
             redo(record, commit_lsns);
 
-        // ### UNDO ###
         auto active_txns = get_active_txns(last_lsn_per_txn, commit_lsns, rollback_lsns);
         undo(active_txns);
     }
 
-    // ### APPLY ###
+    // ### REDO ###
 
     void
     RecoveryManager::redo(
@@ -86,7 +84,7 @@ namespace recovery
                 auto page = io_.read_data_page(r.page_id);
                 auto mt = io_.read_table_meta(r.table_id);
                 if (!page)
-                    page = std::make_unique<DataPage>(io_.create_page(mt));
+                    page = std::make_unique<DataPage>(io_.create_page(mt, r.page_id));
 
                 if (page->header.last_lsn < r.lsn)
                 {
@@ -109,142 +107,21 @@ namespace recovery
                 {
                     if constexpr (std::is_same_v<R, CreateSchemaRecord>)
                         io_.write_ms(r.schema);
+                    else if constexpr (std::is_same_v<R, UpdateSchemaRecord>)
+                        io_.write_ms(r.after);
+                    else if constexpr (std::is_same_v<R, DeleteSchemaRecord>)
+                        io_.delete_ms(r.before);
                     else if constexpr (std::is_same_v<R, CreateTableRecord>)
-                        io_.write_mt(r.table);
+                        io_.write_mt(r.after);
+                    else if constexpr (std::is_same_v<R, UpdateTableRecord>)
+                        io_.write_mt(r.after);
+                    else if constexpr (std::is_same_v<R, DeleteTableRecord>)
+                        io_.delete_mt(r.before);
                 }
             },
             record
         );
     }
-
-    void
-    RecoveryManager::undo(const std::unordered_map<TxnId, LSN>& active_lsns)
-    {
-        for (const auto& [txn_id, last_lsn] : active_lsns)
-        {
-            LSN current = last_lsn;
-            LSN txn_prev_lsn = last_lsn;
-
-            while (current != 0)
-            {
-                auto record = wal_.read_log(current);
-
-                std::visit(
-                    [&]<typename TRecord>(const TRecord& r)
-                    {
-                        using R = std::decay_t<TRecord>;
-
-                        if constexpr (
-                            std::is_same_v<R, CLRInsertRecord> ||
-                            std::is_same_v<R, CLRUpdateRecord> ||
-                            std::is_same_v<R, CLRDeleteRecord>)
-                        {
-                            txn_prev_lsn = r.lsn;
-                            current = r.undo_next_lsn;
-                            return;
-                        }
-
-                        else if constexpr (wal_log::has_page_id_v<R>)
-                        {
-                            auto page = io_.read_data_page(r.page_id);
-                            if (!page)
-                            {
-                                current = r.prev_lsn;
-                                return;
-                            }
-
-                            auto clr = make_clr(r);
-                            clr = std::visit(
-                                [&](auto rec) -> WALRecord
-                                {
-                                    rec.lsn = txn_prev_lsn;
-                                    return rec;
-                                },
-                                clr
-                            );
-
-                            LSN clr_lsn = wal_.get_next_lsn();
-                            wal_.append_log(clr);
-                            wal_.flush();
-
-                            undo_record(r, *page);
-                            page->header.last_lsn = clr_lsn;
-                            io_.write_page(*page);
-
-                            txn_prev_lsn = clr_lsn;
-                        }
-                        current = r.prev_lsn;
-                    },
-                    record
-                );
-            }
-
-            RollbackTxnRecord rollback_marker(txn_prev_lsn, 0, txn_id);
-            wal_.append_log(rollback_marker);
-            wal_.flush();
-        }
-    }
-    void
-    RecoveryManager::undo_record(const InsertRecord& record, DataPage& page)
-    {
-        bool found = false;
-        for (auto& row : page.rows)
-        {
-            if (row.id != record.after.id)
-                continue;
-
-            row.flags |= DataRowFlags::OBSOLETE;
-            found = true;
-            break;
-        }
-
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::undo(InsertRecord): failed to find 'after' row " +
-                std::to_string(record.after.id)
-            );
-    }
-    void
-    RecoveryManager::undo_record(const UpdateRecord& record, DataPage& page)
-    {
-        bool found = false;
-        for (auto& row : page.rows)
-        {
-            if (row.id != record.after.id)
-                continue;
-
-            row.tokens = record.before.tokens;
-            row.flags &= ~DataRowFlags::OBSOLETE;
-            found = true;
-            break;
-        }
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::undo(UpdateRecord): failed to find 'after' row " +
-                std::to_string(record.after.id)
-            );
-    }
-    void
-    RecoveryManager::undo_record(const DeleteRecord& record, DataPage& page)
-    {
-        bool found = false;
-        for (auto& row : page.rows)
-        {
-            if (row.id != record.before.id)
-                continue;
-
-            row.flags &= ~DataRowFlags::OBSOLETE;
-            found = true;
-            break;
-        }
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::undo(DeleteRecord): failed to find 'after' row " +
-                std::to_string(record.before.id)
-            );
-    }
-
-    // ### REDO ###
 
     void
     RecoveryManager::redo(const InsertRecord& record, DataPage& page)
@@ -357,6 +234,173 @@ namespace recovery
                 "RecoveryManager::redo(CLRDeleteRecord): failed to find row " +
                 std::to_string(record.before.id)
             );
+    }
+
+    void
+    RecoveryManager::undo(const std::unordered_map<TxnId, LSN>& active_lsns)
+    {
+        for (const auto& [txn_id, last_lsn] : active_lsns)
+        {
+            LSN current = last_lsn;
+            LSN txn_prev_lsn = last_lsn;
+
+            while (current != 0)
+            {
+                auto record = wal_.read_log(current);
+
+                std::visit(
+                    [&]<typename TRecord>(const TRecord& r)
+                    {
+                        using R = std::decay_t<TRecord>;
+
+                        if constexpr (
+                            std::is_same_v<R, CLRInsertRecord> ||
+                            std::is_same_v<R, CLRUpdateRecord> ||
+                            std::is_same_v<R, CLRDeleteRecord>)
+                        {
+                            txn_prev_lsn = r.lsn;
+                            current = r.undo_next_lsn;
+                            return;
+                        }
+
+                        else if constexpr (wal_log::has_page_id_v<R>)
+                        {
+                            auto page = io_.read_data_page(r.page_id);
+                            if (!page)
+                            {
+                                current = r.prev_lsn;
+                                return;
+                            }
+
+                            auto clr = make_clr(r);
+                            clr = std::visit(
+                                [&](auto rec) -> WALRecord
+                                {
+                                    rec.lsn = txn_prev_lsn;
+                                    return rec;
+                                },
+                                clr
+                            );
+
+                            LSN clr_lsn = wal_.get_next_lsn();
+                            wal_.append_log(clr);
+                            wal_.flush();
+
+                            undo_record(r, *page);
+                            page->header.last_lsn = clr_lsn;
+                            io_.write_page(*page);
+
+                            txn_prev_lsn = clr_lsn;
+                        }
+                        else if constexpr (is_in_variant_v<R, WALMetaRecord>)
+                        {
+                            undo_record(r);
+                        }
+                        current = r.prev_lsn;
+                    },
+                    record
+                );
+            }
+
+            RollbackTxnRecord rollback_marker(txn_prev_lsn, 0, txn_id);
+            wal_.append_log(rollback_marker);
+            wal_.flush();
+        }
+    }
+    void
+    RecoveryManager::undo_record(const InsertRecord& record, DataPage& page)
+    {
+        bool found = false;
+        for (auto& row : page.rows)
+        {
+            if (row.id != record.after.id)
+                continue;
+
+            row.flags |= DataRowFlags::OBSOLETE;
+            found = true;
+            break;
+        }
+
+        if (!found)
+            throw std::runtime_error(
+                "RecoveryManager::undo(InsertRecord): failed to find 'after' row " +
+                std::to_string(record.after.id)
+            );
+    }
+    void
+    RecoveryManager::undo_record(const UpdateRecord& record, DataPage& page)
+    {
+        bool found = false;
+        for (auto& row : page.rows)
+        {
+            if (row.id != record.after.id)
+                continue;
+
+            row.tokens = record.before.tokens;
+            row.flags &= ~DataRowFlags::OBSOLETE;
+            found = true;
+            break;
+        }
+        if (!found)
+            throw std::runtime_error(
+                "RecoveryManager::undo(UpdateRecord): failed to find 'after' row " +
+                std::to_string(record.after.id)
+            );
+    }
+    void
+    RecoveryManager::undo_record(const DeleteRecord& record, DataPage& page)
+    {
+        bool found = false;
+        for (auto& row : page.rows)
+        {
+            if (row.id != record.before.id)
+                continue;
+
+            row.flags &= ~DataRowFlags::OBSOLETE;
+            found = true;
+            break;
+        }
+        if (!found)
+            throw std::runtime_error(
+                "RecoveryManager::undo(DeleteRecord): failed to find 'after' row " +
+                std::to_string(record.before.id)
+            );
+    }
+
+    void
+    RecoveryManager::undo_record(const CreateSchemaRecord& record)
+    {
+        io_.delete_ms(record.schema);
+    }
+
+    void
+    RecoveryManager::undo_record(const UpdateSchemaRecord& record)
+    {
+        io_.write_ms(record.before);
+    }
+
+    void
+    RecoveryManager::undo_record(const DeleteSchemaRecord& record)
+    {
+        io_.write_ms(record.before);
+    }
+
+    void
+    RecoveryManager::undo_record(const CreateTableRecord& record)
+    {
+        io_.delete_mt(record.after);
+    }
+
+    void
+    RecoveryManager::undo_record(const UpdateTableRecord& record)
+    {
+        io_.write_mt(record.before);
+    }
+
+    void
+    RecoveryManager::undo_record(const DeleteTableRecord& record)
+    {
+        io_.write_mt(record.before);
     }
 
     WALRecord

@@ -20,16 +20,20 @@ namespace types
     enum class WALRecordType : uint64_t
     {
         INSERT = 1,
-        UPDATE = 2,
-        DELETE = 3,
-        CREATE_TABLE = 4,
-        CREATE_SCHEMA = 5,
-        BEGIN_TXN = 6,
-        COMMIT_TXN = 7,
-        ROLLBACK_TXN = 8,
-        CLR_INSERT = 9,
-        CLR_UPDATE = 10,
-        CLR_DELETE = 11
+        UPDATE,
+        DELETE,
+        CREATE_TABLE,
+        UPDATE_TABLE,
+        DELETE_TABLE,
+        CREATE_SCHEMA,
+        UPDATE_SCHEMA,
+        DELETE_SCHEMA,
+        BEGIN_TXN,
+        COMMIT_TXN,
+        ROLLBACK_TXN,
+        CLR_INSERT,
+        CLR_UPDATE,
+        CLR_DELETE
     };
 
     namespace detail
@@ -47,8 +51,7 @@ namespace types
             requires std::same_as<decltype(x.txn_id), Uuid>;
         };
 
-        template <WAL_c... Ts>
-        using WALRecordVariant = std::variant<Ts...>;
+        template <WAL_c... Ts> using WALRecordVariant = std::variant<Ts...>;
 
         template <typename T>
         concept HasPageId_c = requires(const T& x) {
@@ -79,8 +82,8 @@ namespace types
             const PageId& page_id,
             DataRow after
         )
-            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id),
-              page_id(page_id), after(std::move(after))
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
+              after(std::move(after))
         {
         }
     };
@@ -108,8 +111,8 @@ namespace types
             DataRow before,
             DataRow after
         )
-            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id),
-              page_id(page_id), before(std::move(before)), after(std::move(after))
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
+              before(std::move(before)), after(std::move(after))
         {
         }
     };
@@ -135,8 +138,8 @@ namespace types
             const PageId& page_id,
             DataRow before
         )
-            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id),
-              page_id(page_id), before(std::move(before))
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
+              before(std::move(before))
         {
         }
     };
@@ -164,8 +167,8 @@ namespace types
             LSN undo_next_lsn,
             DataRow after
         )
-            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id),
-              page_id(page_id), undo_next_lsn(undo_next_lsn), after(std::move(after))
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
+              undo_next_lsn(undo_next_lsn), after(std::move(after))
         {
         }
     };
@@ -195,9 +198,8 @@ namespace types
             DataRow before,
             DataRow after
         )
-            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id),
-              page_id(page_id), undo_next_lsn(undo_next_lsn), before(std::move(before)),
-              after(std::move(after))
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
+              undo_next_lsn(undo_next_lsn), before(std::move(before)), after(std::move(after))
         {
         }
     };
@@ -225,8 +227,8 @@ namespace types
             LSN undo_next_lsn,
             DataRow before
         )
-            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id),
-              page_id(page_id), undo_next_lsn(undo_next_lsn), before(std::move(before))
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
+              undo_next_lsn(undo_next_lsn), before(std::move(before))
         {
         }
     };
@@ -248,6 +250,44 @@ namespace types
         }
     };
 
+    struct UpdateSchemaRecord
+    {
+        static constexpr auto type = WALRecordType::UPDATE_SCHEMA;
+
+        LSN lsn;
+        LSN prev_lsn;
+        Uuid txn_id;
+        MetaSchema before;
+        MetaSchema after;
+
+        UpdateSchemaRecord() = default;
+
+        UpdateSchemaRecord(
+            LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaSchema before, MetaSchema after
+        )
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before)),
+              after(std::move(after))
+        {
+        }
+    };
+
+    struct DeleteSchemaRecord
+    {
+        static constexpr auto type = WALRecordType::DELETE_SCHEMA;
+
+        LSN lsn;
+        LSN prev_lsn;
+        Uuid txn_id;
+        MetaSchema before;
+
+        DeleteSchemaRecord() = default;
+
+        DeleteSchemaRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaSchema before)
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before))
+        {
+        }
+    };
+
     struct CreateTableRecord
     {
         static constexpr auto type = WALRecordType::CREATE_TABLE;
@@ -255,12 +295,50 @@ namespace types
         LSN lsn;
         LSN prev_lsn;
         Uuid txn_id;
-        MetaTable table;
+        MetaTable after;
 
         CreateTableRecord() = default;
 
         CreateTableRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaTable table)
-            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table(std::move(table))
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), after(std::move(table))
+        {
+        }
+    };
+
+    struct UpdateTableRecord
+    {
+        static constexpr auto type = WALRecordType::UPDATE_TABLE;
+
+        LSN lsn;
+        LSN prev_lsn;
+        Uuid txn_id;
+        MetaTable before;
+        MetaTable after;
+
+        UpdateTableRecord() = default;
+
+        UpdateTableRecord(
+            LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaTable before, MetaTable after
+        )
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before)),
+              after(std::move(after))
+        {
+        }
+    };
+
+    struct DeleteTableRecord
+    {
+        static constexpr auto type = WALRecordType::DELETE_TABLE;
+
+        LSN lsn;
+        LSN prev_lsn;
+        Uuid txn_id;
+        MetaTable before;
+
+        DeleteTableRecord() = default;
+
+        DeleteTableRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaTable before)
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before))
         {
         }
     };
@@ -321,7 +399,11 @@ namespace types
         CLRUpdateRecord,
         CLRDeleteRecord,
         CreateSchemaRecord,
+        UpdateSchemaRecord,
+        DeleteSchemaRecord,
         CreateTableRecord,
+        UpdateTableRecord,
+        DeleteTableRecord,
         BeginTxnRecord,
         CommitTxnRecord,
         RollbackTxnRecord>;
@@ -333,14 +415,24 @@ namespace types
         CLRInsertRecord,
         CLRUpdateRecord,
         CLRDeleteRecord>;
-    using WALMetaRecord = detail::WALRecordVariant<CreateSchemaRecord, CreateTableRecord>;
-    using WALTxnRecord = detail::WALRecordVariant<BeginTxnRecord, CommitTxnRecord, RollbackTxnRecord>;
 
-    template <typename T, typename Variant>
-    struct is_in_variant;
+    using WALMetaRecord = detail::WALRecordVariant<
+        CreateSchemaRecord,
+        UpdateSchemaRecord,
+        DeleteSchemaRecord,
+        CreateTableRecord,
+        UpdateTableRecord,
+        DeleteTableRecord>;
+
+    using WALTxnRecord =
+        detail::WALRecordVariant<BeginTxnRecord, CommitTxnRecord, RollbackTxnRecord>;
+
+    template <typename T, typename Variant> struct is_in_variant;
 
     template <typename T, typename... Ts>
-    struct is_in_variant<T, std::variant<Ts...>> : std::disjunction<std::is_same<T, Ts>...> {};
+    struct is_in_variant<T, std::variant<Ts...>> : std::disjunction<std::is_same<T, Ts>...>
+    {
+    };
 
     template <typename T, typename Variant>
     inline constexpr bool is_in_variant_v = is_in_variant<T, Variant>::value;
@@ -369,17 +461,18 @@ namespace types
         extract_page_id(const WALRecord& record)
         {
             return std::visit(
-                []<typename TRecord>(const TRecord& rec) -> PageId {
-                    if constexpr (
-                        std::is_same_v<std::decay_t<TRecord>, InsertRecord> ||
-                        std::is_same_v<std::decay_t<TRecord>, UpdateRecord> ||
-                        std::is_same_v<std::decay_t<TRecord>, DeleteRecord>)
+                []<typename TRecord>(const TRecord& rec) -> PageId
+                {
+                    if constexpr (std::is_same_v<std::decay_t<TRecord>, InsertRecord> ||
+                                  std::is_same_v<std::decay_t<TRecord>, UpdateRecord> ||
+                                  std::is_same_v<std::decay_t<TRecord>, DeleteRecord>)
                     {
                         return rec.page_id;
                     }
 
                     throw std::runtime_error("extract_page_id: record does not have page id");
-                }, record
+                },
+                record
             );
         }
     } // namespace wal_log

@@ -71,8 +71,17 @@ namespace storage
         virtual void
         write_ms(const types::MetaSchema& ms) = 0;
 
+        virtual void
+        delete_mt(const types::MetaTable& table) = 0;
+
+        virtual void
+        delete_ms(const types::MetaSchema& schema) = 0;
+
         virtual types::DataPage
         create_page(const types::MetaTable& mt) = 0;
+
+        virtual types::DataPage
+        create_page(const types::MetaTable& mt, const types::PageId& page_id) = 0;
 
         virtual bool
         exists_schema(const std::string& schema_name) = 0;

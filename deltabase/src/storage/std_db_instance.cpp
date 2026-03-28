@@ -30,7 +30,8 @@ namespace storage
         wal::WalManagerFactory wal_factory;
         wal_manager_ = wal_factory.make(cfg);
         txn_manager_ = std::make_unique<txn::TransactionManager>(*wal_manager_);
-        recovery_manager_ = std::make_unique<recovery::RecoveryManager>(cfg_, *wal_manager_, *io_manager_);
+        recovery_manager_ =
+            std::make_unique<recovery::RecoveryManager>(cfg_, *wal_manager_, *io_manager_);
 
         init();
     }
@@ -110,17 +111,18 @@ namespace storage
         txn::Transaction& txn
     )
     {
-        auto table = io_manager_->read_table_meta(table_name, schema_name);
+        const auto old_table = io_manager_->read_table_meta(table_name, schema_name);
+        auto updated_table = old_table;
         auto pages = io_manager_->read_table_data(table_name, schema_name);
 
         DataRow data_row;
-        data_row.id = table.last_rid++;
+        data_row.id = updated_table.last_rid++;
         data_row.tokens = std::move(row);
 
         size_t row_size = io_manager_->estimate_size(data_row);
 
         if (int idx = has_available_page(pages, row_size); idx == -1)
-            pages.emplace_back(io_manager_->create_page(table));
+            pages.emplace_back(io_manager_->create_page(old_table));
 
         int idx = has_available_page(pages, row_size);
         if (idx == -1)
@@ -128,11 +130,13 @@ namespace storage
 
         pages[idx].rows.push_back(data_row);
 
-        InsertRecord record(0, 0, Uuid{}, table.id, pages[idx].header.id, data_row);
-        txn.append_log(record);
+        InsertRecord insert_record(0, 0, txn.get_id(), old_table.id, pages[idx].header.id, data_row);
+        UpdateTableRecord update_table_record(0, 0, txn.get_id(), old_table, updated_table);
+        txn.append_log(insert_record);
+        txn.append_log(update_table_record);
 
         io_manager_->write_page(pages[idx]);
-        io_manager_->write_mt(table, schema_name);
+        io_manager_->write_mt(updated_table, schema_name);
     }
 
     void
@@ -140,10 +144,12 @@ namespace storage
         const std::string& table_name,
         const std::string& schema_name,
         RowUpdate update,
-        const std::vector<DataRow>& rows
+        const std::vector<DataRow>& rows,
+        txn::Transaction& txn
     )
     {
-        auto table = io_manager_->read_table_meta(table_name, schema_name);
+        const auto old_table = io_manager_->read_table_meta(table_name, schema_name);
+        auto updated_table = old_table;
         std::vector<DataPage> pages = io_manager_->read_table_data(table_name, schema_name);
 
         std::unordered_set<RowId> ids;
@@ -163,16 +169,16 @@ namespace storage
                     continue;
 
                 DataRow new_row = row;
-                new_row.id = ++table.last_rid;
+                new_row.id = ++updated_table.last_rid;
 
                 row.flags |= DataRowFlags::OBSOLETE;
 
                 for (const auto& assignment : update)
                 {
-                    ColumnId col_id = std::visit([](auto& a){ return a.first; }, assignment);
-                    int64_t col_idx = table.get_column_idx(col_id);
+                    ColumnId col_id = std::visit([](auto& a) { return a.first; }, assignment);
+                    int64_t col_idx = old_table.get_column_idx(col_id);
 
-                    MetaColumn cola = table.get_column(col_idx);
+                    MetaColumn cola = old_table.get_column(col_idx);
 
                     if (auto* lit = std::get_if<AssignLiteral>(&assignment))
                     {
@@ -181,10 +187,13 @@ namespace storage
                     else
                     {
                         auto* col = std::get_if<AssignColumn>(&assignment);
-                        int src_idx = table.get_column_idx(col->second);
+                        int src_idx = old_table.get_column_idx(col->second);
                         new_row.tokens[col_idx] = row.tokens[src_idx];
                     }
                 }
+
+                UpdateRecord record(0, 0, txn.get_id(), old_table.id, page.header.id, row, new_row);
+                txn.append_log(record);
 
                 page.rows.push_back(new_row);
                 page.header.max_rid = std::max(page.header.max_rid, new_row.id);
@@ -192,20 +201,25 @@ namespace storage
             }
 
             if (updated)
+            {
                 io_manager_->write_page(page);
+                UpdateTableRecord record(0, 0, txn.get_id(), old_table, updated_table);
+                txn.append_log(record);
+            }
         }
 
-        io_manager_->write_mt(table, schema_name);
+        io_manager_->write_mt(updated_table, schema_name);
     }
 
     void
     StdDbInstance::delete_rows(
         const std::string& table_name,
         const std::string& schema_name,
-        const std::vector<DataRow>& rows
+        const std::vector<DataRow>& rows,
+        txn::Transaction& txn
     )
     {
-        auto table = io_manager_->read_table_meta(table_name, schema_name);
+        const auto table = io_manager_->read_table_meta(table_name, schema_name);
         std::vector<DataPage> pages = io_manager_->read_table_data(table_name, schema_name);
 
         std::unordered_set<RowId> ids;
@@ -227,11 +241,15 @@ namespace storage
                 deleted = true;
 
                 row.flags |= DataRowFlags::OBSOLETE;
+
+                DeleteRecord record(0, 0, txn.get_id(), table.id, page.header.id, row);
+                txn.append_log(record);
             }
 
-            if (deleted)
+            if (deleted) 
                 io_manager_->write_page(page);
         }
+
     }
 
     MetaTable
