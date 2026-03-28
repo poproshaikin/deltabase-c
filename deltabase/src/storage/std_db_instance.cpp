@@ -306,7 +306,8 @@ namespace storage
     StdDbInstance::create_table(
         const std::string& table_name,
         const std::string& schema_name,
-        const std::vector<ColumnDefinition>& columns
+        const std::vector<ColumnDefinition>& columns,
+        txn::Transaction& txn
     )
     {
         auto schema = io_manager_->read_schema_meta(schema_name);
@@ -325,16 +326,22 @@ namespace storage
             mt.columns.emplace_back(column);
         }
 
+        CreateTableRecord record(0, 0, txn.get_id(), mt);
+        txn.append_log(record);
+
         io_manager_->write_mt(mt, schema_name);
     }
 
     void
-    StdDbInstance::create_schema(const std::string& schema_name)
+    StdDbInstance::create_schema(const std::string& schema_name, txn::Transaction& txn)
     {
         MetaSchema ms;
         ms.id = Uuid::make();
         ms.name = schema_name;
         ms.db_name = cfg_.db_name.value();
+
+        CreateSchemaRecord record(0, 0, txn.get_id(), ms);
+        txn.append_log(record);
 
         io_manager_->write_ms(ms);
     }

@@ -91,15 +91,18 @@ namespace storage
     }
 
     void
-    DetachedDbInstance::create_table(const std::string& table_name,
+    DetachedDbInstance::create_table(
+        const std::string& table_name,
         const std::string& schema_name,
-        const std::vector<ColumnDefinition>& vector)
+        const std::vector<ColumnDefinition>& vector,
+        txn::Transaction& txn
+    )
     {
         throw std::logic_error("DetachedDbInstance::create_table: this method is not supported");
     }
 
     void
-    DetachedDbInstance::create_schema(const std::string& schema_name)
+    DetachedDbInstance::create_schema(const std::string& schema_name, txn::Transaction& txn)
     {
         throw std::logic_error("DetachedDbInstance::create_schema: this method is not supported");
     }

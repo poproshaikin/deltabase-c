@@ -28,6 +28,7 @@ namespace wal
         stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
+        stream.write(&record.page_id, sizeof(uuid_t));
 
         auto serialized_row = binary_serializer_.serialize_dr(record.after);
         stream.append(serialized_row, serialized_row.size());
@@ -44,6 +45,7 @@ namespace wal
         stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
+        stream.write(&record.page_id, sizeof(uuid_t));
 
         // Сериализуем old_row
         auto serialized_old_row = binary_serializer_.serialize_dr(record.before);
@@ -65,6 +67,7 @@ namespace wal
         stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
         stream.write(&record.table_id, sizeof(uuid_t));
+        stream.write(&record.page_id, sizeof(uuid_t));
 
         auto serialized_row = binary_serializer_.serialize_dr(record.before);
         stream.append(serialized_row, serialized_row.size());
@@ -353,6 +356,7 @@ namespace wal
                 LSN prev_lsn;
                 Uuid txn_id;
                 Uuid table_id;
+                Uuid page_id;
                 DataRow after;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
@@ -363,11 +367,20 @@ namespace wal
                     return false;
                 if (!stream.read(table_id.raw(), sizeof(uuid_t)))
                     return false;
+                if (!stream.read(page_id.raw(), sizeof(uuid_t)))
+                    return false;
                 
                 if (!binary_serializer_.deserialize_dr(stream, after))
                     return false;
                 
-                out = InsertRecord(lsn, prev_lsn, txn_id, table_id, Uuid{}, std::move(after));
+                out = InsertRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    table_id,
+                    page_id,
+                    std::move(after)
+                );
                 return true;
             }
             
@@ -377,6 +390,7 @@ namespace wal
                 LSN prev_lsn;
                 Uuid txn_id;
                 Uuid table_id;
+                Uuid page_id;
                 DataRow before;
                 DataRow after;
 
@@ -387,6 +401,8 @@ namespace wal
                 if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
                     return false;
                 if (!stream.read(table_id.raw(), sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(page_id.raw(), sizeof(uuid_t)))
                     return false;
                 
                 if (!binary_serializer_.deserialize_dr(stream, before))
@@ -400,7 +416,7 @@ namespace wal
                     prev_lsn,
                     txn_id,
                     table_id,
-                    Uuid{},
+                    page_id,
                     std::move(before),
                     std::move(after)
                 );
@@ -413,6 +429,7 @@ namespace wal
                 LSN prev_lsn;
                 Uuid txn_id;
                 Uuid table_id;
+                Uuid page_id;
                 DataRow before;
 
                 if (!stream.read(&lsn, sizeof(lsn)))
@@ -423,11 +440,20 @@ namespace wal
                     return false;
                 if (!stream.read(table_id.raw(), sizeof(uuid_t)))
                     return false;
+                if (!stream.read(page_id.raw(), sizeof(uuid_t)))
+                    return false;
                 
                 if (!binary_serializer_.deserialize_dr(stream, before))
                     return false;
                 
-                out = DeleteRecord(lsn, prev_lsn, txn_id, table_id, Uuid{}, std::move(before));
+                out = DeleteRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    table_id,
+                    page_id,
+                    std::move(before)
+                );
                 return true;
             }
             

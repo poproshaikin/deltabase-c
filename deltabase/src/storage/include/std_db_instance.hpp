@@ -93,11 +93,12 @@ namespace storage
         create_table(
             const std::string& table_name,
             const std::string& schema_name,
-            const std::vector<types::ColumnDefinition>& columns
+            const std::vector<types::ColumnDefinition>& columns,
+            txn::Transaction& txn
         ) override;
 
         void
-        create_schema(const std::string& schema_name) override;
+        create_schema(const std::string& schema_name, txn::Transaction& txn) override;
 
         bool
         exists_schema(const std::string& schema_name) override;

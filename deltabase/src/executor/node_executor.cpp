@@ -8,7 +8,6 @@
 #include "../storage/include/std_db_instance.hpp"
 
 #include <algorithm>
-#include <iostream>
 
 namespace exq
 {
@@ -312,6 +311,9 @@ namespace exq
         int updated_count = 0;
         std::vector<DataRow> rows;
 
+        auto txn = db_.make_txn();
+        txn.begin();
+
         while (true)
         {
             DataRow row;
@@ -327,8 +329,10 @@ namespace exq
             updated_count++;
         }
 
-        db_.update_row(table_name_, schema_name_, assignments_, rows, TODO);
+        db_.update_row(table_name_, schema_name_, assignments_, rows, txn);
         executed_ = true;
+
+        txn.commit();
 
         DataToken affected_rows_count(misc::convert(updated_count), DataType::INTEGER);
         out.tokens = {affected_rows_count};
@@ -373,6 +377,9 @@ namespace exq
         int deleted_count = 0;
         std::vector<DataRow> rows;
 
+        auto txn = db_.make_txn();
+        txn.begin();
+
         while (true)
         {
             DataRow row;
@@ -388,8 +395,10 @@ namespace exq
             deleted_count++;
         }
 
-        db_.delete_rows(table_name_, schema_name_, rows, TODO);
+        db_.delete_rows(table_name_, schema_name_, rows, txn);
         executed_ = true;
+
+        txn.commit();
 
         DataToken affected_rows_count(misc::convert(deleted_count), DataType::INTEGER);
         out.tokens = {affected_rows_count};
@@ -426,7 +435,10 @@ namespace exq
     bool
     CreateTableNodeExecutor::next(DataRow& out)
     {
-        db_.create_table(table_name_, schema_.name, columns_);
+        auto txn = db_.make_txn();
+        txn.begin();
+        db_.create_table(table_name_, schema_.name, columns_, txn);
+        txn.commit();
         return false;
     }
 

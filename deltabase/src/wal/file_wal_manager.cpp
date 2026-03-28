@@ -115,13 +115,11 @@ namespace wal
     void
     FileWalManager::append_log(const WALRecord& record)
     {
-        auto prev_lsn = std::visit([](const auto& rec) { return rec.lsn; }, record);
         auto lsn = next_lsn_++;
 
         auto record_with_lsn = std::visit(
-            [prev_lsn, lsn](auto rec) -> WALRecord
+            [lsn](auto rec) -> WALRecord
             {
-                rec.prev_lsn = prev_lsn;
                 rec.lsn = lsn;
                 return rec;
             },

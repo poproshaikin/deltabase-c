@@ -77,11 +77,12 @@ namespace storage
         create_table(
             const std::string& table_name,
             const std::string& schema_name,
-            const std::vector<types::ColumnDefinition>& vector
+            const std::vector<types::ColumnDefinition>& vector,
+            txn::Transaction& txn
         ) = 0;
 
         virtual void
-        create_schema(const std::string& schema_name) = 0;
+        create_schema(const std::string& schema_name, txn::Transaction& txn) = 0;
 
         virtual bool
         exists_schema(const std::string& schema_name) = 0;

@@ -29,6 +29,7 @@ namespace txn
         TxnId id_;
         wal::IWALManager& wal_manager_;
         TransactionState state_;
+        types::LSN last_lsn_ = 0;
 
         Transaction(const TxnId& id, wal::IWALManager& wal_manager)
             : id_(id), wal_manager_(wal_manager), state_(TransactionState::IDLE)
@@ -55,6 +56,7 @@ namespace txn
 
             wal_manager_.append_log(record);
             wal_manager_.flush();
+            last_lsn_ = wal_manager_.get_next_lsn() - 1;
             state_ = TransactionState::ACTIVE;
         }
 
@@ -67,11 +69,13 @@ namespace txn
             types::WALRecord record_with_txn_id = std::visit([this](auto rec) -> types::WALRecord
             {
                 rec.txn_id = id_;
+                rec.prev_lsn = last_lsn_;
                 return rec;
             }, record);
 
             wal_manager_.append_log(record_with_txn_id);
             wal_manager_.flush();
+            last_lsn_ = wal_manager_.get_next_lsn() - 1;
         }
 
         void
@@ -80,10 +84,11 @@ namespace txn
             if (state_ != TransactionState::ACTIVE)
                 throw std::runtime_error("Transaction::commit: transaction state not active");
 
-            types::CommitTxnRecord commit_record(0, 0, id_); // lsn/prev_lsn assigned in WAL manager
+            types::CommitTxnRecord commit_record(0, last_lsn_, id_);
 
             wal_manager_.append_log(commit_record);
             wal_manager_.flush();
+            last_lsn_ = wal_manager_.get_next_lsn() - 1;
             state_ = TransactionState::COMMITTED;
         }
     };

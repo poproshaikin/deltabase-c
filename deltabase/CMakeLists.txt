@@ -110,3 +110,11 @@ target_link_libraries(main.exe
     cli
     recovery
 )
+
+add_executable(wal_dump.exe wal_dump.cpp)
+target_link_libraries(wal_dump.exe
+    wal
+    storage
+    types
+    misc
+)

@@ -64,7 +64,10 @@ namespace engine
 
         if (config.db_name.has_value() && !db_->exists_schema(config.default_schema))
         {
-            db_->create_schema(config.default_schema);
+            auto txn = db_->make_txn();
+            txn.begin();
+            db_->create_schema(config.default_schema, txn);
+            txn.commit();
         }
     }
 
