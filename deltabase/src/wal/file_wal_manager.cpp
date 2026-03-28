@@ -279,16 +279,13 @@ namespace wal
 
         while (stream.remaining() > 0)
         {
-            // Прочитать размер записи
             uint64_t record_size;
             if (!stream.read(&record_size, sizeof(record_size)))
                 break;
 
-            // Проверить что хватает данных
             if (stream.remaining() < record_size)
                 break;
 
-            // Десериализовать запись
             WALRecord record;
             if (serializer_->deserialize(stream, record))
             {

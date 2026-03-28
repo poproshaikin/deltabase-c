@@ -74,6 +74,12 @@ namespace storage
 
         bool
         exists_schema(const std::string& schema_name) override;
+
+        types::MetaTable
+        read_table_meta(const types::Uuid& table_id) override;
+
+        std::unique_ptr<types::DataPage>
+        read_data_page(types::PageId id) override;
     };
 } // namespace storage
 

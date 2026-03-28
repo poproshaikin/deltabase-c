@@ -23,6 +23,9 @@ namespace wal
         serialize(const types::CommitTxnRecord& record) const;
 
         misc::MemoryStream
+        serialize(const types::RollbackTxnRecord& record) const;
+
+        misc::MemoryStream
         serialize(const types::InsertRecord& record) const;
 
         misc::MemoryStream
@@ -30,6 +33,15 @@ namespace wal
 
         misc::MemoryStream
         serialize(const types::DeleteRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRInsertRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRUpdateRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRDeleteRecord& record) const;
 
         misc::MemoryStream
         serialize(const types::CreateSchemaRecord& record) const;

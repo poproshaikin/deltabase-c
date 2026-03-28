@@ -6,6 +6,7 @@
 #define DELTABASE_RECOVERY_MANAGER_HPP
 #include "../../storage/include/io_manager.hpp"
 #include "../../wal/include/wal_manager.hpp"
+#include "../../transactions/include/transaction.hpp"
 
 namespace recovery
 {
@@ -16,11 +17,14 @@ namespace recovery
         storage::IIOManager& io_;
 
         void
-        apply(const types::WALRecord& record);
+        redo(
+            const types::WALRecord& record,
+            const std::unordered_map<txn::TxnId, types::LSN>& commit_lsns
+        );
         void
-        apply_data(const types::WALDataRecord& record);
+        redo_data(const types::WALDataRecord& record);
         void
-        apply_meta(const types::WALRecord& record);
+        redo_meta(const types::WALRecord& record);
 
         void
         redo(const types::InsertRecord& record, types::DataPage& page);
@@ -28,6 +32,41 @@ namespace recovery
         redo(const types::UpdateRecord& record, types::DataPage& page);
         void
         redo(const types::DeleteRecord& record, types::DataPage& page);
+        void
+        redo(const types::CLRInsertRecord& record, types::DataPage& page);
+        void
+        redo(const types::CLRUpdateRecord& record, types::DataPage& page);
+        void
+        redo(const types::CLRDeleteRecord& record, types::DataPage& page);
+
+        types::WALRecord
+        make_clr(const types::InsertRecord& record) const;
+        types::WALRecord
+        make_clr(const types::UpdateRecord& record) const;
+        types::WALRecord
+        make_clr(const types::DeleteRecord& record) const;
+
+        std::unordered_map<txn::TxnId, types::LSN>
+        get_commit_lsns(const std::vector<types::WALRecord>& wal) const;
+        std::unordered_map<txn::TxnId, types::LSN>
+        get_rollback_lsns(const std::vector<types::WALRecord>& wal) const;
+        std::unordered_map<txn::TxnId, types::LSN>
+        get_last_lsns(const std::vector<types::WALRecord>& wal) const;
+        std::unordered_map<txn::TxnId, types::LSN>
+        get_active_txns(
+            const std::unordered_map<txn::TxnId, types::LSN>& last,
+            const std::unordered_map<txn::TxnId, types::LSN>& commit,
+            const std::unordered_map<txn::TxnId, types::LSN>& rollback);
+
+        void
+        undo(const std::unordered_map<txn::TxnId, types::LSN>& active_lsns);
+
+        void
+        undo_record(const types::InsertRecord& record, types::DataPage& page);
+        void
+        undo_record(const types::UpdateRecord& record, types::DataPage& page);
+        void
+        undo_record(const types::DeleteRecord& record, types::DataPage& page);
 
     public:
         explicit

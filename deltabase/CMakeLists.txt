@@ -41,7 +41,7 @@ function(add_cpp_module module_name)
     endif()
 
     if (${module_name} STREQUAL "storage")
-    target_link_libraries(${module_name} PUBLIC misc types wal transactions)
+    target_link_libraries(${module_name} PUBLIC misc types wal transactions recovery)
     endif()
 
     if (${module_name} STREQUAL "executor")
@@ -61,7 +61,7 @@ function(add_cpp_module module_name)
     endif()
     
     if (${module_name} STREQUAL "wal")
-        target_link_libraries(${module_name} PUBLIC storage types misc)
+        target_link_libraries(${module_name} PUBLIC storage)
     endif()
 
     if (${module_name} STREQUAL "recovery")

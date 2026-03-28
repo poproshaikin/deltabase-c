@@ -125,4 +125,16 @@ namespace storage
     {
         throw std::logic_error("DetachedFileIOManager::exists_schema: unsupported method");
     }
+
+    types::MetaTable
+    DetachedFileIOManager::read_table_meta(const types::Uuid& table_id)
+    {
+        throw std::logic_error("DetachedFileIOManager::read_table_meta: unsupported method");
+    }
+
+    std::unique_ptr<types::DataPage>
+    DetachedFileIOManager::read_data_page(types::PageId id)
+    {
+        throw std::logic_error("DetachedFileIOManager::read_data_page: unsupported method");
+    }
 } // namespace storage

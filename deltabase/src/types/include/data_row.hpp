@@ -51,6 +51,13 @@ namespace types
         return left = left & right;
     }
 
+    inline DataRowFlags
+    operator~(DataRowFlags flags)
+    {
+        using T = std::underlying_type_t<DataRowFlags>;
+        return static_cast<DataRowFlags>(~static_cast<T>(flags));
+    }
+
     using RowId = uint64_t;
 
     struct DataRow
