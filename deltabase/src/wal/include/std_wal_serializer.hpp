@@ -44,6 +44,24 @@ namespace wal
         serialize(const types::CLRDeleteRecord& record) const;
 
         misc::MemoryStream
+        serialize(const types::CLRCreateSchemaRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRUpdateSchemaRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRDeleteSchemaRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRCreateTableRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRUpdateTableRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRDeleteTableRecord& record) const;
+
+        misc::MemoryStream
         serialize(const types::CreateSchemaRecord& record) const;
 
         misc::MemoryStream

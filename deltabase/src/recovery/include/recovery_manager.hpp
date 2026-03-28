@@ -45,6 +45,18 @@ namespace recovery
         make_clr(const types::UpdateRecord& record) const;
         types::WALRecord
         make_clr(const types::DeleteRecord& record) const;
+        types::WALRecord
+        make_clr(const types::CreateSchemaRecord& record) const;
+        types::WALRecord
+        make_clr(const types::UpdateSchemaRecord& record) const;
+        types::WALRecord
+        make_clr(const types::DeleteSchemaRecord& record) const;
+        types::WALRecord
+        make_clr(const types::CreateTableRecord& record) const;
+        types::WALRecord
+        make_clr(const types::UpdateTableRecord& record) const;
+        types::WALRecord
+        make_clr(const types::DeleteTableRecord& record) const;
 
         std::unordered_map<txn::TxnId, types::LSN>
         get_commit_lsns(const std::vector<types::WALRecord>& wal) const;

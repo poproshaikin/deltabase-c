@@ -493,12 +493,7 @@ namespace storage
             }
         );
 
-        if (result)
-            return result;
-
-        throw std::runtime_error(
-            "FileIOManager::load_data_page: page " + id.to_string() + " not found"
-        );
+        return result;
     }
 
     void

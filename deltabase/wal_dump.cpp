@@ -155,6 +155,18 @@ namespace
             return "CLR_UPDATE";
         case WALRecordType::CLR_DELETE:
             return "CLR_DELETE";
+        case WALRecordType::CLR_CREATE_SCHEMA:
+            return "CLR_CREATE_SCHEMA";
+        case WALRecordType::CLR_UPDATE_SCHEMA:
+            return "CLR_UPDATE_SCHEMA";
+        case WALRecordType::CLR_DELETE_SCHEMA:
+            return "CLR_DELETE_SCHEMA";
+        case WALRecordType::CLR_CREATE_TABLE:
+            return "CLR_CREATE_TABLE";
+        case WALRecordType::CLR_UPDATE_TABLE:
+            return "CLR_UPDATE_TABLE";
+        case WALRecordType::CLR_DELETE_TABLE:
+            return "CLR_DELETE_TABLE";
         default:
             return "UNKNOWN";
         }
@@ -323,6 +335,38 @@ main(int argc, char** argv)
                     else if constexpr (std::is_same_v<R, DeleteTableRecord>)
                     {
                         std::cout << " before=" << table_to_string(r.before);
+                    }
+                    else if constexpr (std::is_same_v<R, CLRCreateSchemaRecord>)
+                    {
+                        std::cout << " undo_next=" << r.undo_next_lsn
+                                  << " schema=" << schema_to_string(r.schema);
+                    }
+                    else if constexpr (std::is_same_v<R, CLRUpdateSchemaRecord>)
+                    {
+                        std::cout << " undo_next=" << r.undo_next_lsn
+                                  << " before=" << schema_to_string(r.before)
+                                  << " after=" << schema_to_string(r.after);
+                    }
+                    else if constexpr (std::is_same_v<R, CLRDeleteSchemaRecord>)
+                    {
+                        std::cout << " undo_next=" << r.undo_next_lsn
+                                  << " before=" << schema_to_string(r.before);
+                    }
+                    else if constexpr (std::is_same_v<R, CLRCreateTableRecord>)
+                    {
+                        std::cout << " undo_next=" << r.undo_next_lsn
+                                  << " after=" << table_to_string(r.after);
+                    }
+                    else if constexpr (std::is_same_v<R, CLRUpdateTableRecord>)
+                    {
+                        std::cout << " undo_next=" << r.undo_next_lsn
+                                  << " before=" << table_to_string(r.before)
+                                  << " after=" << table_to_string(r.after);
+                    }
+                    else if constexpr (std::is_same_v<R, CLRDeleteTableRecord>)
+                    {
+                        std::cout << " undo_next=" << r.undo_next_lsn
+                                  << " before=" << table_to_string(r.before);
                     }
 
                     std::cout << "\n";

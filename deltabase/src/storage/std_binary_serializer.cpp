@@ -120,6 +120,7 @@ namespace storage
         stream.write(&header.min_rid, sizeof(header.min_rid));
         stream.write(&header.max_rid, sizeof(header.max_rid));
         stream.write(&header.rows_count, sizeof(header.rows_count));
+        stream.write(&header.last_lsn, sizeof(header.last_lsn));
 
         stream.seek(0);
         return stream;
@@ -299,6 +300,9 @@ namespace storage
             return false;
 
         if (stream.read(&out.rows_count, sizeof(out.rows_count)) != sizeof(out.rows_count))
+            return false;
+
+        if (stream.read(&out.last_lsn, sizeof(out.last_lsn)) != sizeof(out.last_lsn))
             return false;
 
         return true;

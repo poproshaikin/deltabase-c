@@ -45,6 +45,12 @@ namespace txn
             return id_;
         }
 
+        types::LSN
+        get_last_lsn() const
+        {
+            return last_lsn_;
+        }
+
         void
         begin()
         {

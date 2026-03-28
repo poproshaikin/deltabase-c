@@ -43,15 +43,16 @@ namespace recovery
             {
                 using R = std::decay_t<TRecord>;
 
-                if constexpr (
-                    std::is_same_v<R, CLRInsertRecord> ||
-                    std::is_same_v<R, CLRUpdateRecord> ||
-                    std::is_same_v<R, CLRDeleteRecord>)
+                if constexpr (is_in_variant_v<R, WALCLRRecord>)
                 {
                     if (r.lsn <= last_checkpoint)
                         return;
 
-                    redo_data(r);
+                    if constexpr (wal_log::has_page_id_v<R>)
+                        redo_data(r);
+                    else
+                        redo_meta(r);
+
                     return;
                 }
 
@@ -67,9 +68,9 @@ namespace recovery
                 if (r.lsn > commit_lsns.at(r.txn_id))
                     return;
 
-                if constexpr (wal_log::has_page_id_v<R>)
+                if constexpr (is_in_variant_v<R, WALDataRecord>)
                     redo_data(r);
-                else
+                else if constexpr (is_in_variant_v<R, WALMetaRecord>)
                     redo_meta(r);
             },
             record
@@ -117,6 +118,18 @@ namespace recovery
                         io_.write_mt(r.after);
                     else if constexpr (std::is_same_v<R, DeleteTableRecord>)
                         io_.delete_mt(r.before);
+                    else if constexpr (std::is_same_v<R, CLRCreateSchemaRecord>)
+                        io_.delete_ms(r.schema);
+                    else if constexpr (std::is_same_v<R, CLRUpdateSchemaRecord>)
+                        io_.write_ms(r.before);
+                    else if constexpr (std::is_same_v<R, CLRDeleteSchemaRecord>)
+                        io_.write_ms(r.before);
+                    else if constexpr (std::is_same_v<R, CLRCreateTableRecord>)
+                        io_.delete_mt(r.after);
+                    else if constexpr (std::is_same_v<R, CLRUpdateTableRecord>)
+                        io_.write_mt(r.before);
+                    else if constexpr (std::is_same_v<R, CLRDeleteTableRecord>)
+                        io_.write_mt(r.before);
                 }
             },
             record
@@ -131,72 +144,46 @@ namespace recovery
     void
     RecoveryManager::redo(const UpdateRecord& record, DataPage& page)
     {
-        bool found = false;
-
         for (auto& row : page.rows)
         {
             if (row.id != record.before.id)
                 continue;
 
             row.flags |= DataRowFlags::OBSOLETE;
-            found = true;
             break;
         }
-
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::redo(DeleteRecord): failed to find old row " +
-                std::to_string(record.before.id)
-            );
 
         page.rows.push_back(record.after);
     }
     void
     RecoveryManager::redo(const DeleteRecord& record, DataPage& page)
     {
-        bool found = false;
         for (auto& row : page.rows)
         {
             if (row.id != record.before.id)
                 continue;
 
             row.flags |= DataRowFlags::OBSOLETE;
-            found = true;
             break;
         }
-
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::redo(DeleteRecord): failed to find old row " +
-                std::to_string(record.before.id)
-            );
     }
 
     void
     RecoveryManager::redo(const CLRInsertRecord& record, DataPage& page)
     {
-        bool found = false;
         for (auto& row : page.rows)
         {
             if (row.id != record.after.id)
                 continue;
 
             row.flags |= DataRowFlags::OBSOLETE;
-            found = true;
             break;
         }
-
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::redo(CLRInsertRecord): failed to find row " +
-                std::to_string(record.after.id)
-            );
     }
 
     void
     RecoveryManager::redo(const CLRUpdateRecord& record, DataPage& page)
     {
-        bool found = false;
         for (auto& row : page.rows)
         {
             if (row.id != record.after.id)
@@ -204,36 +191,21 @@ namespace recovery
 
             row.tokens = record.before.tokens;
             row.flags &= ~DataRowFlags::OBSOLETE;
-            found = true;
             break;
         }
-
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::redo(CLRUpdateRecord): failed to find row " +
-                std::to_string(record.after.id)
-            );
     }
 
     void
     RecoveryManager::redo(const CLRDeleteRecord& record, DataPage& page)
     {
-        bool found = false;
         for (auto& row : page.rows)
         {
             if (row.id != record.before.id)
                 continue;
 
             row.flags &= ~DataRowFlags::OBSOLETE;
-            found = true;
             break;
         }
-
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::redo(CLRDeleteRecord): failed to find row " +
-                std::to_string(record.before.id)
-            );
     }
 
     void
@@ -253,17 +225,13 @@ namespace recovery
                     {
                         using R = std::decay_t<TRecord>;
 
-                        if constexpr (
-                            std::is_same_v<R, CLRInsertRecord> ||
-                            std::is_same_v<R, CLRUpdateRecord> ||
-                            std::is_same_v<R, CLRDeleteRecord>)
+                        if constexpr (is_in_variant_v<R, WALCLRRecord>)
                         {
                             txn_prev_lsn = r.lsn;
                             current = r.undo_next_lsn;
                             return;
                         }
-
-                        else if constexpr (wal_log::has_page_id_v<R>)
+                        else if constexpr (is_in_variant_v<R, WALDataRecord>)
                         {
                             auto page = io_.read_data_page(r.page_id);
                             if (!page)
@@ -294,8 +262,24 @@ namespace recovery
                         }
                         else if constexpr (is_in_variant_v<R, WALMetaRecord>)
                         {
+                            auto clr = make_clr(r);
+                            clr = std::visit(
+                                [&](auto rec) -> WALRecord
+                                {
+                                    rec.lsn = txn_prev_lsn;
+                                    return rec;
+                                },
+                                clr
+                            );
+
+                            LSN clr_lsn = wal_.get_next_lsn();
+                            wal_.append_log(clr);
+                            wal_.flush();
+
                             undo_record(r);
+                            txn_prev_lsn = clr_lsn;
                         }
+
                         current = r.prev_lsn;
                     },
                     record
@@ -310,27 +294,18 @@ namespace recovery
     void
     RecoveryManager::undo_record(const InsertRecord& record, DataPage& page)
     {
-        bool found = false;
         for (auto& row : page.rows)
         {
             if (row.id != record.after.id)
                 continue;
 
             row.flags |= DataRowFlags::OBSOLETE;
-            found = true;
             break;
         }
-
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::undo(InsertRecord): failed to find 'after' row " +
-                std::to_string(record.after.id)
-            );
     }
     void
     RecoveryManager::undo_record(const UpdateRecord& record, DataPage& page)
     {
-        bool found = false;
         for (auto& row : page.rows)
         {
             if (row.id != record.after.id)
@@ -338,33 +313,20 @@ namespace recovery
 
             row.tokens = record.before.tokens;
             row.flags &= ~DataRowFlags::OBSOLETE;
-            found = true;
             break;
         }
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::undo(UpdateRecord): failed to find 'after' row " +
-                std::to_string(record.after.id)
-            );
     }
     void
     RecoveryManager::undo_record(const DeleteRecord& record, DataPage& page)
     {
-        bool found = false;
         for (auto& row : page.rows)
         {
             if (row.id != record.before.id)
                 continue;
 
             row.flags &= ~DataRowFlags::OBSOLETE;
-            found = true;
             break;
         }
-        if (!found)
-            throw std::runtime_error(
-                "RecoveryManager::undo(DeleteRecord): failed to find 'after' row " +
-                std::to_string(record.before.id)
-            );
     }
 
     void
@@ -441,6 +403,80 @@ namespace recovery
             record.txn_id,
             record.table_id,
             record.page_id,
+            record.prev_lsn,
+            record.before
+        );
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const CreateSchemaRecord& record) const
+    {
+        return CLRCreateSchemaRecord(
+            record.lsn,
+            0,
+            record.txn_id,
+            record.prev_lsn,
+            record.schema
+        );
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const UpdateSchemaRecord& record) const
+    {
+        return CLRUpdateSchemaRecord(
+            record.lsn,
+            0,
+            record.txn_id,
+            record.prev_lsn,
+            record.before,
+            record.after
+        );
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const DeleteSchemaRecord& record) const
+    {
+        return CLRDeleteSchemaRecord(
+            record.lsn,
+            0,
+            record.txn_id,
+            record.prev_lsn,
+            record.before
+        );
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const CreateTableRecord& record) const
+    {
+        return CLRCreateTableRecord(
+            record.lsn,
+            0,
+            record.txn_id,
+            record.prev_lsn,
+            record.after
+        );
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const UpdateTableRecord& record) const
+    {
+        return CLRUpdateTableRecord(
+            record.lsn,
+            0,
+            record.txn_id,
+            record.prev_lsn,
+            record.before,
+            record.after
+        );
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const DeleteTableRecord& record) const
+    {
+        return CLRDeleteTableRecord(
+            record.lsn,
+            0,
+            record.txn_id,
             record.prev_lsn,
             record.before
         );

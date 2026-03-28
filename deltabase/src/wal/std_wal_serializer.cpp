@@ -133,6 +133,108 @@ namespace wal
     }
 
     MemoryStream
+    StdWalSerializer::serialize(const CLRCreateSchemaRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_schema = binary_serializer_.serialize_ms(record.schema);
+        stream.append(serialized_schema, serialized_schema.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const CLRUpdateSchemaRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_before = binary_serializer_.serialize_ms(record.before);
+        stream.append(serialized_before, serialized_before.size());
+
+        auto serialized_after = binary_serializer_.serialize_ms(record.after);
+        stream.append(serialized_after, serialized_after.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const CLRDeleteSchemaRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_before = binary_serializer_.serialize_ms(record.before);
+        stream.append(serialized_before, serialized_before.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const CLRCreateTableRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_after = binary_serializer_.serialize_mt(record.after);
+        stream.append(serialized_after, serialized_after.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const CLRUpdateTableRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_before = binary_serializer_.serialize_mt(record.before);
+        stream.append(serialized_before, serialized_before.size());
+
+        auto serialized_after = binary_serializer_.serialize_mt(record.after);
+        stream.append(serialized_after, serialized_after.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const CLRDeleteTableRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_before = binary_serializer_.serialize_mt(record.before);
+        stream.append(serialized_before, serialized_before.size());
+
+        return stream;
+    }
+
+    MemoryStream
     StdWalSerializer::serialize(const CreateSchemaRecord& record) const
     {
         MemoryStream stream;
@@ -267,6 +369,18 @@ namespace wal
             return serialize(std::get<CLRUpdateRecord>(record));
         case WALRecordType::CLR_DELETE:
             return serialize(std::get<CLRDeleteRecord>(record));
+        case WALRecordType::CLR_CREATE_SCHEMA:
+            return serialize(std::get<CLRCreateSchemaRecord>(record));
+        case WALRecordType::CLR_UPDATE_SCHEMA:
+            return serialize(std::get<CLRUpdateSchemaRecord>(record));
+        case WALRecordType::CLR_DELETE_SCHEMA:
+            return serialize(std::get<CLRDeleteSchemaRecord>(record));
+        case WALRecordType::CLR_CREATE_TABLE:
+            return serialize(std::get<CLRCreateTableRecord>(record));
+        case WALRecordType::CLR_UPDATE_TABLE:
+            return serialize(std::get<CLRUpdateTableRecord>(record));
+        case WALRecordType::CLR_DELETE_TABLE:
+            return serialize(std::get<CLRDeleteTableRecord>(record));
         case WALRecordType::CREATE_TABLE:
             return serialize(std::get<CreateTableRecord>(record));
         case WALRecordType::UPDATE_TABLE:
@@ -710,6 +824,188 @@ namespace wal
                     txn_id,
                     table_id,
                     page_id,
+                    undo_next_lsn,
+                    std::move(before)
+                );
+                return true;
+            }
+
+        case WALRecordType::CLR_CREATE_SCHEMA:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                LSN undo_next_lsn;
+                MetaSchema schema;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                    return false;
+                if (!binary_serializer_.deserialize_ms(stream, schema))
+                    return false;
+
+                out = CLRCreateSchemaRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    undo_next_lsn,
+                    std::move(schema)
+                );
+                return true;
+            }
+
+        case WALRecordType::CLR_UPDATE_SCHEMA:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                LSN undo_next_lsn;
+                MetaSchema before;
+                MetaSchema after;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                    return false;
+                if (!binary_serializer_.deserialize_ms(stream, before))
+                    return false;
+                if (!binary_serializer_.deserialize_ms(stream, after))
+                    return false;
+
+                out = CLRUpdateSchemaRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    undo_next_lsn,
+                    std::move(before),
+                    std::move(after)
+                );
+                return true;
+            }
+
+        case WALRecordType::CLR_DELETE_SCHEMA:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                LSN undo_next_lsn;
+                MetaSchema before;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                    return false;
+                if (!binary_serializer_.deserialize_ms(stream, before))
+                    return false;
+
+                out = CLRDeleteSchemaRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    undo_next_lsn,
+                    std::move(before)
+                );
+                return true;
+            }
+
+        case WALRecordType::CLR_CREATE_TABLE:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                LSN undo_next_lsn;
+                MetaTable after;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                    return false;
+                if (!binary_serializer_.deserialize_mt(stream, after))
+                    return false;
+
+                out = CLRCreateTableRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    undo_next_lsn,
+                    std::move(after)
+                );
+                return true;
+            }
+
+        case WALRecordType::CLR_UPDATE_TABLE:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                LSN undo_next_lsn;
+                MetaTable before;
+                MetaTable after;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                    return false;
+                if (!binary_serializer_.deserialize_mt(stream, before))
+                    return false;
+                if (!binary_serializer_.deserialize_mt(stream, after))
+                    return false;
+
+                out = CLRUpdateTableRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
+                    undo_next_lsn,
+                    std::move(before),
+                    std::move(after)
+                );
+                return true;
+            }
+
+        case WALRecordType::CLR_DELETE_TABLE:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                LSN undo_next_lsn;
+                MetaTable before;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                    return false;
+                if (!binary_serializer_.deserialize_mt(stream, before))
+                    return false;
+
+                out = CLRDeleteTableRecord(
+                    lsn,
+                    prev_lsn,
+                    txn_id,
                     undo_next_lsn,
                     std::move(before)
                 );

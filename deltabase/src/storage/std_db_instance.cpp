@@ -133,7 +133,10 @@ namespace storage
         InsertRecord insert_record(0, 0, txn.get_id(), old_table.id, pages[idx].header.id, data_row);
         UpdateTableRecord update_table_record(0, 0, txn.get_id(), old_table, updated_table);
         txn.append_log(insert_record);
+        const LSN page_lsn = txn.get_last_lsn();
         txn.append_log(update_table_record);
+
+        pages[idx].header.last_lsn = page_lsn;
 
         io_manager_->write_page(pages[idx]);
         io_manager_->write_mt(updated_table, schema_name);
@@ -159,6 +162,7 @@ namespace storage
         for (auto& page : pages)
         {
             bool updated = false;
+            LSN page_lsn = page.header.last_lsn;
 
             for (auto& row : page.rows)
             {
@@ -194,6 +198,7 @@ namespace storage
 
                 UpdateRecord record(0, 0, txn.get_id(), old_table.id, page.header.id, row, new_row);
                 txn.append_log(record);
+                page_lsn = std::max(page_lsn, txn.get_last_lsn());
 
                 page.rows.push_back(new_row);
                 page.header.max_rid = std::max(page.header.max_rid, new_row.id);
@@ -202,6 +207,7 @@ namespace storage
 
             if (updated)
             {
+                page.header.last_lsn = page_lsn;
                 io_manager_->write_page(page);
                 UpdateTableRecord record(0, 0, txn.get_id(), old_table, updated_table);
                 txn.append_log(record);
@@ -229,6 +235,7 @@ namespace storage
         for (auto& page : pages)
         {
             bool deleted = false;
+            LSN page_lsn = page.header.last_lsn;
 
             for (auto& row : page.rows)
             {
@@ -244,10 +251,14 @@ namespace storage
 
                 DeleteRecord record(0, 0, txn.get_id(), table.id, page.header.id, row);
                 txn.append_log(record);
+                page_lsn = std::max(page_lsn, txn.get_last_lsn());
             }
 
-            if (deleted) 
+            if (deleted)
+            {
+                page.header.last_lsn = page_lsn;
                 io_manager_->write_page(page);
+            }
         }
 
     }
