@@ -612,16 +612,6 @@ namespace types
     using WALTxnRecord =
         detail::WALRecordVariant<BeginTxnRecord, CommitTxnRecord, RollbackTxnRecord>;
 
-    template <typename T, typename Variant> struct is_in_variant;
-
-    template <typename T, typename... Ts>
-    struct is_in_variant<T, std::variant<Ts...>> : std::disjunction<std::is_same<T, Ts>...>
-    {
-    };
-
-    template <typename T, typename Variant>
-    inline constexpr bool is_in_variant_v = is_in_variant<T, Variant>::value;
-
     namespace wal_log
     {
         template <typename T> constexpr bool has_page_id_v = detail::HasPageId_c<T>;

@@ -30,9 +30,6 @@ namespace storage
         serialize_cfg(const types::Config& db) const = 0;
 
         virtual misc::MemoryStream
-        serialize_dph(const types::DataPageHeader& header) const = 0;
-
-        virtual misc::MemoryStream
         serialize_dp(const types::DataPage& page) const = 0;
 
         virtual misc::MemoryStream
@@ -49,9 +46,6 @@ namespace storage
 
         virtual bool
         deserialize_mc(misc::ReadOnlyMemoryStream& content, types::MetaColumn& out) const = 0;
-
-        virtual bool
-        deserialize_dph(misc::ReadOnlyMemoryStream& content, types::DataPageHeader& out) const = 0;
 
         virtual bool
         deserialize_dp(misc::ReadOnlyMemoryStream& content, types::DataPage& out) const = 0;

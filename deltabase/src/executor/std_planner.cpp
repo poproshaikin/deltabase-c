@@ -70,7 +70,7 @@ namespace exq
         {
             std::cout << "creating filter node " << std::endl;
             auto filter = std::make_unique<FilterPlanNode>(
-                db_.get_table(stmt.table), std::move(*stmt.where), std::move(node)
+                *db_.get_table(stmt.table), std::move(*stmt.where), std::move(node)
             );
             node = std::move(filter);
         }
@@ -83,7 +83,7 @@ namespace exq
                 cols.push_back(c.value);
 
             auto project =
-                std::make_unique<ProjectPlanNode>(db_.get_table(stmt.table), cols, std::move(node));
+                std::make_unique<ProjectPlanNode>(*db_.get_table(stmt.table), cols, std::move(node));
             node = std::move(project);
         }
 
@@ -140,7 +140,7 @@ namespace exq
     QueryPlan
     StdPlanner::plan_update(UpdateStatement& stmt) const
     {
-        const auto table = db_.get_table(stmt.table);
+        const auto* table = db_.get_table(stmt.table);
 
         const std::string schema_name = stmt.table.schema_name.has_value()
                                             ? stmt.table.schema_name.value().value
@@ -149,12 +149,10 @@ namespace exq
         std::vector<Assignment> assignments;
         for (const auto& assignment : stmt.assignments)
         {
-            std::cout << "assign ment " << static_cast<int>(assignment.left->type) << " "
-                      << static_cast<int>(assignment.right->type) << std::endl;
             if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
                 assignment.right->type == AstNodeType::LITERAL)
             {
-                const auto& col_id = table.get_column(std::get<SqlToken>(assignment.left->value)).id;
+                const auto& col_id = table->get_column(std::get<SqlToken>(assignment.left->value)).id;
                 auto data_token = DataToken(std::get<SqlToken>(assignment.right->value));
 
                 assignments.emplace_back(std::make_pair(col_id, data_token));
@@ -162,8 +160,8 @@ namespace exq
             if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
                 assignment.right->type == AstNodeType::COLUMN_IDENTIFIER)
             {
-                const auto& left = table.get_column(std::get<SqlToken>(assignment.left->value));
-                const auto& right = table.get_column(std::get<SqlToken>(assignment.right->value));
+                const auto& left = table->get_column(std::get<SqlToken>(assignment.left->value));
+                const auto& right = table->get_column(std::get<SqlToken>(assignment.right->value));
 
                 assignments.emplace_back(std::make_pair(left.id, right.id));
             }
@@ -175,7 +173,7 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                db_.get_table(stmt.table), std::move(*stmt.where), std::move(root)
+                *db_.get_table(stmt.table), std::move(*stmt.where), std::move(root)
             );
         }
 
@@ -207,7 +205,7 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                db_.get_table(stmt.table), std::move(*stmt.where), std::move(root)
+                *db_.get_table(stmt.table), std::move(*stmt.where), std::move(root)
             );
         }
 
@@ -241,10 +239,10 @@ namespace exq
         auto name = table.table.schema_name.has_value() ? table.table.schema_name.value().value
                                                         : db_config_.default_schema;
 
-        MetaSchema schema = db_.get_schema(name);
+        const auto* schema = db_.get_schema(name);
 
         std::unique_ptr<IPlanNode> root = std::make_unique<CreateTablePlanNode>(
-            table.table.table_name.value, schema, table.columns
+            table.table.table_name.value, *schema, table.columns
         );
 
         QueryPlan plan;

@@ -89,6 +89,9 @@ namespace storage
 
         std::unique_ptr<types::DataPage>
         read_data_page(types::PageId id) override;
+
+        std::unordered_map<types::TableId, std::vector<types::PageId>>
+        map_tables_pages() override;
     };
 } // namespace storage
 

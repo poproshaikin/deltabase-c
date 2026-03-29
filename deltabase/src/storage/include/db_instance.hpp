@@ -58,13 +58,13 @@ namespace storage
         virtual bool
         exists_table(const types::TableIdentifier& identifier) = 0;
 
-        virtual types::MetaTable
+        virtual types::MetaTable*
         get_table(const std::string& table_name, const std::string& schema_name) = 0;
 
-        virtual types::MetaTable
+        virtual types::MetaTable*
         get_table(const types::TableIdentifier& identifier) = 0;
 
-        virtual types::MetaSchema
+        virtual types::MetaSchema*
         get_schema(const std::string& name) = 0;
 
         virtual const types::Config&

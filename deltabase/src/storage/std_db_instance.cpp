@@ -29,7 +29,9 @@ namespace storage
         io_manager_ = io_factory.make(cfg);
         wal::WalManagerFactory wal_factory;
         wal_manager_ = wal_factory.make(cfg);
-        txn_manager_ = std::make_unique<txn::TransactionManager>(*wal_manager_);
+        buffer_pool_ = std::make_unique<BufferPool>(*io_manager_);
+        catalog_ = std::make_unique<CatalogCache>(*io_manager_);
+        txn_manager_ = std::make_unique<txn::TransactionManager>(*wal_manager_, *buffer_pool_);
         recovery_manager_ =
             std::make_unique<recovery::RecoveryManager>(cfg_, *wal_manager_, *io_manager_);
 
@@ -41,6 +43,8 @@ namespace storage
     {
         io_manager_->init();
         recovery_manager_->recover();
+        catalog_->hydrate();
+        buffer_pool_->initialize();
     }
 
     StdDbInstance::~StdDbInstance()
@@ -58,21 +62,22 @@ namespace storage
     DataTable
     StdDbInstance::seq_scan(const std::string& table_name, const std::string& schema_name)
     {
-        auto mt = io_manager_->read_table_meta(table_name, schema_name);
-        auto pages = io_manager_->read_table_data(table_name, schema_name);
+        const auto* ms = catalog_->get_schema(schema_name);
+        const auto* mt = catalog_->get_table(table_name, ms->id);
+        const auto pages = buffer_pool_->get_table_data(mt->id);
 
         DataTable dt;
-        dt.output_schema = convert(mt);
+        dt.output_schema = convert(*mt);
 
         uint64_t rows_count = 0;
-        for (const auto& page : pages)
-            rows_count += page.rows.size();
+        for (auto* page : pages)
+            rows_count += page->rows.size();
 
         dt.rows.reserve(rows_count);
 
         for (const auto& page : pages)
         {
-            for (const auto& row : page.rows)
+            for (const auto& row : page->rows)
             {
                 if (has_flag(row.flags, DataRowFlags::OBSOLETE))
                     continue;
@@ -91,13 +96,13 @@ namespace storage
     }
 
     ssize_t
-    StdDbInstance::has_available_page(const std::vector<DataPage>& vec, size_t size) const
+    StdDbInstance::has_available_page(const std::vector<const DataPage*>& vec, size_t size) const
     {
         if (vec.size() == 0)
             return -1;
 
         for (size_t i = 0; i < vec.size(); i++)
-            if (vec[i].size + size <= DataPage::MAX_SIZE)
+            if (vec[i]->size + size <= DataPage::MAX_SIZE)
                 return i;
 
         return -1;
@@ -111,35 +116,27 @@ namespace storage
         txn::Transaction& txn
     )
     {
-        const auto old_table = io_manager_->read_table_meta(table_name, schema_name);
-        auto updated_table = old_table;
-        auto pages = io_manager_->read_table_data(table_name, schema_name);
+        const auto ms = catalog_->get_schema(schema_name);
+        const auto mt = catalog_->get_table(table_name, ms->id);
+        const auto mt_unchanged = *mt;
 
         DataRow data_row;
-        data_row.id = updated_table.last_rid++;
+        data_row.id = mt->last_rid++;
         data_row.tokens = std::move(row);
-
         size_t row_size = io_manager_->estimate_size(data_row);
 
-        if (int idx = has_available_page(pages, row_size); idx == -1)
-            pages.emplace_back(io_manager_->create_page(old_table));
+        auto* page = buffer_pool_->prepare_dp(row_size, *mt);
+        page->rows.push_back(data_row);
 
-        int idx = has_available_page(pages, row_size);
-        if (idx == -1)
-            throw std::runtime_error("StdDbInstance::insert_row: Failed to create new data page");
-
-        pages[idx].rows.push_back(data_row);
-
-        InsertRecord insert_record(0, 0, txn.get_id(), old_table.id, pages[idx].header.id, data_row);
-        UpdateTableRecord update_table_record(0, 0, txn.get_id(), old_table, updated_table);
+        InsertRecord insert_record(0, 0, txn.get_id(), mt->id, page->id, data_row);
+        UpdateTableRecord update_table_record(0, 0, txn.get_id(), mt_unchanged, *mt);
         txn.append_log(insert_record);
         const LSN page_lsn = txn.get_last_lsn();
         txn.append_log(update_table_record);
 
-        pages[idx].header.last_lsn = page_lsn;
+        page->last_lsn = page_lsn;
 
-        io_manager_->write_page(pages[idx]);
-        io_manager_->write_mt(updated_table, schema_name);
+        buffer_pool_->dirty_dp(page->id);
     }
 
     void
@@ -151,20 +148,21 @@ namespace storage
         txn::Transaction& txn
     )
     {
-        const auto old_table = io_manager_->read_table_meta(table_name, schema_name);
-        auto updated_table = old_table;
-        std::vector<DataPage> pages = io_manager_->read_table_data(table_name, schema_name);
+        auto* ms = catalog_->get_schema(schema_name);
+        auto* mt = catalog_->get_table(table_name, ms->id);
+        const auto unchanged_mt = *mt;
+        auto pages = buffer_pool_->get_table_data(mt->id);
 
         std::unordered_set<RowId> ids;
         for (const auto& row : rows)
             ids.insert(row.id);
 
-        for (auto& page : pages)
+        for (DataPage* page : pages)
         {
             bool updated = false;
-            LSN page_lsn = page.header.last_lsn;
+            LSN page_lsn = page->last_lsn;
 
-            for (auto& row : page.rows)
+            for (auto& row : page->rows)
             {
                 if (!ids.contains(row.id))
                     continue;
@@ -173,16 +171,15 @@ namespace storage
                     continue;
 
                 DataRow new_row = row;
-                new_row.id = ++updated_table.last_rid;
+                new_row.id = ++mt->last_rid;
 
                 row.flags |= DataRowFlags::OBSOLETE;
 
                 for (const auto& assignment : update)
                 {
                     ColumnId col_id = std::visit([](auto& a) { return a.first; }, assignment);
-                    int64_t col_idx = old_table.get_column_idx(col_id);
-
-                    MetaColumn cola = old_table.get_column(col_idx);
+                    int64_t col_idx = mt->get_column_idx(col_id);
+                    MetaColumn cola = mt->get_column(col_idx);
 
                     if (auto* lit = std::get_if<AssignLiteral>(&assignment))
                     {
@@ -191,30 +188,29 @@ namespace storage
                     else
                     {
                         auto* col = std::get_if<AssignColumn>(&assignment);
-                        int src_idx = old_table.get_column_idx(col->second);
+                        int src_idx = mt->get_column_idx(col->second);
                         new_row.tokens[col_idx] = row.tokens[src_idx];
                     }
                 }
 
-                UpdateRecord record(0, 0, txn.get_id(), old_table.id, page.header.id, row, new_row);
-                txn.append_log(record);
+                UpdateRecord update_record(0, 0, txn.get_id(), mt->id, page->id, row, new_row);
+                txn.append_log(update_record);
                 page_lsn = std::max(page_lsn, txn.get_last_lsn());
 
-                page.rows.push_back(new_row);
-                page.header.max_rid = std::max(page.header.max_rid, new_row.id);
+                UpdateTableRecord update_table_record(0, 0, txn.get_id(), unchanged_mt, *mt);
+                txn.append_log(update_table_record);
+
+                page->rows.push_back(new_row);
+                page->max_rid = std::max(page->max_rid, new_row.id);
                 updated = true;
             }
 
             if (updated)
             {
-                page.header.last_lsn = page_lsn;
-                io_manager_->write_page(page);
-                UpdateTableRecord record(0, 0, txn.get_id(), old_table, updated_table);
-                txn.append_log(record);
+                page->last_lsn = page_lsn;
+                buffer_pool_->dirty_dp(page->id);
             }
         }
-
-        io_manager_->write_mt(updated_table, schema_name);
     }
 
     void
@@ -235,7 +231,7 @@ namespace storage
         for (auto& page : pages)
         {
             bool deleted = false;
-            LSN page_lsn = page.header.last_lsn;
+            LSN page_lsn = page.last_lsn;
 
             for (auto& row : page.rows)
             {
@@ -249,27 +245,29 @@ namespace storage
 
                 row.flags |= DataRowFlags::OBSOLETE;
 
-                DeleteRecord record(0, 0, txn.get_id(), table.id, page.header.id, row);
+                DeleteRecord record(0, 0, txn.get_id(), table.id, page.id, row);
                 txn.append_log(record);
                 page_lsn = std::max(page_lsn, txn.get_last_lsn());
             }
 
             if (deleted)
             {
-                page.header.last_lsn = page_lsn;
+                page.last_lsn = page_lsn;
                 io_manager_->write_page(page);
             }
         }
 
     }
 
-    MetaTable
+    MetaTable*
     StdDbInstance::get_table(const std::string& table_name, const std::string& schema_name)
     {
-        return io_manager_->read_table_meta(table_name, schema_name);
+        auto* ms = get_schema(schema_name);
+        if (!ms) return nullptr;
+        return catalog_->get_table(table_name, ms->id);
     }
 
-    MetaTable
+    MetaTable*
     StdDbInstance::get_table(const TableIdentifier& identifier)
     {
         return get_table(
@@ -285,16 +283,16 @@ namespace storage
         return cfg_;
     }
 
-    MetaSchema
+    MetaSchema*
     StdDbInstance::get_schema(const std::string& name)
     {
-        return io_manager_->read_schema_meta(name);
+        return catalog_->get_schema(name);
     }
 
     bool
     StdDbInstance::exists_table(const std::string& table_name, const std::string& schema_name)
     {
-        return io_manager_->exists_table(table_name, schema_name);
+        return get_table(table_name, schema_name) != nullptr;;
     }
 
     bool
@@ -321,12 +319,12 @@ namespace storage
         txn::Transaction& txn
     )
     {
-        auto schema = io_manager_->read_schema_meta(schema_name);
+        auto* schema = catalog_->get_schema(schema_name);
 
         MetaTable mt;
         mt.id = Uuid::make();
         mt.name = table_name;
-        mt.schema_id = schema.id;
+        mt.schema_id = schema->id;
         mt.last_rid = 0;
         mt.columns.reserve(columns.size());
         for (const auto& col_def : columns)
@@ -340,7 +338,7 @@ namespace storage
         CreateTableRecord record(0, 0, txn.get_id(), mt);
         txn.append_log(record);
 
-        io_manager_->write_mt(mt, schema_name);
+        catalog_->save_table(mt);
     }
 
     void
@@ -354,12 +352,12 @@ namespace storage
         CreateSchemaRecord record(0, 0, txn.get_id(), ms);
         txn.append_log(record);
 
-        io_manager_->write_ms(ms);
+        catalog_->save_schema(ms);
     }
 
     bool
     StdDbInstance::exists_schema(const std::string& schema_name)
     {
-        return io_manager_->exists_schema(schema_name);
+        return catalog_->exists_schema(schema_name);
     }
 } // namespace storage

@@ -72,19 +72,19 @@ namespace storage
         throw std::logic_error("DetachedDbInstance::exists_table: this method is not supported");
     }
 
-    MetaTable
+    MetaTable*
     DetachedDbInstance::get_table(const std::string& table_name, const std::string& schema_name)
     {
         throw std::logic_error("DetachedDbInstance::get_table: this method is not supported");
     }
 
-    MetaTable
+    MetaTable*
     DetachedDbInstance::get_table(const TableIdentifier& identifier)
     {
         throw std::logic_error("DetachedDbInstance::get_table: this method is not supported");
     }
 
-    MetaSchema
+    MetaSchema*
     DetachedDbInstance::get_schema(const std::string& name)
     {
         throw std::logic_error("DetachedDbInstance::get_schema: this method is not supported");

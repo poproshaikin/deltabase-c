@@ -57,15 +57,15 @@ namespace exq
         if (!db_.exists_table(stmt.table))
             return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
 
-        auto table = db_.get_table(stmt.table);
+        const auto* table = db_.get_table(stmt.table);
 
         for (const SqlToken& col : stmt.columns)
-            if (!table.has_column(col.value))
+            if (!table->has_column(col.value))
                 return AnalysisResult(ColumnDoesntExists(col.value));
 
         if (stmt.where.has_value())
         {
-            auto where_result = analyze_where(stmt.where.value(), table);
+            auto where_result = analyze_where(stmt.where.value(), *table);
             if (!where_result.is_valid)
                 return AnalysisResult(where_result.err.value());
         }
@@ -82,10 +82,10 @@ namespace exq
         if (!db_.exists_table(stmt.table))
             return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
 
-        auto table = db_.get_table(stmt.table);
+        const auto* table = db_.get_table(stmt.table);
 
         for (const SqlToken& col : stmt.columns)
-            if (!table.has_column(col.value))
+            if (!table->has_column(col.value))
                 return AnalysisResult(ColumnDoesntExists(col.value));
 
         auto get_column = [&stmt, &table](
@@ -93,10 +93,10 @@ namespace exq
                           ) -> std::optional<std::reference_wrapper<const MetaColumn>>
         {
             const auto& name = stmt.columns.at(value_idx);
-            if (!table.has_column(name.value))
+            if (!table->has_column(name.value))
                 return std::nullopt;
 
-            return std::cref(table.get_column(name.value));
+            return std::cref(table->get_column(name.value));
         };
 
         for (const auto& values : stmt.values)
@@ -142,18 +142,18 @@ namespace exq
         if (!db_.exists_table(stmt.table))
             return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
 
-        const auto& table = db_.get_table(stmt.table);
+        const auto* table = db_.get_table(stmt.table);
 
         for (const auto& assignment : stmt.assignments)
         {
-            auto assignment_analysis = analyze_column_assignment(assignment, table);
+            auto assignment_analysis = analyze_column_assignment(assignment, *table);
             if (!assignment_analysis.is_valid)
                 return AnalysisResult(*assignment_analysis.err);
         }
 
         if (stmt.where.has_value())
         {
-            auto where_result = analyze_where(*stmt.where, table);
+            auto where_result = analyze_where(*stmt.where, *table);
             if (!where_result.is_valid)
                 return AnalysisResult(*where_result.err);
         }
@@ -170,11 +170,11 @@ namespace exq
         if (!db_.exists_table(stmt.table))
             return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
 
-        const auto& table = db_.get_table(stmt.table);
+        const auto* table = db_.get_table(stmt.table);
 
         if (stmt.where.has_value())
         {
-            auto where_result = analyze_where(*stmt.where, table);
+            auto where_result = analyze_where(*stmt.where, *table);
             if (!where_result.is_valid)
                 return AnalysisResult(where_result.err.value());
         }

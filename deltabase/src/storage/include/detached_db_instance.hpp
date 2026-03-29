@@ -49,13 +49,13 @@ namespace storage
         bool
         exists_table(const types::TableIdentifier& identifier) override;
 
-        types::MetaTable
+        types::MetaTable*
         get_table(const std::string& table_name, const std::string& schema_name) override;
 
-        types::MetaTable
+        types::MetaTable*
         get_table(const types::TableIdentifier& identifier) override;
 
-        types::MetaSchema
+        types::MetaSchema*
         get_schema(const std::string& name) override;
 
         void

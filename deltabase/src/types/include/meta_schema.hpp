@@ -10,9 +10,11 @@
 
 namespace types
 {
+    using SchemaId = Uuid;
+
     struct MetaSchema
     {
-        Uuid id;
+        SchemaId id;
         std::string name;
         std::string db_name;
 

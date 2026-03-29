@@ -44,7 +44,7 @@ namespace storage
         virtual std::vector<types::DataPage>
         read_table_data(const std::string& table_name, const std::string& schema_name) = 0;
 
-        virtual std::vector<std::pair<types::Uuid, std::vector<types::DataPage> > >
+        virtual std::vector<std::pair<types::TableId, std::vector<types::DataPage> > >
         read_tables_data() = 0;
 
         virtual std::unique_ptr<types::DataPage>
@@ -85,6 +85,9 @@ namespace storage
 
         virtual bool
         exists_schema(const std::string& schema_name) = 0;
+
+        virtual std::unordered_map<types::TableId, std::vector<types::PageId>>
+        map_tables_pages() = 0;
     };
 }
 

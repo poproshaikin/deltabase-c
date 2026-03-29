@@ -83,7 +83,7 @@ namespace storage
     }
 
     void
-    FileIOManager::for_each_table(const std::function<void(fs::directory_entry)>& func) const
+    FileIOManager::for_each_table(const std::function<void(fs::directory_entry table_dir)>& func) const
     {
         for_each_in_db(
             [&](const fs::directory_entry& schema_entry)
@@ -297,10 +297,10 @@ namespace storage
         return tables;
     }
 
-    std::vector<std::pair<Uuid, std::vector<DataPage>>>
+    std::vector<std::pair<TableId, std::vector<DataPage>>>
     FileIOManager::read_tables_data()
     {
-        std::vector<std::pair<Uuid, std::vector<DataPage>>> tables;
+        std::vector<std::pair<TableId, std::vector<DataPage>>> tables;
 
         for_each_table(
             [&](const fs::directory_entry& table_dir)
@@ -481,7 +481,7 @@ namespace storage
                     page.path = page_entry.path();
                     page.size = content.size();
 
-                    if (page.header.id != id)
+                    if (page.id != id)
                         throw std::runtime_error(
                             "FileIOManager::load_data_page: page id mismatch for " +
                             page_entry.path().string()
@@ -581,5 +581,46 @@ namespace storage
     {
         auto path = path_db_schema_meta(db_path_, db_name_, schema_name);
         return fs::exists(path) && fs::is_regular_file(path);
+    }
+
+    std::unordered_map<TableId, std::vector<PageId>>
+    FileIOManager::map_tables_pages()
+    {
+        std::unordered_map<TableId, std::vector<PageId>> result;
+
+        for_each_table([this, &result](const fs::directory_entry& table_dir)
+        {
+            const auto table_name = table_dir.path().filename().string();
+            const auto meta_path = table_dir.path() / make_meta_filename(table_name);
+
+            if (!fs::exists(meta_path) || !fs::is_regular_file(meta_path))
+                return;
+
+            auto content = read_file(meta_path);
+            MetaTable table;
+            misc::ReadOnlyMemoryStream stream(content);
+            if (!serializer_->deserialize_mt(stream, table))
+                throw std::runtime_error(
+                    "FileIOManager::map_tables_pages: failed to deserialize meta table " +
+                    meta_path.string()
+                );
+
+            auto data_dir = table_dir.path() / PATH_DATA;
+            if (!fs::exists(data_dir) || !fs::is_directory(data_dir))
+                return;
+
+            std::vector<PageId> page_ids;
+            for (const auto& page_entry : fs::directory_iterator(data_dir))
+            {
+                if (!page_entry.is_regular_file())
+                    continue;
+
+                page_ids.push_back(PageId(page_entry.path().filename().string()));
+            }
+
+            result[table.id] = std::move(page_ids);
+        });
+
+        return result;
     }
 } // namespace storage

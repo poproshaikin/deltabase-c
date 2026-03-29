@@ -112,21 +112,6 @@ namespace storage
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_dph(const DataPageHeader& header) const
-    {
-        MemoryStream stream;
-        stream.write(header.id.raw(), sizeof(uuid_t));
-        stream.write(header.table_id.raw(), sizeof(uuid_t));
-        stream.write(&header.min_rid, sizeof(header.min_rid));
-        stream.write(&header.max_rid, sizeof(header.max_rid));
-        stream.write(&header.rows_count, sizeof(header.rows_count));
-        stream.write(&header.last_lsn, sizeof(header.last_lsn));
-
-        stream.seek(0);
-        return stream;
-    }
-
-    MemoryStream
     StdBinarySerializer::serialize_dt(const DataToken& token) const
     {
         MemoryStream stream;
@@ -144,12 +129,13 @@ namespace storage
     {
         MemoryStream stream;
 
-        // Create header copy with correct rows_count
-        DataPageHeader header = page.header;
-        header.rows_count = page.rows.size();
-
-        auto serialized_header = serialize_dph(header);
-        stream.append(serialized_header, serialized_header.size());
+        stream.write(page.id.raw(), sizeof(uuid_t));
+        stream.write(page.table_id.raw(), sizeof(uuid_t));
+        stream.write(&page.min_rid, sizeof(page.min_rid));
+        stream.write(&page.max_rid, sizeof(page.max_rid));
+        uint64_t rows_count = page.rows.size();
+        stream.write(&rows_count, sizeof(rows_count));
+        stream.write(&page.last_lsn, sizeof(page.last_lsn));
 
         for (size_t i = 0; i < page.rows.size(); ++i)
         {
@@ -263,30 +249,6 @@ namespace storage
     bool
     StdBinarySerializer::deserialize_dp(ReadOnlyMemoryStream& stream, DataPage& out) const
     {
-        if (!deserialize_dph(stream, out.header))
-            return false;
-
-        // rows_count already read in header
-        uint64_t rows_count = out.header.rows_count;
-
-        out.rows.clear();
-        out.rows.reserve(rows_count);
-
-        for (size_t i = 0; i < rows_count; ++i)
-        {
-            DataRow row;
-            if (!deserialize_dr(stream, row))
-                return false;
-
-            out.rows.push_back(std::move(row));
-        }
-
-        return true;
-    }
-
-    bool
-    StdBinarySerializer::deserialize_dph(ReadOnlyMemoryStream& stream, DataPageHeader& out) const
-    {
         if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
             return false;
 
@@ -305,9 +267,22 @@ namespace storage
         if (stream.read(&out.last_lsn, sizeof(out.last_lsn)) != sizeof(out.last_lsn))
             return false;
 
+        uint64_t rows_count = out.rows_count;
+
+        out.rows.clear();
+        out.rows.reserve(rows_count);
+
+        for (size_t i = 0; i < rows_count; ++i)
+        {
+            DataRow row;
+            if (!deserialize_dr(stream, row))
+                return false;
+
+            out.rows.push_back(std::move(row));
+        }
+
         return true;
     }
-
     bool
     StdBinarySerializer::deserialize_cfg(ReadOnlyMemoryStream& stream, Config& out) const
     {

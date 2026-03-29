@@ -9,6 +9,8 @@
 #include "../../transactions/include/transaction_manager.hpp"
 #include "../../types/include/config.hpp"
 #include "../../wal/include/wal_manager.hpp"
+#include "buffer_pool.hpp"
+#include "catalog.hpp"
 #include "db_instance.hpp"
 #include "io_manager.hpp"
 
@@ -21,12 +23,14 @@ namespace storage
         std::unique_ptr<wal::IWALManager> wal_manager_;
         std::unique_ptr<txn::TransactionManager> txn_manager_;
         std::unique_ptr<recovery::RecoveryManager> recovery_manager_;
+        std::unique_ptr<BufferPool> buffer_pool_;
+        std::unique_ptr<CatalogCache> catalog_;
 
         void
         init();
 
         ssize_t
-        has_available_page(const std::vector<types::DataPage>& vec, size_t size) const;
+        has_available_page(const std::vector<const types::DataPage*>& vec, size_t size) const;
 
     public:
         explicit
@@ -68,16 +72,16 @@ namespace storage
             txn::Transaction& txn
         ) override;
 
-        types::MetaTable
+        types::MetaTable*
         get_table(const std::string& table_name, const std::string& schema_name) override;
 
-        types::MetaTable
+        types::MetaTable*
         get_table(const types::TableIdentifier& identifier) override;
 
         const types::Config&
         get_config() const override;
 
-        types::MetaSchema
+        types::MetaSchema*
         get_schema(const std::string& name) override;
 
         bool

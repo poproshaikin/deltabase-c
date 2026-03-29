@@ -57,6 +57,8 @@ namespace recovery
         make_clr(const types::UpdateTableRecord& record) const;
         types::WALRecord
         make_clr(const types::DeleteTableRecord& record) const;
+        types::WALRecord
+        make_clr(const types::RollbackTxnRecord& record) const;
 
         std::unordered_map<txn::TxnId, types::LSN>
         get_commit_lsns(const std::vector<types::WALRecord>& wal) const;
@@ -91,6 +93,8 @@ namespace recovery
         undo_record(const types::UpdateTableRecord& record);
         void
         undo_record(const types::DeleteTableRecord& record);
+        void
+        undo_record(const types::RollbackTxnRecord& record);
 
     public:
         explicit

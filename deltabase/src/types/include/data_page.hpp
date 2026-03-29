@@ -12,13 +12,15 @@
 
 namespace types
 {
-
     using PageId = Uuid;
     using LSN = uint64_t;
 
-    // DTO which is serialized for storing in a page
-    struct DataPageHeader
+    struct DataPage
     {
+        static constexpr uint64_t MAX_SIZE = 32 * 1024; // 32 kB
+        static constexpr uint64_t HEADER_SIZE =
+            sizeof(uuid_t) * 2 + sizeof(RowId) * 2 + sizeof(uint64_t) + sizeof(LSN);
+
         PageId id;
         Uuid table_id;
         RowId min_rid = 0;
@@ -26,18 +28,9 @@ namespace types
         uint64_t rows_count = 0;
         LSN last_lsn = 0;
 
-        static constexpr uint64_t SIZE =
-            sizeof(uuid_t) * 2 + sizeof(RowId) * 2 + sizeof(uint64_t) + sizeof(LSN);
-    };
+        uint64_t size; //     |
+        fs::path path; //     | do not serialize
 
-    struct DataPage
-    {
-        static constexpr uint64_t MAX_SIZE = 32 * 1024; // 32 kB
-
-        uint64_t size; // + do not serialize
-        fs::path path; // |
-
-        DataPageHeader header;
         std::vector<DataRow> rows;
 
         DataPage() = default;
@@ -46,10 +39,10 @@ namespace types
         make(const fs::path& base_path, const Uuid& table_id, const Uuid& page_id)
         {
             DataPage page;
-            page.header.id = page_id;
-            page.header.table_id = table_id;
-            page.size = DataPageHeader::SIZE;
-            page.path = base_path / page.header.id.to_string();
+            page.id = page_id;
+            page.table_id = table_id;
+            page.size = HEADER_SIZE;
+            page.path = base_path / page.id.to_string();
             return page;
         }
     };

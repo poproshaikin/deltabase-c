@@ -122,6 +122,9 @@ namespace storage
 
         bool
         exists_schema(const std::string& schema_name) override;
+
+        std::unordered_map<types::TableId, std::vector<types::PageId>>
+        map_tables_pages() override;
     };
 }
 

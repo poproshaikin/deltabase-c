@@ -4,6 +4,8 @@
 
 #include "recovery_manager.hpp"
 
+#include "type_traits.hpp"
+
 namespace recovery
 {
     using namespace types;
@@ -43,7 +45,7 @@ namespace recovery
             {
                 using R = std::decay_t<TRecord>;
 
-                if constexpr (is_in_variant_v<R, WALCLRRecord>)
+                if constexpr (misc::is_in_variant_v<R, WALCLRRecord>)
                 {
                     if (r.lsn <= last_checkpoint)
                         return;
@@ -68,9 +70,9 @@ namespace recovery
                 if (r.lsn > commit_lsns.at(r.txn_id))
                     return;
 
-                if constexpr (is_in_variant_v<R, WALDataRecord>)
+                if constexpr (misc::is_in_variant_v<R, WALDataRecord>)
                     redo_data(r);
-                else if constexpr (is_in_variant_v<R, WALMetaRecord>)
+                else if constexpr (misc::is_in_variant_v<R, WALMetaRecord>)
                     redo_meta(r);
             },
             record
@@ -87,10 +89,10 @@ namespace recovery
                 if (!page)
                     page = std::make_unique<DataPage>(io_.create_page(mt, r.page_id));
 
-                if (page->header.last_lsn < r.lsn)
+                if (page->last_lsn < r.lsn)
                 {
                     redo(r, *page);
-                    page->header.last_lsn = r.lsn;
+                    page->last_lsn = r.lsn;
                     io_.write_page(*page);
                 }
             },
@@ -104,7 +106,9 @@ namespace recovery
             [&]<typename TRecord>(const TRecord& r)
             {
                 using R = std::decay_t<TRecord>;
-                if constexpr (is_in_variant_v<R, WALMetaRecord>)
+                if constexpr (
+                    misc::is_in_variant_v<R, WALMetaRecord> ||
+                    misc::is_in_variant_v<R, WALMetaCLRRecord>)
                 {
                     if constexpr (std::is_same_v<R, CreateSchemaRecord>)
                         io_.write_ms(r.schema);
@@ -215,6 +219,7 @@ namespace recovery
         {
             LSN current = last_lsn;
             LSN txn_prev_lsn = last_lsn;
+            bool rollback_marker_seen = false;
 
             while (current != 0)
             {
@@ -225,13 +230,21 @@ namespace recovery
                     {
                         using R = std::decay_t<TRecord>;
 
-                        if constexpr (is_in_variant_v<R, WALCLRRecord>)
+                        if constexpr (std::is_same_v<R, RollbackTxnRecord>)
+                        {
+                            txn_prev_lsn = r.lsn;
+                            rollback_marker_seen = true;
+                            current = 0;
+                            return;
+                        }
+
+                        if constexpr (misc::is_in_variant_v<R, WALCLRRecord>)
                         {
                             txn_prev_lsn = r.lsn;
                             current = r.undo_next_lsn;
                             return;
                         }
-                        else if constexpr (is_in_variant_v<R, WALDataRecord>)
+                        else if constexpr (misc::is_in_variant_v<R, WALDataRecord>)
                         {
                             auto page = io_.read_data_page(r.page_id);
                             if (!page)
@@ -255,12 +268,12 @@ namespace recovery
                             wal_.flush();
 
                             undo_record(r, *page);
-                            page->header.last_lsn = clr_lsn;
+                            page->last_lsn = clr_lsn;
                             io_.write_page(*page);
 
                             txn_prev_lsn = clr_lsn;
                         }
-                        else if constexpr (is_in_variant_v<R, WALMetaRecord>)
+                        else if constexpr (misc::is_in_variant_v<R, WALMetaRecord>)
                         {
                             auto clr = make_clr(r);
                             clr = std::visit(
@@ -286,9 +299,12 @@ namespace recovery
                 );
             }
 
-            RollbackTxnRecord rollback_marker(txn_prev_lsn, 0, txn_id);
-            wal_.append_log(rollback_marker);
-            wal_.flush();
+            if (!rollback_marker_seen)
+            {
+                RollbackTxnRecord rollback_marker(txn_prev_lsn, 0, txn_id);
+                wal_.append_log(rollback_marker);
+                wal_.flush();
+            }
         }
     }
     void

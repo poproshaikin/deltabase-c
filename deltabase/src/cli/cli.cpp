@@ -4,6 +4,8 @@
 
 #include "cli.hpp"
 
+#include <chrono>
+
 namespace cli
 {
     using namespace types;
@@ -17,6 +19,8 @@ namespace cli
     void
     Cli::execute_query(const CliCommand& command)
     {
+        const auto started_at = std::chrono::steady_clock::now();
+
         try
         {
             auto [query] = std::get<SqlCommand>(command);
@@ -29,6 +33,18 @@ namespace cli
         {
             std::cerr << "Executing query failed: " << e.what() << std::endl;
         }
+
+        const auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - started_at
+        ).count();
+        const auto elapsed_ms = elapsed_ns / 1000000;
+        const auto ns_fraction = elapsed_ns % 1000000;
+
+        std::string fraction = std::to_string(ns_fraction);
+        if (fraction.size() < 6)
+            fraction.insert(0, 6 - fraction.size(), '0');
+
+        io_.write("Query took: " + std::to_string(elapsed_ms) + "." + fraction + " ms\n");
     }
 
     void

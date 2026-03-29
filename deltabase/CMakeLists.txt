@@ -41,7 +41,7 @@ function(add_cpp_module module_name)
     endif()
 
     if (${module_name} STREQUAL "storage")
-    target_link_libraries(${module_name} PUBLIC misc types wal transactions recovery)
+    target_link_libraries(${module_name} PUBLIC misc wal transactions recovery)
     endif()
 
     if (${module_name} STREQUAL "executor")
@@ -67,6 +67,7 @@ function(add_cpp_module module_name)
     if (${module_name} STREQUAL "recovery")
         target_link_libraries(${module_name} PUBLIC wal)
     endif()
+
 endfunction()
 
 add_cpp_module(types)
@@ -114,6 +115,13 @@ target_link_libraries(main.exe
 add_executable(wal_dump.exe wal_dump.cpp)
 target_link_libraries(wal_dump.exe
     wal
+    storage
+    types
+    misc
+)
+
+add_executable(dp_dump.exe dp_dump.cpp)
+target_link_libraries(dp_dump.exe
     storage
     types
     misc

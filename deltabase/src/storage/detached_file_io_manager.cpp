@@ -155,4 +155,9 @@ namespace storage
     {
         throw std::logic_error("DetachedFileIOManager::read_data_page: unsupported method");
     }
+    std::unordered_map<types::TableId, std::vector<types::PageId>>
+    DetachedFileIOManager::map_tables_pages()
+    {
+        throw std::logic_error("DetachedFileIOManager::map_tables_pages: unsupported method");
+    }
 } // namespace storage

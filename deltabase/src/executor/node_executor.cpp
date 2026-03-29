@@ -45,12 +45,12 @@ namespace exq
     OutputSchema
     SeqScanNodeExecutor::output_schema()
     {
-        MetaTable mt = db_.get_table(table_name_, schema_name_);
+        const auto* mt = db_.get_table(table_name_, schema_name_);
 
         OutputSchema output_schema;
-        output_schema.reserve(mt.columns.size());
+        output_schema.reserve(mt->columns.size());
 
-        for (const auto& column : mt.columns)
+        for (const auto& column : mt->columns)
             output_schema.push_back({.name = column.name, .type = column.type});
 
         return output_schema;
@@ -320,11 +320,6 @@ namespace exq
             if (!child_->next(row))
                 break;
 
-            if (row.id == 0)
-                throw std::runtime_error(
-                    "UpdateNodeExecutor::next: received a data row without an id"
-                );
-
             rows.push_back(std::move(row));
             updated_count++;
         }
@@ -385,11 +380,6 @@ namespace exq
             DataRow row;
             if (!child_->next(row))
                 break;
-
-            if (row.id == 0)
-                throw std::runtime_error(
-                    "DeleteNodeExecutor::next: received a data row without an id"
-                );
 
             rows.push_back(std::move(row));
             deleted_count++;

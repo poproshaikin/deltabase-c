@@ -40,9 +40,6 @@ namespace storage
         serialize_dr(const types::DataRow& row) const override;
 
         misc::MemoryStream
-        serialize_dph(const types::DataPageHeader& header) const override;
-
-        misc::MemoryStream
         serialize_dt(const types::DataToken& token) const override;
 
         misc::MemoryStream
@@ -59,9 +56,6 @@ namespace storage
 
         bool
         deserialize_dp(misc::ReadOnlyMemoryStream& stream, types::DataPage& out) const override;
-
-        bool
-        deserialize_dph(misc::ReadOnlyMemoryStream& content, types::DataPageHeader& out) const override;
 
         bool
         deserialize_cfg(misc::ReadOnlyMemoryStream& stream, types::Config& out) const override;
