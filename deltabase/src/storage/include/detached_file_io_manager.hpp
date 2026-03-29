@@ -52,7 +52,7 @@ namespace storage
         estimate_size(const types::DataRow& row) override;
 
         void
-        write_page(const types::DataPage& page) override;
+        write_page(const types::DataPage& page, bool fsync) override;
 
         void
         write_mt(const types::MetaTable& table, const std::string& schema_name) override;

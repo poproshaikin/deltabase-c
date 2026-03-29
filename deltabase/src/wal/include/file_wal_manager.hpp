@@ -9,8 +9,8 @@
 #include "wal_manager.hpp"
 #include "wal_serializer.hpp"
 
+#include <condition_variable>
 #include <filesystem>
-#include <fstream>
 #include <memory>
 
 namespace wal
@@ -22,6 +22,11 @@ namespace wal
         fs::path db_path_;
         std::string db_name_;
         types::LSN next_lsn_;
+        types::LSN flushed_lsn_;
+
+        mutable std::mutex mtx_;
+        std::condition_variable cv_;
+        bool flush_in_progress_ = false;
 
         std::unique_ptr<IWalSerializer> serializer_;
 
@@ -58,6 +63,8 @@ namespace wal
 
         types::WALRecord
         read_log(types::LSN lsn) override;
+
+        void commit_wait(types::LSN lsn);
 
         void
         flush() override;

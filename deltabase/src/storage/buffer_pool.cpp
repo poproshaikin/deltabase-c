@@ -70,20 +70,37 @@ namespace storage
     DataPage*
     BufferPool::prepare_dp(size_t size, const MetaTable& mt)
     {
-        DataPage* page = nullptr;
+        DataPage* result = nullptr;
         for (auto& entry : data_pages_ | std::views::values)
         {
             if (entry.value.size + size > DataPage::MAX_SIZE)
                 continue;
 
-            page = &entry.value;
+            result = &entry.value;
             break;
         }
 
-        if (!page)
-            page = create_dp(mt);
+        if (!result)
+        {
+            bool found_available = false;
+            for (const auto& page_id : pages_to_tables_[mt.id])
+            {
+                auto* page = get_dp(page_id);
+                if (page->size + size > DataPage::MAX_SIZE)
+                    continue;
 
-        return page;
+                result = page;
+                found_available = true;
+                break;
+            }
+
+            if (!found_available)
+            {
+                result = create_dp(mt);
+            }
+        }
+
+        return result;
     }
 
     std::vector<DataPage*>
@@ -120,7 +137,7 @@ namespace storage
         {
             if (page.dirty)
             {
-                io_.write_page(page.value);
+                io_.write_page(page.value, true);
                 page.dirty = false;
             }
         }

@@ -54,7 +54,7 @@ namespace storage
         estimate_size(const types::DataRow& row) = 0;
 
         virtual void
-        write_page(const types::DataPage& page) = 0;
+        write_page(const types::DataPage& page, bool fsync = false) = 0;
 
         virtual void
         write_mt(const types::MetaTable& table, const std::string& schema_name) = 0;

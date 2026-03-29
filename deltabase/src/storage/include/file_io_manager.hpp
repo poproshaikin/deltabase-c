@@ -88,7 +88,7 @@ namespace storage
         read_data_page(types::PageId id) override;
 
         void
-        write_page(const types::DataPage& page) override;
+        write_page(const types::DataPage& page, bool fsync) override;
 
         uint64_t
         estimate_size(const types::DataRow& row) override;

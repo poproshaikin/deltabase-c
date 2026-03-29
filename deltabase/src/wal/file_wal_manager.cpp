@@ -8,10 +8,10 @@
 #include "path.hpp"
 
 #include <algorithm>
+#include <fcntl.h>
 #include <fstream>
 #include <stdexcept>
 #include <string>
-#include <fcntl.h>
 
 namespace wal
 {
@@ -21,7 +21,7 @@ namespace wal
     FileWalManager::FileWalManager(
         const fs::path& db_path, const std::string& db_name, Config::SerializerType serializer_type
     )
-        : db_path_(db_path), db_name_(db_name), next_lsn_(1)
+        : db_path_(db_path), db_name_(db_name), next_lsn_(1), flushed_lsn_(0)
     {
         WalSerializerFactory factory;
         serializer_ = factory.make(serializer_type);
@@ -36,9 +36,8 @@ namespace wal
         // Ensure a first WAL file exists for an empty WAL directory.
         if (fs::is_empty(wal_dir))
         {
-            auto first_file_path = storage::path_db_wal_logfile(
-                db_path_, db_name_, 1, MAX_RECORDS_PER_LOGFILE
-            );
+            auto first_file_path =
+                storage::path_db_wal_logfile(db_path_, db_name_, 1, MAX_RECORDS_PER_LOGFILE);
 
             int fd = open(first_file_path.c_str(), O_WRONLY | O_CREAT, 0644);
             if (fd < 0)
@@ -110,11 +109,17 @@ namespace wal
                 return l_lsn < r_lsn;
             }
         );
+
+        if (!flushed_.empty())
+        {
+            flushed_lsn_ = std::visit([](const auto& rec) { return rec.lsn; }, flushed_.back());
+        }
     }
 
     void
     FileWalManager::append_log(const WALRecord& record)
     {
+        std::lock_guard lk(mtx_);
         auto lsn = next_lsn_++;
 
         auto record_with_lsn = std::visit(
@@ -141,6 +146,8 @@ namespace wal
     WALRecord
     FileWalManager::read_log(LSN lsn)
     {
+        std::lock_guard lk(mtx_);
+
         // Check dirty buffer first (most recent records)
         for (const auto& record : dirty_)
         {
@@ -162,14 +169,59 @@ namespace wal
     }
 
     void
+    FileWalManager::commit_wait(LSN lsn)
+    {
+        std::unique_lock lk(mtx_);
+        while (flushed_lsn_ < lsn)
+        {
+            if (!flush_in_progress_)
+            {
+                flush_in_progress_ = true;
+
+                lk.unlock();
+                try
+                {
+                    flush();
+                }
+                catch (...)
+                {
+                    lk.lock();
+                    flush_in_progress_ = false;
+                    cv_.notify_all();
+                    throw;
+                }
+                lk.lock();
+
+                flush_in_progress_ = false;
+                cv_.notify_all();
+            }
+            else
+            {
+                cv_.wait(lk, [&] { return !flush_in_progress_ || flushed_lsn_ >= lsn; });
+            }
+        }
+    }
+
+    void
     FileWalManager::flush()
     {
-        if (dirty_.empty())
-            return;
+        std::vector<WALRecord> to_flush;
+        {
+            std::lock_guard lk(mtx_);
+            if (dirty_.empty())
+                return;
 
-        write_logs(dirty_);
-        flushed_.insert(flushed_.end(), dirty_.begin(), dirty_.end());
-        dirty_.clear();
+            to_flush.swap(dirty_);
+        }
+
+        write_logs(to_flush);
+
+        auto batch_max_lsn = std::visit([](const auto& rec) { return rec.lsn; }, to_flush.back());
+
+        std::lock_guard lk(mtx_);
+        flushed_.insert(flushed_.end(), to_flush.begin(), to_flush.end());
+        if (batch_max_lsn > flushed_lsn_)
+            flushed_lsn_ = batch_max_lsn;
     }
 
     void
@@ -181,6 +233,8 @@ namespace wal
     std::vector<WALRecord>
     FileWalManager::read_all_logs()
     {
+        std::lock_guard lk(mtx_);
+
         // Return all cached records (flushed from disk + dirty in memory)
         std::vector<WALRecord> all_logs;
         all_logs.reserve(flushed_.size() + dirty_.size());
@@ -197,6 +251,7 @@ namespace wal
     LSN
     FileWalManager::get_next_lsn() const
     {
+        std::lock_guard lk(mtx_);
         return next_lsn_;
     }
 
@@ -213,8 +268,8 @@ namespace wal
         for (const auto& record : logs)
         {
             auto record_lsn = std::visit([](const auto& rec) { return rec.lsn; }, record);
-            uint64_t file_first_lsn = ((record_lsn - 1) / MAX_RECORDS_PER_LOGFILE)
-                * MAX_RECORDS_PER_LOGFILE + 1;
+            uint64_t file_first_lsn =
+                ((record_lsn - 1) / MAX_RECORDS_PER_LOGFILE) * MAX_RECORDS_PER_LOGFILE + 1;
             uint64_t file_last_lsn = file_first_lsn + MAX_RECORDS_PER_LOGFILE - 1;
 
             if (fd < 0 || opened_first_lsn != file_first_lsn)
@@ -225,9 +280,8 @@ namespace wal
                     close(fd);
                 }
 
-                auto file_path = storage::path_db_wal_logfile(
-                    db_path_, db_name_, file_first_lsn, file_last_lsn
-                );
+                auto file_path =
+                    storage::path_db_wal_logfile(db_path_, db_name_, file_first_lsn, file_last_lsn);
 
                 fd = open(file_path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
                 if (fd < 0)

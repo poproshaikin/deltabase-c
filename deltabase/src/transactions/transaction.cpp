@@ -5,6 +5,7 @@
 #include "include/transaction.hpp"
 
 #include <stdexcept>
+#include <thread>
 #include <variant>
 
 namespace txn
@@ -35,10 +36,9 @@ namespace txn
             throw std::runtime_error("Transaction::begin: transaction state not idle");
 
         // lsn/prev_lsn are assigned in the WAL manager.
-        types::BeginTxnRecord record(0, 0, id_);
+        types::BeginTxnRecord record(0, last_lsn_, id_);
 
         wal_manager_.append_log(record);
-        wal_manager_.flush();
         last_lsn_ = wal_manager_.get_next_lsn() - 1;
         state_ = TransactionState::ACTIVE;
     }
@@ -72,9 +72,13 @@ namespace txn
         types::CommitTxnRecord commit_record(0, last_lsn_, id_);
 
         wal_manager_.append_log(commit_record);
-        wal_manager_.flush();
-        buffer_pool_.flush_dirty();
         last_lsn_ = wal_manager_.get_next_lsn() - 1;
+        wal_manager_.flush();
         state_ = TransactionState::COMMITTED;
+
+        auto* buffer_pool = &buffer_pool_;
+        std::thread([buffer_pool] {
+            buffer_pool->flush_dirty();
+        }).detach();
     }
 } // namespace txn

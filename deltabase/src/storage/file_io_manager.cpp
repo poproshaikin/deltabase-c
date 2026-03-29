@@ -497,10 +497,13 @@ namespace storage
     }
 
     void
-    FileIOManager::write_page(const DataPage& page)
+    FileIOManager::write_page(const DataPage& page, bool fsync)
     {
         auto serialized = serializer_->serialize_dp(page);
-        write_file(page.path, serialized.to_vector());
+        if (fsync)
+            fsync_file(page.path, serialized.to_vector());
+        else
+            write_file(page.path, serialized.to_vector());
     }
 
     uint64_t

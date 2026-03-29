@@ -79,7 +79,7 @@ namespace storage
     }
 
     void
-    DetachedFileIOManager::write_page(const types::DataPage& page)
+    DetachedFileIOManager::write_page(const types::DataPage& page, bool fsync)
     {
         throw std::logic_error("DetachedFileIOManager::write_page: unsupported method");
     }

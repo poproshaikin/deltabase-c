@@ -3,7 +3,14 @@
 //
 
 #include "file_utils.hpp"
+
 #include <fstream>
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <unistd.h>
+    #include <fcntl.h>
+#endif
 
 namespace storage
 {
@@ -37,4 +44,74 @@ namespace storage
         file.write(reinterpret_cast<const char*>(content.data()), content.size());
         file.close();
     }
-}
+
+    void
+    fsync_file(const fs::path& path, const Bytes& content)
+    {
+#ifdef _WIN32
+        // --- Windows ---
+        HANDLE file = CreateFileW(
+            path.wstring().c_str(),
+            GENERIC_WRITE,
+            0,
+            nullptr,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr
+        );
+
+        if (file == INVALID_HANDLE_VALUE)
+            throw std::runtime_error("CreateFile failed");
+
+        DWORD written = 0;
+        if (!WriteFile(file, content.data(), static_cast<DWORD>(content.size()), &written, nullptr))
+        {
+            CloseHandle(file);
+            throw std::runtime_error("WriteFile failed");
+        }
+
+        if (written != content.size())
+        {
+            CloseHandle(file);
+            throw std::runtime_error("Partial write");
+        }
+
+        if (!FlushFileBuffers(file))
+        {
+            CloseHandle(file);
+            throw std::runtime_error("FlushFileBuffers failed");
+        }
+
+        CloseHandle(file);
+#else
+        // --- POSIX (Linux, macOS) ---
+        int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0)
+            throw std::runtime_error("open failed");
+
+        ssize_t total = 0;
+        const uint8_t* data = content.data();
+        ssize_t size = content.size();
+
+        while (total < size)
+        {
+            ssize_t written = write(fd, data + total, size - total);
+            if (written < 0)
+            {
+                close(fd);
+                throw std::runtime_error("write failed");
+            }
+            total += written;
+        }
+
+        if (fsync(fd) < 0)
+        {
+            close(fd);
+            throw std::runtime_error("fsync failed");
+        }
+
+        close(fd);
+#endif
+    }
+
+} // namespace storage

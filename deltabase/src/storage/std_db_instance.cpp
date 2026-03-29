@@ -116,7 +116,7 @@ namespace storage
         txn::Transaction& txn
     )
     {
-        const auto ms = catalog_->get_schema(schema_name);
+        auto ms = catalog_->get_schema(schema_name);
         const auto mt = catalog_->get_table(table_name, ms->id);
         const auto mt_unchanged = *mt;
 
@@ -131,8 +131,8 @@ namespace storage
         InsertRecord insert_record(0, 0, txn.get_id(), mt->id, page->id, data_row);
         UpdateTableRecord update_table_record(0, 0, txn.get_id(), mt_unchanged, *mt);
         txn.append_log(insert_record);
-        const LSN page_lsn = txn.get_last_lsn();
         txn.append_log(update_table_record);
+        const LSN page_lsn = txn.get_last_lsn();
 
         page->last_lsn = page_lsn;
 
