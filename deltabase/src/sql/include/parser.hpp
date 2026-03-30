@@ -5,8 +5,9 @@
 #ifndef DELTABASE_PARSER_HPP
 #define DELTABASE_PARSER_HPP
 
-#include "../../types/include/sql_token.hpp"
+#include "../../misc/include/exceptions.hpp"
 #include "../../types/include/ast_tree.hpp"
+#include "../../types/include/sql_token.hpp"
 
 #include <vector>
 
@@ -76,7 +77,7 @@ namespace sql
         match_or_throw(TEnum expected, std::string error_msg = "Invalid syntax") const
         {
             if (!match<TEnum>(expected))
-                throw std::runtime_error(error_msg);
+                throw InvalidStatementSyntax(error_msg);
         }
 
         bool

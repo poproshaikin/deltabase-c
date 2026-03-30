@@ -39,6 +39,44 @@ namespace recovery
         void
         redo(const types::CLRDeleteRecord& record, types::DataPage& page);
 
+        void
+        redo(const types::CreateSchemaRecord& record);
+        void
+        redo(const types::UpdateSchemaRecord& record);
+        void
+        redo(const types::DeleteSchemaRecord& record);
+        void
+        redo(const types::CLRCreateSchemaRecord& record);
+        void
+        redo(const types::CLRUpdateSchemaRecord& record);
+        void
+        redo(const types::CLRDeleteSchemaRecord& record);
+
+        void
+        redo(const types::CreateTableRecord& record);
+        void
+        redo(const types::UpdateTableRecord& record);
+        void
+        redo(const types::DeleteTableRecord& record);
+        void
+        redo(const types::CLRCreateTableRecord& record);
+        void
+        redo(const types::CLRUpdateTableRecord& record);
+        void
+        redo(const types::CLRDeleteTableRecord& record);
+
+        void
+        redo(const types::CreateIndexRecord& record);
+        void
+        redo(const types::CLRCreateIndexRecord& record);
+
+        void
+        redo(const types::BeginTxnRecord& record);
+        void
+        redo(const types::CommitTxnRecord& record);
+        void
+        redo(const types::RollbackTxnRecord& record);
+
         types::WALRecord
         make_clr(const types::InsertRecord& record) const;
         types::WALRecord
@@ -57,6 +95,8 @@ namespace recovery
         make_clr(const types::UpdateTableRecord& record) const;
         types::WALRecord
         make_clr(const types::DeleteTableRecord& record) const;
+        types::WALRecord
+        make_clr(const types::CreateIndexRecord& record) const;
         types::WALRecord
         make_clr(const types::RollbackTxnRecord& record) const;
 
@@ -93,6 +133,8 @@ namespace recovery
         undo_record(const types::UpdateTableRecord& record);
         void
         undo_record(const types::DeleteTableRecord& record);
+        void
+        undo_record(const types::CreateIndexRecord& record);
         void
         undo_record(const types::RollbackTxnRecord& record);
 

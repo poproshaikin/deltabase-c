@@ -471,6 +471,45 @@ namespace exq
         return OutputSchema{};
     }
 
+    CreateIndexNodeExecutor::CreateIndexNodeExecutor(
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& column_name,
+        const std::string& schema_name,
+        bool is_unique,
+        storage::IDbInstance& db
+    )
+        : index_name_(index_name), column_name_(column_name), table_name_(table_name),
+          schema_name_(schema_name), is_unique_(is_unique), db_(db)
+    {
+    }
+
+    void
+    CreateIndexNodeExecutor::open()
+    {
+    }
+
+    bool
+    CreateIndexNodeExecutor::next(DataRow& out)
+    {
+        auto txn = db_.make_txn();
+        txn.begin();
+        db_.create_index(index_name_, table_name_, column_name_, schema_name_, is_unique_, txn);
+        txn.commit();
+        return false;
+    }
+
+    void
+    CreateIndexNodeExecutor::close()
+    {
+    }
+
+    OutputSchema
+    CreateIndexNodeExecutor::output_schema()
+    {
+        return OutputSchema{};
+    }
+
     std::unique_ptr<INodeExecutor>
     NodeExecutorFactory::from_plan(std::unique_ptr<IPlanNode>&& node, storage::IDbInstance& db)
     {
@@ -568,6 +607,19 @@ namespace exq
             auto& create_db_node = static_cast<CreateDbPlanNode&>(*node);
             CreateDbNodeExecutor executor(create_db_node.db_name);
             return std::make_unique<CreateDbNodeExecutor>(std::move(executor));
+        }
+        case IPlanNode::Type::CREATE_INDEX:
+        {
+            auto& create_index_node = static_cast<CreateIndexPlanNode&>(*node);
+            CreateIndexNodeExecutor executor(
+                create_index_node.index_name,
+                create_index_node.table_name,
+                create_index_node.column_name,
+                create_index_node.schema_name,
+                create_index_node.is_unique,
+                db
+            );
+            return std::make_unique<CreateIndexNodeExecutor>(std::move(executor));
         }
         default:
             throw std::runtime_error(

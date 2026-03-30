@@ -4,12 +4,12 @@
 
 #ifndef DELTABASE_STORAGE_HPP
 #define DELTABASE_STORAGE_HPP
+#include "../../transactions/include/transaction.hpp"
 #include "../../types/include/config.hpp"
 #include "../../types/include/data_row.hpp"
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/query_plan.hpp"
-#include "../../transactions/include/transaction.hpp"
 
 namespace storage
 {
@@ -86,6 +86,16 @@ namespace storage
 
         virtual bool
         exists_schema(const std::string& schema_name) = 0;
+
+        virtual void
+        create_index(
+            const std::string& string,
+            const std::string& table_name,
+            const std::string& column_name,
+            const std::string& schema_name,
+            bool is_unique,
+            txn::Transaction& txn
+        ) = 0;
     };
 } // namespace storage
 

@@ -32,6 +32,9 @@ namespace exq
         analyze_create_table(const types::CreateTableStatement& stmt) const;
 
         types::AnalysisResult
+        analyze_create_index(const types::CreateIndexStatement& stmt) const;
+
+        types::AnalysisResult
         analyze_create_db(const types::CreateDbStatement& stmt) const;
 
         types::AnalysisResult

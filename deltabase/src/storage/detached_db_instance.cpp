@@ -134,4 +134,17 @@ namespace storage
     {
         throw std::logic_error("DetachedDbInstance::delete_row: this method is not supported");
     }
+
+    void
+    DetachedDbInstance::create_index(
+        const std::string& string,
+        const std::string& table_name,
+        const std::string& column_name,
+        const std::string& schema_name,
+        bool is_unique,
+        txn::Transaction& txn
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::create_index: this method is not supported");
+    }
 } // namespace storage

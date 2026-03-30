@@ -97,6 +97,7 @@ target_link_libraries(test.exe
     engine
     types
     cli
+    recovery
 )
 
 # --- main ---

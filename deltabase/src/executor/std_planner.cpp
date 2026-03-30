@@ -44,6 +44,10 @@ namespace exq
         {
             return plan_create_table(std::get<CreateTableStatement>(ast.value));
         }
+        if (ast.type == AstNodeType::CREATE_INDEX)
+        {
+            return plan_create_index(std::get<CreateIndexStatement>(ast.value));
+        }
 
         throw std::runtime_error(
             std::format(
@@ -82,8 +86,9 @@ namespace exq
             for (auto& c : stmt.columns)
                 cols.push_back(c.value);
 
-            auto project =
-                std::make_unique<ProjectPlanNode>(*db_.get_table(stmt.table), cols, std::move(node));
+            auto project = std::make_unique<ProjectPlanNode>(
+                *db_.get_table(stmt.table), cols, std::move(node)
+            );
             node = std::move(project);
         }
 
@@ -152,7 +157,8 @@ namespace exq
             if (assignment.left->type == AstNodeType::COLUMN_IDENTIFIER &&
                 assignment.right->type == AstNodeType::LITERAL)
             {
-                const auto& col_id = table->get_column(std::get<SqlToken>(assignment.left->value)).id;
+                const auto& col_id =
+                    table->get_column(std::get<SqlToken>(assignment.left->value)).id;
                 auto data_token = DataToken(std::get<SqlToken>(assignment.right->value));
 
                 assignments.emplace_back(std::make_pair(col_id, data_token));
@@ -193,14 +199,12 @@ namespace exq
     QueryPlan
     StdPlanner::plan_delete(DeleteStatement& stmt) const
     {
-        std::string schema_name =
-            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                               : db_config_.default_schema;
+        std::string schema_name = stmt.table.schema_name.has_value()
+                                      ? stmt.table.schema_name.value().value
+                                      : db_config_.default_schema;
 
-        std::unique_ptr<IPlanNode> root = std::make_unique<SeqScanPlanNode>(
-            stmt.table.table_name,
-            schema_name
-        );
+        std::unique_ptr<IPlanNode> root =
+            std::make_unique<SeqScanPlanNode>(stmt.table.table_name, schema_name);
 
         if (stmt.where)
         {
@@ -209,7 +213,8 @@ namespace exq
             );
         }
 
-        auto del = std::make_unique<DeletePlanNode>(stmt.table.table_name, schema_name, std::move(root));
+        auto del =
+            std::make_unique<DeletePlanNode>(stmt.table.table_name, schema_name, std::move(root));
 
         QueryPlan plan;
         plan.root = std::move(del);
@@ -248,6 +253,27 @@ namespace exq
         QueryPlan plan;
         plan.root = std::move(root);
         plan.type = QueryPlan::Type::CREATE_TABLE;
+        plan.needs_stream = false;
+        plan.db_specific = true;
+        return plan;
+    }
+
+    QueryPlan
+    StdPlanner::plan_create_index(const CreateIndexStatement& stmt) const
+    {
+        auto schema_name = stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
+                                                              : db_config_.default_schema;
+        auto table_name = stmt.table.table_name.value;
+        auto column_name = stmt.column_name.value;
+        auto index_name = stmt.index_name.value;
+
+        std::unique_ptr<IPlanNode> root = std::make_unique<CreateIndexPlanNode>(
+            index_name, table_name, schema_name, column_name, stmt.is_unique
+        );
+
+        QueryPlan plan;
+        plan.root = std::move(root);
+        plan.type = QueryPlan::Type::CREATE_INDEX;
         plan.needs_stream = false;
         plan.db_specific = true;
         return plan;

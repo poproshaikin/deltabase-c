@@ -18,7 +18,7 @@ namespace types
         std::optional<bool> is_system_query;
 
         explicit
-        AnalysisResult(bool is_valid) : is_valid(is_valid)
+        AnalysisResult(bool is_valid) : is_valid(is_valid), is_system_query(false)
         {
         }
 

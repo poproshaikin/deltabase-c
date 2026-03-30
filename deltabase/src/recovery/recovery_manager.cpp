@@ -6,6 +6,8 @@
 
 #include "type_traits.hpp"
 
+#include <algorithm>
+
 namespace recovery
 {
     using namespace types;
@@ -103,41 +105,120 @@ namespace recovery
     RecoveryManager::redo_meta(const WALRecord& record)
     {
         std::visit(
-            [&]<typename TRecord>(const TRecord& r)
+            [this]<typename TRecord>(const TRecord& r)
             {
                 using R = std::decay_t<TRecord>;
-                if constexpr (
-                    misc::is_in_variant_v<R, WALMetaRecord> ||
-                    misc::is_in_variant_v<R, WALMetaCLRRecord>)
+                if constexpr (misc::is_in_variant_v<R, WALMetaRecord> ||
+                              misc::is_in_variant_v<R, WALMetaCLRRecord>)
                 {
-                    if constexpr (std::is_same_v<R, CreateSchemaRecord>)
-                        io_.write_ms(r.schema);
-                    else if constexpr (std::is_same_v<R, UpdateSchemaRecord>)
-                        io_.write_ms(r.after);
-                    else if constexpr (std::is_same_v<R, DeleteSchemaRecord>)
-                        io_.delete_ms(r.before);
-                    else if constexpr (std::is_same_v<R, CreateTableRecord>)
-                        io_.write_mt(r.after);
-                    else if constexpr (std::is_same_v<R, UpdateTableRecord>)
-                        io_.write_mt(r.after);
-                    else if constexpr (std::is_same_v<R, DeleteTableRecord>)
-                        io_.delete_mt(r.before);
-                    else if constexpr (std::is_same_v<R, CLRCreateSchemaRecord>)
-                        io_.delete_ms(r.schema);
-                    else if constexpr (std::is_same_v<R, CLRUpdateSchemaRecord>)
-                        io_.write_ms(r.before);
-                    else if constexpr (std::is_same_v<R, CLRDeleteSchemaRecord>)
-                        io_.write_ms(r.before);
-                    else if constexpr (std::is_same_v<R, CLRCreateTableRecord>)
-                        io_.delete_mt(r.after);
-                    else if constexpr (std::is_same_v<R, CLRUpdateTableRecord>)
-                        io_.write_mt(r.before);
-                    else if constexpr (std::is_same_v<R, CLRDeleteTableRecord>)
-                        io_.write_mt(r.before);
+                    redo(r);
                 }
             },
             record
         );
+    }
+
+    void
+    RecoveryManager::redo(const CreateSchemaRecord& record)
+    {
+        io_.write_ms(record.schema);
+    }
+
+    void
+    RecoveryManager::redo(const UpdateSchemaRecord& record)
+    {
+        io_.write_ms(record.after);
+    }
+
+    void
+    RecoveryManager::redo(const DeleteSchemaRecord& record)
+    {
+        io_.delete_ms(record.before);
+    }
+
+    void
+    RecoveryManager::redo(const CLRCreateSchemaRecord& record)
+    {
+        io_.delete_ms(record.schema);
+    }
+
+    void
+    RecoveryManager::redo(const CLRUpdateSchemaRecord& record)
+    {
+        io_.write_ms(record.before);
+    }
+
+    void
+    RecoveryManager::redo(const CLRDeleteSchemaRecord& record)
+    {
+        io_.write_ms(record.before);
+    }
+
+    void
+    RecoveryManager::redo(const CreateTableRecord& record)
+    {
+        io_.write_mt(record.after);
+    }
+
+    void
+    RecoveryManager::redo(const UpdateTableRecord& record)
+    {
+        io_.write_mt(record.after);
+    }
+
+    void
+    RecoveryManager::redo(const DeleteTableRecord& record)
+    {
+        io_.delete_mt(record.before);
+    }
+
+    void
+    RecoveryManager::redo(const CLRCreateTableRecord& record)
+    {
+        io_.delete_mt(record.after);
+    }
+
+    void
+    RecoveryManager::redo(const CLRUpdateTableRecord& record)
+    {
+        io_.write_mt(record.before);
+    }
+
+    void
+    RecoveryManager::redo(const CLRDeleteTableRecord& record)
+    {
+        io_.write_mt(record.before);
+    }
+
+    void
+    RecoveryManager::redo(const CreateIndexRecord& record)
+    {
+        auto table = io_.read_table_meta(record.after.table_id);
+        table.indexes.push_back(record.after);
+        io_.write_mt(table);
+    }
+
+    void
+    RecoveryManager::redo(const CLRCreateIndexRecord& record)
+    {
+        auto table = io_.read_table_meta(record.after.table_id);
+        std::erase_if(table.indexes, [&](const MetaIndex& value) { return value.id == record.after.id; });
+        io_.write_mt(table);
+    }
+
+    void
+    RecoveryManager::redo(const BeginTxnRecord&)
+    {
+    }
+
+    void
+    RecoveryManager::redo(const CommitTxnRecord&)
+    {
+    }
+
+    void
+    RecoveryManager::redo(const RollbackTxnRecord&)
+    {
     }
 
     void
@@ -381,6 +462,14 @@ namespace recovery
         io_.write_mt(record.before);
     }
 
+    void
+    RecoveryManager::undo_record(const CreateIndexRecord& record)
+    {
+        MetaTable table = io_.read_table_meta(record.after.table_id);
+        std::erase_if(table.indexes, [&](MetaIndex& value) { return value.id == record.after.id; });
+        io_.write_mt(table);
+    }
+
     WALRecord
     RecoveryManager::make_clr(const InsertRecord& record) const
     {
@@ -427,75 +516,47 @@ namespace recovery
     WALRecord
     RecoveryManager::make_clr(const CreateSchemaRecord& record) const
     {
-        return CLRCreateSchemaRecord(
-            record.lsn,
-            0,
-            record.txn_id,
-            record.prev_lsn,
-            record.schema
-        );
+        return CLRCreateSchemaRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.schema);
     }
 
     WALRecord
     RecoveryManager::make_clr(const UpdateSchemaRecord& record) const
     {
         return CLRUpdateSchemaRecord(
-            record.lsn,
-            0,
-            record.txn_id,
-            record.prev_lsn,
-            record.before,
-            record.after
+            record.lsn, 0, record.txn_id, record.prev_lsn, record.before, record.after
         );
     }
 
     WALRecord
     RecoveryManager::make_clr(const DeleteSchemaRecord& record) const
     {
-        return CLRDeleteSchemaRecord(
-            record.lsn,
-            0,
-            record.txn_id,
-            record.prev_lsn,
-            record.before
-        );
+        return CLRDeleteSchemaRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.before);
     }
 
     WALRecord
     RecoveryManager::make_clr(const CreateTableRecord& record) const
     {
-        return CLRCreateTableRecord(
-            record.lsn,
-            0,
-            record.txn_id,
-            record.prev_lsn,
-            record.after
-        );
+        return CLRCreateTableRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.after);
     }
 
     WALRecord
     RecoveryManager::make_clr(const UpdateTableRecord& record) const
     {
         return CLRUpdateTableRecord(
-            record.lsn,
-            0,
-            record.txn_id,
-            record.prev_lsn,
-            record.before,
-            record.after
+            record.lsn, 0, record.txn_id, record.prev_lsn, record.before, record.after
         );
     }
 
     WALRecord
     RecoveryManager::make_clr(const DeleteTableRecord& record) const
     {
-        return CLRDeleteTableRecord(
-            record.lsn,
-            0,
-            record.txn_id,
-            record.prev_lsn,
-            record.before
-        );
+        return CLRDeleteTableRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.before);
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const CreateIndexRecord& record) const
+    {
+        return CLRCreateIndexRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.after);
     }
 
     std::unordered_map<TxnId, LSN>

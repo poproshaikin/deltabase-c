@@ -39,7 +39,9 @@ namespace types
         CLR_DELETE_SCHEMA,
         CLR_CREATE_TABLE,
         CLR_UPDATE_TABLE,
-        CLR_DELETE_TABLE
+        CLR_DELETE_TABLE,
+        CREATE_INDEX,
+        CLR_CREATE_INDEX
     };
 
     namespace detail
@@ -71,14 +73,19 @@ namespace types
     {
         static constexpr auto type = WALRecordType::INSERT;
 
-        LSN lsn;
-        LSN prev_lsn;
-        Uuid txn_id;
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
+
         Uuid table_id;
         PageId page_id;
         DataRow after;
 
         InsertRecord() = default;
+        InsertRecord(const Uuid& table_id, const PageId& page_id, DataRow after)
+            : table_id(table_id), page_id(page_id), after(std::move(after))
+        {
+        }
 
         InsertRecord(
             LSN lsn,
@@ -98,43 +105,54 @@ namespace types
     {
         static constexpr auto type = WALRecordType::UPDATE;
 
-        LSN lsn;
-        LSN prev_lsn;
-        Uuid txn_id;
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
+
         Uuid table_id;
         PageId page_id;
         DataRow before;
         DataRow after;
 
         UpdateRecord() = default;
-
-        UpdateRecord(
-            LSN lsn,
-            LSN prev_lsn,
-            const Uuid& txn_id,
-            const Uuid& table_id,
-            const PageId& page_id,
-            DataRow before,
-            DataRow after
-        )
-            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
-              before(std::move(before)), after(std::move(after))
+        UpdateRecord(const Uuid& table_id, const PageId& page_id, DataRow before, DataRow after)
+            : table_id(table_id), page_id(page_id), before(std::move(before)),
+              after(std::move(after))
         {
         }
+
+                UpdateRecord(
+                        LSN lsn,
+                        LSN prev_lsn,
+                        const Uuid& txn_id,
+                        const Uuid& table_id,
+                        const PageId& page_id,
+                        DataRow before,
+                        DataRow after
+                )
+                        : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
+                            before(std::move(before)), after(std::move(after))
+                {
+                }
     };
 
     struct DeleteRecord
     {
         static constexpr auto type = WALRecordType::DELETE;
 
-        LSN lsn;
-        LSN prev_lsn;
-        Uuid txn_id;
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
+
         Uuid table_id;
         PageId page_id;
         DataRow before;
 
         DeleteRecord() = default;
+        DeleteRecord(const Uuid& table_id, const PageId& page_id, DataRow before)
+            : table_id(table_id), page_id(page_id), before(std::move(before))
+        {
+        }
 
         DeleteRecord(
             LSN lsn,
@@ -252,11 +270,7 @@ namespace types
         CLRCreateSchemaRecord() = default;
 
         CLRCreateSchemaRecord(
-            LSN lsn,
-            LSN prev_lsn,
-            const Uuid& txn_id,
-            LSN undo_next_lsn,
-            MetaSchema schema
+            LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, MetaSchema schema
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn),
               schema(std::move(schema))
@@ -304,11 +318,7 @@ namespace types
         CLRDeleteSchemaRecord() = default;
 
         CLRDeleteSchemaRecord(
-            LSN lsn,
-            LSN prev_lsn,
-            const Uuid& txn_id,
-            LSN undo_next_lsn,
-            MetaSchema before
+            LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, MetaSchema before
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn),
               before(std::move(before))
@@ -327,13 +337,8 @@ namespace types
         MetaTable after;
 
         CLRCreateTableRecord() = default;
-
         CLRCreateTableRecord(
-            LSN lsn,
-            LSN prev_lsn,
-            const Uuid& txn_id,
-            LSN undo_next_lsn,
-            MetaTable after
+            LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, MetaTable after
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn),
               after(std::move(after))
@@ -353,7 +358,6 @@ namespace types
         MetaTable after;
 
         CLRUpdateTableRecord() = default;
-
         CLRUpdateTableRecord(
             LSN lsn,
             LSN prev_lsn,
@@ -381,11 +385,7 @@ namespace types
         CLRDeleteTableRecord() = default;
 
         CLRDeleteTableRecord(
-            LSN lsn,
-            LSN prev_lsn,
-            const Uuid& txn_id,
-            LSN undo_next_lsn,
-            MetaTable before
+            LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, MetaTable before
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn),
               before(std::move(before))
@@ -397,12 +397,15 @@ namespace types
     {
         static constexpr auto type = WALRecordType::CREATE_SCHEMA;
 
-        LSN lsn;
-        LSN prev_lsn;
-        Uuid txn_id;
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
         MetaSchema schema;
 
         CreateSchemaRecord() = default;
+        CreateSchemaRecord(MetaSchema schema) : schema(std::move(schema))
+        {
+        }
 
         CreateSchemaRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaSchema schema)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), schema(std::move(schema))
@@ -414,16 +417,24 @@ namespace types
     {
         static constexpr auto type = WALRecordType::UPDATE_SCHEMA;
 
-        LSN lsn;
-        LSN prev_lsn;
-        Uuid txn_id;
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
         MetaSchema before;
         MetaSchema after;
 
         UpdateSchemaRecord() = default;
+        UpdateSchemaRecord(MetaSchema before, MetaSchema after)
+            : before(std::move(before)), after(std::move(after))
+        {
+        }
 
         UpdateSchemaRecord(
-            LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaSchema before, MetaSchema after
+            LSN lsn,
+            LSN prev_lsn,
+            const Uuid& txn_id,
+            MetaSchema before,
+            MetaSchema after
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before)),
               after(std::move(after))
@@ -435,12 +446,15 @@ namespace types
     {
         static constexpr auto type = WALRecordType::DELETE_SCHEMA;
 
-        LSN lsn;
-        LSN prev_lsn;
-        Uuid txn_id;
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
         MetaSchema before;
 
         DeleteSchemaRecord() = default;
+        DeleteSchemaRecord(MetaSchema before) : before(std::move(before))
+        {
+        }
 
         DeleteSchemaRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaSchema before)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before))
@@ -452,12 +466,15 @@ namespace types
     {
         static constexpr auto type = WALRecordType::CREATE_TABLE;
 
-        LSN lsn;
-        LSN prev_lsn;
-        Uuid txn_id;
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
         MetaTable after;
 
         CreateTableRecord() = default;
+        CreateTableRecord(MetaTable table) : after(std::move(table))
+        {
+        }
 
         CreateTableRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaTable table)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), after(std::move(table))
@@ -469,16 +486,24 @@ namespace types
     {
         static constexpr auto type = WALRecordType::UPDATE_TABLE;
 
-        LSN lsn;
-        LSN prev_lsn;
-        Uuid txn_id;
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
         MetaTable before;
         MetaTable after;
 
         UpdateTableRecord() = default;
+        UpdateTableRecord(MetaTable before, MetaTable after)
+            : before(std::move(before)), after(std::move(after))
+        {
+        }
 
         UpdateTableRecord(
-            LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaTable before, MetaTable after
+            LSN lsn,
+            LSN prev_lsn,
+            const Uuid& txn_id,
+            MetaTable before,
+            MetaTable after
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before)),
               after(std::move(after))
@@ -490,15 +515,56 @@ namespace types
     {
         static constexpr auto type = WALRecordType::DELETE_TABLE;
 
-        LSN lsn;
-        LSN prev_lsn;
-        Uuid txn_id;
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
         MetaTable before;
 
         DeleteTableRecord() = default;
+        DeleteTableRecord(MetaTable before) : before(std::move(before))
+        {
+        }
 
         DeleteTableRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaTable before)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before))
+        {
+        }
+    };
+
+    struct CreateIndexRecord
+    {
+        static constexpr auto type = WALRecordType::CREATE_INDEX;
+
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
+        MetaIndex after;
+
+        CreateIndexRecord() = default;
+        CreateIndexRecord(const MetaIndex& after) : after(after)
+        {
+        }
+
+        CreateIndexRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, const MetaIndex& after)
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), after(after)
+        {
+        }
+    };
+
+    struct CLRCreateIndexRecord
+    {
+        static constexpr auto type = WALRecordType::CLR_CREATE_INDEX;
+
+        LSN lsn;
+        LSN prev_lsn;
+        Uuid txn_id;
+
+        LSN undo_next_lsn;
+        MetaIndex after;
+
+        CLRCreateIndexRecord() = default;
+        CLRCreateIndexRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, const MetaIndex& after)
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn), after(after)
         {
         }
     };
@@ -553,23 +619,35 @@ namespace types
 
     using WALRecord = detail::WALRecordVariant<
         InsertRecord,
-        UpdateRecord,
-        DeleteRecord,
         CLRInsertRecord,
+
+        UpdateRecord,
         CLRUpdateRecord,
+
+        DeleteRecord,
         CLRDeleteRecord,
-        CLRCreateSchemaRecord,
-        CLRUpdateSchemaRecord,
-        CLRDeleteSchemaRecord,
-        CLRCreateTableRecord,
-        CLRUpdateTableRecord,
-        CLRDeleteTableRecord,
+
         CreateSchemaRecord,
+        CLRCreateSchemaRecord,
+
         UpdateSchemaRecord,
+        CLRUpdateSchemaRecord,
+
         DeleteSchemaRecord,
+        CLRDeleteSchemaRecord,
+
         CreateTableRecord,
+        CLRCreateTableRecord,
+
         UpdateTableRecord,
+        CLRUpdateTableRecord,
+
         DeleteTableRecord,
+        CLRDeleteTableRecord,
+
+        CreateIndexRecord,
+        CLRCreateIndexRecord,
+
         BeginTxnRecord,
         CommitTxnRecord,
         RollbackTxnRecord>;
@@ -588,7 +666,8 @@ namespace types
         DeleteSchemaRecord,
         CreateTableRecord,
         UpdateTableRecord,
-        DeleteTableRecord>;
+        DeleteTableRecord,
+        CreateIndexRecord>;
 
     using WALMetaCLRRecord = detail::WALRecordVariant<
         CLRCreateSchemaRecord,
@@ -596,7 +675,8 @@ namespace types
         CLRDeleteSchemaRecord,
         CLRCreateTableRecord,
         CLRUpdateTableRecord,
-        CLRDeleteTableRecord>;
+        CLRDeleteTableRecord,
+        CLRCreateIndexRecord>;
 
     using WALCLRRecord = detail::WALRecordVariant<
         CLRInsertRecord,
@@ -607,7 +687,8 @@ namespace types
         CLRDeleteSchemaRecord,
         CLRCreateTableRecord,
         CLRUpdateTableRecord,
-        CLRDeleteTableRecord>;
+        CLRDeleteTableRecord,
+        CLRCreateIndexRecord>;
 
     using WALTxnRecord =
         detail::WALRecordVariant<BeginTxnRecord, CommitTxnRecord, RollbackTxnRecord>;

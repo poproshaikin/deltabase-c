@@ -27,6 +27,7 @@ namespace types
         CREATE_TABLE,
         CREATE_DATABASE,
         CREATE_SCHEMA,
+        CREATE_INDEX,
     };
 
     enum class AstOperator
@@ -155,8 +156,8 @@ namespace types
     struct CreateIndexStatement
     {
         TableIdentifier table;
-        std::string index_name;
-        std::string column_name;
+        SqlToken index_name;
+        SqlToken column_name;
         bool is_unique;
     };
 
@@ -175,6 +176,7 @@ namespace types
         CreateTableStatement,
         CreateDbStatement,
         CreateSchemaStatement,
+        CreateIndexStatement,
         ColumnDefinition>;
 
     struct AstNode

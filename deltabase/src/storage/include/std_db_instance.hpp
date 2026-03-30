@@ -106,6 +106,16 @@ namespace storage
 
         bool
         exists_schema(const std::string& schema_name) override;
+
+        void
+        create_index(
+            const std::string& string,
+            const std::string& table_name,
+            const std::string& column_name,
+            const std::string& schema_name,
+            bool is_unique,
+            txn::Transaction& txn
+        ) override;
     };
 }
 

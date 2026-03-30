@@ -90,6 +90,9 @@ namespace sql
 
             if (match(SqlKeyword::SCHEMA))
                 return AstNode(AstNodeType::CREATE_SCHEMA, parse_create_schema());
+
+            if (match(SqlKeyword::INDEX))
+                return AstNode(AstNodeType::CREATE_INDEX, parse_create_index());
         }
 
         throw std::runtime_error("Unsupported statement");
@@ -399,6 +402,41 @@ namespace sql
         advance_or_throw("Expected schema identifier");
 
         stmt.name = current();
+        return stmt;
+    }
+
+    CreateIndexStatement
+    SqlParser::parse_create_index()
+    {
+        CreateIndexStatement stmt;
+
+        if (match(SqlKeyword::UNIQUE))
+        {
+            stmt.is_unique = true;
+            advance_or_throw("Expected 'INDEX' after 'UNIQUE'");
+        }
+
+        match_or_throw(SqlKeyword::INDEX);
+        advance_or_throw("Expected index identifier");
+
+        match_or_throw(SqlTokenType::IDENTIFIER, "Expected index identifier");
+        stmt.index_name = current();
+        advance_or_throw("Incomplete CREATE INDEX syntax");
+
+        match_or_throw(SqlKeyword::ON);
+        advance_or_throw("Expected table name after 'ON'");
+
+        stmt.table = parse_table_identifier();
+
+        match_or_throw(SqlSymbol::LPAREN, "Expected '(' after table identifier");
+        advance_or_throw("Expected column name after '('");
+
+        match_or_throw(SqlTokenType::IDENTIFIER, "Expected column name after '('");
+        stmt.column_name = current();
+        advance_or_throw("Expected ')' after column identifier");
+
+        match_or_throw(SqlSymbol::RPAREN, "Expected ')' after column identifier");
+
         return stmt;
     }
 

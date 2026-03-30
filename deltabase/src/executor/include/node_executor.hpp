@@ -293,6 +293,39 @@ namespace exq
         output_schema() override;
     };
 
+    class CreateIndexNodeExecutor final : public INodeExecutor
+    {
+        std::string index_name_;
+        std::string column_name_;
+        std::string table_name_;
+        std::string schema_name_;
+        bool is_unique_;
+
+        storage::IDbInstance& db_;
+
+    public:
+        explicit CreateIndexNodeExecutor(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& column_name,
+            const std::string& schema_name,
+            bool is_unique,
+            storage::IDbInstance& db
+        );
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
     class NodeExecutorFactory
     {
     public:

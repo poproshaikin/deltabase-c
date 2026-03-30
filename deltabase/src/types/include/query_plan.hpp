@@ -30,7 +30,8 @@ namespace types
             UPDATE,
             DELETE,
             CREATE_DB,
-            CREATE_TABLE
+            CREATE_TABLE,
+            CREATE_INDEX
         };
 
         virtual constexpr Type
@@ -50,7 +51,8 @@ namespace types
             UPDATE,
             DELETE,
             CREATE_DB,
-            CREATE_TABLE
+            CREATE_TABLE,
+            CREATE_INDEX
         };
 
         Type type = Type::UNDEFINED;
@@ -257,6 +259,33 @@ namespace types
         type() const override
         {
             return Type::CREATE_TABLE;
+        }
+    };
+
+    struct CreateIndexPlanNode final : LeafPlanNode
+    {
+        std::string index_name;
+        std::string table_name;
+        std::string schema_name;
+        std::string column_name;
+        bool is_unique;
+
+        explicit CreateIndexPlanNode(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name,
+            const std::string& column_name,
+            bool is_unique
+        )
+            : index_name(index_name), table_name(table_name), schema_name(schema_name),
+              column_name(column_name), is_unique(is_unique)
+        {
+        }
+
+        constexpr Type
+        type() const override
+        {
+            return Type::CREATE_INDEX;
         }
     };
 } // namespace types

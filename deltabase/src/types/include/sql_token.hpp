@@ -52,7 +52,9 @@ namespace types
         NOT,
         AUTOINCREMENT,
         UNIQUE,
-        SCHEMA
+        SCHEMA,
+        INDEX,
+        ON
     };
 
     enum class SqlSymbol

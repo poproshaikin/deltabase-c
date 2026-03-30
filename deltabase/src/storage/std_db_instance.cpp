@@ -128,8 +128,8 @@ namespace storage
         auto* page = buffer_pool_->prepare_dp(row_size, *mt);
         page->rows.push_back(data_row);
 
-        InsertRecord insert_record(0, 0, txn.get_id(), mt->id, page->id, data_row);
-        UpdateTableRecord update_table_record(0, 0, txn.get_id(), mt_unchanged, *mt);
+        InsertRecord insert_record(mt->id, page->id, data_row);
+        UpdateTableRecord update_table_record(mt_unchanged, *mt);
         txn.append_log(insert_record);
         txn.append_log(update_table_record);
         const LSN page_lsn = txn.get_last_lsn();
@@ -193,11 +193,11 @@ namespace storage
                     }
                 }
 
-                UpdateRecord update_record(0, 0, txn.get_id(), mt->id, page->id, row, new_row);
+                UpdateRecord update_record(mt->id, page->id, row, new_row);
                 txn.append_log(update_record);
                 page_lsn = std::max(page_lsn, txn.get_last_lsn());
 
-                UpdateTableRecord update_table_record(0, 0, txn.get_id(), unchanged_mt, *mt);
+                UpdateTableRecord update_table_record(unchanged_mt, *mt);
                 txn.append_log(update_table_record);
 
                 page->rows.push_back(new_row);
@@ -245,7 +245,7 @@ namespace storage
 
                 row.flags |= DataRowFlags::OBSOLETE;
 
-                DeleteRecord record(0, 0, txn.get_id(), table.id, page.id, row);
+                DeleteRecord record(table.id, page.id, row);
                 txn.append_log(record);
                 page_lsn = std::max(page_lsn, txn.get_last_lsn());
             }
@@ -335,7 +335,7 @@ namespace storage
             mt.columns.emplace_back(column);
         }
 
-        CreateTableRecord record(0, 0, txn.get_id(), mt);
+        CreateTableRecord record(mt);
         txn.append_log(record);
 
         catalog_->save_table(mt);
@@ -349,7 +349,7 @@ namespace storage
         ms.name = schema_name;
         ms.db_name = cfg_.db_name.value();
 
-        CreateSchemaRecord record(0, 0, txn.get_id(), ms);
+        CreateSchemaRecord record(ms);
         txn.append_log(record);
 
         catalog_->save_schema(ms);
@@ -359,5 +359,33 @@ namespace storage
     StdDbInstance::exists_schema(const std::string& schema_name)
     {
         return catalog_->exists_schema(schema_name);
+    }
+
+    void
+    StdDbInstance::create_index(
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& column_name,
+        const std::string& schema_name,
+        bool is_unique,
+        txn::Transaction& txn
+    )
+    {
+        const auto* schema = catalog_->get_schema(schema_name);
+        auto* table = catalog_->get_table(table_name, schema->id);
+        const auto& column = table->get_column(column_name);
+
+        MetaIndex mi;
+        mi.id = Uuid::make();
+        mi.name = index_name;
+        mi.column_id = column.id;
+        mi.key_type = column.type;
+        mi.is_unique = is_unique;
+        mi.table_id = table->id;
+
+        CreateIndexRecord record(mi);
+        txn.append_log(record);
+
+        table->indexes.push_back(std::move(mi));
     }
 } // namespace storage

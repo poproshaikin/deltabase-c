@@ -41,7 +41,9 @@ namespace sql
             {"not", SqlKeyword::NOT},
             {"autoincrement", SqlKeyword::AUTOINCREMENT},
             {"unique", SqlKeyword::UNIQUE},
-            {"schema", SqlKeyword::SCHEMA}
+            {"schema", SqlKeyword::SCHEMA},
+            {"index", SqlKeyword::INDEX},
+            {"on", SqlKeyword::ON}
         };
 
         return dictionary;

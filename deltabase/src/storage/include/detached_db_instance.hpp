@@ -88,6 +88,16 @@ namespace storage
             const std::vector<types::DataRow>& rows,
             txn::Transaction& txn
         ) override;
+
+        void
+        create_index(
+            const std::string& string,
+            const std::string& table_name,
+            const std::string& column_name,
+            const std::string& schema_name,
+            bool is_unique,
+            txn::Transaction& txn
+        ) override;
     };
 }
 

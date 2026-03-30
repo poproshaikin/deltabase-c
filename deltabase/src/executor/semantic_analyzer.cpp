@@ -41,6 +41,9 @@ namespace exq
         case AstNodeType::CREATE_TABLE:
             return analyze_create_table(std::get<CreateTableStatement>(node.value));
 
+        case AstNodeType::CREATE_INDEX:
+            return analyze_create_index(std::get<CreateIndexStatement>(node.value));
+
         default:
             throw std::runtime_error(
                 "SemanticAnalyzer::analyze: Unsupported AST node type for semantic analysis"
@@ -187,6 +190,24 @@ namespace exq
     {
         if (db_.exists_table(stmt.table))
             return AnalysisResult(TableExists(stmt.table.table_name.value));
+
+        return AnalysisResult(true);
+    }
+
+    AnalysisResult
+    SemanticAnalyzer::analyze_create_index(const CreateIndexStatement& stmt) const
+    {
+        if (!db_.exists_table(stmt.table))
+            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+
+        const auto* table = db_.get_table(stmt.table);
+
+        for (const auto& index : table->indexes)
+            if (index.name == stmt.index_name.value)
+                return AnalysisResult(std::runtime_error("Index already exists"));
+
+        if (!table->has_column(stmt.column_name.value))
+            return AnalysisResult(std::runtime_error("Column doesn't exists"));
 
         return AnalysisResult(true);
     }
