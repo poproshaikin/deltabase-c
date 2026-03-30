@@ -34,6 +34,9 @@ namespace storage
         serialize_mc(const types::MetaColumn& column) const override;
 
         misc::MemoryStream
+        serialize_mi(const types::MetaIndex& index) const override;
+
+        misc::MemoryStream
         serialize_dp(const types::DataPage& page) const override;
 
         misc::MemoryStream
@@ -53,6 +56,9 @@ namespace storage
 
         bool
         deserialize_mc(misc::ReadOnlyMemoryStream& content, types::MetaColumn& out) const override;
+
+        bool
+        deserialize_mi(misc::ReadOnlyMemoryStream& content, types::MetaIndex& out) const override;
 
         bool
         deserialize_dp(misc::ReadOnlyMemoryStream& stream, types::DataPage& out) const override;

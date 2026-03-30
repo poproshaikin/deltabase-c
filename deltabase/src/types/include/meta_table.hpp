@@ -7,21 +7,22 @@
 #include "meta_column.hpp"
 
 #include "data_row_update.hpp"
+#include "meta_index.hpp"
 #include "meta_schema.hpp"
+#include "table_id.hpp"
 
 #include <string>
 #include <vector>
 
 namespace types
 {
-    using TableId = Uuid;
-
     struct MetaTable
     {
         TableId id;
         SchemaId schema_id;
         std::string name;
         std::vector<MetaColumn> columns;
+        std::vector<MetaIndex> indexes;
         RowId last_rid;
 
         MetaTable();

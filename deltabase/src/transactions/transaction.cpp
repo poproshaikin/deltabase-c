@@ -74,11 +74,12 @@ namespace txn
         wal_manager_.append_log(commit_record);
         last_lsn_ = wal_manager_.get_next_lsn() - 1;
         wal_manager_.flush();
+        buffer_pool_.flush_dirty();
         state_ = TransactionState::COMMITTED;
 
         auto* buffer_pool = &buffer_pool_;
-        std::thread([buffer_pool] {
-            buffer_pool->flush_dirty();
-        }).detach();
+        // std::thread([buffer_pool] {
+        //     buffer_pool->flush_dirty();
+        // }).detach();
     }
 } // namespace txn

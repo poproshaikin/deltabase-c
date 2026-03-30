@@ -5,6 +5,7 @@
 #ifndef DELTABASE_DATA_PAGE_HPP
 #define DELTABASE_DATA_PAGE_HPP
 #include "data_row.hpp"
+#include "page_id.hpp"
 #include "typedefs.hpp"
 #include "uuid.hpp"
 
@@ -12,7 +13,6 @@
 
 namespace types
 {
-    using PageId = Uuid;
     using LSN = uint64_t;
 
     struct DataPage

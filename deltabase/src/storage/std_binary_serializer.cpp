@@ -83,6 +83,16 @@ namespace storage
         }
 
         stream.write(&table.last_rid, sizeof(table.last_rid));
+
+        uint64_t indexes_count = table.indexes.size();
+        stream.write(&indexes_count, sizeof(uint64_t));
+
+        for (const auto& index : table.indexes)
+        {
+            auto serialized_mi = serialize_mi(index);
+            stream.write(serialized_mi.data(), serialized_mi.size());
+        }
+
         stream.seek(0);
         return stream;
     }
@@ -107,6 +117,22 @@ namespace storage
         write_str(column.name, stream);
         stream.write(&column.type, sizeof(column.type));
         stream.write(&column.flags, sizeof(column.flags));
+        stream.seek(0);
+        return stream;
+    }
+
+    MemoryStream
+    StdBinarySerializer::serialize_mi(const MetaIndex& index) const
+    {
+        MemoryStream stream;
+        stream.write(index.id.raw(), sizeof(uuid_t));
+        stream.write(index.table_id.raw(), sizeof(uuid_t));
+        stream.write(index.column_id.raw(), sizeof(uuid_t));
+        stream.write(index.root_page_id.raw(), sizeof(uuid_t));
+        write_str(index.name, stream);
+        stream.write(&index.is_unique, sizeof(bool));
+        stream.write(&index.key_type, sizeof(index.key_type));
+
         stream.seek(0);
         return stream;
     }
@@ -210,6 +236,21 @@ namespace storage
         if (stream.read(&out.last_rid, sizeof(out.last_rid)) != sizeof(out.last_rid))
             return false;
 
+        uint64_t indexes_count = 0;
+        if (stream.read(&indexes_count, sizeof(uint64_t)) != sizeof(uint64_t))
+            return false;
+
+        out.indexes.clear();
+        out.indexes.reserve(indexes_count);
+        for (uint64_t i = 0; i < indexes_count; ++i)
+        {
+            MetaIndex index;
+            if (!deserialize_mi(stream, index))
+                return false;
+
+            out.indexes.push_back(std::move(index));
+        }
+
         return true;
     }
 
@@ -241,6 +282,41 @@ namespace storage
         if (stream.read(&out.type, sizeof(out.type)) != sizeof(out.type))
             return false;
         if (stream.read(&out.flags, sizeof(out.flags)) != sizeof(out.flags))
+            return false;
+
+        return true;
+    }
+
+    bool
+    StdBinarySerializer::deserialize_mi(ReadOnlyMemoryStream& stream, MetaIndex& out) const
+    {
+        // stream.write(index.id.raw(), sizeof(uuid_t));
+        // stream.write(index.table_id.raw(), sizeof(uuid_t));
+        // stream.write(index.column_id.raw(), sizeof(uuid_t));
+        // stream.write(index.root_page_id.raw(), sizeof(uuid_t));
+        // write_str(index.name, stream);
+        // stream.write(&index.is_unique, sizeof(bool));
+        // stream.write(&index.key_type, sizeof(index.key_type));
+
+        if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
+            return false;
+
+        if (stream.read(out.table_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
+            return false;
+
+        if (stream.read(out.column_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
+            return false;
+
+        if (stream.read(out.root_page_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
+            return false;
+
+        if (!read_str(out.name, stream))
+            return false;
+
+        if (stream.read(&out.is_unique, sizeof(out.is_unique)) != sizeof(out.is_unique))
+            return false;
+
+        if (stream.read(&out.key_type, sizeof(out.key_type)) != sizeof(out.key_type))
             return false;
 
         return true;

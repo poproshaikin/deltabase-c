@@ -27,6 +27,9 @@ namespace storage
         serialize_mc(const types::MetaColumn& column) const = 0;
 
         virtual misc::MemoryStream
+        serialize_mi(const types::MetaIndex& index) const = 0;
+
+        virtual misc::MemoryStream
         serialize_cfg(const types::Config& db) const = 0;
 
         virtual misc::MemoryStream
@@ -46,6 +49,9 @@ namespace storage
 
         virtual bool
         deserialize_mc(misc::ReadOnlyMemoryStream& content, types::MetaColumn& out) const = 0;
+
+        virtual bool
+        deserialize_mi(misc::ReadOnlyMemoryStream& content, types::MetaIndex& out) const = 0;
 
         virtual bool
         deserialize_dp(misc::ReadOnlyMemoryStream& content, types::DataPage& out) const = 0;

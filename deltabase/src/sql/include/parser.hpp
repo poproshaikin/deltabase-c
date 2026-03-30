@@ -39,6 +39,9 @@ namespace sql
         types::CreateSchemaStatement
         parse_create_schema();
 
+        types::CreateIndexStatement
+        parse_create_index();
+
         std::unique_ptr<types::AstNode>
         parse_binary_tree(int min_priority);
 

@@ -152,6 +152,14 @@ namespace types
         SqlToken name;
     };
 
+    struct CreateIndexStatement
+    {
+        TableIdentifier table;
+        std::string index_name;
+        std::string column_name;
+        bool is_unique;
+    };
+
     struct CreateDbStatement
     {
         SqlToken name;
