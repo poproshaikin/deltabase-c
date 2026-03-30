@@ -108,7 +108,7 @@ namespace storage
     {
         auto pages_list_it = pages_to_tables_.find(table_id);
         if (pages_list_it == pages_to_tables_.end())
-            throw std::runtime_error("BufferPool::get_table_data: table " + table_id.to_string() + " doesn't exist");
+            return {};
 
         std::vector<DataPage*> pages;
 

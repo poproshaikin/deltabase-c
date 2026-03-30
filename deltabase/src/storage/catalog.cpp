@@ -39,10 +39,10 @@ namespace storage
     CatalogCache::flush()
     {
         for (const auto& [_, schema] : schemas_)
-            io_.write_ms(schema);
+            io_.write_ms(schema, true);
 
         for (const auto& [_, table] : tables_)
-            io_.write_mt(table);
+            io_.write_mt(table, true);
     }
 
     void

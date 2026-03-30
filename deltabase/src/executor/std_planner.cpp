@@ -72,7 +72,6 @@ namespace exq
         // 2. WHERE
         if (stmt.where)
         {
-            std::cout << "creating filter node " << std::endl;
             auto filter = std::make_unique<FilterPlanNode>(
                 *db_.get_table(stmt.table), std::move(*stmt.where), std::move(node)
             );

@@ -79,6 +79,12 @@ namespace wal
         misc::MemoryStream
         serialize(const types::DeleteTableRecord& record) const;
 
+        misc::MemoryStream
+        serialize(const types::CreateIndexRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRCreateIndexRecord& record) const;
+
         // ---
 
     public:

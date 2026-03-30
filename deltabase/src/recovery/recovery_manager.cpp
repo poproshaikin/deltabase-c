@@ -121,13 +121,13 @@ namespace recovery
     void
     RecoveryManager::redo(const CreateSchemaRecord& record)
     {
-        io_.write_ms(record.schema);
+        io_.write_ms(record.schema, true);
     }
 
     void
     RecoveryManager::redo(const UpdateSchemaRecord& record)
     {
-        io_.write_ms(record.after);
+        io_.write_ms(record.after, true);
     }
 
     void
@@ -145,13 +145,13 @@ namespace recovery
     void
     RecoveryManager::redo(const CLRUpdateSchemaRecord& record)
     {
-        io_.write_ms(record.before);
+        io_.write_ms(record.before, true);
     }
 
     void
     RecoveryManager::redo(const CLRDeleteSchemaRecord& record)
     {
-        io_.write_ms(record.before);
+        io_.write_ms(record.before, true);
     }
 
     void
@@ -435,13 +435,13 @@ namespace recovery
     void
     RecoveryManager::undo_record(const UpdateSchemaRecord& record)
     {
-        io_.write_ms(record.before);
+        io_.write_ms(record.before, true);
     }
 
     void
     RecoveryManager::undo_record(const DeleteSchemaRecord& record)
     {
-        io_.write_ms(record.before);
+        io_.write_ms(record.before, true);
     }
 
     void

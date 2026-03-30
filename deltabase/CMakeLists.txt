@@ -127,3 +127,10 @@ target_link_libraries(dp_dump.exe
     types
     misc
 )
+
+add_executable(mt_dump.exe mt_dump.cpp)
+target_link_libraries(mt_dump.exe
+    storage
+    types
+    misc
+)

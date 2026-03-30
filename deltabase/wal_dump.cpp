@@ -121,6 +121,43 @@ namespace
     }
 
     std::string
+    data_type_to_string(DataType type)
+    {
+        switch (type)
+        {
+        case DataType::_NULL:
+            return "NULL";
+        case DataType::INTEGER:
+            return "INTEGER";
+        case DataType::REAL:
+            return "REAL";
+        case DataType::CHAR:
+            return "CHAR";
+        case DataType::BOOL:
+            return "BOOL";
+        case DataType::STRING:
+            return "STRING";
+        default:
+            return "UNKNOWN";
+        }
+    }
+
+    std::string
+    index_to_string(const MetaIndex& index)
+    {
+        std::ostringstream out;
+        out << "index{name='" << index.name
+            << "', id=" << index.id.to_string()
+            << ", table_id=" << index.table_id.to_string()
+            << ", column_id=" << index.column_id.to_string()
+            << ", root_page_id=" << index.root_page_id.to_string()
+            << ", key_type=" << data_type_to_string(index.key_type)
+            << ", unique=" << (index.is_unique ? "true" : "false")
+            << "}";
+        return out.str();
+    }
+
+    std::string
     type_to_string(WALRecordType type)
     {
         switch (type)
@@ -167,6 +204,10 @@ namespace
             return "CLR_UPDATE_TABLE";
         case WALRecordType::CLR_DELETE_TABLE:
             return "CLR_DELETE_TABLE";
+        case WALRecordType::CREATE_INDEX:
+            return "CREATE_INDEX";
+        case WALRecordType::CLR_CREATE_INDEX:
+            return "CLR_CREATE_INDEX";
         default:
             return "UNKNOWN";
         }
@@ -367,6 +408,15 @@ main(int argc, char** argv)
                     {
                         std::cout << " undo_next=" << r.undo_next_lsn
                                   << " before=" << table_to_string(r.before);
+                    }
+                    else if constexpr (std::is_same_v<R, CreateIndexRecord>)
+                    {
+                        std::cout << " after=" << index_to_string(r.after);
+                    }
+                    else if constexpr (std::is_same_v<R, CLRCreateIndexRecord>)
+                    {
+                        std::cout << " undo_next=" << r.undo_next_lsn
+                                  << " after=" << index_to_string(r.after);
                     }
 
                     std::cout << "\n";

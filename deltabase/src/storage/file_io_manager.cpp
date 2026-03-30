@@ -513,26 +513,33 @@ namespace storage
     }
 
     void
-    FileIOManager::write_mt(const MetaTable& table, const std::string& schema_name)
+    FileIOManager::write_mt(const MetaTable& table, const std::string& schema_name, bool fsync)
     {
         auto path = path_db_schema_table_meta(db_path_, db_name_, schema_name, table.name);
         auto serialized = serializer_->serialize_mt(table);
-        write_file(path, serialized.to_vector());
+        if (fsync)
+            fsync_file(path, serialized.to_vector());
+        else
+            write_file(path, serialized.to_vector());
     }
 
     void
-    FileIOManager::write_mt(const MetaTable& table)
+    FileIOManager::write_mt(const MetaTable& table, bool fsync)
     {
         auto schema = read_schema_meta(table.schema_id);
-        write_mt(table, schema.name);
+        write_mt(table, schema.name, fsync);
     }
 
     void
-    FileIOManager::write_ms(const MetaSchema& ms)
+    FileIOManager::write_ms(const MetaSchema& ms, bool fsync)
     {
         auto path = path_db_schema_meta(db_path_, db_name_, ms.name);
         auto serialized = serializer_->serialize_ms(ms);
-        write_file(path, serialized.to_vector());
+
+        if (fsync)
+            fsync_file(path, serialized.to_vector());
+        else
+            write_file(path, serialized.to_vector());
     }
 
     void

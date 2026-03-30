@@ -331,6 +331,37 @@ namespace wal
     }
 
     MemoryStream
+    StdWalSerializer::serialize(const CreateIndexRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+
+        auto serialized_index = binary_serializer_.serialize_mi(record.after);
+        stream.append(serialized_index, serialized_index.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const CLRCreateIndexRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_index = binary_serializer_.serialize_mi(record.after);
+        stream.append(serialized_index, serialized_index.size());
+
+        return stream;
+    }
+
+    MemoryStream
     StdWalSerializer::serialize(const CommitTxnRecord& record) const
     {
         MemoryStream stream;
@@ -393,6 +424,10 @@ namespace wal
             return serialize(std::get<UpdateSchemaRecord>(record));
         case WALRecordType::DELETE_SCHEMA:
             return serialize(std::get<DeleteSchemaRecord>(record));
+        case WALRecordType::CREATE_INDEX:
+            return serialize(std::get<CreateIndexRecord>(record));
+        case WALRecordType::CLR_CREATE_INDEX:
+            return serialize(std::get<CLRCreateIndexRecord>(record));
         case WALRecordType::BEGIN_TXN:
             return serialize(std::get<BeginTxnRecord>(record));
         case WALRecordType::COMMIT_TXN:
@@ -715,6 +750,26 @@ namespace wal
                 return true;
             }
 
+        case WALRecordType::CREATE_INDEX:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                MetaIndex after;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+                if (!binary_serializer_.deserialize_mi(stream, after))
+                    return false;
+
+                out = CreateIndexRecord(lsn, prev_lsn, txn_id, after);
+                return true;
+            }
+
         case WALRecordType::CLR_INSERT:
             {
                 LSN lsn;
@@ -1009,6 +1064,29 @@ namespace wal
                     undo_next_lsn,
                     std::move(before)
                 );
+                return true;
+            }
+
+        case WALRecordType::CLR_CREATE_INDEX:
+            {
+                LSN lsn;
+                LSN prev_lsn;
+                Uuid txn_id;
+                LSN undo_next_lsn;
+                MetaIndex after;
+
+                if (!stream.read(&lsn, sizeof(lsn)))
+                    return false;
+                if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                    return false;
+                if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                    return false;
+                if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                    return false;
+                if (!binary_serializer_.deserialize_mi(stream, after))
+                    return false;
+
+                out = CLRCreateIndexRecord(lsn, prev_lsn, txn_id, undo_next_lsn, after);
                 return true;
             }
             

@@ -5,6 +5,7 @@
 #include "file_utils.hpp"
 
 #include <fstream>
+#include <iostream>
 #ifdef _WIN32
     #include <windows.h>
 #else
@@ -48,6 +49,7 @@ namespace storage
     void
     fsync_file(const fs::path& path, const Bytes& content)
     {
+        fs::create_directories(path.parent_path());
 #ifdef _WIN32
         // --- Windows ---
         HANDLE file = CreateFileW(
@@ -85,9 +87,10 @@ namespace storage
         CloseHandle(file);
 #else
         // --- POSIX (Linux, macOS) ---
+
         int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (fd < 0)
-            throw std::runtime_error("open failed");
+            throw std::runtime_error("fsync_file: open failed");
 
         ssize_t total = 0;
         const uint8_t* data = content.data();
@@ -99,7 +102,7 @@ namespace storage
             if (written < 0)
             {
                 close(fd);
-                throw std::runtime_error("write failed");
+                throw std::runtime_error("fsync_file: write failed");
             }
             total += written;
         }
@@ -107,7 +110,7 @@ namespace storage
         if (fsync(fd) < 0)
         {
             close(fd);
-            throw std::runtime_error("fsync failed");
+            throw std::runtime_error("fsync_file: fsync failed");
         }
 
         close(fd);

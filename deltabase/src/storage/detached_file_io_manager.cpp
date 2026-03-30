@@ -85,13 +85,13 @@ namespace storage
     }
 
     void
-    DetachedFileIOManager::write_mt(const types::MetaTable& table, const std::string& schema_name)
+    DetachedFileIOManager::write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync)
     {
         throw std::logic_error("DetachedFileIOManager::write_mt: unsupported method");
     }
 
     void
-    DetachedFileIOManager::write_mt(const types::MetaTable& table)
+    DetachedFileIOManager::write_mt(const types::MetaTable& table, bool fsync)
     {
         throw std::logic_error("DetachedFileIOManager::write_mt: unsupported method");
     }
@@ -103,7 +103,7 @@ namespace storage
     }
 
     void
-    DetachedFileIOManager::write_ms(const types::MetaSchema& ms)
+    DetachedFileIOManager::write_ms(const types::MetaSchema& ms, bool fsync)
     {
         throw std::logic_error("DetachedFileIOManager::write_ms: unsupported method");
     }

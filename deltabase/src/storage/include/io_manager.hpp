@@ -57,10 +57,10 @@ namespace storage
         write_page(const types::DataPage& page, bool fsync = false) = 0;
 
         virtual void
-        write_mt(const types::MetaTable& table, const std::string& schema_name) = 0;
+        write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync = false) = 0;
 
         virtual void
-        write_mt(const types::MetaTable& table) = 0;
+        write_mt(const types::MetaTable& table, bool fsync = false) = 0;
 
         virtual void
         write_cfg(const types::Config& cfg) = 0;
@@ -69,7 +69,7 @@ namespace storage
         exists_db(const std::string& name) = 0;
 
         virtual void
-        write_ms(const types::MetaSchema& ms) = 0;
+        write_ms(const types::MetaSchema& ms, bool fsync = false) = 0;
 
         virtual void
         delete_mt(const types::MetaTable& table) = 0;

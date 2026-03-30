@@ -55,16 +55,16 @@ namespace storage
         write_page(const types::DataPage& page, bool fsync) override;
 
         void
-        write_mt(const types::MetaTable& table, const std::string& schema_name) override;
+        write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync) override;
 
         void
-        write_mt(const types::MetaTable& table) override;
+        write_mt(const types::MetaTable& table, bool fsync) override;
 
         void
         write_cfg(const types::Config& cfg) override;
 
         void
-        write_ms(const types::MetaSchema& ms) override;
+        write_ms(const types::MetaSchema& ms, bool fsync) override;
 
         void
         delete_mt(const types::MetaTable& table) override;
