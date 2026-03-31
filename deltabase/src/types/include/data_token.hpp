@@ -10,7 +10,6 @@
 #include "data_type.hpp"
 
 #include <cassert>
-#include <cstdint>
 #include <cstring>
 
 namespace types

@@ -8,7 +8,7 @@
 
 namespace types
 {
-    using PageId = Uuid;
+    using DataPageId = Uuid;
 }
 
 #endif // DELTABASE_PAGE_ID_HPP

@@ -83,7 +83,9 @@ namespace storage
     }
 
     void
-    FileIOManager::for_each_table(const std::function<void(fs::directory_entry table_dir)>& func) const
+    FileIOManager::for_each_table(
+        const std::function<void(fs::directory_entry table_dir)>& func
+    ) const
     {
         for_each_in_db(
             [&](const fs::directory_entry& schema_entry)
@@ -391,8 +393,7 @@ namespace storage
             return *result;
 
         throw std::runtime_error(
-            "FileIOManager::read_table_meta: table with id " + table_id.to_string() +
-            " not found"
+            "FileIOManager::read_table_meta: table with id " + table_id.to_string() + " not found"
         );
     }
 
@@ -443,7 +444,7 @@ namespace storage
     }
 
     std::unique_ptr<DataPage>
-    FileIOManager::read_data_page(PageId id)
+    FileIOManager::read_data_page(DataPageId id)
     {
         const auto page_filename = id.to_string();
         std::unique_ptr<DataPage> result;
@@ -575,11 +576,11 @@ namespace storage
     DataPage
     FileIOManager::create_page(const MetaTable& mt)
     {
-        return create_page(mt, PageId::make());
+        return create_page(mt, DataPageId::make());
     }
 
     DataPage
-    FileIOManager::create_page(const MetaTable& mt, const PageId& page_id)
+    FileIOManager::create_page(const MetaTable& mt, const DataPageId& page_id)
     {
         auto ms = read_schema_meta(mt.schema_id);
         auto data_path = path_db_schema_table_data(db_path_, db_name_, ms.name, mt.name);
@@ -593,44 +594,72 @@ namespace storage
         return fs::exists(path) && fs::is_regular_file(path);
     }
 
-    std::unordered_map<TableId, std::vector<PageId>>
+    std::unordered_map<TableId, std::vector<DataPageId>>
     FileIOManager::map_tables_pages()
     {
-        std::unordered_map<TableId, std::vector<PageId>> result;
+        std::unordered_map<TableId, std::vector<DataPageId>> result;
 
-        for_each_table([this, &result](const fs::directory_entry& table_dir)
-        {
-            const auto table_name = table_dir.path().filename().string();
-            const auto meta_path = table_dir.path() / make_meta_filename(table_name);
-
-            if (!fs::exists(meta_path) || !fs::is_regular_file(meta_path))
-                return;
-
-            auto content = read_file(meta_path);
-            MetaTable table;
-            misc::ReadOnlyMemoryStream stream(content);
-            if (!serializer_->deserialize_mt(stream, table))
-                throw std::runtime_error(
-                    "FileIOManager::map_tables_pages: failed to deserialize meta table " +
-                    meta_path.string()
-                );
-
-            auto data_dir = table_dir.path() / PATH_DATA;
-            if (!fs::exists(data_dir) || !fs::is_directory(data_dir))
-                return;
-
-            std::vector<PageId> page_ids;
-            for (const auto& page_entry : fs::directory_iterator(data_dir))
+        for_each_table(
+            [this, &result](const fs::directory_entry& table_dir)
             {
-                if (!page_entry.is_regular_file())
-                    continue;
+                const auto table_name = table_dir.path().filename().string();
+                const auto meta_path = table_dir.path() / make_meta_filename(table_name);
 
-                page_ids.push_back(PageId(page_entry.path().filename().string()));
+                if (!fs::exists(meta_path) || !fs::is_regular_file(meta_path))
+                    return;
+
+                auto content = read_file(meta_path);
+                MetaTable table;
+                misc::ReadOnlyMemoryStream stream(content);
+                if (!serializer_->deserialize_mt(stream, table))
+                    throw std::runtime_error(
+                        "FileIOManager::map_tables_pages: failed to deserialize meta table " +
+                        meta_path.string()
+                    );
+
+                auto data_dir = table_dir.path() / PATH_DATA;
+                if (!fs::exists(data_dir) || !fs::is_directory(data_dir))
+                    return;
+
+                std::vector<DataPageId> page_ids;
+                for (const auto& page_entry : fs::directory_iterator(data_dir))
+                {
+                    if (!page_entry.is_regular_file())
+                        continue;
+
+                    page_ids.push_back(DataPageId(page_entry.path().filename().string()));
+                }
+
+                result[table.id] = std::move(page_ids);
             }
-
-            result[table.id] = std::move(page_ids);
-        });
+        );
 
         return result;
+    }
+
+    void
+    FileIOManager::create_index_file(
+        const std::string& schema_name, const std::string& table_name, const MetaIndex& mi
+    )
+    {
+        IndexPage root;
+        root.id = 1;
+        root.index_id = mi.id;
+        root.is_leaf = true;
+        root.parent = 0;
+        root.data = LeafIndexNode{ .keys = {}, .rows = {}, .next_leaf = 0};
+
+        IndexFile file;
+        file.index_id = mi.id;
+        file.root_page = root.id;
+        file.last_page = root.id;
+        file.pages.push_back(std::move(root));
+
+        auto serialized = serializer_->serialize_if(file);
+        auto content = serialized.to_vector();
+
+        auto path = path_db_schema_table_index(db_path_, db_name_, schema_name, table_name, mi.name);
+        fs::create_directories(path.parent_path());
+        write_file(path, content);
     }
 } // namespace storage

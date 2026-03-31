@@ -29,7 +29,7 @@ namespace storage
     DataPage*
     BufferPool::create_dp(const MetaTable& mt)
     {
-        PageId id = PageId::make();
+        DataPageId id = DataPageId::make();
         DataPage new_page = io_.create_page(mt, id);
         data_pages_.put(id, std::move(new_page), flusher_);
 
@@ -43,13 +43,13 @@ namespace storage
     }
 
     void
-    BufferPool::put_dp(const PageId& page_id, DataPage&& page)
+    BufferPool::put_dp(const DataPageId& page_id, DataPage&& page)
     {
         data_pages_.put(page_id, {std::move(page)}, flusher_);
     }
 
     DataPage*
-    BufferPool::get_dp(const PageId& page_id)
+    BufferPool::get_dp(const DataPageId& page_id)
     {
         auto* entry = data_pages_.get(page_id);
 
@@ -120,8 +120,14 @@ namespace storage
         return pages;
     }
 
+    std::vector<IndexPage*>
+    BufferPool::get_table_index(const Uuid& table_id, const IndexId& index_id)
+    {
+
+    }
+
     DataPage*
-    BufferPool::dirty_dp(const PageId& page_id)
+    BufferPool::dirty_dp(const DataPageId& page_id)
     {
         data_pages_.mark_dirty(page_id);
         auto* entry = data_pages_.get(page_id);

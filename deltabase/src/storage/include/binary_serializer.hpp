@@ -5,10 +5,12 @@
 #ifndef DELTABASE_BINARY_SERIALIZER_HPP
 #define DELTABASE_BINARY_SERIALIZER_HPP
 #include "../../misc/include/memory_stream.hpp"
+#include "../../types/include/config.hpp"
+#include "../../types/include/data_page.hpp"
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/meta_table.hpp"
-#include "../../types/include/data_page.hpp"
-#include "../../types/include/config.hpp"
+#include "index_file.hpp"
+#include "index_page.hpp"
 
 namespace storage
 {
@@ -36,6 +38,12 @@ namespace storage
         serialize_dp(const types::DataPage& page) const = 0;
 
         virtual misc::MemoryStream
+        serialize_ip(const types::IndexPage& page) const = 0;
+
+        virtual misc::MemoryStream
+        serialize_if(const types::IndexFile& file) const = 0;
+
+        virtual misc::MemoryStream
         serialize_dr(const types::DataRow& row) const = 0;
 
         virtual misc::MemoryStream
@@ -55,6 +63,12 @@ namespace storage
 
         virtual bool
         deserialize_dp(misc::ReadOnlyMemoryStream& content, types::DataPage& out) const = 0;
+
+        virtual bool
+        deserialize_if(misc::ReadOnlyMemoryStream& content, types::IndexFile& out) const = 0;
+
+        virtual bool
+        deserialize_ip(misc::ReadOnlyMemoryStream& content, types::IndexPage& out) const = 0;
 
         virtual bool
         deserialize_cfg(misc::ReadOnlyMemoryStream& content, types::Config& out) const = 0;

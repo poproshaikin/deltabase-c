@@ -386,6 +386,7 @@ namespace storage
         CreateIndexRecord record(mi);
         txn.append_log(record);
 
+        io_manager_->create_index_file(schema_name, table_name, mi);
         table->indexes.push_back(std::move(mi));
     }
 } // namespace storage

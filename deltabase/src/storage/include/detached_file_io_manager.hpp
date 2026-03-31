@@ -79,7 +79,7 @@ namespace storage
         create_page(const types::MetaTable& mt) override;
 
         types::DataPage
-        create_page(const types::MetaTable& mt, const types::PageId& page_id) override;
+        create_page(const types::MetaTable& mt, const types::DataPageId& page_id) override;
 
         bool
         exists_schema(const std::string& schema_name) override;
@@ -88,10 +88,15 @@ namespace storage
         read_table_meta(const types::Uuid& table_id) override;
 
         std::unique_ptr<types::DataPage>
-        read_data_page(types::PageId id) override;
+        read_data_page(types::DataPageId id) override;
 
-        std::unordered_map<types::TableId, std::vector<types::PageId>>
+        std::unordered_map<types::TableId, std::vector<types::DataPageId>>
         map_tables_pages() override;
+
+        void
+        create_index_file(
+            const std::string& string, const std::string& table_name, const types::MetaIndex& mi
+        ) override;
     };
 } // namespace storage
 

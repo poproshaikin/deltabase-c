@@ -174,6 +174,85 @@ namespace storage
     }
 
     MemoryStream
+    StdBinarySerializer::serialize_if(const IndexFile& file) const
+    {
+        MemoryStream stream;
+
+        stream.write(file.index_id.raw(), sizeof(uuid_t));
+        stream.write(&file.root_page, sizeof(file.root_page));
+        uint64_t pages_count = file.pages.size();
+        stream.write(&pages_count, sizeof(pages_count));
+
+        for (const auto& page : file.pages)
+        {
+            auto serialized_page = serialize_ip(page);
+            stream.append(serialized_page, serialized_page.size());
+        }
+
+        stream.seek(0);
+        return stream;
+    }
+
+    MemoryStream
+    StdBinarySerializer::serialize_ip(const IndexPage& page) const
+    {
+        MemoryStream stream;
+
+        stream.write(&page.id, sizeof(page.id));
+        stream.write(&page.parent, sizeof(page.parent));
+        stream.write(page.index_id.raw(), sizeof(uuid_t));
+        stream.write(&page.is_leaf, sizeof(uuid_t));
+
+        if (std::holds_alternative<InternalIndexNode>(page.data))
+        {
+            const auto& internal = std::get<InternalIndexNode>(page.data);
+
+            uint64_t keys_count = internal.keys.size();
+            stream.write(&keys_count, sizeof(keys_count));
+            for (const auto& key : internal.keys)
+            {
+                auto serialized_token = serialize_dt(key);
+                stream.append(serialized_token, serialized_token.size());
+            }
+            uint64_t children_count = internal.children.size();
+            stream.write(&children_count, sizeof(children_count));
+            for (auto child_id : internal.children)
+            {
+                stream.write(&child_id, sizeof(child_id));
+            }
+        }
+        else if (std::holds_alternative<LeafIndexNode>(page.data))
+        {
+            const auto& leaf = std::get<LeafIndexNode>(page.data);
+
+            uint64_t keys_count = leaf.keys.size();
+            stream.write(&keys_count, sizeof(keys_count));
+            for (const auto& key : leaf.keys)
+            {
+                auto serialized_token = serialize_dt(key);
+                stream.append(serialized_token, serialized_token.size());
+            }
+
+            uint64_t rows_count = leaf.rows.size();
+            stream.write(&rows_count, sizeof(rows_count));
+            for (const auto& row : leaf.rows)
+            {
+                stream.write(row.first.raw(), sizeof(uuid_t));
+                stream.write(&row.second, sizeof(row.second));
+            }
+
+            stream.write(&leaf.next_leaf, sizeof(leaf.next_leaf));
+        }
+        else
+        {
+            throw std::runtime_error("StdBinarySerializer::serialize_ip");
+        }
+
+        stream.seek(0);
+        return stream;
+    }
+
+    MemoryStream
     StdBinarySerializer::serialize_dr(const DataRow& row) const
     {
         MemoryStream stream;
@@ -359,6 +438,127 @@ namespace storage
 
         return true;
     }
+
+    bool
+    StdBinarySerializer::deserialize_if(ReadOnlyMemoryStream& content, IndexFile& out) const
+    {
+        if (content.read(out.index_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
+            return false;
+
+        if (content.read(&out.root_page, sizeof(out.root_page)) != sizeof(out.root_page))
+            return false;
+
+        uint64_t pages_count = 0;
+        if (content.read(&pages_count, sizeof(pages_count)) != sizeof(pages_count))
+            return false;
+
+        out.pages.clear();
+        out.pages.reserve(pages_count);
+
+        for (uint64_t i = 0; i < pages_count; ++i)
+        {
+            IndexPage page;
+            if (!deserialize_ip(content, page))
+                return false;
+
+            out.pages.push_back(std::move(page));
+        }
+
+        return true;
+    }
+
+    bool
+    StdBinarySerializer::deserialize_ip(ReadOnlyMemoryStream& content, IndexPage& out) const
+    {
+        if (content.read(&out.id, sizeof(out.id)) != sizeof(out.id))
+            return false;
+
+        if (content.read(&out.parent, sizeof(out.parent)) != sizeof(out.parent))
+            return false;
+
+        if (content.read(out.index_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
+            return false;
+
+        if (content.read(&out.is_leaf, sizeof(out.is_leaf)) != sizeof(out.is_leaf))
+            return false;
+
+        if (out.is_leaf)
+        {
+            LeafIndexNode leaf;
+
+            uint64_t keys_count = 0;
+            if (content.read(&keys_count, sizeof(keys_count)) != sizeof(keys_count))
+                return false;
+
+            leaf.keys.clear();
+            leaf.keys.reserve(keys_count);
+            for (uint64_t i = 0; i < keys_count; ++i)
+            {
+                DataToken key;
+                if (!deserialize_dt(content, key))
+                    return false;
+                leaf.keys.push_back(std::move(key));
+            }
+
+            uint64_t rows_count = 0;
+            if (content.read(&rows_count, sizeof(rows_count)) != sizeof(rows_count))
+                return false;
+
+            leaf.rows.clear();
+            leaf.rows.reserve(rows_count);
+            for (uint64_t i = 0; i < rows_count; ++i)
+            {
+                RowPtr row_ptr;
+                if (content.read(row_ptr.first.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
+                    return false;
+                if (content.read(&row_ptr.second, sizeof(row_ptr.second)) != sizeof(row_ptr.second))
+                    return false;
+                leaf.rows.push_back(row_ptr);
+            }
+
+            if (content.read(&leaf.next_leaf, sizeof(leaf.next_leaf)) != sizeof(leaf.next_leaf))
+                return false;
+
+            out.data = leaf;
+        }
+        else
+        {
+            InternalIndexNode internal;
+
+            uint64_t keys_count = 0;
+            if (content.read(&keys_count, sizeof(keys_count)) != sizeof(keys_count))
+                return false;
+
+            internal.keys.clear();
+            internal.keys.reserve(keys_count);
+            for (uint64_t i = 0; i < keys_count; ++i)
+            {
+                DataToken key;
+                if (!deserialize_dt(content, key))
+                    return false;
+                internal.keys.push_back(std::move(key));
+            }
+
+            uint64_t children_count = 0;
+            if (content.read(&children_count, sizeof(children_count)) != sizeof(children_count))
+                return false;
+
+            internal.children.clear();
+            internal.children.reserve(children_count);
+            for (uint64_t i = 0; i < children_count; ++i)
+            {
+                IndexPageId child_id = 0;
+                if (content.read(&child_id, sizeof(child_id)) != sizeof(child_id))
+                    return false;
+                internal.children.push_back(child_id);
+            }
+
+            out.data = internal;
+        }
+
+        return true;
+    }
+
     bool
     StdBinarySerializer::deserialize_cfg(ReadOnlyMemoryStream& stream, Config& out) const
     {

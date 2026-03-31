@@ -20,7 +20,7 @@ namespace types
         IndexId id;
         TableId table_id;
         ColumnId column_id;
-        PageId root_page_id;
+        DataPageId root_page_id;
         std::string name;
         DataType key_type;
         bool is_unique;

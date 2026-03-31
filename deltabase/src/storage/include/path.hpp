@@ -24,6 +24,7 @@ namespace storage
     static const std::string PATH_DATA = "data";
     static const std::string PATH_WAL = "wal";
     static const std::string PATH_META = "meta";
+    static const std::string PATH_INDEX = "index";
 
     inline std::string
     make_meta_filename(const std::string& name)
@@ -130,6 +131,18 @@ namespace storage
     )
     {
         return data_dir / db_name / schema_name / make_meta_filename(schema_name);
+    }
+
+    inline fs::path
+    path_db_schema_table_index(
+        const fs::path& db_path,
+        const std::string& db_name,
+        const std::string& schema_name,
+        const std::string& table_name,
+        const std::string& index_name
+    )
+    {
+        return db_path / db_name / schema_name / table_name / PATH_INDEX / index_name;
     }
 
 } // namespace storage

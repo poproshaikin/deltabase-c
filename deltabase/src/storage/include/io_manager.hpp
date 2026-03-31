@@ -48,7 +48,7 @@ namespace storage
         read_tables_data() = 0;
 
         virtual std::unique_ptr<types::DataPage>
-        read_data_page(types::PageId id) = 0;
+        read_data_page(types::DataPageId id) = 0;
 
         virtual uint64_t
         estimate_size(const types::DataRow& row) = 0;
@@ -81,13 +81,16 @@ namespace storage
         create_page(const types::MetaTable& mt) = 0;
 
         virtual types::DataPage
-        create_page(const types::MetaTable& mt, const types::PageId& page_id) = 0;
+        create_page(const types::MetaTable& mt, const types::DataPageId& page_id) = 0;
 
         virtual bool
         exists_schema(const std::string& schema_name) = 0;
 
-        virtual std::unordered_map<types::TableId, std::vector<types::PageId>>
+        virtual std::unordered_map<types::TableId, std::vector<types::DataPageId>>
         map_tables_pages() = 0;
+
+        virtual void
+        create_index_file(const std::string& string, const std::string& table_name, const types::MetaIndex& mi) = 0;
     };
 }
 

@@ -133,7 +133,7 @@ namespace storage
     }
 
     types::DataPage
-    DetachedFileIOManager::create_page(const types::MetaTable& mt, const types::PageId& page_id)
+    DetachedFileIOManager::create_page(const types::MetaTable& mt, const types::DataPageId& page_id)
     {
         throw std::logic_error("DetachedFileIOManager::create_page: unsupported method");
     }
@@ -151,13 +151,21 @@ namespace storage
     }
 
     std::unique_ptr<types::DataPage>
-    DetachedFileIOManager::read_data_page(types::PageId id)
+    DetachedFileIOManager::read_data_page(types::DataPageId id)
     {
         throw std::logic_error("DetachedFileIOManager::read_data_page: unsupported method");
     }
-    std::unordered_map<types::TableId, std::vector<types::PageId>>
+    std::unordered_map<types::TableId, std::vector<types::DataPageId>>
     DetachedFileIOManager::map_tables_pages()
     {
         throw std::logic_error("DetachedFileIOManager::map_tables_pages: unsupported method");
+    }
+
+    void
+    DetachedFileIOManager::create_index_file(
+        const std::string& string, const std::string& table_name, const types::MetaIndex& mi
+    )
+    {
+        throw std::logic_error("DetachedFileIOManager::create_index_file: unsupported method");
     }
 } // namespace storage

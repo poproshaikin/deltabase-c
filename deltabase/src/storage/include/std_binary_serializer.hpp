@@ -40,6 +40,12 @@ namespace storage
         serialize_dp(const types::DataPage& page) const override;
 
         misc::MemoryStream
+        serialize_if(const types::IndexFile& file) const override;
+
+        misc::MemoryStream
+        serialize_ip(const types::IndexPage& page) const override;
+
+        misc::MemoryStream
         serialize_dr(const types::DataRow& row) const override;
 
         misc::MemoryStream
@@ -62,6 +68,12 @@ namespace storage
 
         bool
         deserialize_dp(misc::ReadOnlyMemoryStream& stream, types::DataPage& out) const override;
+
+        bool
+        deserialize_if(misc::ReadOnlyMemoryStream& content, types::IndexFile& out) const override;
+
+        bool
+        deserialize_ip(misc::ReadOnlyMemoryStream& content, types::IndexPage& out) const override;
 
         bool
         deserialize_cfg(misc::ReadOnlyMemoryStream& stream, types::Config& out) const override;

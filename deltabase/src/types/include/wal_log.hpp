@@ -65,7 +65,7 @@ namespace types
         concept HasPageId_c = requires(const T& x) {
             x.page_id;
 
-            requires std::same_as<decltype(x.page_id), PageId>;
+            requires std::same_as<decltype(x.page_id), DataPageId>;
         };
     }; // namespace detail
 
@@ -78,11 +78,11 @@ namespace types
         Uuid txn_id = Uuid::null();
 
         Uuid table_id;
-        PageId page_id;
+        DataPageId page_id;
         DataRow after;
 
         InsertRecord() = default;
-        InsertRecord(const Uuid& table_id, const PageId& page_id, DataRow after)
+        InsertRecord(const Uuid& table_id, const DataPageId& page_id, DataRow after)
             : table_id(table_id), page_id(page_id), after(std::move(after))
         {
         }
@@ -92,7 +92,7 @@ namespace types
             LSN prev_lsn,
             const Uuid& txn_id,
             const Uuid& table_id,
-            const PageId& page_id,
+            const DataPageId& page_id,
             DataRow after
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
@@ -110,12 +110,12 @@ namespace types
         Uuid txn_id = Uuid::null();
 
         Uuid table_id;
-        PageId page_id;
+        DataPageId page_id;
         DataRow before;
         DataRow after;
 
         UpdateRecord() = default;
-        UpdateRecord(const Uuid& table_id, const PageId& page_id, DataRow before, DataRow after)
+        UpdateRecord(const Uuid& table_id, const DataPageId& page_id, DataRow before, DataRow after)
             : table_id(table_id), page_id(page_id), before(std::move(before)),
               after(std::move(after))
         {
@@ -126,7 +126,7 @@ namespace types
                         LSN prev_lsn,
                         const Uuid& txn_id,
                         const Uuid& table_id,
-                        const PageId& page_id,
+                        const DataPageId& page_id,
                         DataRow before,
                         DataRow after
                 )
@@ -145,11 +145,11 @@ namespace types
         Uuid txn_id = Uuid::null();
 
         Uuid table_id;
-        PageId page_id;
+        DataPageId page_id;
         DataRow before;
 
         DeleteRecord() = default;
-        DeleteRecord(const Uuid& table_id, const PageId& page_id, DataRow before)
+        DeleteRecord(const Uuid& table_id, const DataPageId& page_id, DataRow before)
             : table_id(table_id), page_id(page_id), before(std::move(before))
         {
         }
@@ -159,7 +159,7 @@ namespace types
             LSN prev_lsn,
             const Uuid& txn_id,
             const Uuid& table_id,
-            const PageId& page_id,
+            const DataPageId& page_id,
             DataRow before
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
@@ -176,7 +176,7 @@ namespace types
         LSN prev_lsn;
         Uuid txn_id;
         Uuid table_id;
-        PageId page_id;
+        DataPageId page_id;
         LSN undo_next_lsn;
         DataRow after;
 
@@ -187,7 +187,7 @@ namespace types
             LSN prev_lsn,
             const Uuid& txn_id,
             const Uuid& table_id,
-            const PageId& page_id,
+            const DataPageId& page_id,
             LSN undo_next_lsn,
             DataRow after
         )
@@ -205,7 +205,7 @@ namespace types
         LSN prev_lsn;
         Uuid txn_id;
         Uuid table_id;
-        PageId page_id;
+        DataPageId page_id;
         LSN undo_next_lsn;
         DataRow before;
         DataRow after;
@@ -217,7 +217,7 @@ namespace types
             LSN prev_lsn,
             const Uuid& txn_id,
             const Uuid& table_id,
-            const PageId& page_id,
+            const DataPageId& page_id,
             LSN undo_next_lsn,
             DataRow before,
             DataRow after
@@ -236,7 +236,7 @@ namespace types
         LSN prev_lsn;
         Uuid txn_id;
         Uuid table_id;
-        PageId page_id;
+        DataPageId page_id;
         LSN undo_next_lsn;
         DataRow before;
 
@@ -247,7 +247,7 @@ namespace types
             LSN prev_lsn,
             const Uuid& txn_id,
             const Uuid& table_id,
-            const PageId& page_id,
+            const DataPageId& page_id,
             LSN undo_next_lsn,
             DataRow before
         )
@@ -713,11 +713,11 @@ namespace types
             return std::visit([](const auto& rec) { return rec.lsn; }, record);
         }
 
-        inline PageId
+        inline DataPageId
         extract_page_id(const WALRecord& record)
         {
             return std::visit(
-                []<typename TRecord>(const TRecord& rec) -> PageId
+                []<typename TRecord>(const TRecord& rec) -> DataPageId
                 {
                     if constexpr (std::is_same_v<std::decay_t<TRecord>, InsertRecord> ||
                                   std::is_same_v<std::decay_t<TRecord>, UpdateRecord> ||
