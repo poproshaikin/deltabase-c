@@ -156,9 +156,15 @@ namespace storage
         throw std::logic_error("DetachedFileIOManager::read_data_page: unsupported method");
     }
     std::unordered_map<types::TableId, std::vector<types::DataPageId>>
-    DetachedFileIOManager::map_tables_pages()
+    DetachedFileIOManager::map_data_pages_for_table()
     {
         throw std::logic_error("DetachedFileIOManager::map_tables_pages: unsupported method");
+    }
+
+    std::unordered_map<types::TableId, std::vector<types::IndexId>>
+    DetachedFileIOManager::map_index_files_for_table()
+    {
+        throw std::logic_error("DetachedFileIOManager::map_index_files_for_table: unsupported method");
     }
 
     void
@@ -167,5 +173,17 @@ namespace storage
     )
     {
         throw std::logic_error("DetachedFileIOManager::create_index_file: unsupported method");
+    }
+
+    std::unique_ptr<types::IndexFile>
+    DetachedFileIOManager::read_index_file(const types::IndexId& index_id)
+    {
+        throw std::logic_error("DetachedFileIOManager::read_index_file: unsupported method");
+    }
+
+    void
+    DetachedFileIOManager::write_index_file(const types::IndexFile& index_file, bool fsync)
+    {
+        throw std::logic_error("DetachedFileIOManager::write_index_file: unsupported method");
     }
 } // namespace storage

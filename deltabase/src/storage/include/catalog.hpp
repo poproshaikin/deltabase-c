@@ -13,12 +13,12 @@ namespace storage
 {
     class CatalogCache
     {
-        storage::IIOManager& io_;
+        IIOManager& io_;
         std::unordered_map<types::Uuid, types::MetaTable> tables_;
         std::unordered_map<types::Uuid, types::MetaSchema> schemas_;
 
     public:
-        explicit CatalogCache(storage::IIOManager& io);
+        explicit CatalogCache(IIOManager& io);
         ~CatalogCache();
 
         void

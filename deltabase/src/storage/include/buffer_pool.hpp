@@ -8,7 +8,7 @@
 #include "../../misc/include/LRU_policy.hpp"
 #include "../../misc/include/cache.hpp"
 #include "../../types/include/data_page.hpp"
-#include "../../types/include/index_page.hpp"
+#include "../../types/include/index_file.hpp"
 #include "io_manager.hpp"
 
 namespace storage
@@ -16,28 +16,38 @@ namespace storage
     template <typename TKey, typename TValue>
     using Buffer = misc::Cache<TKey, TValue, cache::LRUPolicy<TKey>>;
     using DataPageBuffer = Buffer<types::DataPageId, types::DataPage>;
-    using IndexPageBuffer = Buffer<types::IndexPageId, types::IndexPage>;
+    using IndexFileBuffer = Buffer<types::IndexId, types::IndexFile>;
 
     class BufferPool
     {
         DataPageBuffer data_pages_;
-        IndexPageBuffer index_pages_;
+        IndexFileBuffer index_files_;
         IIOManager& io_;
 
-        std::unordered_map<types::TableId, std::vector<types::DataPageId>>
-            pages_to_tables_;
+        std::unordered_map<types::TableId, std::vector<types::DataPageId>> data_pages_per_table_;
+
+        std::unordered_map<types::TableId, std::vector<types::IndexId>> index_files_per_table_;
 
         void
         flush(DataPageBuffer::CacheEntry& page_entry);
 
-        std::function<void(DataPageBuffer::CacheEntry&)> flusher_ =
+        void
+        flush(IndexFileBuffer::CacheEntry& index_file_entry);
+
+        std::function<void(DataPageBuffer::CacheEntry&)> data_page_flusher_ =
             [this](DataPageBuffer::CacheEntry& page_entry) { flush(page_entry); };
+
+        std::function<void(IndexFileBuffer::CacheEntry&)> index_file_flusher_ =
+            [this](IndexFileBuffer::CacheEntry& index_file_entry) { flush(index_file_entry); };
 
         types::DataPage*
         create_dp(const types::MetaTable& mt);
 
     public:
-        BufferPool(IIOManager& io) : data_pages_(cache::LRUPolicy<types::DataPageId>{}), index_pages_(cache::LRUPolicy<types::IndexPageId>{}), io_(io)
+        BufferPool(IIOManager& io)
+            : data_pages_(cache::LRUPolicy<types::DataPageId>{}),
+              index_files_(cache::LRUPolicy<types::IndexId>{}),
+              io_(io)
         {
         }
 
@@ -56,15 +66,18 @@ namespace storage
         std::vector<types::DataPage*>
         get_table_data(const types::Uuid& table_id);
 
-        std::vector<types::IndexPage*>
-        get_table_index(const types::Uuid& table_id, const types::IndexId& index_id);
-
         types::DataPage*
         dirty_dp(const types::DataPageId& page_id);
+
+        types::IndexFile*
+        get_table_index(const types::Uuid& table_id, const types::IndexId& index_id);
+
+        types::IndexFile*
+        dirty_if(const types::IndexId& index_id);
 
         void
         flush_dirty();
     };
-} // namespace cache
+} // namespace storage
 
 #endif // DELTABASE_BUFFER_POOL_HPP

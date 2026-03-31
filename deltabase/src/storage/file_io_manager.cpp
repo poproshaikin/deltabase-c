@@ -12,6 +12,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <optional>
 
 namespace storage
 {
@@ -595,7 +596,7 @@ namespace storage
     }
 
     std::unordered_map<TableId, std::vector<DataPageId>>
-    FileIOManager::map_tables_pages()
+    FileIOManager::map_data_pages_for_table()
     {
         std::unordered_map<TableId, std::vector<DataPageId>> result;
 
@@ -637,6 +638,49 @@ namespace storage
         return result;
     }
 
+    std::unordered_map<TableId, std::vector<IndexId>>
+    FileIOManager::map_index_files_for_table()
+    {
+        std::unordered_map<TableId, std::vector<IndexId>> result;
+
+        for_each_table(
+            [this, &result](const fs::directory_entry& table_dir)
+            {
+                const auto table_name = table_dir.path().filename().string();
+                const auto meta_path = table_dir.path() / make_meta_filename(table_name);
+
+                if (!fs::exists(meta_path) || !fs::is_regular_file(meta_path))
+                    return;
+
+                auto content = read_file(meta_path);
+                MetaTable table;
+                misc::ReadOnlyMemoryStream stream(content);
+                if (!serializer_->deserialize_mt(stream, table))
+                    throw std::runtime_error(
+                        "FileIOManager::map_tables_pages: failed to deserialize meta table " +
+                        meta_path.string()
+                    );
+
+                auto data_dir = table_dir.path() / PATH_INDEX;
+                if (!fs::exists(data_dir) || !fs::is_directory(data_dir))
+                    return;
+
+                std::vector<IndexId> page_ids;
+                for (const auto& index_file_entry : fs::directory_iterator(data_dir))
+                {
+                    if (!index_file_entry.is_regular_file())
+                        continue;
+
+                    page_ids.push_back(IndexId(index_file_entry.path().filename().string()));
+                }
+
+                result[table.id] = std::move(page_ids);
+            }
+        );
+
+        return result;
+    }
+
     void
     FileIOManager::create_index_file(
         const std::string& schema_name, const std::string& table_name, const MetaIndex& mi
@@ -658,8 +702,73 @@ namespace storage
         auto serialized = serializer_->serialize_if(file);
         auto content = serialized.to_vector();
 
-        auto path = path_db_schema_table_index(db_path_, db_name_, schema_name, table_name, mi.name);
+        auto path = path_db_schema_table_index(db_path_, db_name_, schema_name, table_name, mi.id.to_string());
         fs::create_directories(path.parent_path());
         write_file(path, content);
+    }
+
+    std::unique_ptr<IndexFile>
+    FileIOManager::read_index_file(const IndexId& index_id)
+    {
+        std::unique_ptr<IndexFile> result;
+
+        for_each_table(
+            [this, &index_id, &result](const fs::directory_entry& table_dir)
+            {
+                if (result)
+                    return;
+
+                const auto index_path = table_dir.path() / PATH_INDEX / index_id.to_string();
+                if (!fs::exists(index_path) || !fs::is_regular_file(index_path))
+                    return;
+
+                auto content = read_file(index_path);
+
+                IndexFile file;
+                misc::ReadOnlyMemoryStream stream(content);
+                if (!serializer_->deserialize_if(stream, file))
+                    throw std::runtime_error(
+                        "FileIOManager::read_index_file: failed to deserialize index file " +
+                        index_path.string()
+                    );
+
+                if (file.index_id != index_id)
+                    throw std::runtime_error(
+                        "FileIOManager::read_index_file: index id mismatch for " +
+                        index_path.string()
+                    );
+
+                result = std::make_unique<IndexFile>(std::move(file));
+            }
+        );
+
+        return result;
+    }
+
+    void
+    FileIOManager::write_index_file(const IndexFile& index_file, bool fsync)
+    {
+        std::optional<fs::path> index_path;
+
+        for_each_table(
+            [&index_file, &index_path](const fs::directory_entry& table_dir)
+            {
+                if (index_path)
+                    return;
+
+                const auto candidate = table_dir.path() / PATH_INDEX / index_file.index_id.to_string();
+                if (fs::exists(candidate) && fs::is_regular_file(candidate))
+                    index_path = candidate;
+            }
+        );
+
+        if (!index_path)
+            throw std::runtime_error(
+                "FileIOManager::write_index_file: index file with id " +
+                index_file.index_id.to_string() + " not found"
+            );
+
+        auto serialized = serializer_->serialize_if(index_file);
+        write_file(*index_path, serialized.to_vector());
     }
 } // namespace storage

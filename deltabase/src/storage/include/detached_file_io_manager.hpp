@@ -15,9 +15,9 @@ namespace storage
     {
         fs::path db_path_;
         std::unique_ptr<IBinarySerializer> serializer_;
+
     public:
-        explicit
-        DetachedFileIOManager(const fs::path& db_path);
+        explicit DetachedFileIOManager(const fs::path& db_path);
 
         void
         init() override;
@@ -55,7 +55,9 @@ namespace storage
         write_page(const types::DataPage& page, bool fsync) override;
 
         void
-        write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync) override;
+        write_mt(
+            const types::MetaTable& table, const std::string& schema_name, bool fsync
+        ) override;
 
         void
         write_mt(const types::MetaTable& table, bool fsync) override;
@@ -91,13 +93,22 @@ namespace storage
         read_data_page(types::DataPageId id) override;
 
         std::unordered_map<types::TableId, std::vector<types::DataPageId>>
-        map_tables_pages() override;
+        map_data_pages_for_table() override;
+
+        std::unordered_map<types::TableId, std::vector<types::IndexId>>
+        map_index_files_for_table() override;
 
         void
         create_index_file(
             const std::string& string, const std::string& table_name, const types::MetaIndex& mi
         ) override;
+
+        std::unique_ptr<types::IndexFile>
+        read_index_file(const types::IndexId& index_id) override;
+
+        void
+        write_index_file(const types::IndexFile& index_file, bool fsync) override;
     };
 } // namespace storage
 
-#endif //DELTABASE_DETACHED_FILE_IO_MANAGER_HPP
+#endif // DELTABASE_DETACHED_FILE_IO_MANAGER_HPP

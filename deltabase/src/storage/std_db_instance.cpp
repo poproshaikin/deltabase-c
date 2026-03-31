@@ -116,8 +116,8 @@ namespace storage
         txn::Transaction& txn
     )
     {
-        auto ms = catalog_->get_schema(schema_name);
-        const auto mt = catalog_->get_table(table_name, ms->id);
+        const auto* ms = catalog_->get_schema(schema_name);
+        auto* mt = catalog_->get_table(table_name, ms->id);
         const auto mt_unchanged = *mt;
 
         DataRow data_row;

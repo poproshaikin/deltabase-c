@@ -8,6 +8,9 @@
 #include "../../types/include/data_page.hpp"
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/meta_table.hpp"
+#include "LRU_policy.hpp"
+#include "cache.hpp"
+#include "index_file.hpp"
 #include <vector>
 
 namespace storage
@@ -87,11 +90,20 @@ namespace storage
         exists_schema(const std::string& schema_name) = 0;
 
         virtual std::unordered_map<types::TableId, std::vector<types::DataPageId>>
-        map_tables_pages() = 0;
+        map_data_pages_for_table() = 0;
+
+        virtual std::unordered_map<types::TableId, std::vector<types::IndexId>>
+        map_index_files_for_table() = 0;
 
         virtual void
         create_index_file(const std::string& string, const std::string& table_name, const types::MetaIndex& mi) = 0;
+
+        virtual std::unique_ptr<types::IndexFile>
+        read_index_file(const types::IndexId& index_id) = 0;
+
+        virtual void
+        write_index_file(const types::IndexFile& index_file, bool fsync = false) = 0;
     };
-}
+} // namespace storage
 
 #endif //DELTABASE_IO_MANAGER_HPP

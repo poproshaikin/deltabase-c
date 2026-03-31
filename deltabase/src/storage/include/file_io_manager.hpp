@@ -124,10 +124,19 @@ namespace storage
         exists_schema(const std::string& schema_name) override;
 
         std::unordered_map<types::TableId, std::vector<types::DataPageId>>
-        map_tables_pages() override;
+        map_data_pages_for_table() override;
+
+        std::unordered_map<types::TableId, std::vector<types::IndexId>>
+        map_index_files_for_table() override;
 
         void
         create_index_file(const std::string& schema_name, const std::string& table_name, const types::MetaIndex& mi) override;
+
+        std::unique_ptr<types::IndexFile>
+        read_index_file(const types::IndexId& index_id) override;
+
+        void
+        write_index_file(const types::IndexFile& index_file, bool fsync) override;
     };
 }
 
