@@ -201,7 +201,7 @@ namespace storage
         stream.write(&page.id, sizeof(page.id));
         stream.write(&page.parent, sizeof(page.parent));
         stream.write(page.index_id.raw(), sizeof(uuid_t));
-        stream.write(&page.is_leaf, sizeof(uuid_t));
+        stream.write(&page.is_leaf, sizeof(page.is_leaf));
 
         if (std::holds_alternative<InternalIndexNode>(page.data))
         {

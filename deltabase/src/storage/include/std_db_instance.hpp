@@ -33,8 +33,7 @@ namespace storage
         has_available_page(const std::vector<const types::DataPage*>& vec, size_t size) const;
 
     public:
-        explicit
-        StdDbInstance(const types::Config& cfg);
+        explicit StdDbInstance(const types::Config& cfg);
 
         ~StdDbInstance() override;
 
@@ -53,6 +52,11 @@ namespace storage
             const std::string& schema_name,
             std::vector<types::DataToken> row,
             txn::Transaction& txn
+        ) override;
+
+        void
+        insert_row_into_indexes(
+            const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id
         ) override;
 
         void
@@ -117,6 +121,6 @@ namespace storage
             txn::Transaction& txn
         ) override;
     };
-}
+} // namespace storage
 
 #endif

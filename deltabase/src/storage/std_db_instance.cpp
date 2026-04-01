@@ -4,6 +4,9 @@
 
 #include "std_db_instance.hpp"
 
+#include "BP_index_pager.hpp"
+#include "exceptions.hpp"
+#include "index_bplus_tree.hpp"
 #include "io_manager_factory.hpp"
 #include "logger.hpp"
 #include "std_binary_serializer.hpp"
@@ -126,6 +129,10 @@ namespace storage
         size_t row_size = io_manager_->estimate_size(data_row);
 
         auto* page = buffer_pool_->prepare_dp(row_size, *mt);
+
+        if (mt->indexes.size() > 0)
+            insert_row_into_indexes(*mt, data_row, page->id);
+
         page->rows.push_back(data_row);
 
         InsertRecord insert_record(mt->id, page->id, data_row);
@@ -137,6 +144,34 @@ namespace storage
         page->last_lsn = page_lsn;
 
         buffer_pool_->dirty_dp(page->id);
+    }
+
+    void
+    StdDbInstance::insert_row_into_indexes(
+        const MetaTable& mt, const DataRow& row, const DataPageId& page_id
+    )
+    {
+        for (auto& mi : mt.indexes)
+        {
+            const auto col_idx = mt.get_column_idx(mi.column_id);
+            if (col_idx < 0)
+                throw std::runtime_error("Index column not found in table schema");
+
+            const auto& key = row.tokens[static_cast<size_t>(col_idx)];
+            const RowPtr row_ptr{page_id, row.id};
+
+            BPIndexPager pager(*buffer_pool_, mt.id, mi.id);
+            IndexBPlusTree tree(pager);
+
+            if (mi.is_unique)
+            {
+                auto existing = tree.find(key);
+                if (existing.has_value())
+                    throw UniqueConstraintViolation(mi.name);
+            }
+
+            tree.insert(key, row_ptr);
+        }
     }
 
     void
@@ -221,8 +256,9 @@ namespace storage
         txn::Transaction& txn
     )
     {
-        const auto table = io_manager_->read_table_meta(table_name, schema_name);
-        std::vector<DataPage> pages = io_manager_->read_table_data(table_name, schema_name);
+        auto* ms = catalog_->get_schema(schema_name);
+        auto* mt = catalog_->get_table(table_name, ms->id);
+        auto pages = buffer_pool_->get_table_data(mt->id);
 
         std::unordered_set<RowId> ids;
         for (const auto& row : rows)
@@ -231,9 +267,9 @@ namespace storage
         for (auto& page : pages)
         {
             bool deleted = false;
-            LSN page_lsn = page.last_lsn;
+            LSN page_lsn = page->last_lsn;
 
-            for (auto& row : page.rows)
+            for (auto& row : page->rows)
             {
                 if (!ids.contains(row.id))
                     continue;
@@ -245,18 +281,17 @@ namespace storage
 
                 row.flags |= DataRowFlags::OBSOLETE;
 
-                DeleteRecord record(table.id, page.id, row);
+                DeleteRecord record(mt->id, page->id, row);
                 txn.append_log(record);
                 page_lsn = std::max(page_lsn, txn.get_last_lsn());
             }
 
             if (deleted)
             {
-                page.last_lsn = page_lsn;
-                io_manager_->write_page(page);
+                page->last_lsn = page_lsn;
+                buffer_pool_->dirty_dp(page->id);
             }
         }
-
     }
 
     MetaTable*

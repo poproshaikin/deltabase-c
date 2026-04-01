@@ -147,4 +147,12 @@ namespace storage
     {
         throw std::logic_error("DetachedDbInstance::create_index: this method is not supported");
     }
+
+    void
+    DetachedDbInstance::insert_row_into_indexes(
+        const MetaTable& mt, const DataRow& row, const DataPageId& page_id
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::insert_row_into_indexes: this method is not supported");
+    }
 } // namespace storage

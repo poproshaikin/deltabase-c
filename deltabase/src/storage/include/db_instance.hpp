@@ -36,6 +36,13 @@ namespace storage
         ) = 0;
 
         virtual void
+        insert_row_into_indexes(
+            const types::MetaTable& mt,
+            const types::DataRow& row,
+            const types::DataPageId& page_id
+        ) = 0;
+
+        virtual void
         update_row(
             const std::string& table_name,
             const std::string& schema_name,

@@ -98,6 +98,11 @@ namespace storage
             bool is_unique,
             txn::Transaction& txn
         ) override;
+
+        void
+        insert_row_into_indexes(
+            const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id
+        ) override;
     };
 }
 

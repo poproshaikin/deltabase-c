@@ -68,4 +68,13 @@ public:
     }
 };
 
+class UniqueConstraintViolation : public std::runtime_error
+{
+public:
+    UniqueConstraintViolation(const std::string& constraint_name)
+        : std::runtime_error("Unique constraint violation: " + constraint_name)
+    {
+    }
+};
+
 #endif

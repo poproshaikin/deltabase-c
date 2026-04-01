@@ -8,9 +8,8 @@
 #include "../../types/include/data_page.hpp"
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/meta_table.hpp"
-#include "LRU_policy.hpp"
-#include "cache.hpp"
-#include "index_file.hpp"
+#include "../../types/include/index_file.hpp"
+#include "../../misc/include/LRU_policy.hpp"
 #include <vector>
 
 namespace storage

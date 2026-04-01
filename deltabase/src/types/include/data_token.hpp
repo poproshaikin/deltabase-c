@@ -77,6 +77,24 @@ namespace types
         }
     };
 
+    bool
+    operator==(const DataToken& lhs, const DataToken& rhs);
+
+    bool
+    operator!=(const DataToken& lhs, const DataToken& rhs);
+
+    bool
+    operator<(const DataToken& lhs, const DataToken& rhs);
+
+    bool
+    operator<=(const DataToken& lhs, const DataToken& rhs);
+
+    bool
+    operator>(const DataToken& lhs, const DataToken& rhs);
+
+    bool
+    operator>=(const DataToken& lhs, const DataToken& rhs);
+
 }
 
 #endif //DELTABASE_DATA_TOKEN_HPP

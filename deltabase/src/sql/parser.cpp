@@ -91,7 +91,7 @@ namespace sql
             if (match(SqlKeyword::SCHEMA))
                 return AstNode(AstNodeType::CREATE_SCHEMA, parse_create_schema());
 
-            if (match(SqlKeyword::INDEX))
+            if (match(SqlKeyword::INDEX) || match(SqlKeyword::UNIQUE))
                 return AstNode(AstNodeType::CREATE_INDEX, parse_create_index());
         }
 
