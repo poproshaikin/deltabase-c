@@ -85,7 +85,11 @@ namespace wal
         misc::MemoryStream
         serialize(const types::CLRCreateIndexRecord& record) const;
 
-        // ---
+        misc::MemoryStream
+        serialize(const types::DropIndexRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRDropIndexRecord& record) const;
 
     public:
         misc::MemoryStream

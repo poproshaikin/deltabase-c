@@ -5,8 +5,6 @@
 #ifndef DELTABASE_SQL_TOKEN_HPP
 #define DELTABASE_SQL_TOKEN_HPP
 
-#include <iostream>
-#include <ostream>
 #include <stdexcept>
 #include <unordered_map>
 #include <variant>

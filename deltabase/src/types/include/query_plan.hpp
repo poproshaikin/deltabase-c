@@ -31,7 +31,8 @@ namespace types
             DELETE,
             CREATE_DB,
             CREATE_TABLE,
-            CREATE_INDEX
+            CREATE_INDEX,
+            DROP_INDEX
         };
 
         virtual constexpr Type
@@ -52,25 +53,26 @@ namespace types
             DELETE,
             CREATE_DB,
             CREATE_TABLE,
-            CREATE_INDEX
+            CREATE_INDEX,
+            DROP_INDEX
         };
 
         Type type = Type::UNDEFINED;
         std::unique_ptr<IPlanNode> root;
     };
 
-    struct UnaryPlanNode : public IPlanNode
+    struct UnaryPlanNode : IPlanNode
     {
         std::unique_ptr<IPlanNode> child;
 
         explicit UnaryPlanNode(std::unique_ptr<IPlanNode> child) : child(std::move(child)) {};
     };
 
-    struct LeafPlanNode : public IPlanNode
+    struct LeafPlanNode : IPlanNode
     {
     };
 
-    struct SeqScanPlanNode final : public LeafPlanNode
+    struct SeqScanPlanNode final : LeafPlanNode
     {
         std::string table_name;
         std::string schema_name;
@@ -286,6 +288,27 @@ namespace types
         type() const override
         {
             return Type::CREATE_INDEX;
+        }
+    };
+
+    struct DropIndexPlanNode final : LeafPlanNode
+    {
+        std::string index_name;
+        std::string table_name;
+        std::string schema_name;
+
+        explicit DropIndexPlanNode(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name
+        ) : index_name(index_name), table_name(table_name), schema_name(schema_name)
+        {
+        }
+
+        constexpr Type
+        type() const override
+        {
+            return Type::DROP_INDEX;
         }
     };
 } // namespace types

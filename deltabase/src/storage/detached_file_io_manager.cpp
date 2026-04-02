@@ -167,7 +167,7 @@ namespace storage
         throw std::logic_error("DetachedFileIOManager::map_index_files_for_table: unsupported method");
     }
 
-    void
+    types::IndexFile
     DetachedFileIOManager::create_index_file(
         const std::string& string, const std::string& table_name, const types::MetaIndex& mi
     )

@@ -111,6 +111,22 @@ namespace storage
         return -1;
     }
 
+    bool
+    StdDbInstance::is_row_obsolete(const RowPtr& row_ptr) const
+    {
+        const auto* page = buffer_pool_->get_dp(row_ptr.first);
+        if (!page)
+            return false;
+
+        for (const auto& row : page->rows)
+        {
+            if (row.id == row_ptr.second)
+                return has_flag(row.flags, DataRowFlags::OBSOLETE);
+        }
+
+        return false;
+    }
+
     void
     StdDbInstance::insert_row(
         const std::string& table_name,
@@ -166,7 +182,7 @@ namespace storage
             if (mi.is_unique)
             {
                 auto existing = tree.find(key);
-                if (existing.has_value())
+                if (existing.has_value() && !is_row_obsolete(existing.value()))
                     throw UniqueConstraintViolation(mi.name);
             }
 
@@ -237,6 +253,10 @@ namespace storage
 
                 page->rows.push_back(new_row);
                 page->max_rid = std::max(page->max_rid, new_row.id);
+
+                if (mt->indexes.size() > 0)
+                    insert_row_into_indexes(*mt, new_row, page->id);
+
                 updated = true;
             }
 
@@ -327,7 +347,7 @@ namespace storage
     bool
     StdDbInstance::exists_table(const std::string& table_name, const std::string& schema_name)
     {
-        return get_table(table_name, schema_name) != nullptr;;
+        return get_table(table_name, schema_name) != nullptr;
     }
 
     bool
@@ -421,7 +441,102 @@ namespace storage
         CreateIndexRecord record(mi);
         txn.append_log(record);
 
-        io_manager_->create_index_file(schema_name, table_name, mi);
+        buffer_pool_->create_table_index(schema_name, table_name, mi);
+
+        const auto col_idx = table->get_column_idx(column.id);
+        if (col_idx < 0)
+            throw std::runtime_error("Index column not found in table schema");
+
+        BPIndexPager pager(*buffer_pool_, table->id, mi.id);
+        IndexBPlusTree tree(pager);
+
+        auto pages = buffer_pool_->get_table_data(table->id);
+
+        for (const auto& page : pages)
+        {
+            for (const auto& row : page->rows)
+            {
+                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    continue;
+
+                const auto& key = row.tokens[static_cast<size_t>(col_idx)];
+                const RowPtr row_ptr{page->id, row.id};
+
+                if (is_unique)
+                {
+                    auto existing = tree.find(key);
+                    if (existing.has_value() && !is_row_obsolete(existing.value()))
+                        throw UniqueConstraintViolation(mi.name);
+                }
+
+                tree.insert(key, row_ptr);
+            }
+        }
+
         table->indexes.push_back(std::move(mi));
+    }
+
+    bool
+    StdDbInstance::exists_index(
+        const std::string& index_name, const std::string& table_name, const std::string& schema_name
+    )
+    {
+        return get_index(index_name, table_name, schema_name) != nullptr;
+    }
+
+    bool
+    StdDbInstance::exists_index(
+        const std::string& index_name, const TableIdentifier& table_identifier
+    )
+    {
+        return get_index(index_name, table_identifier) != nullptr;
+    }
+
+    MetaIndex*
+    StdDbInstance::get_index(
+        const std::string& index_name, const std::string& table_name, const std::string& schema_name
+    )
+    {
+        const auto* schema = catalog_->get_schema(schema_name);
+        auto* table = catalog_->get_table(table_name, schema->id);
+
+        for (auto& index : table->indexes)
+            if (index.name == index_name)
+                return &index;
+
+        return nullptr;
+    }
+
+    MetaIndex*
+    StdDbInstance::get_index(
+        const std::string& index_name, const TableIdentifier& identifier
+    )
+    {
+        std::string schema_name = identifier.schema_name.has_value()
+                                      ? identifier.schema_name.value().value
+                                      : cfg_.default_schema;
+
+        return get_index(index_name, identifier.table_name.value, schema_name);
+    }
+
+    void
+    StdDbInstance::drop_index(
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& schema_name,
+        txn::Transaction& txn
+    )
+    {
+        auto* table = get_table(table_name, schema_name);
+        auto* index = get_index(index_name, table_name, schema_name);
+        if (!index)
+            throw std::runtime_error("StdDbInstance::drop_index");
+
+        const auto index_unchanged = *index;
+
+        std::erase_if(table->indexes, [&index](MetaIndex& index_entry) { return index_entry.id == index->id; });
+
+        DropIndexRecord record(index_unchanged);
+        txn.append_log(record);
     }
 } // namespace storage

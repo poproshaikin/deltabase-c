@@ -155,4 +155,47 @@ namespace storage
     {
         throw std::logic_error("DetachedDbInstance::insert_row_into_indexes: this method is not supported");
     }
+
+    bool
+    DetachedDbInstance::exists_index(
+        const std::string& index_name, const std::string& table_name, const std::string& schema_name
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::exists_index: this method is not supported");
+    }
+
+    bool
+    DetachedDbInstance::exists_index(
+        const std::string& index_name, const TableIdentifier& table_identifier
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::exists_index: this method is not supported");
+    }
+
+    MetaIndex*
+    DetachedDbInstance::get_index(
+        const std::string& index_name, const std::string& table_name, const std::string& schema_name
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::get_index: this method is not supported");
+    }
+
+    MetaIndex*
+    DetachedDbInstance::get_index(
+        const std::string& index_name, const types::TableIdentifier& table_identifier
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::get_index: this method is not supported");
+    }
+
+    void
+    DetachedDbInstance::drop_index(
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& schema_name,
+        txn::Transaction& txn
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::get_index: this method is not supported");
+    }
 } // namespace storage

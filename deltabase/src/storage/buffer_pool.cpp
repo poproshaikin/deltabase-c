@@ -159,6 +159,16 @@ namespace storage
         return entry ? &entry->value : nullptr;
     }
 
+    void
+    BufferPool::create_table_index(
+        const std::string& schema_name, const std::string& table_name, const MetaIndex& index
+    )
+    {
+        IndexFile file = io_.create_index_file(schema_name, table_name, index);
+        index_files_.put(index.id, std::move(file), index_file_flusher_);
+        index_files_.mark_dirty(file.index_id);
+    }
+
     IndexFile*
     BufferPool::dirty_if(const IndexId& index_id)
     {

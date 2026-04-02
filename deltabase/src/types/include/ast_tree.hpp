@@ -28,6 +28,7 @@ namespace types
         CREATE_DATABASE,
         CREATE_SCHEMA,
         CREATE_INDEX,
+        DROP_INDEX,
     };
 
     enum class AstOperator
@@ -161,6 +162,12 @@ namespace types
         bool is_unique;
     };
 
+    struct DropIndexStatement
+    {
+        TableIdentifier table;
+        SqlToken index_name;
+    };
+
     struct CreateDbStatement
     {
         SqlToken name;
@@ -177,6 +184,7 @@ namespace types
         CreateDbStatement,
         CreateSchemaStatement,
         CreateIndexStatement,
+        DropIndexStatement,
         ColumnDefinition>;
 
     struct AstNode

@@ -44,6 +44,9 @@ namespace exq
         case AstNodeType::CREATE_INDEX:
             return analyze_create_index(std::get<CreateIndexStatement>(node.value));
 
+        case AstNodeType::DROP_INDEX:
+            return analyze_drop_index(std::get<DropIndexStatement>(node.value));
+
         default:
             throw std::runtime_error(
                 "SemanticAnalyzer::analyze: Unsupported AST node type for semantic analysis"
@@ -208,6 +211,18 @@ namespace exq
 
         if (!table->has_column(stmt.column_name.value))
             return AnalysisResult(std::runtime_error("Column doesn't exists"));
+
+        return AnalysisResult(true);
+    }
+
+    AnalysisResult
+    SemanticAnalyzer::analyze_drop_index(const DropIndexStatement& stmt) const
+    {
+        if (!db_.exists_table(stmt.table))
+            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+
+        if (!db_.exists_index(stmt.index_name.value, stmt.table))
+            return AnalysisResult(IndexDoesntExist(stmt.index_name.value, stmt.table.table_name.value));
 
         return AnalysisResult(true);
     }

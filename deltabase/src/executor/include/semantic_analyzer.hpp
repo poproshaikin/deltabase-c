@@ -35,6 +35,9 @@ namespace exq
         analyze_create_index(const types::CreateIndexStatement& stmt) const;
 
         types::AnalysisResult
+        analyze_drop_index(const types::DropIndexStatement& stmt) const;
+
+        types::AnalysisResult
         analyze_create_db(const types::CreateDbStatement& stmt) const;
 
         types::AnalysisResult

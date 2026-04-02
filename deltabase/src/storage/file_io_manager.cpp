@@ -681,7 +681,7 @@ namespace storage
         return result;
     }
 
-    void
+    IndexFile
     FileIOManager::create_index_file(
         const std::string& schema_name, const std::string& table_name, const MetaIndex& mi
     )
@@ -705,6 +705,8 @@ namespace storage
         auto path = path_db_schema_table_index(db_path_, db_name_, schema_name, table_name, mi.id.to_string());
         fs::create_directories(path.parent_path());
         write_file(path, content);
+
+        return file;
     }
 
     std::unique_ptr<IndexFile>

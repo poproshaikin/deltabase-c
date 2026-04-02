@@ -8,6 +8,7 @@
 #include "../storage/include/std_db_instance.hpp"
 
 #include <algorithm>
+#include <ranges>
 
 namespace exq
 {
@@ -510,6 +511,42 @@ namespace exq
         return OutputSchema{};
     }
 
+    DropIndexNodeExecutor::DropIndexNodeExecutor(
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& schema_name,
+        storage::IDbInstance& db
+    )
+        : index_name_(index_name), table_name_(table_name), schema_name_(schema_name), db_(db)
+    {
+    }
+
+    void
+    DropIndexNodeExecutor::open()
+    {
+    }
+
+    bool
+    DropIndexNodeExecutor::next(DataRow& out)
+    {
+        auto txn = db_.make_txn();
+        txn.begin();
+        db_.drop_index(index_name_, table_name_, schema_name_, txn);
+        txn.commit();
+        return false;
+    }
+
+    void
+    DropIndexNodeExecutor::close()
+    {
+    }
+
+    OutputSchema
+    DropIndexNodeExecutor::output_schema()
+    {
+        return {};
+    }
+
     std::unique_ptr<INodeExecutor>
     NodeExecutorFactory::from_plan(std::unique_ptr<IPlanNode>&& node, storage::IDbInstance& db)
     {
@@ -620,6 +657,17 @@ namespace exq
                 db
             );
             return std::make_unique<CreateIndexNodeExecutor>(std::move(executor));
+        }
+        case IPlanNode::Type::DROP_INDEX:
+        {
+            auto& drop_index_node = static_cast<DropIndexPlanNode&>(*node);
+            DropIndexNodeExecutor executor(
+                drop_index_node.index_name,
+                drop_index_node.table_name,
+                drop_index_node.schema_name,
+                db
+            );
+            return std::make_unique<DropIndexNodeExecutor>(std::move(executor));
         }
         default:
             throw std::runtime_error(

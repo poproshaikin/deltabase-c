@@ -32,6 +32,9 @@ namespace storage
         ssize_t
         has_available_page(const std::vector<const types::DataPage*>& vec, size_t size) const;
 
+        bool
+        is_row_obsolete(const types::RowPtr& row_ptr) const;
+
     public:
         explicit StdDbInstance(const types::Config& cfg);
 
@@ -118,6 +121,38 @@ namespace storage
             const std::string& column_name,
             const std::string& schema_name,
             bool is_unique,
+            txn::Transaction& txn
+        ) override;
+
+        bool
+        exists_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name
+        ) override;
+
+        bool
+        exists_index(
+            const std::string& index_name, const types::TableIdentifier& table_identifier
+        ) override;
+
+        types::MetaIndex*
+        get_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name
+        ) override;
+
+        types::MetaIndex*
+        get_index(
+            const std::string& index_name, const types::TableIdentifier& table_identifier
+        ) override;
+
+        void
+        drop_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name,
             txn::Transaction& txn
         ) override;
     };

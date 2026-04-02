@@ -207,6 +207,22 @@ namespace recovery
     }
 
     void
+    RecoveryManager::redo(const DropIndexRecord& record)
+    {
+        auto table = io_.read_table_meta(record.before.table_id);
+        std::erase_if(table.indexes, [&](const MetaIndex& value) { return value.id == record.before.id; });
+        io_.write_mt(table);
+    }
+
+    void
+    RecoveryManager::redo(const CLRDropIndexRecord& record)
+    {
+        auto table = io_.read_table_meta(record.before.table_id);
+        table.indexes.push_back(record.before);
+        io_.write_mt(table);
+    }
+
+    void
     RecoveryManager::redo(const BeginTxnRecord&)
     {
     }
@@ -470,6 +486,14 @@ namespace recovery
         io_.write_mt(table);
     }
 
+    void
+    RecoveryManager::undo_record(const DropIndexRecord& record)
+    {
+        MetaTable table = io_.read_table_meta(record.before.table_id);
+        table.indexes.push_back(record.before);
+        io_.write_mt(table);
+    }
+
     WALRecord
     RecoveryManager::make_clr(const InsertRecord& record) const
     {
@@ -557,6 +581,12 @@ namespace recovery
     RecoveryManager::make_clr(const CreateIndexRecord& record) const
     {
         return CLRCreateIndexRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.after);
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const DropIndexRecord& record) const
+    {
+        return CLRDropIndexRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.before);
     }
 
     std::unordered_map<TxnId, LSN>

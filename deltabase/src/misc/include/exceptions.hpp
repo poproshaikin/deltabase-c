@@ -77,4 +77,13 @@ public:
     }
 };
 
+class IndexDoesntExist : public std::runtime_error
+{
+    public:
+    IndexDoesntExist(const std::string& index_name, const std::string& table_name)
+        : std::runtime_error("Index '" + index_name + "' does not exist on table " + table_name)
+    {
+    }
+};
+
 #endif

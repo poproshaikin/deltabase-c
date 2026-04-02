@@ -98,7 +98,7 @@ namespace storage
         std::unordered_map<types::TableId, std::vector<types::IndexId>>
         map_index_files_for_table() override;
 
-        void
+        types::IndexFile
         create_index_file(
             const std::string& string, const std::string& table_name, const types::MetaIndex& mi
         ) override;

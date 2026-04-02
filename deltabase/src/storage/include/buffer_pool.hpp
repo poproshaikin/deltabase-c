@@ -72,6 +72,13 @@ namespace storage
         types::IndexFile*
         get_table_index(const types::Uuid& table_id, const types::IndexId& index_id);
 
+        void
+        create_table_index(
+            const std::string& schema_name,
+            const std::string& table_name,
+            const types::MetaIndex& index
+        );
+
         types::IndexFile*
         dirty_if(const types::IndexId& index_id);
 

@@ -41,7 +41,9 @@ namespace types
         CLR_UPDATE_TABLE,
         CLR_DELETE_TABLE,
         CREATE_INDEX,
-        CLR_CREATE_INDEX
+        CLR_CREATE_INDEX,
+        DROP_INDEX,
+        CLR_DROP_INDEX
     };
 
     namespace detail
@@ -569,6 +571,44 @@ namespace types
         }
     };
 
+    struct DropIndexRecord
+    {
+        static constexpr auto type = WALRecordType::DROP_INDEX;
+
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        Uuid txn_id = Uuid::null();
+        MetaIndex before;
+
+        DropIndexRecord() = default;
+        DropIndexRecord(const MetaIndex& before) : before(before)
+        {
+        }
+
+        DropIndexRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, const MetaIndex& before)
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(before)
+        {
+        }
+    };
+
+    struct CLRDropIndexRecord
+    {
+        static constexpr auto type = WALRecordType::CLR_DROP_INDEX;
+
+        LSN lsn;
+        LSN prev_lsn;
+        Uuid txn_id;
+
+        LSN undo_next_lsn;
+        MetaIndex before;
+
+        CLRDropIndexRecord() = default;
+        CLRDropIndexRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, const MetaIndex& before)
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn), before(before)
+        {
+        }
+    };
+
     struct BeginTxnRecord
     {
         static constexpr auto type = WALRecordType::BEGIN_TXN;
@@ -648,6 +688,9 @@ namespace types
         CreateIndexRecord,
         CLRCreateIndexRecord,
 
+        DropIndexRecord,
+        CLRDropIndexRecord,
+
         BeginTxnRecord,
         CommitTxnRecord,
         RollbackTxnRecord>;
@@ -667,7 +710,8 @@ namespace types
         CreateTableRecord,
         UpdateTableRecord,
         DeleteTableRecord,
-        CreateIndexRecord>;
+        CreateIndexRecord,
+        DropIndexRecord>;
 
     using WALMetaCLRRecord = detail::WALRecordVariant<
         CLRCreateSchemaRecord,
@@ -676,7 +720,8 @@ namespace types
         CLRCreateTableRecord,
         CLRUpdateTableRecord,
         CLRDeleteTableRecord,
-        CLRCreateIndexRecord>;
+        CLRCreateIndexRecord,
+        CLRDropIndexRecord>;
 
     using WALCLRRecord = detail::WALRecordVariant<
         CLRInsertRecord,
@@ -688,7 +733,8 @@ namespace types
         CLRCreateTableRecord,
         CLRUpdateTableRecord,
         CLRDeleteTableRecord,
-        CLRCreateIndexRecord>;
+        CLRCreateIndexRecord,
+        CLRDropIndexRecord>;
 
     using WALTxnRecord =
         detail::WALRecordVariant<BeginTxnRecord, CommitTxnRecord, RollbackTxnRecord>;

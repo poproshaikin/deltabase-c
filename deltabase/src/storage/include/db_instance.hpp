@@ -37,9 +37,7 @@ namespace storage
 
         virtual void
         insert_row_into_indexes(
-            const types::MetaTable& mt,
-            const types::DataRow& row,
-            const types::DataPageId& page_id
+            const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id
         ) = 0;
 
         virtual void
@@ -96,11 +94,43 @@ namespace storage
 
         virtual void
         create_index(
-            const std::string& string,
+            const std::string& index_name,
             const std::string& table_name,
             const std::string& column_name,
             const std::string& schema_name,
             bool is_unique,
+            txn::Transaction& txn
+        ) = 0;
+
+        virtual bool
+        exists_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name
+        ) = 0;
+
+        virtual bool
+        exists_index(
+            const std::string& index_name, const types::TableIdentifier& table_identifier
+        ) = 0;
+
+        virtual types::MetaIndex*
+        get_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name
+        ) = 0;
+
+        virtual types::MetaIndex*
+        get_index(
+            const std::string& index_name, const types::TableIdentifier& table_identifier
+        ) = 0;
+
+        virtual void
+        drop_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name,
             txn::Transaction& txn
         ) = 0;
     };

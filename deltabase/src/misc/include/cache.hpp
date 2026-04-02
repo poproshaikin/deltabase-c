@@ -18,8 +18,8 @@ namespace misc
     {
     public:
         struct CacheEntry;
-        using iterator = typename std::unordered_map<TKey, CacheEntry>::iterator;
-        using const_iterator = typename std::unordered_map<TKey, CacheEntry>::const_iterator;
+        using iterator = std::unordered_map<TKey, CacheEntry>::iterator;
+        using const_iterator = std::unordered_map<TKey, CacheEntry>::const_iterator;
 
     private:
         std::size_t max_size_ = 100;

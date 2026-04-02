@@ -94,6 +94,14 @@ namespace sql
             if (match(SqlKeyword::INDEX) || match(SqlKeyword::UNIQUE))
                 return AstNode(AstNodeType::CREATE_INDEX, parse_create_index());
         }
+        if (match(SqlKeyword::DROP))
+        {
+            if (!advance())
+                throw InvalidStatementSyntax();
+
+            if (match(SqlKeyword::INDEX))
+                return AstNode(AstNodeType::DROP_INDEX, parse_drop_index());
+        }
 
         throw std::runtime_error("Unsupported statement");
     }
@@ -436,6 +444,25 @@ namespace sql
         advance_or_throw("Expected ')' after column identifier");
 
         match_or_throw(SqlSymbol::RPAREN, "Expected ')' after column identifier");
+
+        return stmt;
+    }
+
+    DropIndexStatement
+    SqlParser::parse_drop_index()
+    {
+        DropIndexStatement stmt;
+
+        match_or_throw(SqlKeyword::INDEX);
+        advance_or_throw("Expected index identifier");
+
+        match_or_throw(SqlTokenType::IDENTIFIER, "Expected index identifier");
+        stmt.index_name = current();
+        advance_or_throw("Expected 'ON' after index identifier");
+
+        match_or_throw(SqlKeyword::ON, "Expected 'ON' after index identifier");
+        advance_or_throw("Expected table identifier after 'ON'");
+        stmt.table = parse_table_identifier();
 
         return stmt;
     }

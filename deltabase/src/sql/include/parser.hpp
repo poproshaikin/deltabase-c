@@ -43,6 +43,9 @@ namespace sql
         types::CreateIndexStatement
         parse_create_index();
 
+        types::DropIndexStatement
+        parse_drop_index();
+
         std::unique_ptr<types::AstNode>
         parse_binary_tree(int min_priority);
 

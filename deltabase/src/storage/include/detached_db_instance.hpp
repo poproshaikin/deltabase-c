@@ -15,8 +15,7 @@ namespace storage
         std::unique_ptr<IIOManager> io_manager_;
 
     public:
-        explicit
-        DetachedDbInstance(const types::Config& config);
+        explicit DetachedDbInstance(const types::Config& config);
 
         bool
         exists_db(const std::string& db_name) override;
@@ -32,8 +31,8 @@ namespace storage
         types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) override;
 
-    txn::Transaction
-    make_txn() override;
+        txn::Transaction
+        make_txn() override;
 
         void
         insert_row(
@@ -103,7 +102,39 @@ namespace storage
         insert_row_into_indexes(
             const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id
         ) override;
-    };
-}
 
-#endif //DELTABASE_DETACHED_DB_INSTANCE_HPP
+        bool
+        exists_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name
+        ) override;
+
+        bool
+        exists_index(
+            const std::string& index_name, const types::TableIdentifier& table_identifier
+        ) override;
+
+        types::MetaIndex*
+        get_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name
+        ) override;
+
+        types::MetaIndex*
+        get_index(
+            const std::string& index_name, const types::TableIdentifier& table_identifier
+        ) override;
+
+        void
+        drop_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name,
+            txn::Transaction& txn
+        ) override;
+    };
+} // namespace storage
+
+#endif // DELTABASE_DETACHED_DB_INSTANCE_HPP

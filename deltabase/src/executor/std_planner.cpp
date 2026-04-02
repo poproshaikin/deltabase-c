@@ -22,31 +22,35 @@ namespace exq
     {
         if (ast.type == AstNodeType::SELECT)
         {
-            return plan_select(std::get<SelectStatement>(ast.value));
+            return plan(std::get<SelectStatement>(ast.value));
         }
         if (ast.type == AstNodeType::INSERT)
         {
-            return plan_insert(std::get<InsertStatement>(ast.value));
+            return plan(std::get<InsertStatement>(ast.value));
         }
         if (ast.type == AstNodeType::UPDATE)
         {
-            return plan_update(std::get<UpdateStatement>(ast.value));
+            return plan(std::get<UpdateStatement>(ast.value));
         }
         if (ast.type == AstNodeType::DELETE)
         {
-            return plan_delete(std::get<DeleteStatement>(ast.value));
+            return plan(std::get<DeleteStatement>(ast.value));
         }
         if (ast.type == AstNodeType::CREATE_DATABASE)
         {
-            return plan_create_db(std::get<CreateDbStatement>(ast.value));
+            return plan(std::get<CreateDbStatement>(ast.value));
         }
         if (ast.type == AstNodeType::CREATE_TABLE)
         {
-            return plan_create_table(std::get<CreateTableStatement>(ast.value));
+            return plan(std::get<CreateTableStatement>(ast.value));
         }
         if (ast.type == AstNodeType::CREATE_INDEX)
         {
-            return plan_create_index(std::get<CreateIndexStatement>(ast.value));
+            return plan(std::get<CreateIndexStatement>(ast.value));
+        }
+        if (ast.type == AstNodeType::DROP_INDEX)
+        {
+            return plan(std::get<DropIndexStatement>(ast.value));
         }
 
         throw std::runtime_error(
@@ -58,7 +62,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan_select(SelectStatement& stmt) const
+    StdPlanner::plan(SelectStatement& stmt) const
     {
         // 1. SEQ SCAN
         auto scan = std::make_unique<SeqScanPlanNode>(
@@ -107,7 +111,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan_insert(InsertStatement& stmt) const
+    StdPlanner::plan(InsertStatement& stmt) const
     {
         std::vector<DataRow> rows;
         for (auto& [vals] : stmt.values)
@@ -142,7 +146,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan_update(UpdateStatement& stmt) const
+    StdPlanner::plan(UpdateStatement& stmt) const
     {
         const auto* table = db_.get_table(stmt.table);
 
@@ -196,7 +200,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan_delete(DeleteStatement& stmt) const
+    StdPlanner::plan(DeleteStatement& stmt) const
     {
         std::string schema_name = stmt.table.schema_name.has_value()
                                       ? stmt.table.schema_name.value().value
@@ -225,7 +229,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan_create_db(CreateDbStatement& stmt) const
+    StdPlanner::plan(CreateDbStatement& stmt) const
     {
         std::unique_ptr<IPlanNode> root = std::make_unique<CreateDbPlanNode>(stmt.name);
 
@@ -238,7 +242,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan_create_table(const CreateTableStatement& table) const
+    StdPlanner::plan(const CreateTableStatement& table) const
     {
         auto name = table.table.schema_name.has_value() ? table.table.schema_name.value().value
                                                         : db_config_.default_schema;
@@ -258,7 +262,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan_create_index(const CreateIndexStatement& stmt) const
+    StdPlanner::plan(const CreateIndexStatement& stmt) const
     {
         auto schema_name = stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
                                                               : db_config_.default_schema;
@@ -273,6 +277,26 @@ namespace exq
         QueryPlan plan;
         plan.root = std::move(root);
         plan.type = QueryPlan::Type::CREATE_INDEX;
+        plan.needs_stream = false;
+        plan.db_specific = true;
+        return plan;
+    }
+
+    QueryPlan
+    StdPlanner::plan(const DropIndexStatement& stmt) const
+    {
+
+        auto schema_name = stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
+                                                              : db_config_.default_schema;
+        auto table_name = stmt.table.table_name.value;
+        auto index_name = stmt.index_name.value;
+
+        std::unique_ptr<IPlanNode> root =
+            std::make_unique<DropIndexPlanNode>(index_name, table_name, schema_name);
+
+        QueryPlan plan;
+        plan.root = std::move(root);
+        plan.type = QueryPlan::Type::DROP_INDEX;
         plan.needs_stream = false;
         plan.db_specific = true;
         return plan;

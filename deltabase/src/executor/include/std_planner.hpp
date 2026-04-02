@@ -16,25 +16,28 @@ namespace exq
         types::Config db_config_;
 
         types::QueryPlan
-        plan_select(types::SelectStatement& stmt) const;
+        plan(types::SelectStatement& stmt) const;
 
         types::QueryPlan
-        plan_insert(types::InsertStatement& stmt) const;
+        plan(types::InsertStatement& stmt) const;
 
         types::QueryPlan
-        plan_update(types::UpdateStatement& stmt) const;
+        plan(types::UpdateStatement& stmt) const;
 
         types::QueryPlan
-        plan_delete(types::DeleteStatement& stmt) const;
+        plan(types::DeleteStatement& stmt) const;
 
         types::QueryPlan
-        plan_create_db(types::CreateDbStatement& stmt) const;
+        plan(types::CreateDbStatement& stmt) const;
 
         types::QueryPlan
-        plan_create_table(const types::CreateTableStatement& table) const;
+        plan(const types::CreateTableStatement& table) const;
 
         types::QueryPlan
-        plan_create_index(const types::CreateIndexStatement& stmt) const;
+        plan(const types::CreateIndexStatement& stmt) const;
+
+        types::QueryPlan
+        plan(const types::DropIndexStatement& stmt) const;
 
     public:
         explicit

@@ -94,8 +94,10 @@ namespace storage
         virtual std::unordered_map<types::TableId, std::vector<types::IndexId>>
         map_index_files_for_table() = 0;
 
-        virtual void
-        create_index_file(const std::string& string, const std::string& table_name, const types::MetaIndex& mi) = 0;
+        virtual types::IndexFile
+        create_index_file(
+            const std::string& string, const std::string& table_name, const types::MetaIndex& mi
+        ) = 0;
 
         virtual std::unique_ptr<types::IndexFile>
         read_index_file(const types::IndexId& index_id) = 0;
