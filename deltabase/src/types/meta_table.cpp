@@ -9,7 +9,7 @@
 namespace types
 {
     MetaTable::MetaTable()
-        : id(Uuid::null()), schema_id(Uuid::null()), name(), columns(), last_rid(0)
+        : id(Uuid::null()), schema_id(Uuid::null())
     {
     }
 

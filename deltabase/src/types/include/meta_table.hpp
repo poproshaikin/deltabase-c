@@ -23,7 +23,9 @@ namespace types
         std::string name;
         std::vector<MetaColumn> columns;
         std::vector<MetaIndex> indexes;
-        RowId last_rid;
+        RowId last_rid = 0;
+        uint64_t total_rows = 0;
+        uint64_t live_rows = 0;
 
         MetaTable();
 

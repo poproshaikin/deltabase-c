@@ -151,6 +151,9 @@ namespace storage
 
         page->rows.push_back(data_row);
 
+        mt->total_rows++;
+        mt->live_rows++;
+
         InsertRecord insert_record(mt->id, page->id, data_row);
         UpdateTableRecord update_table_record(mt_unchanged, *mt);
         txn.append_log(insert_record);
@@ -244,6 +247,8 @@ namespace storage
                     }
                 }
 
+                mt->total_rows++;
+
                 UpdateRecord update_record(mt->id, page->id, row, new_row);
                 txn.append_log(update_record);
                 page_lsn = std::max(page_lsn, txn.get_last_lsn());
@@ -278,6 +283,7 @@ namespace storage
     {
         auto* ms = catalog_->get_schema(schema_name);
         auto* mt = catalog_->get_table(table_name, ms->id);
+        const auto unchanged_mt = *mt;
         auto pages = buffer_pool_->get_table_data(mt->id);
 
         std::unordered_set<RowId> ids;
@@ -301,9 +307,13 @@ namespace storage
 
                 row.flags |= DataRowFlags::OBSOLETE;
 
+                mt->live_rows--;
+
                 DeleteRecord record(mt->id, page->id, row);
                 txn.append_log(record);
                 page_lsn = std::max(page_lsn, txn.get_last_lsn());
+                UpdateTableRecord update_table_record(unchanged_mt, *mt);
+                txn.append_log(update_table_record);
             }
 
             if (deleted)

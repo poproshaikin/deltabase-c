@@ -223,18 +223,18 @@ main(int argc, char** argv)
 
                 std::cout << "  TABLE " << table.name
                           << " id=" << table.id.to_string()
-                          << " last_rid=" << table.last_rid << "\n";
+                          << " last_rid=" << table.last_rid
+                          << " total_rows=" << table.total_rows
+                          << " live_rows=" << table.live_rows << "\n";
                 printed_tables += 1;
 
                 if (args.show_columns)
                 {
                     for (const auto& column : table.columns)
                     {
-                        std::cout << "    COLUMN " << column.name
-                                  << " id=" << column.id.to_string()
+                        std::cout << "    COLUMN " << column.name << " id=" << column.id.to_string()
                                   << " type=" << data_type_to_string(column.type)
-                                  << " flags=" << column_flags_to_string(column.flags)
-                                  << "\n";
+                                  << " flags=" << column_flags_to_string(column.flags) << "\n";
                         printed_columns += 1;
                     }
                 }
@@ -243,14 +243,12 @@ main(int argc, char** argv)
                 {
                     for (const auto& index : table.indexes)
                     {
-                        std::cout << "    INDEX " << index.name
-                                  << " id=" << index.id.to_string()
+                        std::cout << "    INDEX " << index.name << " id=" << index.id.to_string()
                                   << " table_id=" << index.table_id.to_string()
                                   << " column_id=" << index.column_id.to_string()
                                   << " root_page_id=" << index.root_page_id.to_string()
                                   << " key_type=" << data_type_to_string(index.key_type)
-                                  << " unique=" << (index.is_unique ? "true" : "false")
-                                  << "\n";
+                                  << " unique=" << (index.is_unique ? "true" : "false") << "\n";
                         printed_indexes += 1;
                     }
                 }
@@ -263,10 +261,8 @@ main(int argc, char** argv)
             std::cout << "No matching schemas found.\n";
 
         std::cout << "=== META SUMMARY ===\n";
-        std::cout << "schemas=" << printed_schemas
-                  << " tables=" << printed_tables
-                  << " columns=" << printed_columns
-                  << " indexes=" << printed_indexes << "\n";
+        std::cout << "schemas=" << printed_schemas << " tables=" << printed_tables
+                  << " columns=" << printed_columns << " indexes=" << printed_indexes << "\n";
 
         return 0;
     }
