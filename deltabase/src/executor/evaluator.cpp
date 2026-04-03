@@ -47,7 +47,7 @@ namespace exq
             return evaluate(left_literal, right_literal, expr.op);
         }
 
-        throw std::runtime_error("Evaluator::evaluate: Invalid comparation");
+        throw std::runtime_error("Evaluator::evaluate: Invalid comparison");
     }
 
     bool
