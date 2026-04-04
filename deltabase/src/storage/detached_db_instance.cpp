@@ -43,6 +43,17 @@ namespace storage
         throw std::logic_error("DetachedDbInstance::seq_scan: this method is not supported");
     }
 
+    DataTable
+    DetachedDbInstance::index_scan(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const IndexId& index_id,
+        const BinaryExpr& condition
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::index_scan: this method is not supported");
+    }
+
     txn::Transaction
     DetachedDbInstance::make_txn()
     {

@@ -38,6 +38,9 @@ namespace types
         const MetaColumn&
         get_column(const int64_t& col_pos) const;
 
+        const MetaColumn&
+        get_column(const ColumnId& col_id) const;
+
         // -1 if not found
         int64_t
         get_column_idx(const std::string& col_name) const;

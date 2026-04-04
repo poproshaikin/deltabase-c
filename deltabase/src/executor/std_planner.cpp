@@ -68,7 +68,7 @@ namespace exq
         switch (condition.op)
         {
         case AstOperator::EQ:
-            return idx.is_unique ? 1.0 : 0.1;
+            return idx.is_unique ? 0.1 : 1.0;
         case AstOperator::LT:
         case AstOperator::LTE:
         case AstOperator::GR:
@@ -112,7 +112,7 @@ namespace exq
         for (const auto& idx : table.indexes)
         {
             // TODO
-            if (condition->left->type != AstNodeType::COLUMN_IDENTIFIER)
+            if (condition->left->type != AstNodeType::IDENTIFIER)
                 throw std::runtime_error("choose_scan_type: left token must be column identifier");
 
             auto& column = table.get_column(std::get<SqlToken>(condition->left->value).value);
@@ -144,15 +144,18 @@ namespace exq
 
         if (scan_type == IPlanNode::Type::INDEX_SCAN)
         {
+            std::cout << "Chosen INDEX SCAN on column " << table->get_column(chosen_index->column_id).name << std::endl;
             node = std::make_unique<IndexScanPlanNode>(
                 stmt.table.table_name,
                 stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
                                                    : db_config_.default_schema,
-                chosen_index->id
+                chosen_index->id,
+                std::move(*stmt.where)
             );
         }
         else
         {
+            std::cout << "Chosen SEQUENTIAL SCAN" << std::endl;
             node = std::make_unique<SeqScanPlanNode>(
                 stmt.table.table_name,
                 stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value

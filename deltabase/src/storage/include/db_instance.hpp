@@ -24,6 +24,14 @@ namespace storage
         virtual types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) = 0;
 
+        virtual types::DataTable
+        index_scan(
+            const std::string& table_name,
+            const std::string& schema_name,
+            const types::IndexId& index_id,
+            const types::BinaryExpr& condition
+        ) = 0;
+
         virtual txn::Transaction
         make_txn() = 0;
 

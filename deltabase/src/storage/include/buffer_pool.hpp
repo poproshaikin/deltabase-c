@@ -75,7 +75,7 @@ namespace storage
         void
         create_table_index(
             const std::string& schema_name,
-            const std::string& table_name,
+            const types::MetaTable& table,
             const types::MetaIndex& index
         );
 

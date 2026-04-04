@@ -44,6 +44,17 @@ namespace types
         return columns[col_pos];
     }
 
+    const MetaColumn&
+    MetaTable::get_column(const ColumnId& col_id) const
+    {
+        for (const auto& column : columns)
+        {
+            if (column.id == col_id)
+                return column;
+        }
+        throw std::runtime_error("MetaTable::get_column: column '" + col_id.to_string() + "' not found");
+    }
+
     int64_t
     MetaTable::get_column_idx(const std::string& col_name) const
     {

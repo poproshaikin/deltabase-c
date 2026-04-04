@@ -59,6 +59,39 @@ namespace exq
         output_schema() override;
     };
 
+    class IndexScanNodeExecutor final : public INodeExecutor
+    {
+        std::string table_name_;
+        std::string schema_name_;
+        types::IndexId index_id_;
+        types::BinaryExpr condition_;
+        storage::IDbInstance& db_;
+
+        types::DataTable table_;
+        uint64_t index_ = 0;
+
+    public:
+        explicit IndexScanNodeExecutor(
+            const std::string& table_name,
+            const std::string& schema_name,
+            const types::IndexId& index_id,
+            types::BinaryExpr condition,
+            storage::IDbInstance& db
+        );
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
     class FilterNodeExecutor final : public INodeExecutor
     {
         types::BinaryExpr condition_;

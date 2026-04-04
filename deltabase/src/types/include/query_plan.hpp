@@ -95,11 +95,16 @@ namespace types
         std::string table_name;
         std::string schema_name;
         IndexId index_id;
+        BinaryExpr condition;
 
         explicit IndexScanPlanNode(
-            const std::string& table_name, const std::string& schema_name, const IndexId& index_id
+            const std::string& table_name,
+            const std::string& schema_name,
+            const IndexId& index_id,
+            BinaryExpr condition
         )
-            : table_name(table_name), schema_name(schema_name), index_id(index_id)
+            : table_name(table_name), schema_name(schema_name), index_id(index_id),
+              condition(std::move(condition))
         {
         }
 
