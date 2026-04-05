@@ -23,7 +23,9 @@ namespace types
         std::string name;
         std::vector<MetaColumn> columns;
         std::vector<MetaIndex> indexes;
-        RowId last_rid;
+        RowId last_rid = 0;
+        uint64_t total_rows = 0;
+        uint64_t live_rows = 0;
 
         MetaTable();
 
@@ -35,6 +37,9 @@ namespace types
 
         const MetaColumn&
         get_column(const int64_t& col_pos) const;
+
+        const MetaColumn&
+        get_column(const ColumnId& col_id) const;
 
         // -1 if not found
         int64_t

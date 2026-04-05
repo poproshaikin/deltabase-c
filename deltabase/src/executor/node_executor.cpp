@@ -65,6 +65,53 @@ namespace exq
     {
     }
 
+    IndexScanNodeExecutor::IndexScanNodeExecutor(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const IndexId& index_id,
+        BinaryExpr condition,
+        storage::IDbInstance& db
+    )
+        : schema_name_(schema_name), index_id_(index_id), condition_(std::move(condition)),
+          db_(db), table_name_(table_name)
+    {
+    }
+
+    void
+    IndexScanNodeExecutor::open()
+    {
+        table_ = db_.index_scan(table_name_, schema_name_, index_id_, condition_);
+    }
+
+    bool
+    IndexScanNodeExecutor::next(DataRow& out)
+    {
+        if (index_ >= table_.rows.size())
+            return false;
+
+        out = table_.rows[index_++];
+        return true;
+    }
+
+    void
+    IndexScanNodeExecutor::close()
+    {
+    }
+
+    OutputSchema
+    IndexScanNodeExecutor::output_schema()
+    {
+        const auto* mt = db_.get_table(table_name_, schema_name_);
+
+        OutputSchema output_schema;
+        output_schema.reserve(mt->columns.size());
+
+        for (const auto& column : mt->columns)
+            output_schema.push_back({.name = column.name, .type = column.type});
+
+        return output_schema;
+    }
+
     void
     FilterNodeExecutor::open()
     {
@@ -558,6 +605,19 @@ namespace exq
             SeqScanNodeExecutor executor(db, seq_scan_node.table_name, seq_scan_node.schema_name);
 
             return std::make_unique<SeqScanNodeExecutor>(std::move(executor));
+        }
+        case IPlanNode::Type::INDEX_SCAN:
+        {
+            auto& index_scan_node = static_cast<IndexScanPlanNode&>(*node);
+            IndexScanNodeExecutor executor(
+                index_scan_node.table_name,
+                index_scan_node.schema_name,
+                index_scan_node.index_id,
+                std::move(index_scan_node.condition),
+                db
+            );
+
+            return std::make_unique<IndexScanNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::FILTER:
         {

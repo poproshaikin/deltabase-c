@@ -161,12 +161,16 @@ namespace storage
 
     void
     BufferPool::create_table_index(
-        const std::string& schema_name, const std::string& table_name, const MetaIndex& index
+        const std::string& schema_name, const MetaTable& table, const MetaIndex& index
     )
     {
-        IndexFile file = io_.create_index_file(schema_name, table_name, index);
+        IndexFile file = io_.create_index_file(schema_name, table.name, index);
+
         index_files_.put(index.id, std::move(file), index_file_flusher_);
         index_files_.mark_dirty(file.index_id);
+
+        auto& indexes_list = index_files_per_table_.at(table.id);
+        indexes_list.push_back(index.id);
     }
 
     IndexFile*

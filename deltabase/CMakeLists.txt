@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(deltabase LANGUAGES CXX)
 
+enable_language(C)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -9,6 +11,8 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/bin)
 
 set(CMAKE_OBJECT_MAX_PATH 4096)
+
+# --- LIBUUID inclusion ---
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(UUID REQUIRED uuid)
@@ -19,7 +23,14 @@ else()
     message(FATAL_ERROR "libuuid not found. Please install it (e.g., 'sudo pacman -S uuid-dev').")
 endif()
 
-# --- modules ---
+# --- LINENOISE inclusion ---
+
+add_library(linenoise STATIC third_party/linenoise-ng/linenoise.c)
+set_target_properties(linenoise PROPERTIES LINKER_LANGUAGE C)
+target_include_directories(linenoise PUBLIC third_party/linenoise-ng)
+
+# --- Modules ---
+
 function(add_cpp_module module_name)
     file(GLOB_RECURSE MOD_SRCS
             src/${module_name}/*.cpp
@@ -57,7 +68,7 @@ function(add_cpp_module module_name)
     endif()
 
     if (${module_name} STREQUAL "cli")
-        target_link_libraries(${module_name} PUBLIC engine)
+        target_link_libraries(${module_name} PUBLIC engine linenoise)
     endif()
     
     if (${module_name} STREQUAL "wal")

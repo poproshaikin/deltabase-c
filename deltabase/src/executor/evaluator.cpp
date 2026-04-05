@@ -24,7 +24,7 @@ namespace exq
         {
             int64_t col_idx = table.get_column_idx(left);
 
-            DataToken left_value(row.tokens[col_idx]);
+            DataToken left_value(row.tokens.at(col_idx));
             DataToken right_literal(right);
 
             return evaluate(left_value, right_literal, expr.op);
@@ -47,7 +47,7 @@ namespace exq
             return evaluate(left_literal, right_literal, expr.op);
         }
 
-        throw std::runtime_error("Evaluator::evaluate: Invalid comparation");
+        throw std::runtime_error("Evaluator::evaluate: Invalid comparison");
     }
 
     bool

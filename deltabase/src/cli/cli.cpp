@@ -17,26 +17,13 @@ namespace cli
     }
 
     void
-    Cli::execute_query(const CliCommand& command)
+    Cli::print_timer(std::chrono::time_point<std::chrono::steady_clock> started_at) const
     {
-        const auto started_at = std::chrono::steady_clock::now();
-
-        try
-        {
-            auto [query] = std::get<SqlCommand>(command);
-            auto result = engine_.execute_query(query);
-
-            auto formatted = formatter_.format(*result);
-            io_.write(formatted);
-        }
-        catch (const std::exception& e)
-        {
-            std::cerr << "Executing query failed: " << e.what() << std::endl;
-        }
 
         const auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now() - started_at
-        ).count();
+                                    std::chrono::steady_clock::now() - started_at
+        )
+                                    .count();
         const auto elapsed_ms = elapsed_ns / 1000000;
         const auto ns_fraction = elapsed_ns % 1000000;
 
@@ -48,27 +35,57 @@ namespace cli
     }
 
     void
+    Cli::execute_meta(const CliCommand& command) noexcept(true)
+    {
+        try
+        {
+            meta_exq_.execute(command);
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "ERR: " << e.what() << std::endl;
+        }
+    }
+
+    void
+    Cli::execute_query(const CliCommand& command) noexcept(true)
+    {
+        try
+        {
+            const auto started_at = std::chrono::steady_clock::now();
+
+            auto [query] = std::get<SqlCommand>(command);
+            auto result = engine_.execute_query(query);
+
+            auto formatted = formatter_.format(*result);
+            io_.write(formatted);
+
+            print_timer(started_at);
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "ERR: " << e.what() << std::endl;
+        }
+    }
+
+    void
     Cli::run()
     {
         while (ctx_.running)
         {
             std::string cmd = io_.get_command();
+
             CliCommand command = parser_.parse(cmd);
 
-            auto type = std::visit(
-                [](auto&& cmd)
-                {
-                    return cmd.type;
-                },
-                command
-            );
+            auto type = std::visit([](auto&& cmd) { return cmd.type; }, command);
             if (is_meta_command(type))
             {
-                meta_exq_.execute(command);
-                continue;
+                execute_meta(command);
             }
-
-            execute_query(command);
+            else
+            {
+                execute_query(command);
+            }
         }
     }
-}
+} // namespace cli

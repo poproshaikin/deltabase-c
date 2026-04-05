@@ -27,6 +27,7 @@ namespace types
             INSERT,
             VALUES,
             SEQ_SCAN,
+            INDEX_SCAN,
             UPDATE,
             DELETE,
             CREATE_DB,
@@ -86,6 +87,31 @@ namespace types
         type() const override
         {
             return Type::SEQ_SCAN;
+        }
+    };
+
+    struct IndexScanPlanNode final : LeafPlanNode
+    {
+        std::string table_name;
+        std::string schema_name;
+        IndexId index_id;
+        BinaryExpr condition;
+
+        explicit IndexScanPlanNode(
+            const std::string& table_name,
+            const std::string& schema_name,
+            const IndexId& index_id,
+            BinaryExpr condition
+        )
+            : table_name(table_name), schema_name(schema_name), index_id(index_id),
+              condition(std::move(condition))
+        {
+        }
+
+        constexpr Type
+        type() const override
+        {
+            return Type::INDEX_SCAN;
         }
     };
 
@@ -301,7 +327,8 @@ namespace types
             const std::string& index_name,
             const std::string& table_name,
             const std::string& schema_name
-        ) : index_name(index_name), table_name(table_name), schema_name(schema_name)
+        )
+            : index_name(index_name), table_name(table_name), schema_name(schema_name)
         {
         }
 

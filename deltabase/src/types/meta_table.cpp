@@ -9,7 +9,7 @@
 namespace types
 {
     MetaTable::MetaTable()
-        : id(Uuid::null()), schema_id(Uuid::null()), name(), columns(), last_rid(0)
+        : id(Uuid::null()), schema_id(Uuid::null())
     {
     }
 
@@ -42,6 +42,17 @@ namespace types
             throw std::runtime_error("MetaTable::get_column: column at pos '" + std::to_string(col_pos) + "' not found");
 
         return columns[col_pos];
+    }
+
+    const MetaColumn&
+    MetaTable::get_column(const ColumnId& col_id) const
+    {
+        for (const auto& column : columns)
+        {
+            if (column.id == col_id)
+                return column;
+        }
+        throw std::runtime_error("MetaTable::get_column: column '" + col_id.to_string() + "' not found");
     }
 
     int64_t

@@ -6,6 +6,7 @@
 
 #include "meta_schema.hpp"
 
+#include <cmath>
 #include <format>
 
 namespace exq
@@ -61,25 +62,114 @@ namespace exq
         );
     }
 
+    double
+    estimate_selectivity(const BinaryExpr& condition, const MetaIndex& idx)
+    {
+        switch (condition.op)
+        {
+        case AstOperator::EQ:
+            return idx.is_unique ? 0.1 : 1.0;
+        case AstOperator::LT:
+        case AstOperator::LTE:
+        case AstOperator::GR:
+        case AstOperator::GRE:
+            return 0.3;
+        default:
+            return 1.0;
+        }
+    }
+
+    double
+    estimate_index_scan(const MetaTable& table, const MetaIndex& idx, const BinaryExpr& condition)
+    {
+        double N = table.total_rows;
+        double live = table.live_rows;
+
+        if (live == 0)
+            return 0;
+
+        double live_ratio = live / N;
+
+        double sel = estimate_selectivity(condition, idx);
+        double K_live = live * sel;
+        double K_index = K_live / live_ratio;
+        double btree_cost = std::log2(N);
+
+        return btree_cost + K_index;
+    }
+
+    IPlanNode::Type
+    choose_scan_type(
+        const MetaTable& table, const BinaryExpr* condition, const MetaIndex** chosen_index
+    )
+    {
+        double best_cost = table.total_rows;
+        auto best = IPlanNode::Type::SEQ_SCAN;
+
+        if (!condition)
+            return best;
+
+        for (const auto& idx : table.indexes)
+        {
+            // TODO
+            if (condition->left->type != AstNodeType::IDENTIFIER)
+                throw std::runtime_error("choose_scan_type: left token must be column identifier");
+
+            auto& column = table.get_column(std::get<SqlToken>(condition->left->value).value);
+            if (idx.column_id != column.id)
+                continue;
+
+            auto cost = estimate_index_scan(table, idx, *condition);
+            if (cost < best_cost)
+            {
+                best_cost = cost;
+                best = IPlanNode::Type::INDEX_SCAN;
+                *chosen_index = &idx;
+            }
+        }
+
+        return best;
+    }
+
     QueryPlan
     StdPlanner::plan(SelectStatement& stmt) const
     {
-        // 1. SEQ SCAN
-        auto scan = std::make_unique<SeqScanPlanNode>(
-            stmt.table.table_name.value,
-            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                               : db_config_.default_schema
-        );
+        auto table = db_.get_table(stmt.table);
+        const auto* condition_ptr = stmt.where ? &(*stmt.where) : nullptr;
 
-        std::unique_ptr<IPlanNode> node = std::move(scan);
+        const MetaIndex* chosen_index = nullptr;
+        auto scan_type = choose_scan_type(*table, condition_ptr, &chosen_index);
 
-        // 2. WHERE
-        if (stmt.where)
+        std::unique_ptr<IPlanNode> node;
+
+        if (scan_type == IPlanNode::Type::INDEX_SCAN)
         {
-            auto filter = std::make_unique<FilterPlanNode>(
-                *db_.get_table(stmt.table), std::move(*stmt.where), std::move(node)
+            std::cout << "Chosen INDEX SCAN on column " << table->get_column(chosen_index->column_id).name << std::endl;
+            node = std::make_unique<IndexScanPlanNode>(
+                stmt.table.table_name,
+                stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
+                                                   : db_config_.default_schema,
+                chosen_index->id,
+                std::move(*stmt.where)
             );
-            node = std::move(filter);
+        }
+        else
+        {
+            std::cout << "Chosen SEQUENTIAL SCAN" << std::endl;
+            node = std::make_unique<SeqScanPlanNode>(
+                stmt.table.table_name,
+                stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
+                                                   : db_config_.default_schema
+            );
+
+            // 2. WHERE
+            if (stmt.where)
+            {
+                auto filter = std::make_unique<FilterPlanNode>(
+                    *db_.get_table(stmt.table), std::move(*stmt.where), std::move(node)
+                );
+                node = std::move(filter);
+            }
         }
 
         // 3. PROJECT

@@ -31,6 +31,14 @@ namespace storage
         types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) override;
 
+        types::DataTable
+        index_scan(
+            const std::string& table_name,
+            const std::string& schema_name,
+            const types::IndexId& index_id,
+            const types::BinaryExpr& condition
+        ) override;
+
         txn::Transaction
         make_txn() override;
 

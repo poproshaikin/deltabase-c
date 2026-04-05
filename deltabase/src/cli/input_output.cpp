@@ -6,6 +6,10 @@
 
 #include <ostream>
 #include <istream>
+extern "C"
+{
+#include "../../third_party/linenoise-ng/linenoise.h"
+}
 
 namespace cli
 {
@@ -16,14 +20,21 @@ namespace cli
     std::string
     InputOutput::get_command() const
     {
-        std::string line;
-        ctx_.out << (!ctx_.attached_db.empty() ? ctx_.attached_db : std::string("db")) <<
-            std::string(">") << std::flush;
+        std::string prompt = (!ctx_.attached_db.empty() ? ctx_.attached_db : "db") + "> ";
 
-        if (!std::getline(ctx_.in, line))
-            return {}; // EOF
+        char* line = linenoise(prompt.c_str());
+        if (!line)
+            return {}; // EOF (Ctrl+D)
 
-        return line;
+        std::string command(line);
+        free(line);
+
+        if (!command.empty()) {
+            linenoiseHistoryAdd(command.c_str());
+            linenoiseHistorySetMaxLen(100);
+        }
+
+        return command;
     }
 
     void

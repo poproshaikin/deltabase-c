@@ -72,6 +72,8 @@ namespace storage
         stream.write(table.id.raw(), sizeof(uuid_t));
         stream.write(table.schema_id.raw(), sizeof(uuid_t));
         write_str(table.name, stream);
+        stream.write(&table.total_rows, sizeof(table.total_rows));
+        stream.write(&table.live_rows, sizeof(table.live_rows));
 
         uint64_t column_count = table.columns.size();
         stream.write(&column_count, sizeof(uint64_t));
@@ -295,6 +297,9 @@ namespace storage
 
         if (!read_str(out.name, stream))
             return false;
+
+        stream.read(&out.total_rows, sizeof(out.total_rows));
+        stream.read(&out.live_rows, sizeof(out.live_rows));
 
         uint64_t column_count = 0;
         if (stream.read(&column_count, sizeof(uint64_t)) != sizeof(size_t))
