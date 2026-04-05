@@ -24,11 +24,17 @@ namespace cli
         MetaExecutor meta_exq_;
         ResultFormatter formatter_;
 
+        void
+        print_timer(std::chrono::time_point<std::chrono::steady_clock> start) const;
+
     public:
         Cli(const CliContext& ctx);
 
         void
-        execute_query(const CliCommand& command) noexcept(false);
+        execute_meta(const CliCommand& command) noexcept(true);
+
+        void
+        execute_query(const CliCommand& command) noexcept(true);
 
         void
         run();

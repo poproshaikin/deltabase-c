@@ -25,7 +25,7 @@ namespace cli
             return "No results.\n";
         }
 
-        size_t num_columns = rows[0].tokens.size();
+        size_t num_columns = result.output_schema().size();
         std::vector<size_t> col_widths(num_columns, 0);
 
         for (const auto& r : rows)

@@ -16,17 +16,24 @@ namespace types
 
         virtual bool
         next(DataRow& out) = 0;
+
+        virtual OutputSchema
+        output_schema() = 0;
     };
 
     class MaterializedResult final : public IExecutionResult
     {
         DataTable table_;
         uint64_t current_;
+        OutputSchema schema_;
     public:
         MaterializedResult(const DataTable& table);
 
         bool
         next(DataRow& out) override;
+
+        OutputSchema
+        output_schema() override;
     };
 
     class EmptyExecutionResult final : public IExecutionResult
@@ -34,6 +41,9 @@ namespace types
     public:
         bool
         next(DataRow& out) override;
+
+        OutputSchema
+        output_schema() override;
     };
 }
 

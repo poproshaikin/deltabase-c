@@ -7,7 +7,7 @@
 namespace types
 {
     MaterializedResult::MaterializedResult(const DataTable& table)
-        : table_(table), current_(0)
+        : table_(table), schema_(table.output_schema), current_(0)
     {
     }
 
@@ -21,9 +21,21 @@ namespace types
         return true;
     }
 
+    OutputSchema
+    MaterializedResult::output_schema()
+    {
+        return schema_;
+    }
+
     bool
     EmptyExecutionResult::next(DataRow& out)
     {
         return false;
     }
-}
+
+    OutputSchema
+    EmptyExecutionResult::output_schema()
+    {
+        return {};
+    }
+} // namespace types

@@ -106,7 +106,7 @@ namespace engine
 
         auto analysis = analyzer_->analyze(ast);
         if (!analysis.is_valid)
-            throw std::runtime_error(std::string("Analysis failed: ") + analysis.err->what());
+            throw *analysis.err;
 
         auto plan = planner_->plan(std::move(ast));
 
@@ -119,6 +119,7 @@ namespace engine
         while (executor->next(row))
             result_table.rows.push_back(row);
         executor->close();
+        result_table.output_schema = executor->output_schema();
 
         return std::make_unique<MaterializedResult>(std::move(result_table));
     }
