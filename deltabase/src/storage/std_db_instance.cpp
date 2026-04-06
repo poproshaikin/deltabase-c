@@ -291,6 +291,7 @@ namespace storage
     StdDbInstance::insert_row(
         const std::string& table_name,
         const std::string& schema_name,
+        const std::optional<std::vector<std::string>>& cols,
         std::vector<DataToken> row,
         txn::Transaction& txn
     )
@@ -299,22 +300,17 @@ namespace storage
         auto* mt = catalog_->get_table(table_name, ms->id);
         const auto mt_unchanged = *mt;
 
-        DataRow data_row;
-        data_row.id = mt->last_rid++;
-        data_row.tokens = std::move(row);
-        size_t row_size = io_manager_->estimate_size(data_row);
+        auto new_row = mt->make_row(cols, row);
+        size_t row_size = io_manager_->estimate_size(new_row);
 
         auto* page = buffer_pool_->prepare_dp(row_size, *mt);
 
         if (mt->indexes.size() > 0)
-            insert_row_into_indexes(*mt, data_row, page->id);
+            insert_row_into_indexes(*mt, new_row, page->id);
 
-        page->rows.push_back(data_row);
+        page->rows.push_back(new_row);
 
-        mt->total_rows++;
-        mt->live_rows++;
-
-        InsertRecord insert_record(mt->id, page->id, data_row);
+        InsertRecord insert_record(mt->id, page->id, new_row);
         UpdateTableRecord update_table_record(mt_unchanged, *mt);
         txn.append_log(insert_record);
         txn.append_log(update_table_record);
@@ -337,6 +333,11 @@ namespace storage
                 throw std::runtime_error("Index column not found in table schema");
 
             const auto& key = row.tokens[static_cast<size_t>(col_idx)];
+            
+            // NULL values are not indexed
+            if (key.type == DataType::_NULL)
+                continue;
+            
             const RowPtr row_ptr{page_id, row.id};
 
             BPIndexPager pager(*buffer_pool_, mt.id, mi.id);
@@ -617,6 +618,40 @@ namespace storage
         if (col_idx < 0)
             throw std::runtime_error("Index column not found in table schema");
 
+        // Pre-validate unique constraint on existing data before creating index file
+        if (is_unique)
+        {
+            auto pages = buffer_pool_->get_table_data(table->id);
+            std::unordered_set<std::string> seen_values;
+
+            for (const auto& page : pages)
+            {
+                for (const auto& row : page->rows)
+                {
+                    if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                        continue;
+
+                    const auto& key = row.tokens[static_cast<size_t>(col_idx)];
+                    
+                    // NULL values are not indexed and don't violate uniqueness
+                    if (key.type == DataType::_NULL)
+                        continue;
+                    
+                    std::string key_str(key.bytes.begin(), key.bytes.end());
+                    
+                    if (seen_values.count(key_str) > 0)
+                    {
+                        throw UniqueConstraintViolation(
+                            "Cannot create unique index '" + index_name + "' on column '" + 
+                            column_name + "': table '" + table_name + "' contains duplicate values"
+                        );
+                    }
+                    
+                    seen_values.insert(key_str);
+                }
+            }
+        }
+
         BPIndexPager pager(*buffer_pool_, table->id, mi.id);
         IndexBPlusTree tree(pager);
 
@@ -630,14 +665,12 @@ namespace storage
                     continue;
 
                 const auto& key = row.tokens[static_cast<size_t>(col_idx)];
+                
+                // NULL values are not indexed
+                if (key.type == DataType::_NULL)
+                    continue;
+                
                 const RowPtr row_ptr{page->id, row.id};
-
-                if (is_unique)
-                {
-                    auto existing = tree.find(key);
-                    if (existing.has_value() && !is_row_obsolete(existing.value()))
-                        throw UniqueConstraintViolation(mi.name);
-                }
 
                 tree.insert(key, row_ptr);
             }

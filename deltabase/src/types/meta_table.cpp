@@ -13,6 +13,47 @@ namespace types
     {
     }
 
+    DataRow
+    MetaTable::make_row(
+        const std::optional<std::vector<std::string>>& cols, const std::vector<DataToken>& row
+    )
+    {
+        const DataToken null_token(Bytes{}, DataType::_NULL);
+
+        DataRow data_row;
+        data_row.id = last_rid++;
+
+        total_rows++;
+        live_rows++;
+
+        // Always reorder tokens according to schema and fill missing values with NULL tokens
+        std::vector<DataToken> reordered_tokens(columns.size(), null_token);
+
+        if (!cols.has_value())
+        {
+            // No column names provided - map row tokens directly by index
+            for (size_t i = 0; i < row.size() && i < columns.size(); ++i)
+            {
+                reordered_tokens[i] = row[i];
+            }
+        }
+        else
+        {
+            // Column names provided - map tokens according to schema
+            for (size_t i = 0; i < cols->size(); ++i)
+            {
+                int64_t col_idx = get_column_idx((*cols)[i]);
+                if (col_idx != -1 && i < row.size())
+                {
+                    reordered_tokens[col_idx] = row[i];
+                }
+            }
+        }
+
+        data_row.tokens = reordered_tokens;
+        return data_row;
+    }
+
     bool
     MetaTable::has_column(const std::string& col_name) const
     {

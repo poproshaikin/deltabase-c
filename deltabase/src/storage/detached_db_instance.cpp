@@ -64,7 +64,8 @@ namespace storage
     DetachedDbInstance::insert_row(
         const std::string& table_name,
         const std::string& schema_name,
-        std::vector<DataToken> row,
+        const std::optional<std::vector<std::string>>& cols,
+        std::vector<DataToken> rows,
         txn::Transaction& txn
     )
     {

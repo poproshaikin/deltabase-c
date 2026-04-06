@@ -490,6 +490,8 @@ namespace sql
             return AstOperator::LT;
         case SqlOperator::LTE:
             return AstOperator::LTE;
+        case SqlOperator::IS:
+            return AstOperator::IS;
         case SqlOperator::ASSIGN:
             return AstOperator::ASSIGN;
         default:
@@ -505,10 +507,21 @@ namespace sql
         while (true)
         {
             const SqlToken& token = current();
-            if (token.type != SqlTokenType::OPERATOR)
+            std::optional<AstOperator> op_opt;
+            if (token.type == SqlTokenType::OPERATOR)
+            {
+                op_opt = to_ast_operator(std::get<SqlOperator>(token.detail));
+            }
+            else if (token.type == SqlTokenType::KEYWORD &&
+                     std::get<SqlKeyword>(token.detail) == SqlKeyword::IS)
+            {
+                op_opt = AstOperator::IS;
+            }
+            else
+            {
                 break;
+            }
 
-            auto op_opt = to_ast_operator(std::get<SqlOperator>(token.detail));
             if (!op_opt)
                 break;
 
@@ -519,6 +532,12 @@ namespace sql
 
             AstOperator op = *op_opt;
             advance();
+
+            if (op == AstOperator::IS && match(SqlKeyword::NOT))
+            {
+                op = AstOperator::NEQ;
+                advance();
+            }
 
             auto right = parse_binary_tree(priority + 1);
 
@@ -575,6 +594,17 @@ namespace sql
             expr.right = std::move(right);
 
             return std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, std::move(expr));
+        }
+
+        if (match(SqlKeyword::_NULL))
+        {
+            advance();
+
+            SqlToken copy = token;
+            copy.type = SqlTokenType::LITERAL;
+            copy.detail = SqlLiteral::NULL_;
+
+            return std::make_unique<AstNode>(AstNodeType::LITERAL, AstNodeValue(std::move(copy)));
         }
 
         if (match(SqlTokenType::LITERAL))

@@ -39,7 +39,8 @@ namespace storage
         insert_row(
             const std::string& table_name,
             const std::string& schema_name,
-            std::vector<types::DataToken> row,
+            const std::optional<std::vector<std::string>>& cols,
+            std::vector<types::DataToken> rows,
             txn::Transaction& txn
         ) = 0;
 
