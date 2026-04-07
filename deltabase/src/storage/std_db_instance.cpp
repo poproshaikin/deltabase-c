@@ -22,6 +22,7 @@ namespace storage
 {
     using namespace types;
     using namespace misc;
+    using InstanceGuard = std::lock_guard<std::recursive_mutex>;
 
     StdDbInstance::StdDbInstance(const Config& cfg) : cfg_(cfg)
     {
@@ -44,6 +45,7 @@ namespace storage
     void
     StdDbInstance::init()
     {
+        InstanceGuard guard(mtx_);
         io_manager_->init();
         recovery_manager_->recover();
         catalog_->hydrate();
@@ -52,12 +54,14 @@ namespace storage
 
     StdDbInstance::~StdDbInstance()
     {
+        InstanceGuard guard(mtx_);
         io_manager_->write_cfg(cfg_);
     }
 
     bool
     StdDbInstance::needs_stream(IPlanNode& plan_node)
     {
+        InstanceGuard guard(mtx_);
         // TODO
         return false;
     }
@@ -65,6 +69,7 @@ namespace storage
     DataTable
     StdDbInstance::seq_scan(const std::string& table_name, const std::string& schema_name)
     {
+        InstanceGuard guard(mtx_);
         const auto* ms = catalog_->get_schema(schema_name);
         const auto* mt = catalog_->get_table(table_name, ms->id);
         const auto pages = buffer_pool_->get_table_data(mt->id);
@@ -100,6 +105,7 @@ namespace storage
         const BinaryExpr& condition
     )
     {
+        InstanceGuard guard(mtx_);
         const auto* ms = catalog_->get_schema(schema_name);
         const auto* mt = catalog_->get_table(table_name, ms->id);
 
@@ -255,6 +261,7 @@ namespace storage
     txn::Transaction
     StdDbInstance::make_txn()
     {
+        InstanceGuard guard(mtx_);
         return txn_manager_->make_transaction();
     }
 
@@ -274,6 +281,7 @@ namespace storage
     bool
     StdDbInstance::is_row_obsolete(const RowPtr& row_ptr) const
     {
+        InstanceGuard guard(mtx_);
         const auto* page = buffer_pool_->get_dp(row_ptr.first);
         if (!page)
             return false;
@@ -296,6 +304,7 @@ namespace storage
         txn::Transaction& txn
     )
     {
+        InstanceGuard guard(mtx_);
         const auto* ms = catalog_->get_schema(schema_name);
         auto* mt = catalog_->get_table(table_name, ms->id);
         const auto mt_unchanged = *mt;
@@ -305,8 +314,9 @@ namespace storage
 
         auto* page = buffer_pool_->prepare_dp(row_size, *mt);
 
+        std::vector<IndexId> touched_indexes;
         if (mt->indexes.size() > 0)
-            insert_row_into_indexes(*mt, new_row, page->id);
+            touched_indexes = insert_row_into_indexes(*mt, new_row, page->id);
 
         page->rows.push_back(new_row);
 
@@ -317,15 +327,21 @@ namespace storage
         const LSN page_lsn = txn.get_last_lsn();
 
         page->last_lsn = page_lsn;
+        for (const auto& index_id : touched_indexes)
+            buffer_pool_->set_if_lsn(index_id, page_lsn);
 
         buffer_pool_->dirty_dp(page->id);
     }
 
-    void
+    std::vector<IndexId>
     StdDbInstance::insert_row_into_indexes(
         const MetaTable& mt, const DataRow& row, const DataPageId& page_id
     )
     {
+        InstanceGuard guard(mtx_);
+        std::vector<IndexId> touched_indexes;
+        touched_indexes.reserve(mt.indexes.size());
+
         for (auto& mi : mt.indexes)
         {
             const auto col_idx = mt.get_column_idx(mi.column_id);
@@ -351,7 +367,10 @@ namespace storage
             }
 
             tree.insert(key, row_ptr);
+            touched_indexes.push_back(mi.id);
         }
+
+        return touched_indexes;
     }
 
     void
@@ -363,6 +382,7 @@ namespace storage
         txn::Transaction& txn
     )
     {
+        InstanceGuard guard(mtx_);
         auto* ms = catalog_->get_schema(schema_name);
         auto* mt = catalog_->get_table(table_name, ms->id);
         const auto unchanged_mt = *mt;
@@ -421,7 +441,11 @@ namespace storage
                 page->max_rid = std::max(page->max_rid, new_row.id);
 
                 if (mt->indexes.size() > 0)
-                    insert_row_into_indexes(*mt, new_row, page->id);
+                {
+                    auto touched_indexes = insert_row_into_indexes(*mt, new_row, page->id);
+                    for (const auto& index_id : touched_indexes)
+                        buffer_pool_->set_if_lsn(index_id, page_lsn);
+                }
 
                 updated = true;
             }
@@ -442,6 +466,7 @@ namespace storage
         txn::Transaction& txn
     )
     {
+        InstanceGuard guard(mtx_);
         auto* ms = catalog_->get_schema(schema_name);
         auto* mt = catalog_->get_table(table_name, ms->id);
         const auto unchanged_mt = *mt;
@@ -488,6 +513,7 @@ namespace storage
     MetaTable*
     StdDbInstance::get_table(const std::string& table_name, const std::string& schema_name)
     {
+        InstanceGuard guard(mtx_);
         auto* ms = get_schema(schema_name);
         if (!ms) return nullptr;
         return catalog_->get_table(table_name, ms->id);
@@ -496,6 +522,7 @@ namespace storage
     MetaTable*
     StdDbInstance::get_table(const TableIdentifier& identifier)
     {
+        InstanceGuard guard(mtx_);
         return get_table(
             identifier.table_name.value,
             identifier.schema_name.has_value() ? identifier.schema_name.value().value
@@ -506,24 +533,28 @@ namespace storage
     const Config&
     StdDbInstance::get_config() const
     {
+        InstanceGuard guard(mtx_);
         return cfg_;
     }
 
     MetaSchema*
     StdDbInstance::get_schema(const std::string& name)
     {
+        InstanceGuard guard(mtx_);
         return catalog_->get_schema(name);
     }
 
     bool
     StdDbInstance::exists_table(const std::string& table_name, const std::string& schema_name)
     {
+        InstanceGuard guard(mtx_);
         return get_table(table_name, schema_name) != nullptr;
     }
 
     bool
     StdDbInstance::exists_table(const TableIdentifier& identifier)
     {
+        InstanceGuard guard(mtx_);
         std::string schema_name = identifier.schema_name.has_value()
                                       ? identifier.schema_name.value().value
                                       : cfg_.default_schema;
@@ -534,6 +565,7 @@ namespace storage
     bool
     StdDbInstance::exists_db(const std::string& name)
     {
+        InstanceGuard guard(mtx_);
         return io_manager_->exists_db(name);
     }
 
@@ -545,6 +577,7 @@ namespace storage
         txn::Transaction& txn
     )
     {
+        InstanceGuard guard(mtx_);
         auto* schema = catalog_->get_schema(schema_name);
 
         MetaTable mt;
@@ -570,6 +603,7 @@ namespace storage
     void
     StdDbInstance::create_schema(const std::string& schema_name, txn::Transaction& txn)
     {
+        InstanceGuard guard(mtx_);
         MetaSchema ms;
         ms.id = Uuid::make();
         ms.name = schema_name;
@@ -584,6 +618,7 @@ namespace storage
     bool
     StdDbInstance::exists_schema(const std::string& schema_name)
     {
+        InstanceGuard guard(mtx_);
         return catalog_->exists_schema(schema_name);
     }
 
@@ -597,6 +632,7 @@ namespace storage
         txn::Transaction& txn
     )
     {
+        InstanceGuard guard(mtx_);
         const auto* schema = catalog_->get_schema(schema_name);
         auto* table = catalog_->get_table(table_name, schema->id);
         const auto& column = table->get_column(column_name);
@@ -612,7 +648,7 @@ namespace storage
         CreateIndexRecord record(mi);
         txn.append_log(record);
 
-        buffer_pool_->create_table_index(schema_name, *table, mi);
+        buffer_pool_->create_table_index(schema_name, *table, mi, txn.get_last_lsn());
 
         const auto col_idx = table->get_column_idx(column.id);
         if (col_idx < 0)
@@ -676,6 +712,8 @@ namespace storage
             }
         }
 
+        buffer_pool_->set_if_lsn(mi.id, txn.get_last_lsn());
+
         table->indexes.push_back(std::move(mi));
     }
 
@@ -684,6 +722,7 @@ namespace storage
         const std::string& index_name, const std::string& table_name, const std::string& schema_name
     )
     {
+        InstanceGuard guard(mtx_);
         return get_index(index_name, table_name, schema_name) != nullptr;
     }
 
@@ -692,6 +731,7 @@ namespace storage
         const std::string& index_name, const TableIdentifier& table_identifier
     )
     {
+        InstanceGuard guard(mtx_);
         return get_index(index_name, table_identifier) != nullptr;
     }
 
@@ -700,6 +740,7 @@ namespace storage
         const std::string& index_name, const std::string& table_name, const std::string& schema_name
     )
     {
+        InstanceGuard guard(mtx_);
         const auto* schema = catalog_->get_schema(schema_name);
         auto* table = catalog_->get_table(table_name, schema->id);
 
@@ -715,6 +756,7 @@ namespace storage
         const std::string& index_name, const TableIdentifier& identifier
     )
     {
+        InstanceGuard guard(mtx_);
         std::string schema_name = identifier.schema_name.has_value()
                                       ? identifier.schema_name.value().value
                                       : cfg_.default_schema;
@@ -730,6 +772,7 @@ namespace storage
         txn::Transaction& txn
     )
     {
+        InstanceGuard guard(mtx_);
         auto* table = get_table(table_name, schema_name);
         auto* index = get_index(index_name, table_name, schema_name);
         if (!index)

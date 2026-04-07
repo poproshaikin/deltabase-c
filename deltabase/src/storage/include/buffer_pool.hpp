@@ -76,14 +76,21 @@ namespace storage
         create_table_index(
             const std::string& schema_name,
             const types::MetaTable& table,
-            const types::MetaIndex& index
+            const types::MetaIndex& index,
+            types::LSN last_lsn
         );
 
         types::IndexFile*
         dirty_if(const types::IndexId& index_id);
 
         void
+        set_if_lsn(const types::IndexId& index_id, types::LSN last_lsn);
+
+        void
         flush_dirty();
+
+        void
+        flush_dirty(types::LSN max_lsn);
     };
 } // namespace storage
 

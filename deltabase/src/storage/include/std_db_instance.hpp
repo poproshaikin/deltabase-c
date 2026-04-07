@@ -14,6 +14,8 @@
 #include "db_instance.hpp"
 #include "io_manager.hpp"
 
+#include <mutex>
+
 namespace storage
 {
     class StdDbInstance final : public IDbInstance
@@ -25,6 +27,7 @@ namespace storage
         std::unique_ptr<recovery::RecoveryManager> recovery_manager_;
         std::unique_ptr<BufferPool> buffer_pool_;
         std::unique_ptr<CatalogCache> catalog_;
+        mutable std::recursive_mutex mtx_;
 
         void
         init();
@@ -66,7 +69,7 @@ namespace storage
             txn::Transaction& txn
         ) override;
 
-        void
+        std::vector<types::IndexId>
         insert_row_into_indexes(
             const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id
         ) override;

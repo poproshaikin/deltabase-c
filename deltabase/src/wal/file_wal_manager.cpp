@@ -17,14 +17,35 @@ namespace wal
 {
     using namespace types;
     using namespace misc;
+    using DbGuard = std::lock_guard<storage::DatabaseIoLockService::Mutex>;
 
     FileWalManager::FileWalManager(
-        const fs::path& db_path, const std::string& db_name, Config::SerializerType serializer_type
+        const fs::path& db_path,
+        const std::string& db_name,
+        Config::SerializerType serializer_type
     )
-        : db_path_(db_path), db_name_(db_name), next_lsn_(1), flushed_lsn_(0)
+        : FileWalManager(db_path, db_name, serializer_type, storage::DatabaseIoLockService::shared())
     {
+    }
+
+    FileWalManager::FileWalManager(
+        const fs::path& db_path,
+        const std::string& db_name,
+        Config::SerializerType serializer_type,
+        std::shared_ptr<storage::DatabaseIoLockService> io_lock_service
+    )
+        : db_path_(db_path),
+          db_name_(db_name),
+          next_lsn_(1),
+          flushed_lsn_(0),
+          io_lock_service_(std::move(io_lock_service))
+    {
+        if (!io_lock_service_)
+            io_lock_service_ = storage::DatabaseIoLockService::shared();
+
         WalSerializerFactory factory;
         serializer_ = factory.make(serializer_type);
+        db_mutex_ = io_lock_service_->mutex_for(db_path_, db_name_);
 
         // Create WAL directory if it doesn't exist
         auto wal_dir = storage::path_db_wal(db_path_, db_name_);
@@ -116,9 +137,10 @@ namespace wal
         }
     }
 
-    void
+    LSN
     FileWalManager::append_log(const WALRecord& record)
     {
+        DbGuard guard(*db_mutex_);
         std::lock_guard lk(mtx_);
         auto lsn = next_lsn_++;
 
@@ -132,20 +154,26 @@ namespace wal
         );
 
         dirty_.push_back(record_with_lsn);
+        return lsn;
     }
 
-    void
+    LSN
     FileWalManager::append_log(const std::vector<WALRecord>& records)
     {
+        DbGuard guard(*db_mutex_);
+        LSN last_lsn = 0;
         for (const auto& record : records)
         {
-            append_log(record);
+            last_lsn = append_log(record);
         }
+
+        return last_lsn;
     }
 
     WALRecord
     FileWalManager::read_log(LSN lsn)
     {
+        DbGuard guard(*db_mutex_);
         std::lock_guard lk(mtx_);
 
         // Check dirty buffer first (most recent records)
@@ -169,8 +197,9 @@ namespace wal
     }
 
     void
-    FileWalManager::commit_wait(LSN lsn)
+    FileWalManager::wait_for_durable(LSN lsn)
     {
+        DbGuard guard(*db_mutex_);
         std::unique_lock lk(mtx_);
         while (flushed_lsn_ < lsn)
         {
@@ -203,8 +232,15 @@ namespace wal
     }
 
     void
+    FileWalManager::commit_wait(LSN lsn)
+    {
+        wait_for_durable(lsn);
+    }
+
+    void
     FileWalManager::flush()
     {
+        DbGuard guard(*db_mutex_);
         std::vector<WALRecord> to_flush;
         {
             std::lock_guard lk(mtx_);
@@ -227,12 +263,14 @@ namespace wal
     void
     FileWalManager::sync()
     {
+        DbGuard guard(*db_mutex_);
         flush();
     }
 
     std::vector<WALRecord>
     FileWalManager::read_all_logs()
     {
+        DbGuard guard(*db_mutex_);
         std::lock_guard lk(mtx_);
 
         // Return all cached records (flushed from disk + dirty in memory)
@@ -251,6 +289,7 @@ namespace wal
     LSN
     FileWalManager::get_next_lsn() const
     {
+        DbGuard guard(*db_mutex_);
         std::lock_guard lk(mtx_);
         return next_lsn_;
     }
@@ -258,6 +297,7 @@ namespace wal
     void
     FileWalManager::write_logs(const std::vector<WALRecord>& logs)
     {
+        DbGuard guard(*db_mutex_);
         auto dir = storage::path_db_wal(db_path_, db_name_);
         if (!fs::exists(dir))
             fs::create_directories(dir);
@@ -311,6 +351,7 @@ namespace wal
     std::vector<WALRecord>
     FileWalManager::read_logs_from_file(const fs::path& file_path)
     {
+        DbGuard guard(*db_mutex_);
         std::vector<WALRecord> logs;
 
         std::ifstream file(file_path, std::ios::binary);

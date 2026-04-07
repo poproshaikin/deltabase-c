@@ -9,8 +9,22 @@
 
 namespace storage
 {
-    DetachedFileIOManager::DetachedFileIOManager(const fs::path& db_path) : db_path_(db_path)
+    using DbGuard = std::lock_guard<DatabaseIoLockService::Mutex>;
+
+    DetachedFileIOManager::DetachedFileIOManager(const fs::path& db_path)
+        : DetachedFileIOManager(db_path, DatabaseIoLockService::shared())
     {
+    }
+
+    DetachedFileIOManager::DetachedFileIOManager(
+        const fs::path& db_path, std::shared_ptr<DatabaseIoLockService> io_lock_service
+    )
+        : db_path_(db_path), io_lock_service_(std::move(io_lock_service))
+    {
+        if (!io_lock_service_)
+            io_lock_service_ = DatabaseIoLockService::shared();
+
+        db_mutex_ = io_lock_service_->mutex_for(db_path_, "detached");
     }
 
     void
@@ -21,6 +35,7 @@ namespace storage
     bool
     DetachedFileIOManager::exists_db(const std::string& name)
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db(db_path_, name);
         return fs::exists(path) && fs::is_directory(path);
     }

@@ -4,6 +4,7 @@
 
 #include "include/buffer_pool.hpp"
 
+#include <algorithm>
 #include <ranges>
 
 namespace storage
@@ -81,37 +82,21 @@ namespace storage
     DataPage*
     BufferPool::prepare_dp(size_t size, const MetaTable& mt)
     {
-        DataPage* result = nullptr;
-        for (auto& entry : data_pages_ | std::views::values)
+        auto table_pages_it = data_pages_per_table_.find(mt.id);
+        if (table_pages_it == data_pages_per_table_.end())
+            return create_dp(mt);
+
+        for (const auto& page_id : table_pages_it->second)
         {
-            if (entry.value.size + size > DataPage::MAX_SIZE)
+            auto* page = get_dp(page_id);
+            if (!page)
                 continue;
 
-            result = &entry.value;
-            break;
+            if (page->size + size <= DataPage::MAX_SIZE)
+                return page;
         }
 
-        if (!result)
-        {
-            bool found_available = false;
-            for (const auto& page_id : data_pages_per_table_[mt.id])
-            {
-                auto* page = get_dp(page_id);
-                if (page->size + size > DataPage::MAX_SIZE)
-                    continue;
-
-                result = page;
-                found_available = true;
-                break;
-            }
-
-            if (!found_available)
-            {
-                result = create_dp(mt);
-            }
-        }
-
-        return result;
+        return create_dp(mt);
     }
 
     std::vector<DataPage*>
@@ -161,10 +146,14 @@ namespace storage
 
     void
     BufferPool::create_table_index(
-        const std::string& schema_name, const MetaTable& table, const MetaIndex& index
+        const std::string& schema_name,
+        const MetaTable& table,
+        const MetaIndex& index,
+        LSN last_lsn
     )
     {
         IndexFile file = io_.create_index_file(schema_name, table.name, index);
+        file.last_lsn = last_lsn;
 
         index_files_.put(index.id, std::move(file), index_file_flusher_);
         index_files_.mark_dirty(file.index_id);
@@ -182,6 +171,16 @@ namespace storage
         index_files_.mark_dirty(index_id);
         auto* entry = index_files_.get(index_id);
         return entry ? &entry->value : nullptr;
+    }
+
+    void
+    BufferPool::set_if_lsn(const IndexId& index_id, LSN last_lsn)
+    {
+        auto* entry = index_files_.get(index_id);
+        if (!entry)
+            return;
+
+        entry->value.last_lsn = std::max(entry->value.last_lsn, last_lsn);
     }
 
     DataPage*
@@ -202,6 +201,32 @@ namespace storage
 
         for (auto& index : index_files_ | std::views::values)
         {
+            flush(index);
+        }
+    }
+
+    void
+    BufferPool::flush_dirty(LSN max_lsn)
+    {
+        for (auto& page : data_pages_ | std::views::values)
+        {
+            if (!page.dirty)
+                continue;
+
+            if (page.value.last_lsn > max_lsn)
+                continue;
+
+            flush(page);
+        }
+
+        for (auto& index : index_files_ | std::views::values)
+        {
+            if (!index.dirty)
+                continue;
+
+            if (index.value.last_lsn > max_lsn)
+                continue;
+
             flush(index);
         }
     }

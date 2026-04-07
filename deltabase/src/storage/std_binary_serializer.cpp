@@ -185,6 +185,7 @@ namespace storage
 
         stream.write(file.index_id.raw(), sizeof(uuid_t));
         stream.write(&file.root_page, sizeof(file.root_page));
+        stream.write(&file.last_lsn, sizeof(file.last_lsn));
         uint64_t pages_count = file.pages.size();
         stream.write(&pages_count, sizeof(pages_count));
 
@@ -454,6 +455,9 @@ namespace storage
             return false;
 
         if (content.read(&out.root_page, sizeof(out.root_page)) != sizeof(out.root_page))
+            return false;
+
+        if (content.read(&out.last_lsn, sizeof(out.last_lsn)) != sizeof(out.last_lsn))
             return false;
 
         uint64_t pages_count = 0;

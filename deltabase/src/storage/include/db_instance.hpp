@@ -44,7 +44,7 @@ namespace storage
             txn::Transaction& txn
         ) = 0;
 
-        virtual void
+        virtual std::vector<types::IndexId>
         insert_row_into_indexes(
             const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id
         ) = 0;

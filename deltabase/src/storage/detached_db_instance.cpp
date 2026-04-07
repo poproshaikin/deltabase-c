@@ -160,7 +160,7 @@ namespace storage
         throw std::logic_error("DetachedDbInstance::create_index: this method is not supported");
     }
 
-    void
+    std::vector<types::IndexId>
     DetachedDbInstance::insert_row_into_indexes(
         const MetaTable& mt, const DataRow& row, const DataPageId& page_id
     )

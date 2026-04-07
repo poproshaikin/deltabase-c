@@ -5,11 +5,13 @@
 #ifndef DELTABASE_FILEIOMANAGER_HPP
 #define DELTABASE_FILEIOMANAGER_HPP
 #include "binary_serializer.hpp"
+#include "db_io_lock_service.hpp"
 #include "io_manager.hpp"
 #include "../../types/include/config.hpp"
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 
 namespace storage
 {
@@ -20,6 +22,8 @@ namespace storage
         std::string db_name_;
         fs::path db_path_;
         std::unique_ptr<IBinarySerializer> serializer_;
+        std::shared_ptr<DatabaseIoLockService> io_lock_service_;
+        std::shared_ptr<DatabaseIoLockService::Mutex> db_mutex_;
 
         void
         for_each_in_db(const std::function<void(fs::directory_entry)>& func) const;
@@ -53,6 +57,12 @@ namespace storage
     public:
         explicit
         FileIOManager(const fs::path& db_path, const std::string& db_name, types::Config::SerializerType serializer_type);
+        FileIOManager(
+            const fs::path& db_path,
+            const std::string& db_name,
+            types::Config::SerializerType serializer_type,
+            std::shared_ptr<DatabaseIoLockService> io_lock_service
+        );
 
         void
         init() override;

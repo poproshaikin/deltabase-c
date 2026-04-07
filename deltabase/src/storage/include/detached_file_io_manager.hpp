@@ -5,7 +5,10 @@
 #ifndef DELTABASE_DETACHED_FILE_IO_MANAGER_HPP
 #define DELTABASE_DETACHED_FILE_IO_MANAGER_HPP
 #include "binary_serializer.hpp"
+#include "db_io_lock_service.hpp"
 #include "io_manager.hpp"
+
+#include <memory>
 
 namespace storage
 {
@@ -15,9 +18,16 @@ namespace storage
     {
         fs::path db_path_;
         std::unique_ptr<IBinarySerializer> serializer_;
+        std::shared_ptr<DatabaseIoLockService> io_lock_service_;
+        std::shared_ptr<DatabaseIoLockService::Mutex> db_mutex_;
 
     public:
         explicit DetachedFileIOManager(const fs::path& db_path);
+
+        DetachedFileIOManager(
+            const fs::path& db_path,
+            std::shared_ptr<DatabaseIoLockService> io_lock_service
+        );
 
         void
         init() override;

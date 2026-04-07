@@ -17,19 +17,37 @@
 namespace storage
 {
     using namespace types;
+    using DbGuard = std::lock_guard<DatabaseIoLockService::Mutex>;
 
     FileIOManager::FileIOManager(
-        const fs::path& db_path, const std::string& db_name, Config::SerializerType serializer_type
+        const fs::path& db_path,
+        const std::string& db_name,
+        Config::SerializerType serializer_type
     )
-        : db_path_(db_path), db_name_(db_name)
+        : FileIOManager(db_path, db_name, serializer_type, DatabaseIoLockService::shared())
     {
+    }
+
+    FileIOManager::FileIOManager(
+        const fs::path& db_path,
+        const std::string& db_name,
+        Config::SerializerType serializer_type,
+        std::shared_ptr<DatabaseIoLockService> io_lock_service
+    )
+        : db_path_(db_path), db_name_(db_name), io_lock_service_(std::move(io_lock_service))
+    {
+        if (!io_lock_service_)
+            io_lock_service_ = DatabaseIoLockService::shared();
+
         BinarySerializerFactory factory;
         serializer_ = factory.make_binary_serializer(serializer_type);
+        db_mutex_ = io_lock_service_->mutex_for(db_path_, db_name_);
     }
 
     void
     FileIOManager::init()
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db(db_path_, db_name_);
 
         if (!fs::exists(path))
@@ -160,6 +178,7 @@ namespace storage
     std::vector<MetaSchema>
     FileIOManager::read_schemas_meta()
     {
+        DbGuard guard(*db_mutex_);
         std::vector<MetaSchema> schemas;
 
         for_each_schema(
@@ -196,6 +215,7 @@ namespace storage
     MetaSchema
     FileIOManager::read_schema_meta(const std::string& target_schema)
     {
+        DbGuard guard(*db_mutex_);
         MetaSchema schema{};
         for_each_schema(
             [&](const fs::directory_entry& schema_entry)
@@ -226,6 +246,7 @@ namespace storage
     MetaSchema
     FileIOManager::read_schema_meta(const Uuid& schema_id)
     {
+        DbGuard guard(*db_mutex_);
         MetaSchema schema{};
 
         for_each_schema(
@@ -261,6 +282,7 @@ namespace storage
     bool
     FileIOManager::exists_table(const std::string& table_name, const std::string& schema_name)
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db_schema_table_meta(db_path_, db_name_, schema_name, table_name);
         return fs::exists(path);
     }
@@ -268,6 +290,7 @@ namespace storage
     std::vector<MetaTable>
     FileIOManager::read_tables_meta()
     {
+        DbGuard guard(*db_mutex_);
         std::vector<MetaTable> tables;
 
         for_each_table(
@@ -303,6 +326,7 @@ namespace storage
     std::vector<std::pair<TableId, std::vector<DataPage>>>
     FileIOManager::read_tables_data()
     {
+        DbGuard guard(*db_mutex_);
         std::vector<std::pair<TableId, std::vector<DataPage>>> tables;
 
         for_each_table(
@@ -361,6 +385,7 @@ namespace storage
     MetaTable
     FileIOManager::read_table_meta(const Uuid& table_id)
     {
+        DbGuard guard(*db_mutex_);
         std::unique_ptr<MetaTable> result;
 
         for_each_table(
@@ -401,6 +426,7 @@ namespace storage
     MetaTable
     FileIOManager::read_table_meta(const std::string& table_name, const std::string& schema_name)
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db_schema_table_meta(db_path_, db_name_, schema_name, table_name);
         auto content = read_file(path);
 
@@ -417,6 +443,7 @@ namespace storage
     std::vector<DataPage>
     FileIOManager::read_table_data(const std::string& table_name, const std::string& schema_name)
     {
+        DbGuard guard(*db_mutex_);
         std::vector<DataPage> pages;
 
         for_each_in_table_data(
@@ -447,6 +474,7 @@ namespace storage
     std::unique_ptr<DataPage>
     FileIOManager::read_data_page(DataPageId id)
     {
+        DbGuard guard(*db_mutex_);
         const auto page_filename = id.to_string();
         std::unique_ptr<DataPage> result;
 
@@ -501,6 +529,7 @@ namespace storage
     void
     FileIOManager::write_page(const DataPage& page, bool fsync)
     {
+        DbGuard guard(*db_mutex_);
         auto serialized = serializer_->serialize_dp(page);
         if (fsync)
             fsync_file(page.path, serialized.to_vector());
@@ -517,6 +546,7 @@ namespace storage
     void
     FileIOManager::write_mt(const MetaTable& table, const std::string& schema_name, bool fsync)
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db_schema_table_meta(db_path_, db_name_, schema_name, table.name);
         auto serialized = serializer_->serialize_mt(table);
         if (fsync)
@@ -528,6 +558,7 @@ namespace storage
     void
     FileIOManager::write_mt(const MetaTable& table, bool fsync)
     {
+        DbGuard guard(*db_mutex_);
         auto schema = read_schema_meta(table.schema_id);
         write_mt(table, schema.name, fsync);
     }
@@ -535,6 +566,7 @@ namespace storage
     void
     FileIOManager::write_ms(const MetaSchema& ms, bool fsync)
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db_schema_meta(db_path_, db_name_, ms.name);
         auto serialized = serializer_->serialize_ms(ms);
 
@@ -547,6 +579,7 @@ namespace storage
     void
     FileIOManager::delete_mt(const MetaTable& table)
     {
+        DbGuard guard(*db_mutex_);
         auto schema = read_schema_meta(table.schema_id);
         auto path = path_db_schema_table(db_path_, db_name_, schema.name, table.name);
         fs::remove_all(path);
@@ -555,6 +588,7 @@ namespace storage
     void
     FileIOManager::delete_ms(const MetaSchema& schema)
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db_schema(db_path_, db_name_, schema.name);
         fs::remove_all(path);
     }
@@ -562,6 +596,7 @@ namespace storage
     void
     FileIOManager::write_cfg(const Config& cfg)
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db_meta(db_path_, cfg.db_name.value());
         auto serialized = serializer_->serialize_cfg(cfg);
         write_file(path, serialized.to_vector());
@@ -570,6 +605,7 @@ namespace storage
     bool
     FileIOManager::exists_db(const std::string& name)
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db(db_path_, name);
         return fs::exists(path) && fs::is_directory(path);
     }
@@ -577,12 +613,14 @@ namespace storage
     DataPage
     FileIOManager::create_page(const MetaTable& mt)
     {
+        DbGuard guard(*db_mutex_);
         return create_page(mt, DataPageId::make());
     }
 
     DataPage
     FileIOManager::create_page(const MetaTable& mt, const DataPageId& page_id)
     {
+        DbGuard guard(*db_mutex_);
         auto ms = read_schema_meta(mt.schema_id);
         auto data_path = path_db_schema_table_data(db_path_, db_name_, ms.name, mt.name);
         return DataPage::make(data_path, mt.id, page_id);
@@ -591,6 +629,7 @@ namespace storage
     bool
     FileIOManager::exists_schema(const std::string& schema_name)
     {
+        DbGuard guard(*db_mutex_);
         auto path = path_db_schema_meta(db_path_, db_name_, schema_name);
         return fs::exists(path) && fs::is_regular_file(path);
     }
@@ -598,6 +637,7 @@ namespace storage
     std::unordered_map<TableId, std::vector<DataPageId>>
     FileIOManager::map_data_pages_for_table()
     {
+        DbGuard guard(*db_mutex_);
         std::unordered_map<TableId, std::vector<DataPageId>> result;
 
         for_each_table(
@@ -641,6 +681,7 @@ namespace storage
     std::unordered_map<TableId, std::vector<IndexId>>
     FileIOManager::map_index_files_for_table()
     {
+        DbGuard guard(*db_mutex_);
         std::unordered_map<TableId, std::vector<IndexId>> result;
 
         for_each_table(
@@ -686,6 +727,7 @@ namespace storage
         const std::string& schema_name, const std::string& table_name, const MetaIndex& mi
     )
     {
+        DbGuard guard(*db_mutex_);
         IndexPage root;
         root.id = 1;
         root.index_id = mi.id;
@@ -712,6 +754,7 @@ namespace storage
     std::unique_ptr<IndexFile>
     FileIOManager::read_index_file(const IndexId& index_id)
     {
+        DbGuard guard(*db_mutex_);
         std::unique_ptr<IndexFile> result;
 
         for_each_table(
@@ -750,6 +793,7 @@ namespace storage
     void
     FileIOManager::write_index_file(const IndexFile& index_file, bool fsync)
     {
+        DbGuard guard(*db_mutex_);
         std::optional<fs::path> index_path;
 
         for_each_table(

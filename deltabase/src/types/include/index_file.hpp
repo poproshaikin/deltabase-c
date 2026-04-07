@@ -14,6 +14,7 @@ namespace types
         IndexId index_id;
         IndexPageId root_page = 0;
         IndexPageId last_page = 0;
+        LSN last_lsn = 0;
         std::vector<IndexPage> pages;
     };
 }
