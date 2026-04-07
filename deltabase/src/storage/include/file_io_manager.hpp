@@ -4,10 +4,10 @@
 
 #ifndef DELTABASE_FILEIOMANAGER_HPP
 #define DELTABASE_FILEIOMANAGER_HPP
-#include "binary_serializer.hpp"
+#include "../../types/include/config.hpp"
 #include "db_io_lock_service.hpp"
 #include "io_manager.hpp"
-#include "../../types/include/config.hpp"
+#include "storage_serializer.hpp"
 
 #include <filesystem>
 #include <functional>
@@ -21,7 +21,7 @@ namespace storage
     {
         std::string db_name_;
         fs::path db_path_;
-        std::unique_ptr<IBinarySerializer> serializer_;
+        std::unique_ptr<IStorageSerializer> serializer_;
         std::shared_ptr<DatabaseIoLockService> io_lock_service_;
         std::shared_ptr<DatabaseIoLockService::Mutex> db_mutex_;
 

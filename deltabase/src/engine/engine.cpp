@@ -9,12 +9,11 @@
 #include "logger.hpp"
 #include "static_storage.hpp"
 
-
 #include "../misc/include/memory_stream.hpp"
 #include "../storage/include/file_utils.hpp"
 #include "../storage/include/path.hpp"
-#include "../storage/include/std_binary_serializer.hpp"
 #include "../storage/include/std_db_instance.hpp"
+#include "../storage/include/std_storage_serializer.hpp"
 
 namespace engine
 {
@@ -30,7 +29,7 @@ namespace engine
 
         ReadOnlyMemoryStream stream(read_file(cfg_path));
         Config cfg;
-        if (StdBinarySerializer serializer; !serializer.deserialize_cfg(stream, cfg))
+        if (StdStorageSerializer serializer; !serializer.deserialize_cfg(stream, cfg))
             throw std::runtime_error(
                 "StdDbInstance::load_config: failed to load config at path " + cfg_path.string()
             );

@@ -4,12 +4,12 @@
 
 #ifndef DELTABASE_STD_BINARY_SERIALIZER_HPP
 #define DELTABASE_STD_BINARY_SERIALIZER_HPP
-#include "binary_serializer.hpp"
 #include "../../misc/include/memory_stream.hpp"
+#include "storage_serializer.hpp"
 
 namespace storage
 {
-    class StdBinarySerializer final : public IBinarySerializer
+    class StdStorageSerializer final : public IStorageSerializer
     {
         void
         write_str(const std::string& str, misc::MemoryStream &stream) const;

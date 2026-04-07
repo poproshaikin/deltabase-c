@@ -9,7 +9,7 @@
 #include "index_bplus_tree.hpp"
 #include "io_manager_factory.hpp"
 #include "logger.hpp"
-#include "std_binary_serializer.hpp"
+#include "std_storage_serializer.hpp"
 #include "utils.hpp"
 
 #include "../misc/include/convert.hpp"

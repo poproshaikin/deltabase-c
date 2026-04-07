@@ -79,6 +79,10 @@ function(add_cpp_module module_name)
         target_link_libraries(${module_name} PUBLIC wal)
     endif()
 
+    if (${module_name} STREQUAL "network")
+        target_link_libraries(${module_name} PUBLIC engine)
+    endif()
+
 endfunction()
 
 add_cpp_module(types)
@@ -91,6 +95,7 @@ add_cpp_module(executor)
 add_cpp_module(engine)
 add_cpp_module(cli)
 add_cpp_module(recovery)
+add_cpp_module(network)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 

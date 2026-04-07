@@ -7,7 +7,7 @@
 #include "binary_serializer_factory.hpp"
 #include "file_utils.hpp"
 #include "path.hpp"
-#include "std_binary_serializer.hpp"
+#include "std_storage_serializer.hpp"
 
 #include <chrono>
 #include <fstream>
