@@ -52,7 +52,8 @@ namespace types
         UNIQUE,
         SCHEMA,
         INDEX,
-        ON
+        ON,
+        IS
     };
 
     enum class SqlSymbol
@@ -76,6 +77,8 @@ namespace types
         LT,
         LTE,
 
+        IS,
+
         AND,
         OR,
         NOT,
@@ -95,6 +98,7 @@ namespace types
         BOOL,
         CHAR,
         REAL,
+        NULL_,
 
         COUNT
     };

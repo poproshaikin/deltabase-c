@@ -67,6 +67,12 @@ namespace types
             type = DataType::CHAR;
             break;
         }
+        case SqlLiteral::NULL_:
+        {
+            bytes.clear();
+            type = DataType::_NULL;
+            break;
+        }
         default:
             throw std::invalid_argument(
                 "Cannot convert SQL token to a data token: invalid value type: " + sql_token.value
@@ -86,6 +92,8 @@ namespace types
 
         switch (lhs.type)
         {
+        case DataType::_NULL:
+            return true;
         case DataType::INTEGER:
             return lhs.as<int>() == rhs.as<int>();
         case DataType::REAL:

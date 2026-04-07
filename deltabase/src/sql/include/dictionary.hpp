@@ -43,7 +43,8 @@ namespace sql
             {"unique", SqlKeyword::UNIQUE},
             {"schema", SqlKeyword::SCHEMA},
             {"index", SqlKeyword::INDEX},
-            {"on", SqlKeyword::ON}
+            {"on", SqlKeyword::ON},
+            {"is", SqlKeyword::IS}
         };
 
         return dictionary;
@@ -156,6 +157,7 @@ namespace sql
             {">=", SqlOperator::GRE},
             {"<", SqlOperator::LT},
             {"<=", SqlOperator::LTE},
+            {"is", SqlOperator::IS},
 
             {"and", SqlOperator::AND},
             {"or", SqlOperator::OR},

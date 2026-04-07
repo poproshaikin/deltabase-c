@@ -46,6 +46,8 @@ namespace types
         LT,
         LTE,
 
+        IS,
+
         ASSIGN,
     };
 
@@ -63,6 +65,7 @@ namespace types
             {AstOperator::GRE, 4},
             {AstOperator::LT, 4},
             {AstOperator::LTE, 4},
+            {AstOperator::IS, 4},
             {AstOperator::ASSIGN, 4},
         };
 

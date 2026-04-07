@@ -144,9 +144,12 @@ namespace storage
     {
         MemoryStream stream;
         stream.write(&token.type, sizeof(token.type));
-        uint64_t size = token.bytes.size();
-        stream.write(&size, sizeof(uint64_t));
-        stream.write(token.bytes.data(), size);
+        if (token.type != DataType::_NULL)
+        {
+            uint64_t size = token.bytes.size();
+            stream.write(&size, sizeof(uint64_t));
+            stream.write(token.bytes.data(), size);
+        }
 
         stream.seek(0);
         return stream;
@@ -636,19 +639,22 @@ namespace storage
             return false;
         }
 
-        uint64_t size = 0;
-        if (stream.read(&size, sizeof(uint64_t)) != sizeof(uint64_t))
+        if (out.type != DataType::_NULL)
         {
-            std::cout << "    [deserialize_dt] ERROR: Failed to read size" << std::endl;
-            return false;
-        }
+            uint64_t size = 0;
+            if (stream.read(&size, sizeof(uint64_t)) != sizeof(uint64_t))
+            {
+                std::cout << "    [deserialize_dt] ERROR: Failed to read size" << std::endl;
+                return false;
+            }
 
-        out.bytes.resize(size);
-        if (stream.read(out.bytes.data(), size) != size)
-        {
-            std::cout << "    [deserialize_dt] ERROR: failed to read " << size << " bytes"
-                      << std::endl;
-            return false;
+            out.bytes.resize(size);
+            if (stream.read(out.bytes.data(), size) != size)
+            {
+                std::cout << "    [deserialize_dt] ERROR: failed to read " << size << " bytes"
+                          << std::endl;
+                return false;
+            }
         }
 
         return true;

@@ -173,14 +173,16 @@ namespace exq
         std::string table_name_;
         std::string schema_name_;
         storage::IDbInstance& db_;
+        std::optional<std::vector<std::string>> col_names_;
         std::unique_ptr<INodeExecutor> child_;
-        bool executed_;
+        bool executed_ = false;
 
     public:
         explicit InsertNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
             storage::IDbInstance& storage,
+            const std::optional<std::vector<std::string>>& col_names,
             std::unique_ptr<INodeExecutor> child
         );
 

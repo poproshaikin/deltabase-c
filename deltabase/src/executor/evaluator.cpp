@@ -69,6 +69,8 @@ namespace exq
             return gr(left, right);
         case AstOperator::GRE:
             return gre(left, right);
+        case AstOperator::IS:
+            return eq(left, right);
         default:
             return false;
         }
@@ -77,15 +79,18 @@ namespace exq
     bool
     Evaluator::eq(const DataToken& left, const DataToken& right) const
     {
+        if (left.type == DataType::_NULL || right.type == DataType::_NULL)
+            return left.type == right.type;
+
         if (left.type != right.type)
         {
-            // TODO
-            std::cerr << "Evaluator::eq: Type mismatch. Returning false";
             return false;
         }
 
         switch (left.type)
         {
+        case DataType::_NULL:
+            return true;
         case DataType::INTEGER:
             return eq(left.as<int>(), right.as<int>());
 

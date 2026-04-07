@@ -51,6 +51,7 @@ namespace exq
 
         types::AnalysisResult
         analyze_column_comparison(
+            types::AstOperator op,
             const std::unique_ptr<types::AstNode>& left,
             const std::unique_ptr<types::AstNode>& right,
             const types::MetaTable& table
@@ -66,7 +67,8 @@ namespace exq
                     { types::DataType::REAL, { types::DataType::REAL, types::DataType::INTEGER } },
                     { types::DataType::STRING, { types::DataType::STRING, types::DataType::CHAR } },
                     { types::DataType::CHAR, { types::DataType::CHAR } },
-                    { types::DataType::BOOL, { types::DataType::BOOL } }
+                    { types::DataType::BOOL, { types::DataType::BOOL } },
+                    { types::DataType::_NULL, { types::DataType::_NULL, types::DataType::INTEGER, types::DataType::REAL, types::DataType::STRING, types::DataType::CHAR, types::DataType::BOOL } }
                 };
 
             return table;
@@ -82,6 +84,7 @@ namespace exq
                 { types::SqlLiteral::CHAR, types::DataType::CHAR },
                 { types::SqlLiteral::BOOL, types::DataType::BOOL },
                 { types::SqlLiteral::REAL, types::DataType::REAL },
+                { types::SqlLiteral::NULL_, types::DataType::_NULL },
             };
             return data_type_table;
         }

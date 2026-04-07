@@ -169,8 +169,11 @@ namespace storage
         index_files_.put(index.id, std::move(file), index_file_flusher_);
         index_files_.mark_dirty(file.index_id);
 
-        auto& indexes_list = index_files_per_table_.at(table.id);
-        indexes_list.push_back(index.id);
+        auto it = index_files_per_table_.find(table.id);
+        if (it == index_files_per_table_.end())
+            index_files_per_table_[table.id] = {index.id};
+        else
+            it->second.push_back(index.id);
     }
 
     IndexFile*

@@ -235,13 +235,19 @@ namespace exq
 
         if (where.op == AstOperator::EQ || where.op == AstOperator::NEQ ||
             where.op == AstOperator::GR || where.op == AstOperator::LT ||
-            where.op == AstOperator::GRE || where.op == AstOperator::LTE)
+            where.op == AstOperator::GRE || where.op == AstOperator::LTE ||
+            where.op == AstOperator::IS)
         {
 
             if (!where.left || !where.right)
                 return AnalysisResult(std::runtime_error("Incomplete comparison expression"));
 
-            auto comparison_analysis = analyze_column_comparison(where.left, where.right, table);
+                auto comparison_analysis = analyze_column_comparison(
+                    where.op,
+                    where.left,
+                    where.right,
+                    table
+                );
             if (!comparison_analysis.is_valid)
                 return AnalysisResult(*comparison_analysis.err);
         }
@@ -316,9 +322,10 @@ namespace exq
 
     AnalysisResult
     SemanticAnalyzer::analyze_column_comparison(
-        const std::unique_ptr<AstNode>& left,
-        const std::unique_ptr<AstNode>& right,
-        const MetaTable& table
+            types::AstOperator op,
+            const std::unique_ptr<AstNode>& left,
+            const std::unique_ptr<AstNode>& right,
+            const MetaTable& table
     ) const
     {
         const AstNode* column_node = nullptr;
@@ -345,6 +352,9 @@ namespace exq
         const auto& value_token = std::get<SqlToken>(value_node->value);
 
         const auto literal_type = std::get<SqlLiteral>(value_token.detail);
+            if (op == AstOperator::IS && literal_type != SqlLiteral::NULL_)
+            return AnalysisResult(std::runtime_error("IS operator can only be used with NULL"));
+
         if (!table.has_column(column_token.value))
             return AnalysisResult(ColumnDoesntExists(column_token.value));
 
@@ -358,6 +368,9 @@ namespace exq
     bool
     SemanticAnalyzer::is_compatible(SqlLiteral lit, DataType col) const
     {
+        if (lit == SqlLiteral::NULL_)
+            return true;
+
         const auto& table = compat_table();
 
         auto it = table.find(col);

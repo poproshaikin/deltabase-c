@@ -249,10 +249,11 @@ namespace exq
         const std::string& table_name,
         const std::string& schema_name,
         storage::IDbInstance& storage,
+        const std::optional<std::vector<std::string>>& col_names,
         std::unique_ptr<INodeExecutor> child
     )
         : table_name_(table_name), schema_name_(schema_name), db_(storage),
-          child_(std::move(child)), executed_(false)
+          col_names_(col_names), child_(std::move(child))
     {
     }
 
@@ -279,11 +280,12 @@ namespace exq
             if (!child_->next(row))
                 break;
 
-            db_.insert_row(table_name_, schema_name_, row.tokens, txn);
+            db_.insert_row(table_name_, schema_name_, col_names_, row.tokens, txn);
             inserted_count++;
         }
 
         txn.commit();
+        executed_ = true;
 
         DataToken affected_rows_count(misc::convert(inserted_count), DataType::INTEGER);
         out.tokens = {affected_rows_count};
@@ -655,6 +657,7 @@ namespace exq
                 insert_node.table_name,
                 insert_node.schema_name,
                 db,
+                insert_node.column_names,
                 from_plan(std::move(insert_node.child), db)
             );
             return std::make_unique<InsertNodeExecutor>(std::move(executor));

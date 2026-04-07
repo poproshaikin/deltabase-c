@@ -129,6 +129,15 @@ namespace sql
                     token.type = SqlTokenType::KEYWORD;
                     token.detail = it->second;
                 }
+                else
+                {
+                    auto op_it = operators.find(word);
+                    if (op_it != operators.end())
+                    {
+                        token.type = SqlTokenType::OPERATOR;
+                        token.detail = op_it->second;
+                    }
+                }
 
                 result.push_back(token);
 

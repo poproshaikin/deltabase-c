@@ -79,6 +79,29 @@ namespace exq
         }
     }
 
+    bool
+    is_null_literal(const std::unique_ptr<AstNode>& node)
+    {
+        if (!node || node->type != AstNodeType::LITERAL)
+            return false;
+
+        const auto& token = std::get<SqlToken>(node->value);
+        return std::holds_alternative<SqlLiteral>(token.detail) &&
+               std::get<SqlLiteral>(token.detail) == SqlLiteral::NULL_;
+    }
+
+    bool
+    is_null_predicate(const BinaryExpr& condition)
+    {
+        if (condition.op == AstOperator::IS)
+            return true;
+
+        if (condition.op != AstOperator::EQ && condition.op != AstOperator::NEQ)
+            return false;
+
+        return is_null_literal(condition.left) || is_null_literal(condition.right);
+    }
+
     double
     estimate_index_scan(const MetaTable& table, const MetaIndex& idx, const BinaryExpr& condition)
     {
@@ -107,6 +130,9 @@ namespace exq
         auto best = IPlanNode::Type::SEQ_SCAN;
 
         if (!condition)
+            return best;
+
+        if (is_null_predicate(*condition))
             return best;
 
         for (const auto& idx : table.indexes)

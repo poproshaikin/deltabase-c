@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_META_TABLE_HPP
 #define DELTABASE_META_TABLE_HPP
+#include "data_row.hpp"
 #include "meta_column.hpp"
 
 #include "data_row_update.hpp"
@@ -28,6 +29,11 @@ namespace types
         uint64_t live_rows = 0;
 
         MetaTable();
+
+        DataRow
+        make_row(
+            const std::optional<std::vector<std::string>>& cols, const std::vector<DataToken>& row
+        );
 
         bool
         has_column(const std::string& col_name) const;
