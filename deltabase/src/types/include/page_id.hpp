@@ -4,11 +4,11 @@
 
 #ifndef DELTABASE_PAGE_ID_HPP
 #define DELTABASE_PAGE_ID_HPP
-#include "uuid.hpp"
+#include "UUID.hpp"
 
 namespace types
 {
-    using DataPageId = Uuid;
+    using DataPageId = UUID;
 }
 
 #endif // DELTABASE_PAGE_ID_HPP

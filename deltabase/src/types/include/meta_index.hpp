@@ -4,16 +4,16 @@
 
 #ifndef DELTABASE_META_INDEX_HPP
 #define DELTABASE_META_INDEX_HPP
+#include "UUID.hpp"
 #include "meta_column.hpp"
 #include "page_id.hpp"
 #include "table_id.hpp"
-#include "uuid.hpp"
 
 #include <string>
 
 namespace types
 {
-    using IndexId = Uuid;
+    using IndexId = UUID;
 
     struct MetaIndex
     {

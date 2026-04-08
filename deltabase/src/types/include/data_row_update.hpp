@@ -4,15 +4,15 @@
 
 #ifndef DELTABASE_DATA_ROW_UPDATE_HPP
 #define DELTABASE_DATA_ROW_UPDATE_HPP
+#include "UUID.hpp"
 #include "data_token.hpp"
 #include "typedefs.hpp"
-#include "uuid.hpp"
 
 #include <utility>
 
 namespace types
 {
-    using ColumnId = Uuid;
+    using ColumnId = UUID;
 
     using AssignLiteral = std::pair<ColumnId, DataToken>;
     using AssignColumn = std::pair<ColumnId, ColumnId>;
