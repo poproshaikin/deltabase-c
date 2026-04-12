@@ -58,14 +58,14 @@ namespace storage
     }
 
     types::MetaTable*
-    CatalogCache::get_table(const types::Uuid& id)
+    CatalogCache::get_table(const types::UUID& id)
     {
         auto it = tables_.find(id);
         return it == tables_.end() ? nullptr : &it->second;
     }
 
     types::MetaTable*
-    CatalogCache::get_table(const std::string& name, const types::Uuid& schema_id)
+    CatalogCache::get_table(const std::string& name, const types::UUID& schema_id)
     {
         for (auto& [_, table] : tables_)
         {
@@ -91,7 +91,7 @@ namespace storage
     }
 
     types::MetaSchema*
-    CatalogCache::get_schema(const types::Uuid& id)
+    CatalogCache::get_schema(const types::UUID& id)
     {
         const auto it = schemas_.find(id);
         return it == schemas_.end() ? nullptr : &it->second;

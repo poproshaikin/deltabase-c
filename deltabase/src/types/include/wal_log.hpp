@@ -58,7 +58,7 @@ namespace types
             requires std::same_as<decltype(T::type), const WALRecordType>;
             requires std::same_as<decltype(x.lsn), LSN>;
             requires std::same_as<decltype(x.prev_lsn), LSN>;
-            requires std::same_as<decltype(x.txn_id), Uuid>;
+            requires std::same_as<decltype(x.txn_id), UUID>;
         };
 
         template <WAL_c... Ts> using WALRecordVariant = std::variant<Ts...>;
@@ -77,14 +77,14 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
 
-        Uuid table_id;
+        UUID table_id;
         DataPageId page_id;
         DataRow after;
 
         InsertRecord() = default;
-        InsertRecord(const Uuid& table_id, const DataPageId& page_id, DataRow after)
+        InsertRecord(const UUID& table_id, const DataPageId& page_id, DataRow after)
             : table_id(table_id), page_id(page_id), after(std::move(after))
         {
         }
@@ -92,8 +92,8 @@ namespace types
         InsertRecord(
             LSN lsn,
             LSN prev_lsn,
-            const Uuid& txn_id,
-            const Uuid& table_id,
+            const UUID& txn_id,
+            const UUID& table_id,
             const DataPageId& page_id,
             DataRow after
         )
@@ -109,15 +109,15 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
 
-        Uuid table_id;
+        UUID table_id;
         DataPageId page_id;
         DataRow before;
         DataRow after;
 
         UpdateRecord() = default;
-        UpdateRecord(const Uuid& table_id, const DataPageId& page_id, DataRow before, DataRow after)
+        UpdateRecord(const UUID& table_id, const DataPageId& page_id, DataRow before, DataRow after)
             : table_id(table_id), page_id(page_id), before(std::move(before)),
               after(std::move(after))
         {
@@ -126,8 +126,8 @@ namespace types
                 UpdateRecord(
                         LSN lsn,
                         LSN prev_lsn,
-                        const Uuid& txn_id,
-                        const Uuid& table_id,
+                        const UUID& txn_id,
+                        const UUID& table_id,
                         const DataPageId& page_id,
                         DataRow before,
                         DataRow after
@@ -144,14 +144,14 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
 
-        Uuid table_id;
+        UUID table_id;
         DataPageId page_id;
         DataRow before;
 
         DeleteRecord() = default;
-        DeleteRecord(const Uuid& table_id, const DataPageId& page_id, DataRow before)
+        DeleteRecord(const UUID& table_id, const DataPageId& page_id, DataRow before)
             : table_id(table_id), page_id(page_id), before(std::move(before))
         {
         }
@@ -159,8 +159,8 @@ namespace types
         DeleteRecord(
             LSN lsn,
             LSN prev_lsn,
-            const Uuid& txn_id,
-            const Uuid& table_id,
+            const UUID& txn_id,
+            const UUID& table_id,
             const DataPageId& page_id,
             DataRow before
         )
@@ -176,8 +176,8 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
-        Uuid table_id;
+        UUID txn_id;
+        UUID table_id;
         DataPageId page_id;
         LSN undo_next_lsn;
         DataRow after;
@@ -187,8 +187,8 @@ namespace types
         CLRInsertRecord(
             LSN lsn,
             LSN prev_lsn,
-            const Uuid& txn_id,
-            const Uuid& table_id,
+            const UUID& txn_id,
+            const UUID& table_id,
             const DataPageId& page_id,
             LSN undo_next_lsn,
             DataRow after
@@ -205,8 +205,8 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
-        Uuid table_id;
+        UUID txn_id;
+        UUID table_id;
         DataPageId page_id;
         LSN undo_next_lsn;
         DataRow before;
@@ -217,8 +217,8 @@ namespace types
         CLRUpdateRecord(
             LSN lsn,
             LSN prev_lsn,
-            const Uuid& txn_id,
-            const Uuid& table_id,
+            const UUID& txn_id,
+            const UUID& table_id,
             const DataPageId& page_id,
             LSN undo_next_lsn,
             DataRow before,
@@ -236,8 +236,8 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
-        Uuid table_id;
+        UUID txn_id;
+        UUID table_id;
         DataPageId page_id;
         LSN undo_next_lsn;
         DataRow before;
@@ -247,8 +247,8 @@ namespace types
         CLRDeleteRecord(
             LSN lsn,
             LSN prev_lsn,
-            const Uuid& txn_id,
-            const Uuid& table_id,
+            const UUID& txn_id,
+            const UUID& table_id,
             const DataPageId& page_id,
             LSN undo_next_lsn,
             DataRow before
@@ -265,14 +265,14 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
         LSN undo_next_lsn;
         MetaSchema schema;
 
         CLRCreateSchemaRecord() = default;
 
         CLRCreateSchemaRecord(
-            LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, MetaSchema schema
+            LSN lsn, LSN prev_lsn, const UUID& txn_id, LSN undo_next_lsn, MetaSchema schema
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn),
               schema(std::move(schema))
@@ -286,7 +286,7 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
         LSN undo_next_lsn;
         MetaSchema before;
         MetaSchema after;
@@ -296,7 +296,7 @@ namespace types
         CLRUpdateSchemaRecord(
             LSN lsn,
             LSN prev_lsn,
-            const Uuid& txn_id,
+            const UUID& txn_id,
             LSN undo_next_lsn,
             MetaSchema before,
             MetaSchema after
@@ -313,14 +313,14 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
         LSN undo_next_lsn;
         MetaSchema before;
 
         CLRDeleteSchemaRecord() = default;
 
         CLRDeleteSchemaRecord(
-            LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, MetaSchema before
+            LSN lsn, LSN prev_lsn, const UUID& txn_id, LSN undo_next_lsn, MetaSchema before
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn),
               before(std::move(before))
@@ -334,13 +334,13 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
         LSN undo_next_lsn;
         MetaTable after;
 
         CLRCreateTableRecord() = default;
         CLRCreateTableRecord(
-            LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, MetaTable after
+            LSN lsn, LSN prev_lsn, const UUID& txn_id, LSN undo_next_lsn, MetaTable after
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn),
               after(std::move(after))
@@ -354,7 +354,7 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
         LSN undo_next_lsn;
         MetaTable before;
         MetaTable after;
@@ -363,7 +363,7 @@ namespace types
         CLRUpdateTableRecord(
             LSN lsn,
             LSN prev_lsn,
-            const Uuid& txn_id,
+            const UUID& txn_id,
             LSN undo_next_lsn,
             MetaTable before,
             MetaTable after
@@ -380,14 +380,14 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
         LSN undo_next_lsn;
         MetaTable before;
 
         CLRDeleteTableRecord() = default;
 
         CLRDeleteTableRecord(
-            LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, MetaTable before
+            LSN lsn, LSN prev_lsn, const UUID& txn_id, LSN undo_next_lsn, MetaTable before
         )
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn),
               before(std::move(before))
@@ -401,7 +401,7 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
         MetaSchema schema;
 
         CreateSchemaRecord() = default;
@@ -409,7 +409,7 @@ namespace types
         {
         }
 
-        CreateSchemaRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaSchema schema)
+        CreateSchemaRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, MetaSchema schema)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), schema(std::move(schema))
         {
         }
@@ -421,7 +421,7 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
         MetaSchema before;
         MetaSchema after;
 
@@ -434,7 +434,7 @@ namespace types
         UpdateSchemaRecord(
             LSN lsn,
             LSN prev_lsn,
-            const Uuid& txn_id,
+            const UUID& txn_id,
             MetaSchema before,
             MetaSchema after
         )
@@ -450,7 +450,7 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
         MetaSchema before;
 
         DeleteSchemaRecord() = default;
@@ -458,7 +458,7 @@ namespace types
         {
         }
 
-        DeleteSchemaRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaSchema before)
+        DeleteSchemaRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, MetaSchema before)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before))
         {
         }
@@ -470,7 +470,7 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
         MetaTable after;
 
         CreateTableRecord() = default;
@@ -478,7 +478,7 @@ namespace types
         {
         }
 
-        CreateTableRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaTable table)
+        CreateTableRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, MetaTable table)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), after(std::move(table))
         {
         }
@@ -490,7 +490,7 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
         MetaTable before;
         MetaTable after;
 
@@ -503,7 +503,7 @@ namespace types
         UpdateTableRecord(
             LSN lsn,
             LSN prev_lsn,
-            const Uuid& txn_id,
+            const UUID& txn_id,
             MetaTable before,
             MetaTable after
         )
@@ -519,7 +519,7 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
         MetaTable before;
 
         DeleteTableRecord() = default;
@@ -527,7 +527,7 @@ namespace types
         {
         }
 
-        DeleteTableRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, MetaTable before)
+        DeleteTableRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, MetaTable before)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(std::move(before))
         {
         }
@@ -539,7 +539,7 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
         MetaIndex after;
 
         CreateIndexRecord() = default;
@@ -547,7 +547,7 @@ namespace types
         {
         }
 
-        CreateIndexRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, const MetaIndex& after)
+        CreateIndexRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, const MetaIndex& after)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), after(after)
         {
         }
@@ -559,13 +559,13 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
 
         LSN undo_next_lsn;
         MetaIndex after;
 
         CLRCreateIndexRecord() = default;
-        CLRCreateIndexRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, const MetaIndex& after)
+        CLRCreateIndexRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, LSN undo_next_lsn, const MetaIndex& after)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn), after(after)
         {
         }
@@ -577,7 +577,7 @@ namespace types
 
         LSN lsn = 0;
         LSN prev_lsn = 0;
-        Uuid txn_id = Uuid::null();
+        UUID txn_id = UUID::null();
         MetaIndex before;
 
         DropIndexRecord() = default;
@@ -585,7 +585,7 @@ namespace types
         {
         }
 
-        DropIndexRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, const MetaIndex& before)
+        DropIndexRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, const MetaIndex& before)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(before)
         {
         }
@@ -597,13 +597,13 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
 
         LSN undo_next_lsn;
         MetaIndex before;
 
         CLRDropIndexRecord() = default;
-        CLRDropIndexRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id, LSN undo_next_lsn, const MetaIndex& before)
+        CLRDropIndexRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, LSN undo_next_lsn, const MetaIndex& before)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn), before(before)
         {
         }
@@ -615,11 +615,11 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
 
         BeginTxnRecord() = default;
 
-        BeginTxnRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id)
+        BeginTxnRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id)
         {
         }
@@ -631,11 +631,11 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
 
         CommitTxnRecord() = default;
 
-        CommitTxnRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id)
+        CommitTxnRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id)
         {
         }
@@ -647,11 +647,11 @@ namespace types
 
         LSN lsn;
         LSN prev_lsn;
-        Uuid txn_id;
+        UUID txn_id;
 
         RollbackTxnRecord() = default;
 
-        RollbackTxnRecord(LSN lsn, LSN prev_lsn, const Uuid& txn_id)
+        RollbackTxnRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id)
         {
         }

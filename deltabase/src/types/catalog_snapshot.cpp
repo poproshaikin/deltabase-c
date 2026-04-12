@@ -9,8 +9,8 @@
 namespace types
 {
     CatalogSnapshot::CatalogSnapshot(
-        const std::unordered_map<Uuid, MetaTable>& tables,
-        const std::unordered_map<Uuid, MetaSchema>& schemas
+        const std::unordered_map<UUID, MetaTable>& tables,
+        const std::unordered_map<UUID, MetaSchema>& schemas
     ) : version(last_version_++)
     {
         this->tables.reserve(tables.size());

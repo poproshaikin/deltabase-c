@@ -224,7 +224,7 @@ namespace storage
     }
 
     MetaSchema
-    FileIOManager::read_schema_meta(const Uuid& schema_id)
+    FileIOManager::read_schema_meta(const UUID& schema_id)
     {
         MetaSchema schema{};
 
@@ -359,7 +359,7 @@ namespace storage
         return tables;
     }
     MetaTable
-    FileIOManager::read_table_meta(const Uuid& table_id)
+    FileIOManager::read_table_meta(const UUID& table_id)
     {
         std::unique_ptr<MetaTable> result;
 

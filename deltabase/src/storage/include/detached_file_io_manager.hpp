@@ -45,7 +45,7 @@ namespace storage
         std::vector<types::DataPage>
         read_table_data(const std::string& table_name, const std::string& schema_name) override;
 
-        std::vector<std::pair<types::Uuid, std::vector<types::DataPage>>>
+        std::vector<std::pair<types::UUID, std::vector<types::DataPage>>>
         read_tables_data() override;
 
         uint64_t
@@ -75,7 +75,7 @@ namespace storage
         delete_ms(const types::MetaSchema& schema) override;
 
         types::MetaSchema
-        read_schema_meta(const types::Uuid& schema_id) override;
+        read_schema_meta(const types::UUID& schema_id) override;
 
         types::DataPage
         create_page(const types::MetaTable& mt) override;
@@ -87,7 +87,7 @@ namespace storage
         exists_schema(const std::string& schema_name) override;
 
         types::MetaTable
-        read_table_meta(const types::Uuid& table_id) override;
+        read_table_meta(const types::UUID& table_id) override;
 
         std::unique_ptr<types::DataPage>
         read_data_page(types::DataPageId id) override;

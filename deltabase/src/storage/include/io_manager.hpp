@@ -32,13 +32,13 @@ namespace storage
         read_schema_meta(const std::string& schema_name) = 0;
 
         virtual types::MetaSchema
-        read_schema_meta(const types::Uuid& schema_id) = 0;
+        read_schema_meta(const types::UUID& schema_id) = 0;
 
         virtual bool
         exists_table(const std::string& table_name, const std::string& schema_name) = 0;
 
         virtual types::MetaTable
-        read_table_meta(const types::Uuid& table_id) = 0;
+        read_table_meta(const types::UUID& table_id) = 0;
 
         virtual types::MetaTable
         read_table_meta(const std::string& table_name, const std::string& schema_name) = 0;

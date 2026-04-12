@@ -4,9 +4,9 @@
 
 #ifndef DELTABASE_CATALOG_SNAPSHOT_HPP
 #define DELTABASE_CATALOG_SNAPSHOT_HPP
-#include "meta_table.hpp"
+#include "UUID.hpp"
 #include "meta_schema.hpp"
-#include "uuid.hpp"
+#include "meta_table.hpp"
 
 #include <cstring>
 #include <unordered_map>
@@ -32,12 +32,12 @@ namespace types
         };
 
         uint64_t version;
-        std::unordered_map<Uuid, Entry<MetaTable> > tables;
-        std::unordered_map<Uuid, Entry<MetaSchema> > schemas;
+        std::unordered_map<UUID, Entry<MetaTable> > tables;
+        std::unordered_map<UUID, Entry<MetaSchema> > schemas;
 
         CatalogSnapshot(
-            const std::unordered_map<Uuid, MetaTable>& tables,
-            const std::unordered_map<Uuid, MetaSchema>& schemas
+            const std::unordered_map<UUID, MetaTable>& tables,
+            const std::unordered_map<UUID, MetaSchema>& schemas
         );
 
         MetaSchema

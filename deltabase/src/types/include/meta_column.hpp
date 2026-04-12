@@ -4,10 +4,10 @@
 
 #ifndef DELTABASE_META_COLUMN_HPP
 #define DELTABASE_META_COLUMN_HPP
+#include "UUID.hpp"
 #include "ast_tree.hpp"
 #include "data_type.hpp"
 #include "typedefs.hpp"
-#include "uuid.hpp"
 
 #include <string>
 
@@ -30,12 +30,12 @@ namespace types
         return static_cast<MetaColumnFlags>(static_cast<T>(left) | static_cast<T>(right));
     }
 
-    using ColumnId = Uuid;
+    using ColumnId = UUID;
 
     struct MetaColumn
     {
         ColumnId id;
-        Uuid table_id;
+        UUID table_id;
         std::string name;
         DataType type;
         MetaColumnFlags flags;

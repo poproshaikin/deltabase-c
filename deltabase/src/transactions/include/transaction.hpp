@@ -4,16 +4,16 @@
 
 #ifndef DELTABASE_TRANSACTION_HPP
 #define DELTABASE_TRANSACTION_HPP
-#include "../../types/include/uuid.hpp"
+#include "../../storage/include/buffer_pool.hpp"
+#include "../../types/include/UUID.hpp"
 #include "../../types/include/wal_log.hpp"
 #include "../../wal/include/wal_manager.hpp"
-#include "../../storage/include/buffer_pool.hpp"
 
 #include <cstdint>
 
 namespace txn
 {
-    using TxnId = types::Uuid;
+    using TxnId = types::UUID;
 
     enum class TransactionState
     {

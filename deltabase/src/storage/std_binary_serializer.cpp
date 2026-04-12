@@ -3,33 +3,262 @@
 //
 
 #include "std_binary_serializer.hpp"
+#include "../misc/include/serialization/schema_fields.hpp"
+
+#include <stdexcept>
+
+namespace
+{
+    using namespace misc::serialization;
+    using namespace types;
+
+    template <typename TObject, typename... TFields>
+    Schema<TObject>
+    build_schema(TFields&&... fields)
+    {
+        Schema<TObject> schema;
+        (schema.fields.push_back(std::forward<TFields>(fields)), ...);
+        return schema;
+    }
+
+    const Schema<DataToken>&
+    data_token_schema();
+
+    const Schema<DataRow>&
+    data_row_schema();
+
+    const Schema<RowPtr>&
+    row_ptr_schema();
+
+    const Schema<LeafIndexNode>&
+    leaf_node_schema();
+
+    const Schema<InternalIndexNode>&
+    internal_node_schema();
+
+    const Schema<IndexPage>&
+    index_page_schema();
+
+    const Schema<MetaSchema>&
+    meta_schema_schema()
+    {
+        static const auto SCHEMA = build_schema<MetaSchema>(
+            make_uuid_field(&MetaSchema::id),
+            make_string_field(&MetaSchema::name),
+            make_string_field(&MetaSchema::db_name)
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<MetaColumn>&
+    meta_column_schema()
+    {
+        static const auto SCHEMA = build_schema<MetaColumn>(
+            make_uuid_field(&MetaColumn::id),
+            make_uuid_field(&MetaColumn::table_id),
+            make_string_field(&MetaColumn::name),
+            make_pod_field(&MetaColumn::type),
+            make_pod_field(&MetaColumn::flags)
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<MetaIndex>&
+    meta_index_schema()
+    {
+        static const auto SCHEMA = build_schema<MetaIndex>(
+            make_uuid_field(&MetaIndex::id),
+            make_uuid_field(&MetaIndex::table_id),
+            make_uuid_field(&MetaIndex::column_id),
+            make_uuid_field(&MetaIndex::root_page_id),
+            make_string_field(&MetaIndex::name),
+            make_pod_field(&MetaIndex::is_unique),
+            make_pod_field(&MetaIndex::key_type)
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<DataToken>&
+    data_token_schema()
+    {
+        static const auto SCHEMA = build_schema<DataToken>(
+            make_pod_field(&DataToken::type),
+            make_conditional_field<DataToken>(
+                [](const DataToken& token)
+                {
+                    return token.type != DataType::_NULL;
+                },
+                make_sized_vector_field(&DataToken::bytes),
+                [](DataToken& token)
+                {
+                    token.bytes.clear();
+                }
+            )
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<DataRow>&
+    data_row_schema()
+    {
+        static const auto SCHEMA = build_schema<DataRow>(
+            make_pod_field(&DataRow::id),
+            make_pod_field(&DataRow::flags),
+            make_vector_object_field(&DataRow::tokens, &data_token_schema())
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<MetaTable>&
+    meta_table_schema()
+    {
+        static const auto SCHEMA = build_schema<MetaTable>(
+            make_uuid_field(&MetaTable::id),
+            make_uuid_field(&MetaTable::schema_id),
+            make_string_field(&MetaTable::name),
+            make_pod_field(&MetaTable::total_rows),
+            make_pod_field(&MetaTable::live_rows),
+            make_vector_object_field(&MetaTable::columns, &meta_column_schema()),
+            make_pod_field(&MetaTable::last_rid),
+            make_vector_object_field(&MetaTable::indexes, &meta_index_schema())
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<DataPage>&
+    data_page_schema()
+    {
+        static const auto SCHEMA = build_schema<DataPage>(
+            make_uuid_field(&DataPage::id),
+            make_uuid_field(&DataPage::table_id),
+            make_pod_field(&DataPage::min_rid),
+            make_pod_field(&DataPage::max_rid),
+            make_vector_count_field(&DataPage::rows_count, &DataPage::rows),
+            make_pod_field(&DataPage::last_lsn),
+            make_vector_object_payload_field(&DataPage::rows, &DataPage::rows_count, &data_row_schema())
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<IndexPage>&
+    index_page_schema();
+
+    const Schema<RowPtr>&
+    row_ptr_schema()
+    {
+        static const auto SCHEMA = build_schema<RowPtr>(
+            make_uuid_field(&RowPtr::first),
+            make_pod_field(&RowPtr::second)
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<LeafIndexNode>&
+    leaf_node_schema()
+    {
+        static const auto SCHEMA = build_schema<LeafIndexNode>(
+            make_vector_object_field(&LeafIndexNode::keys, &data_token_schema()),
+            make_vector_object_field(&LeafIndexNode::rows, &row_ptr_schema()),
+            make_pod_field(&LeafIndexNode::next_leaf)
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<InternalIndexNode>&
+    internal_node_schema()
+    {
+        static const auto SCHEMA = build_schema<InternalIndexNode>(
+            make_vector_object_field(&InternalIndexNode::keys, &data_token_schema()),
+            make_vector_pod_field(&InternalIndexNode::children)
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<IndexFile>&
+    index_file_schema()
+    {
+        static const auto SCHEMA = build_schema<IndexFile>(
+            make_uuid_field(&IndexFile::index_id),
+            make_pod_field(&IndexFile::root_page),
+            make_pod_field(&IndexFile::last_page),
+            make_vector_object_field(&IndexFile::pages, &index_page_schema())
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<Config>&
+    config_schema()
+    {
+        static const auto SCHEMA = build_schema<Config>(
+            make_optional_string_field(&Config::db_name),
+            make_string_field(&Config::default_schema),
+            make_path_field(&Config::db_path),
+            make_pod_field(&Config::io_type),
+            make_pod_field(&Config::planner_type),
+            make_pod_field(&Config::serializer_type),
+            make_pod_field(&Config::last_checkpoint_lsn)
+        );
+
+        return SCHEMA;
+    }
+
+    const Schema<IndexPage>&
+    index_page_schema()
+    {
+        static const auto SCHEMA = build_schema<IndexPage>(
+            make_pod_field(&IndexPage::id),
+            make_pod_field(&IndexPage::parent),
+            make_uuid_field(&IndexPage::index_id),
+            make_pod_field(&IndexPage::is_leaf),
+            make_bool_variant_field(
+                &IndexPage::is_leaf,
+                &IndexPage::data,
+                &leaf_node_schema(),
+                &internal_node_schema()
+            )
+        );
+
+        return SCHEMA;
+    }
+
+    template <typename TObject>
+    misc::MemoryStream
+    serialize_object(const TObject& object, const Schema<TObject>& schema, const char* error)
+    {
+        misc::MemoryStream stream;
+        WriteCursor cursor(stream);
+        if (!write_by_schema(object, schema, cursor))
+            throw std::runtime_error(error);
+
+        stream.seek(0);
+        return stream;
+    }
+
+    template <typename TObject>
+    bool
+    deserialize_object(misc::ReadOnlyMemoryStream& stream, const Schema<TObject>& schema, TObject& out)
+    {
+        ReadCursor cursor(stream);
+        return read_by_schema(cursor, schema, out);
+    }
+} // namespace
 
 namespace storage
 {
     using namespace misc;
     using namespace types;
-
-    void
-    StdBinarySerializer::write_str(const std::string& str, MemoryStream& stream) const
-    {
-        uint64_t size = str.length();
-        stream.write(&size, sizeof(uint64_t));
-        stream.write(str.data(), size);
-    }
-
-    bool
-    StdBinarySerializer::read_str(std::string& str, ReadOnlyMemoryStream& stream) const
-    {
-        uint64_t size = 0;
-        if (stream.read(&size, sizeof(uint64_t)) != sizeof(size_t))
-            return false;
-
-        str.resize(size);
-        if (stream.read(&str[0], size) != size)
-            return false;
-
-        return true;
-    }
+    using namespace misc::serialization;
 
     bool
     StdBinarySerializer::has_dynamic_size(DataType data_type) const
@@ -43,621 +272,128 @@ namespace storage
         }
     }
 
-    uint64_t
-    StdBinarySerializer::get_data_type_size(DataType data_type) const
-    {
-        switch (data_type)
-        {
-        case DataType::INTEGER:
-            return 4;
-        case DataType::REAL:
-            return 8;
-        case DataType::BOOL:
-            return 1;
-        case DataType::CHAR:
-            return 1;
-        default:
-            throw std::runtime_error(
-                "StdBinarySerializer:get_data_type_size: failed to get size of type " +
-                std::to_string(static_cast<int>(data_type))
-            );
-        }
-    }
-
     MemoryStream
     StdBinarySerializer::serialize_mt(const MetaTable& table) const
     {
-        MemoryStream stream;
-        // Write UUID bytes directly (libuuid already stores in network byte order)
-        stream.write(table.id.raw(), sizeof(uuid_t));
-        stream.write(table.schema_id.raw(), sizeof(uuid_t));
-        write_str(table.name, stream);
-        stream.write(&table.total_rows, sizeof(table.total_rows));
-        stream.write(&table.live_rows, sizeof(table.live_rows));
-
-        uint64_t column_count = table.columns.size();
-        stream.write(&column_count, sizeof(uint64_t));
-
-        for (const auto& column : table.columns)
-        {
-            auto serialized_col = serialize_mc(column);
-            stream.write(serialized_col.data(), serialized_col.size());
-        }
-
-        stream.write(&table.last_rid, sizeof(table.last_rid));
-
-        uint64_t indexes_count = table.indexes.size();
-        stream.write(&indexes_count, sizeof(uint64_t));
-
-        for (const auto& index : table.indexes)
-        {
-            auto serialized_mi = serialize_mi(index);
-            stream.write(serialized_mi.data(), serialized_mi.size());
-        }
-
-        stream.seek(0);
-        return stream;
+        return serialize_object(table, meta_table_schema(), "StdBinarySerializer::serialize_mt");
     }
 
     MemoryStream
-    StdBinarySerializer::serialize_ms(const MetaSchema& schema) const
+    StdBinarySerializer::serialize_ms(const MetaSchema& meta_schema) const
     {
-        MemoryStream stream;
-        stream.write(schema.id.raw(), sizeof(uuid_t));
-        write_str(schema.name, stream);
-        write_str(schema.db_name, stream);
-        stream.seek(0);
-        return stream;
+        return serialize_object(
+            meta_schema,
+            meta_schema_schema(),
+            "StdBinarySerializer::serialize_ms: schema write failed"
+        );
     }
 
     MemoryStream
     StdBinarySerializer::serialize_mc(const MetaColumn& column) const
     {
-        MemoryStream stream;
-        stream.write(column.id.raw(), sizeof(uuid_t));
-        stream.write(column.table_id.raw(), sizeof(uuid_t));
-        write_str(column.name, stream);
-        stream.write(&column.type, sizeof(column.type));
-        stream.write(&column.flags, sizeof(column.flags));
-        stream.seek(0);
-        return stream;
+        return serialize_object(column, meta_column_schema(), "StdBinarySerializer::serialize_mc");
     }
 
     MemoryStream
     StdBinarySerializer::serialize_mi(const MetaIndex& index) const
     {
-        MemoryStream stream;
-        stream.write(index.id.raw(), sizeof(uuid_t));
-        stream.write(index.table_id.raw(), sizeof(uuid_t));
-        stream.write(index.column_id.raw(), sizeof(uuid_t));
-        stream.write(index.root_page_id.raw(), sizeof(uuid_t));
-        write_str(index.name, stream);
-        stream.write(&index.is_unique, sizeof(bool));
-        stream.write(&index.key_type, sizeof(index.key_type));
-
-        stream.seek(0);
-        return stream;
+        return serialize_object(index, meta_index_schema(), "StdBinarySerializer::serialize_mi");
     }
 
     MemoryStream
     StdBinarySerializer::serialize_dt(const DataToken& token) const
     {
-        MemoryStream stream;
-        stream.write(&token.type, sizeof(token.type));
-        if (token.type != DataType::_NULL)
-        {
-            uint64_t size = token.bytes.size();
-            stream.write(&size, sizeof(uint64_t));
-            stream.write(token.bytes.data(), size);
-        }
-
-        stream.seek(0);
-        return stream;
+        return serialize_object(token, data_token_schema(), "StdBinarySerializer::serialize_dt");
     }
 
     MemoryStream
     StdBinarySerializer::serialize_dp(const DataPage& page) const
     {
-        MemoryStream stream;
-
-        stream.write(page.id.raw(), sizeof(uuid_t));
-        stream.write(page.table_id.raw(), sizeof(uuid_t));
-        stream.write(&page.min_rid, sizeof(page.min_rid));
-        stream.write(&page.max_rid, sizeof(page.max_rid));
-        uint64_t rows_count = page.rows.size();
-        stream.write(&rows_count, sizeof(rows_count));
-        stream.write(&page.last_lsn, sizeof(page.last_lsn));
-
-        for (size_t i = 0; i < page.rows.size(); ++i)
-        {
-            auto serialized_row = serialize_dr(page.rows[i]);
-            stream.append(serialized_row, serialized_row.size());
-        }
-
-        stream.seek(0);
-        return stream;
+        return serialize_object(page, data_page_schema(), "StdBinarySerializer::serialize_dp");
     }
 
     MemoryStream
     StdBinarySerializer::serialize_if(const IndexFile& file) const
     {
-        MemoryStream stream;
-
-        stream.write(file.index_id.raw(), sizeof(uuid_t));
-        stream.write(&file.root_page, sizeof(file.root_page));
-        uint64_t pages_count = file.pages.size();
-        stream.write(&pages_count, sizeof(pages_count));
-
-        for (const auto& page : file.pages)
-        {
-            auto serialized_page = serialize_ip(page);
-            stream.append(serialized_page, serialized_page.size());
-        }
-
-        stream.seek(0);
-        return stream;
+        return serialize_object(file, index_file_schema(), "StdBinarySerializer::serialize_if");
     }
 
     MemoryStream
     StdBinarySerializer::serialize_ip(const IndexPage& page) const
     {
-        MemoryStream stream;
-
-        stream.write(&page.id, sizeof(page.id));
-        stream.write(&page.parent, sizeof(page.parent));
-        stream.write(page.index_id.raw(), sizeof(uuid_t));
-        stream.write(&page.is_leaf, sizeof(page.is_leaf));
-
-        if (std::holds_alternative<InternalIndexNode>(page.data))
-        {
-            const auto& internal = std::get<InternalIndexNode>(page.data);
-
-            uint64_t keys_count = internal.keys.size();
-            stream.write(&keys_count, sizeof(keys_count));
-            for (const auto& key : internal.keys)
-            {
-                auto serialized_token = serialize_dt(key);
-                stream.append(serialized_token, serialized_token.size());
-            }
-            uint64_t children_count = internal.children.size();
-            stream.write(&children_count, sizeof(children_count));
-            for (auto child_id : internal.children)
-            {
-                stream.write(&child_id, sizeof(child_id));
-            }
-        }
-        else if (std::holds_alternative<LeafIndexNode>(page.data))
-        {
-            const auto& leaf = std::get<LeafIndexNode>(page.data);
-
-            uint64_t keys_count = leaf.keys.size();
-            stream.write(&keys_count, sizeof(keys_count));
-            for (const auto& key : leaf.keys)
-            {
-                auto serialized_token = serialize_dt(key);
-                stream.append(serialized_token, serialized_token.size());
-            }
-
-            uint64_t rows_count = leaf.rows.size();
-            stream.write(&rows_count, sizeof(rows_count));
-            for (const auto& row : leaf.rows)
-            {
-                stream.write(row.first.raw(), sizeof(uuid_t));
-                stream.write(&row.second, sizeof(row.second));
-            }
-
-            stream.write(&leaf.next_leaf, sizeof(leaf.next_leaf));
-        }
-        else
-        {
-            throw std::runtime_error("StdBinarySerializer::serialize_ip");
-        }
-
-        stream.seek(0);
-        return stream;
+        return serialize_object(page, index_page_schema(), "StdBinarySerializer::serialize_ip");
     }
 
     MemoryStream
     StdBinarySerializer::serialize_dr(const DataRow& row) const
     {
-        MemoryStream stream;
-        stream.write(&row.id, sizeof(row.id));
-        stream.write(&row.flags, sizeof(row.flags));
-
-        uint64_t tokens_count = row.tokens.size();
-        stream.write(&tokens_count, sizeof(uint64_t));
-
-        for (size_t i = 0; i < row.tokens.size(); ++i)
-        {
-            MemoryStream serialized_token = serialize_dt(row.tokens[i]);
-            stream.append(serialized_token, serialized_token.size());
-        }
-
-        stream.seek(0);
-        return stream;
+        return serialize_object(row, data_row_schema(), "StdBinarySerializer::serialize_dr");
     }
 
     MemoryStream
     StdBinarySerializer::serialize_cfg(const Config& db) const
     {
-        MemoryStream stream;
-        write_str(db.db_name.value_or(""), stream);
-        write_str(db.default_schema, stream);
-        write_str(db.db_path.string(), stream);
-        stream.write(&db.io_type, sizeof(db.io_type));
-        stream.write(&db.planner_type, sizeof(db.planner_type));
-        stream.write(&db.serializer_type, sizeof(db.serializer_type));
-        stream.write(&db.last_checkpoint_lsn, sizeof(db.last_checkpoint_lsn));
-        stream.seek(0);
-        return stream;
+        return serialize_object(db, config_schema(), "StdBinarySerializer::serialize_cfg");
     }
 
     bool
     StdBinarySerializer::deserialize_mt(ReadOnlyMemoryStream& stream, MetaTable& out) const
     {
-        stream.read(out.id.raw(), sizeof(uuid_t));
-        stream.read(out.schema_id.raw(), sizeof(uuid_t));
-
-        if (!read_str(out.name, stream))
-            return false;
-
-        stream.read(&out.total_rows, sizeof(out.total_rows));
-        stream.read(&out.live_rows, sizeof(out.live_rows));
-
-        uint64_t column_count = 0;
-        if (stream.read(&column_count, sizeof(uint64_t)) != sizeof(size_t))
-            return false;
-
-        out.columns.clear();
-        out.columns.reserve(column_count);
-
-        for (uint64_t i = 0; i < column_count; ++i)
-        {
-            MetaColumn column;
-            if (!deserialize_mc(stream, column))
-                return false;
-
-            out.columns.push_back(std::move(column));
-        }
-
-        if (stream.read(&out.last_rid, sizeof(out.last_rid)) != sizeof(out.last_rid))
-            return false;
-
-        uint64_t indexes_count = 0;
-        if (stream.read(&indexes_count, sizeof(uint64_t)) != sizeof(uint64_t))
-            return false;
-
-        out.indexes.clear();
-        out.indexes.reserve(indexes_count);
-        for (uint64_t i = 0; i < indexes_count; ++i)
-        {
-            MetaIndex index;
-            if (!deserialize_mi(stream, index))
-                return false;
-
-            out.indexes.push_back(std::move(index));
-        }
-
-        return true;
+        return deserialize_object(stream, meta_table_schema(), out);
     }
 
     bool
     StdBinarySerializer::deserialize_ms(ReadOnlyMemoryStream& stream, MetaSchema& out) const
     {
-        stream.read(out.id.raw(), sizeof(uuid_t));
-
-        if (!read_str(out.name, stream))
-            return false;
-
-        if (!read_str(out.db_name, stream))
-            return false;
-
-        return true;
+        return deserialize_object(stream, meta_schema_schema(), out);
     }
 
     bool
     StdBinarySerializer::deserialize_mc(ReadOnlyMemoryStream& stream, MetaColumn& out) const
     {
-        if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-        if (stream.read(out.table_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-
-        if (!read_str(out.name, stream))
-            return false;
-
-        if (stream.read(&out.type, sizeof(out.type)) != sizeof(out.type))
-            return false;
-        if (stream.read(&out.flags, sizeof(out.flags)) != sizeof(out.flags))
-            return false;
-
-        return true;
+        return deserialize_object(stream, meta_column_schema(), out);
     }
 
     bool
     StdBinarySerializer::deserialize_mi(ReadOnlyMemoryStream& stream, MetaIndex& out) const
     {
-        // stream.write(index.id.raw(), sizeof(uuid_t));
-        // stream.write(index.table_id.raw(), sizeof(uuid_t));
-        // stream.write(index.column_id.raw(), sizeof(uuid_t));
-        // stream.write(index.root_page_id.raw(), sizeof(uuid_t));
-        // write_str(index.name, stream);
-        // stream.write(&index.is_unique, sizeof(bool));
-        // stream.write(&index.key_type, sizeof(index.key_type));
-
-        if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-
-        if (stream.read(out.table_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-
-        if (stream.read(out.column_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-
-        if (stream.read(out.root_page_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-
-        if (!read_str(out.name, stream))
-            return false;
-
-        if (stream.read(&out.is_unique, sizeof(out.is_unique)) != sizeof(out.is_unique))
-            return false;
-
-        if (stream.read(&out.key_type, sizeof(out.key_type)) != sizeof(out.key_type))
-            return false;
-
-        return true;
+        return deserialize_object(stream, meta_index_schema(), out);
     }
 
     bool
     StdBinarySerializer::deserialize_dp(ReadOnlyMemoryStream& stream, DataPage& out) const
     {
-        if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-
-        if (stream.read(out.table_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-
-        if (stream.read(&out.min_rid, sizeof(out.min_rid)) != sizeof(out.min_rid))
-            return false;
-
-        if (stream.read(&out.max_rid, sizeof(out.max_rid)) != sizeof(out.max_rid))
-            return false;
-
-        if (stream.read(&out.rows_count, sizeof(out.rows_count)) != sizeof(out.rows_count))
-            return false;
-
-        if (stream.read(&out.last_lsn, sizeof(out.last_lsn)) != sizeof(out.last_lsn))
-            return false;
-
-        uint64_t rows_count = out.rows_count;
-
-        out.rows.clear();
-        out.rows.reserve(rows_count);
-
-        for (size_t i = 0; i < rows_count; ++i)
-        {
-            DataRow row;
-            if (!deserialize_dr(stream, row))
-                return false;
-
-            out.rows.push_back(std::move(row));
-        }
-
-        return true;
+        return deserialize_object(stream, data_page_schema(), out);
     }
 
     bool
     StdBinarySerializer::deserialize_if(ReadOnlyMemoryStream& content, IndexFile& out) const
     {
-        if (content.read(out.index_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-
-        if (content.read(&out.root_page, sizeof(out.root_page)) != sizeof(out.root_page))
-            return false;
-
-        uint64_t pages_count = 0;
-        if (content.read(&pages_count, sizeof(pages_count)) != sizeof(pages_count))
-            return false;
-
-        out.pages.clear();
-        out.pages.reserve(pages_count);
-
-        for (uint64_t i = 0; i < pages_count; ++i)
-        {
-            IndexPage page;
-            if (!deserialize_ip(content, page))
-                return false;
-
-            out.pages.push_back(std::move(page));
-        }
-
-        return true;
+        return deserialize_object(content, index_file_schema(), out);
     }
 
     bool
     StdBinarySerializer::deserialize_ip(ReadOnlyMemoryStream& content, IndexPage& out) const
     {
-        if (content.read(&out.id, sizeof(out.id)) != sizeof(out.id))
-            return false;
-
-        if (content.read(&out.parent, sizeof(out.parent)) != sizeof(out.parent))
-            return false;
-
-        if (content.read(out.index_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-            return false;
-
-        if (content.read(&out.is_leaf, sizeof(out.is_leaf)) != sizeof(out.is_leaf))
-            return false;
-
-        if (out.is_leaf)
-        {
-            LeafIndexNode leaf;
-
-            uint64_t keys_count = 0;
-            if (content.read(&keys_count, sizeof(keys_count)) != sizeof(keys_count))
-                return false;
-
-            leaf.keys.clear();
-            leaf.keys.reserve(keys_count);
-            for (uint64_t i = 0; i < keys_count; ++i)
-            {
-                DataToken key;
-                if (!deserialize_dt(content, key))
-                    return false;
-                leaf.keys.push_back(std::move(key));
-            }
-
-            uint64_t rows_count = 0;
-            if (content.read(&rows_count, sizeof(rows_count)) != sizeof(rows_count))
-                return false;
-
-            leaf.rows.clear();
-            leaf.rows.reserve(rows_count);
-            for (uint64_t i = 0; i < rows_count; ++i)
-            {
-                RowPtr row_ptr;
-                if (content.read(row_ptr.first.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
-                    return false;
-                if (content.read(&row_ptr.second, sizeof(row_ptr.second)) != sizeof(row_ptr.second))
-                    return false;
-                leaf.rows.push_back(row_ptr);
-            }
-
-            if (content.read(&leaf.next_leaf, sizeof(leaf.next_leaf)) != sizeof(leaf.next_leaf))
-                return false;
-
-            out.data = leaf;
-        }
-        else
-        {
-            InternalIndexNode internal;
-
-            uint64_t keys_count = 0;
-            if (content.read(&keys_count, sizeof(keys_count)) != sizeof(keys_count))
-                return false;
-
-            internal.keys.clear();
-            internal.keys.reserve(keys_count);
-            for (uint64_t i = 0; i < keys_count; ++i)
-            {
-                DataToken key;
-                if (!deserialize_dt(content, key))
-                    return false;
-                internal.keys.push_back(std::move(key));
-            }
-
-            uint64_t children_count = 0;
-            if (content.read(&children_count, sizeof(children_count)) != sizeof(children_count))
-                return false;
-
-            internal.children.clear();
-            internal.children.reserve(children_count);
-            for (uint64_t i = 0; i < children_count; ++i)
-            {
-                IndexPageId child_id = 0;
-                if (content.read(&child_id, sizeof(child_id)) != sizeof(child_id))
-                    return false;
-                internal.children.push_back(child_id);
-            }
-
-            out.data = internal;
-        }
-
-        return true;
+        return deserialize_object(content, index_page_schema(), out);
     }
 
     bool
     StdBinarySerializer::deserialize_cfg(ReadOnlyMemoryStream& stream, Config& out) const
     {
-        std::string db_name;
-        if (!read_str(db_name, stream))
-            return false;
-        out.db_name = db_name;
-
-        if (!read_str(out.default_schema, stream))
-            return false;
-
-        std::string db_path_str;
-        if (!read_str(db_path_str, stream))
-            return false;
-
-        out.db_path = fs::path(db_path_str);
-
-        if (stream.read(&out.io_type, sizeof(out.io_type)) != sizeof(out.io_type))
-            return false;
-
-        if (stream.read(&out.planner_type, sizeof(out.planner_type)) != sizeof(out.planner_type))
-            return false;
-
-        if (stream.read(&out.serializer_type, sizeof(out.serializer_type)) !=
-            sizeof(out.serializer_type))
-            return false;
-
-        if (stream.read(&out.last_checkpoint_lsn, sizeof(out.last_checkpoint_lsn)) !=
-            sizeof(out.last_checkpoint_lsn))
-            return false;
-
-        return true;
+        return deserialize_object(stream, config_schema(), out);
     }
 
     bool
     StdBinarySerializer::deserialize_dr(ReadOnlyMemoryStream& stream, DataRow& out) const
     {
-        if (stream.read(&out.id, sizeof(out.id)) != sizeof(out.id))
-            return false;
-
-        if (stream.read(&out.flags, sizeof(out.flags)) != sizeof(out.flags))
-            return false;
-
-        uint64_t tokens_count = 0;
-        if (stream.read(&tokens_count, sizeof(uint64_t)) != sizeof(uint64_t))
-            return false;
-
-        out.tokens.clear();
-        out.tokens.reserve(tokens_count);
-
-        for (uint64_t i = 0; i < tokens_count; ++i)
-        {
-            DataToken token;
-            if (!deserialize_dt(stream, token))
-            {
-                return false;
-            }
-            out.tokens.push_back(std::move(token));
-        }
-
-        return true;
+        return deserialize_object(stream, data_row_schema(), out);
     }
 
     bool
     StdBinarySerializer::deserialize_dt(ReadOnlyMemoryStream& stream, DataToken& out) const
     {
-        if (stream.read(&out.type, sizeof(out.type)) != sizeof(out.type))
-        {
-            std::cout << "    [deserialize_dt] ERROR: Failed to read type" << std::endl;
-            return false;
-        }
-
-        if (out.type != DataType::_NULL)
-        {
-            uint64_t size = 0;
-            if (stream.read(&size, sizeof(uint64_t)) != sizeof(uint64_t))
-            {
-                std::cout << "    [deserialize_dt] ERROR: Failed to read size" << std::endl;
-                return false;
-            }
-
-            out.bytes.resize(size);
-            if (stream.read(out.bytes.data(), size) != size)
-            {
-                std::cout << "    [deserialize_dt] ERROR: failed to read " << size << " bytes"
-                          << std::endl;
-                return false;
-            }
-        }
-
-        return true;
+        return deserialize_object(stream, data_token_schema(), out);
     }
 
     uint64_t

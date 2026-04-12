@@ -6,22 +6,14 @@
 #define DELTABASE_STD_BINARY_SERIALIZER_HPP
 #include "binary_serializer.hpp"
 #include "../../misc/include/memory_stream.hpp"
+#include "../../misc/include/serialization/serializer_base.hpp"
 
 namespace storage
 {
-    class StdBinarySerializer final : public IBinarySerializer
+    class StdBinarySerializer final : public IBinarySerializer, public misc::serialization::SerializerBase
     {
-        void
-        write_str(const std::string& str, misc::MemoryStream &stream) const;
-
-        bool
-        read_str(std::string& str, misc::ReadOnlyMemoryStream& stream) const;
-
         bool
         has_dynamic_size(types::DataType data_type) const;
-
-        uint64_t
-        get_data_type_size(types::DataType data_type) const;
 
     public:
         misc::MemoryStream

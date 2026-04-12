@@ -130,7 +130,7 @@ namespace storage
     }
 
     IndexFile*
-    BufferPool::get_table_index(const Uuid& table_id, const IndexId& index_id)
+    BufferPool::get_table_index(const UUID& table_id, const IndexId& index_id)
     {
         auto index_files_list_it = index_files_per_table_.find(table_id);
         if (index_files_list_it == index_files_per_table_.end())

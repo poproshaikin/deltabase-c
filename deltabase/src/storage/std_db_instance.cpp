@@ -548,7 +548,7 @@ namespace storage
         auto* schema = catalog_->get_schema(schema_name);
 
         MetaTable mt;
-        mt.id = Uuid::make();
+        mt.id = UUID::make();
         mt.name = table_name;
         mt.schema_id = schema->id;
         mt.last_rid = 0;
@@ -556,7 +556,7 @@ namespace storage
         for (const auto& col_def : columns)
         {
             MetaColumn column(col_def);
-            column.id = Uuid::make();
+            column.id = UUID::make();
             column.table_id = mt.id;
             mt.columns.emplace_back(column);
         }
@@ -571,7 +571,7 @@ namespace storage
     StdDbInstance::create_schema(const std::string& schema_name, txn::Transaction& txn)
     {
         MetaSchema ms;
-        ms.id = Uuid::make();
+        ms.id = UUID::make();
         ms.name = schema_name;
         ms.db_name = cfg_.db_name.value();
 
@@ -602,7 +602,7 @@ namespace storage
         const auto& column = table->get_column(column_name);
 
         MetaIndex mi;
-        mi.id = Uuid::make();
+        mi.id = UUID::make();
         mi.name = index_name;
         mi.column_id = column.id;
         mi.key_type = column.type;
