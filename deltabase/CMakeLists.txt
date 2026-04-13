@@ -114,6 +114,7 @@ target_link_libraries(test.exe
     types
     cli
     recovery
+    network
 )
 
 # --- cli ---

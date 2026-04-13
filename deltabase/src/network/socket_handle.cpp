@@ -55,10 +55,7 @@ namespace net
 
     SocketHandle::~SocketHandle()
     {
-        if (is_valid_socket(fd_))
-        {
-
-        }
+        close();
     }
 
     SocketHandle::SocketHandle(SocketHandle&& other) noexcept : fd_(other.fd_), addr_(other.addr_)
@@ -160,13 +157,33 @@ namespace net
     }
 
     SocketHandle
-    SocketHandle::make_listener(uint16_t port, Config::DomainType domain, Config::TransportType type, int backlog)
+    SocketHandle::make_listener(
+        uint16_t port, Config::DomainType domain, Config::TransportType type, int backlog
+    )
     {
         int af = to_af(domain);
         int socktype = to_socktype(type);
 
         sockaddr_storage addr;
         socket_t socket = create_listener(port, af, socktype, backlog, &addr);
+
+        SocketHandle handle(std::move(socket), addr);
+        return handle;
+    }
+
+    SocketHandle
+    SocketHandle::make_client(
+        const std::string& address,
+        uint16_t port,
+        Config::DomainType domain,
+        Config::TransportType type
+    )
+    {
+        int af = to_af(domain);
+        int socktype = to_socktype(type);
+
+        sockaddr_storage addr;
+        socket_t socket = create_client(address, port, af, socktype, &addr);
 
         SocketHandle handle(std::move(socket), addr);
         return handle;

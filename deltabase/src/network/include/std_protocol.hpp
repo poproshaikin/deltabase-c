@@ -23,8 +23,6 @@ namespace net
         types::Bytes
         encode(const types::CloseNetMessage& msg) const;
 
-
-
     public:
         types::Bytes
         encode(const types::NetMessage& msg) const override;

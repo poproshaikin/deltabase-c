@@ -167,4 +167,73 @@ namespace net
         return fd;
     }
 
+    socket_t
+    create_client(
+        const std::string& address,
+        uint16_t port,
+        int af,
+        int socktype,
+        sockaddr_storage* sockaddr
+    )
+    {
+        socket_t fd = socket(af, socktype, 0);
+        if (!is_valid_socket(fd))
+            throw std::runtime_error("Failed to open socket");
+
+        if (af == AF_INET)
+        {
+            sockaddr_in addr{};
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(port);
+
+            if (inet_pton(AF_INET, address.c_str(), &addr.sin_addr) != 1)
+            {
+                close_socket(fd);
+                throw std::runtime_error("Invalid IPv4 address: " + address);
+            }
+
+            if (::connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0)
+            {
+                close_socket(fd);
+                throw std::runtime_error("Failed to connect socket");
+            }
+
+            if (sockaddr)
+            {
+                std::memcpy(sockaddr, &addr, sizeof(addr));
+            }
+
+            return fd;
+        }
+
+        if (af == AF_INET6)
+        {
+            sockaddr_in6 addr{};
+            addr.sin6_family = AF_INET6;
+            addr.sin6_port = htons(port);
+
+            if (inet_pton(AF_INET6, address.c_str(), &addr.sin6_addr) != 1)
+            {
+                close_socket(fd);
+                throw std::runtime_error("Invalid IPv6 address: " + address);
+            }
+
+            if (::connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0)
+            {
+                close_socket(fd);
+                throw std::runtime_error("Failed to connect socket");
+            }
+
+            if (sockaddr)
+            {
+                std::memcpy(sockaddr, &addr, sizeof(addr));
+            }
+
+            return fd;
+        }
+
+        close_socket(fd);
+        throw std::runtime_error("Domain types except IPv4/IPv6 are not supported yet");
+    }
+
 } // namespace net

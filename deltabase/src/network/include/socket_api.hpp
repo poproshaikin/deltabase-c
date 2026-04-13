@@ -5,6 +5,7 @@
 #ifndef DELTABASE_SOCKET_API_HPP
 #define DELTABASE_SOCKET_API_HPP
 #include <cstdint>
+#include <string>
 #include <sys/types.h>
 #include <sys/socket.h>
 #ifdef _WIN32
@@ -24,6 +25,15 @@ namespace net
     socket_t
     create_listener(
         uint16_t port, int af, int socktype, int backlog, sockaddr_storage* sockaddr = nullptr
+    );
+
+    socket_t
+    create_client(
+        const std::string& address,
+        uint16_t port,
+        int af,
+        int socktype,
+        sockaddr_storage* sockaddr = nullptr
     );
 
     ssize_t

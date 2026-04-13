@@ -8,6 +8,7 @@
 #include "../../types/include/config.hpp"
 
 #include <bits/socket.h>
+#include <string>
 #if WINDOWS
 #include <windows.h>
 #else
@@ -46,6 +47,14 @@ namespace net
 
         static SocketHandle
         make_listener(uint16_t port, types::Config::DomainType domain, types::Config::TransportType type, int backlog = 128);
+
+        static SocketHandle
+        make_client(
+            const std::string& address,
+            uint16_t port,
+            types::Config::DomainType domain,
+            types::Config::TransportType type
+        );
 
         std::optional<types::Bytes>
         receive_message() noexcept;
