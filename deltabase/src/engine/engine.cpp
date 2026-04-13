@@ -81,7 +81,6 @@ namespace engine
     void
     Engine::create_db(const Config& config)
     {
-        Logger::info("Start creating a new database");
         auto db = std::make_unique<StdDbInstance>(config);
         set_db_instance(std::move(db));
     }

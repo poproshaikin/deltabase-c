@@ -116,9 +116,9 @@ target_link_libraries(test.exe
     recovery
 )
 
-# --- main ---
-add_executable(main.exe main.cpp)
-target_link_libraries(main.exe 
+# --- cli ---
+add_executable(cli.exe cli.cpp)
+target_link_libraries(cli.exe
     storage
     executor
     sql
@@ -127,6 +127,14 @@ target_link_libraries(main.exe
     types
     cli
     recovery
+)
+
+add_executable(server.exe server.cpp)
+target_link_libraries(server.exe
+    network
+    engine
+    types
+    misc
 )
 
 add_executable(wal_dump.exe wal_dump.cpp)

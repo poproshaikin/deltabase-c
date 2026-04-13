@@ -4,94 +4,113 @@
 
 #include "include/server.hpp"
 
-#include <arpa/inet.h>
-#include <stdexcept>
-#include <sys/socket.h>
+#include "logger.hpp"
+#include "protocol_factory.hpp"
+#include "utils.hpp"
+
 #include <thread>
-#include <unistd.h>
 
 namespace net
 {
     using namespace types;
+    using namespace misc;
 
-    int
-    create_listening_socket(uint16_t port)
+    NetServer::NetServer(
+        uint16_t port,
+        Config::NetProtocolType protocol,
+        Config::DomainType domain,
+        Config::TransportType type
+    )
+        : listener_(SocketHandle::make_listener(port, domain, type)), port_(port)
     {
-        int fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (fd < 0)
-            throw std::runtime_error("Failed to open socket");
-
-        int opt = 1;
-        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
-        {
-            close(fd);
-            throw std::runtime_error("Failed to set SO_REUSEADDR");
-        }
-
-        sockaddr_in addr;
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(port);
-        addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        if (bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
-        {
-            close(fd);
-            throw std::runtime_error("Failed to bind socket");
-        }
-
-        if (listen(fd, 128) < 0)
-        {
-            close(fd);
-            throw std::runtime_error("Failed to listen on socket");
-        }
-
-        return fd;
-    }
-    NetServer::NetServer(uint16_t port, INetTransport& transport) : port_(port), transport_(transport)
-    {
-        server_fd_ = create_listening_socket(port);
-    }
-
-    NetServer::~NetServer()
-    {
-        close(server_fd_);
+        NetProtocolFactory protocol_factory;
+        protocol_ = protocol_factory.make(protocol);
     }
 
     void
     NetServer::start()
     {
         running_ = true;
-        std::cout << "Server started at port " << port_ << std::endl;
+        Logger::info("Server started at port " + std::to_string(port_));
 
         while (running_)
         {
-            int client_fd = accept(server_fd_, nullptr, nullptr);
-            if (client_fd < 0)
-            {
-                perror("Accept failed");
-                continue;
-            }
-
-            std::thread([this, client_fd]{ handleClient(client_fd); }).detach();
+            auto client = listener_.accept();
+            std::thread(
+                [this, client = std::move(client)]() mutable { handle_client(std::move(client)); }
+            ).detach();
         }
     }
 
     void
-    NetServer::handleClient(int client_fd)
+    NetServer::handle_client(SocketHandle handle)
     {
-        UUID id = UUID::make();
+        Logger::info("Accepted client: " + get_ip(handle.addr()));
 
-        PongNetMessage pong(id);
+        auto ping_bytes = handle.receive_message();
+        if (!ping_bytes)
+        {
+            Logger::warn("Disconnecting client: " + get_ip(handle.addr()));
+            handle.close();
+            return;
+        }
 
+        auto msg = protocol_->parse(ping_bytes.value());
+
+        if (!std::holds_alternative<PingNetMessage>(msg))
+        {
+            PongNetMessage pong(
+                UUID::null(), NetErrorCode::PROTOCOL_VIOLATION
+            );
+            auto pong_bytes = protocol_->encode(pong);
+            handle.send_message(pong_bytes);
+            handle.close();
+            return;
+        }
+
+        auto session_id = UUID::make();
+        {
+            std::lock_guard lock(sessions_mutex_);
+            sessions_[session_id] = engine::Engine();
+        }
+
+        PongNetMessage pong(session_id, NetErrorCode::SUCCESS);
+        auto pong_bytes = protocol_->encode(pong);
+        handle.send_message(pong_bytes);
+
+        while (running_)
+        {
+            auto message_bytes = handle.receive_message();
+            if (!message_bytes)
+            {
+                Logger::warn("Disconnecting client: " + get_ip(handle.addr()));
+                handle.close();
+                return;
+            }
+
+            auto message = protocol_->parse(message_bytes.value());
+            if (std::holds_alternative<CloseNetMessage>(message))
+            {
+                auto close_message = std::get<CloseNetMessage>(message);
+                {
+                    std::lock_guard lock(sessions_mutex_);
+                    sessions_.erase(close_message.session_id);
+                }
+                handle.close();
+                break;
+            }
+        }
     }
 
     void
     NetServer::stop()
     {
         running_ = false;
-        if (server_fd_ > 0)
-        {
-            close(server_fd_);
-            server_fd_ = -1;
-        }
+        listener_.close();
+    }
+
+    NetServer::~NetServer()
+    {
+        stop();
     }
 } // namespace net

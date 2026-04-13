@@ -39,7 +39,7 @@ namespace storage
         if (!io_lock_service_)
             io_lock_service_ = DatabaseIoLockService::shared();
 
-        BinarySerializerFactory factory;
+        StorageSerializerFactory factory;
         serializer_ = factory.make_binary_serializer(serializer_type);
         db_mutex_ = io_lock_service_->mutex_for(db_path_, db_name_);
     }

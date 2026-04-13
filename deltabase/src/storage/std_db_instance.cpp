@@ -76,14 +76,9 @@ namespace storage
 
         DataTable dt;
         dt.output_schema = convert(*mt);
+        dt.rows.reserve(mt->total_rows);
 
-        uint64_t rows_count = 0;
-        for (auto* page : pages)
-            rows_count += page->rows.size();
-
-        dt.rows.reserve(rows_count);
-
-        for (const auto& page : pages)
+        for (const auto* page : pages)
         {
             for (const auto& row : page->rows)
             {

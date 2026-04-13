@@ -6,6 +6,7 @@
 #define DELTABASE_NET_MESSAGE_HPP
 
 #include "UUID.hpp"
+#include "net_error.hpp"
 
 #include <concepts>
 #include <variant>
@@ -18,7 +19,8 @@ namespace types
         PING,
         PONG,
         QUERY,
-        SYSTEM,
+        CREATE_DB,
+        ATTACH_DB,
         CLOSE
     };
 
@@ -27,10 +29,8 @@ namespace types
         template <typename T>
         concept NetMessage_c = requires(const T& x) {
             T::type;
-            x.session_id;
 
             requires std::same_as<decltype(T::type), const NetMessageType>;
-            requires std::same_as<decltype(x.session_id), const UUID>;
         };
 
         template <NetMessage_c... T> using NetMessageVariant = std::variant<T...>;
@@ -39,15 +39,15 @@ namespace types
     struct PingNetMessage
     {
         static constexpr auto type = NetMessageType::PING;
-        const UUID session_id = UUID::null();
     };
 
     struct PongNetMessage
     {
-        const UUID session_id;
         static constexpr auto type = NetMessageType::PONG;
+        const UUID session_id;
+        NetErrorCode err;
 
-        PongNetMessage(const UUID& session_id) : session_id(session_id)
+        PongNetMessage(const UUID& session_id, NetErrorCode err) : session_id(session_id), err(err)
         {
         }
     };
@@ -67,7 +67,7 @@ namespace types
 
     struct CreateDbNetMessage
     {
-        static constexpr auto type = NetMessageType::QUERY;
+        static constexpr auto type = NetMessageType::CREATE_DB;
         const UUID session_id;
 
         std::string db_name;
@@ -80,7 +80,7 @@ namespace types
 
     struct AttachDbNetMessage
     {
-        static constexpr auto type = NetMessageType::QUERY;
+        static constexpr auto type = NetMessageType::ATTACH_DB;
         const UUID session_id;
 
         std::string db_name;

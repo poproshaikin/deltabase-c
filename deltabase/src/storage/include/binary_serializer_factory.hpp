@@ -9,7 +9,7 @@
 
 namespace storage
 {
-    class BinarySerializerFactory
+    class StorageSerializerFactory
     {
     public:
         std::unique_ptr<IStorageSerializer>

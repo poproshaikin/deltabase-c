@@ -14,11 +14,11 @@ namespace net
     public:
         virtual ~INetProtocol() = default;
 
-        virtual types::Bytes
-        parse(const types::Bytes& data) = 0;
+        virtual types::NetMessage
+        parse(const types::Bytes& data) const = 0;
 
         virtual types::Bytes
-        encode(const types::NetMessage& msg) = 0;
+        encode(const types::NetMessage& msg) const = 0;
     };
 } // namespace net
 
