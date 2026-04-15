@@ -25,9 +25,9 @@ namespace types
     public:
         UUID() = default;
 
-        UUID(uuid_t other)
+        UUID(const uuid_t& other)
         {
-            std::memcpy(&value_, &other, sizeof(uuid_t));
+            std::memcpy(&value_, other, sizeof(uuid_t));
         }
 
         UUID(const UUID& other)
