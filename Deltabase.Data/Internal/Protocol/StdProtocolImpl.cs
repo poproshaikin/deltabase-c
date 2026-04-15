@@ -1,7 +1,9 @@
 using Deltabase.Data.Internal.Models;
 using System.Buffers.Binary;
+using System.Data;
 using System.IO;
 using System.Text;
+using Deltabase.Data.Internal.Utils;
 
 namespace Deltabase.Data.Internal.Protocol;
 
@@ -44,7 +46,7 @@ internal class StdProtocolImpl : IProtocol
                 return stream.ToArray();
 
             default:
-                return ProtocolViolationMessageBytes();
+                throw new DeltabaseException();
         }
     }
 
@@ -55,7 +57,7 @@ internal class StdProtocolImpl : IProtocol
 
         if (!TryReadByte(reader, out var rawType))
         {
-            return ProtocolViolationMessage();
+            throw new DeltabaseException();
         }
 
         var messageType = (MessageType)rawType;
@@ -68,12 +70,12 @@ internal class StdProtocolImpl : IProtocol
             case MessageType.Pong:
                 if (!TryReadGuid(reader, out var pongSessionId))
                 {
-                    return ProtocolViolationMessage();
+                    throw new DeltabaseException();
                 }
 
                 if (!TryReadByte(reader, out var rawErr))
                 {
-                    return ProtocolViolationMessage();
+                    throw new DeltabaseException();
                 }
 
                 return new PongMessage(pongSessionId, (NetErrorCode)rawErr);
@@ -81,12 +83,12 @@ internal class StdProtocolImpl : IProtocol
             case MessageType.Query:
                 if (!TryReadGuid(reader, out var querySessionId))
                 {
-                    return ProtocolViolationMessage();
+                    throw new DeltabaseException();
                 }
 
                 if (!TryReadString(reader, out var query))
                 {
-                    return ProtocolViolationMessage();
+                    throw new DeltabaseException();
                 }
 
                 return new QueryMessage(querySessionId, query);
@@ -94,12 +96,12 @@ internal class StdProtocolImpl : IProtocol
             case MessageType.CreateDb:
                 if (!TryReadGuid(reader, out var createSessionId))
                 {
-                    return ProtocolViolationMessage();
+                    throw new DeltabaseException();
                 }
 
                 if (!TryReadString(reader, out var createDbName))
                 {
-                    return ProtocolViolationMessage();
+                    throw new DeltabaseException();
                 }
 
                 return new CreateDbMessage(createSessionId, createDbName)
@@ -110,12 +112,12 @@ internal class StdProtocolImpl : IProtocol
             case MessageType.AttachDb:
                 if (!TryReadGuid(reader, out var attachSessionId))
                 {
-                    return ProtocolViolationMessage();
+                    throw new DeltabaseException();
                 }
 
                 if (!TryReadString(reader, out var attachDbName))
                 {
-                    return ProtocolViolationMessage();
+                    throw new DeltabaseException();
                 }
 
                 return new AttachDbMessage(attachSessionId, attachDbName)
@@ -126,14 +128,14 @@ internal class StdProtocolImpl : IProtocol
             case MessageType.Close:
                 if (!TryReadGuid(reader, out var closeSessionId))
                 {
-                    return ProtocolViolationMessage();
+                    throw new DeltabaseException();
                 }
 
                 return new CloseMessage(closeSessionId);
 
             case MessageType.Undefined:
             default:
-                return ProtocolViolationMessage();
+                throw new DeltabaseException();
         }
     }
 
@@ -141,8 +143,35 @@ internal class StdProtocolImpl : IProtocol
     {
         using var stream = new MemoryStream(payload.ToArray(), writable: false);
         using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
-        
-        if (!TryReadUInt64BigEndian())
+
+        if (!TryReadUInt64BigEndian(reader, out var schemaSize))
+            throw new DeltabaseException();
+
+        var columns = new Column[schemaSize];
+        for (ulong i = 0; i < schemaSize; i++)
+        {
+            if (!TryReadColumn(reader, out columns[i]))
+                throw new DeltabaseException();
+        }
+    }
+    
+
+    private bool TryReadColumn(BinaryReader reader, out Column column)
+    {
+        if (!TryReadString(reader, out var name))
+        {
+            column = new Column();
+            return false;
+        }
+
+        if (!TryReadUInt64BigEndian(reader, out ulong rawType))
+        {
+            column = new Column();
+            return false;
+        }
+
+        column = new Column(name, DataTypeMapper.ToType((DataType)rawType));
+        return true;
     }
 
     private static void WriteMessageType(BinaryWriter writer, MessageType messageType)
@@ -263,15 +292,5 @@ internal class StdProtocolImpl : IProtocol
 
         value = BinaryPrimitives.ReadUInt64BigEndian(bytes);
         return true;
-    }
-
-    private static DeltabaseMessage ProtocolViolationMessage()
-    {
-        return new CloseMessage(Guid.Empty);
-    }
-
-    private byte[] ProtocolViolationMessageBytes()
-    {
-        return Encode(ProtocolViolationMessage());
     }
 }
