@@ -4,11 +4,11 @@
 
 #ifndef DELTABASE_TABLE_ID_HPP
 #define DELTABASE_TABLE_ID_HPP
-#include "uuid.hpp"
+#include "UUID.hpp"
 
 namespace types
 {
-    using TableId = Uuid;
+    using TableId = UUID;
 }
 
 #endif // DELTABASE_TABLE_ID_HPP

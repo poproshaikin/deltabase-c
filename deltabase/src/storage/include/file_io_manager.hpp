@@ -4,12 +4,14 @@
 
 #ifndef DELTABASE_FILEIOMANAGER_HPP
 #define DELTABASE_FILEIOMANAGER_HPP
-#include "binary_serializer.hpp"
-#include "io_manager.hpp"
 #include "../../types/include/config.hpp"
+#include "db_io_lock_service.hpp"
+#include "io_manager.hpp"
+#include "storage_serializer.hpp"
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 
 namespace storage
 {
@@ -19,7 +21,9 @@ namespace storage
     {
         std::string db_name_;
         fs::path db_path_;
-        std::unique_ptr<IBinarySerializer> serializer_;
+        std::unique_ptr<IStorageSerializer> serializer_;
+        std::shared_ptr<DatabaseIoLockService> io_lock_service_;
+        std::shared_ptr<DatabaseIoLockService::Mutex> db_mutex_;
 
         void
         for_each_in_db(const std::function<void(fs::directory_entry)>& func) const;
@@ -53,6 +57,12 @@ namespace storage
     public:
         explicit
         FileIOManager(const fs::path& db_path, const std::string& db_name, types::Config::SerializerType serializer_type);
+        FileIOManager(
+            const fs::path& db_path,
+            const std::string& db_name,
+            types::Config::SerializerType serializer_type,
+            std::shared_ptr<DatabaseIoLockService> io_lock_service
+        );
 
         void
         init() override;
@@ -67,16 +77,16 @@ namespace storage
         read_schema_meta(const std::string& target_schema) override;
 
         types::MetaSchema
-        read_schema_meta(const types::Uuid& schema_id) override;
+        read_schema_meta(const types::UUID& schema_id) override;
 
         bool
         exists_table(const std::string& table_name, const std::string& schema_name) override;
 
-        std::vector<std::pair<types::Uuid, std::vector<types::DataPage> > >
+        std::vector<std::pair<types::UUID, std::vector<types::DataPage> > >
         read_tables_data() override;
 
         types::MetaTable
-        read_table_meta(const types::Uuid& table_id) override;
+        read_table_meta(const types::UUID& table_id) override;
 
         types::MetaTable
         read_table_meta(const std::string& table_name, const std::string& schema_name) override;

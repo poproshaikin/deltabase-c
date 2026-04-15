@@ -4,7 +4,7 @@
 
 #ifndef DELTABASE_BINARY_WAL_SERIALIZER_HPP
 #define DELTABASE_BINARY_WAL_SERIALIZER_HPP
-#include "std_binary_serializer.hpp"
+#include "std_storage_serializer.hpp"
 #include "wal_log.hpp"
 #include "wal_serializer.hpp"
 
@@ -12,7 +12,7 @@ namespace wal
 {
     class StdWalSerializer : public IWalSerializer
     {
-        storage::StdBinarySerializer binary_serializer_;
+        storage::StdStorageSerializer binary_serializer_;
 
         // ---
 

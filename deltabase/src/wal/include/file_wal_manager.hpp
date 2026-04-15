@@ -6,12 +6,14 @@
 #define DELTABASE_FILE_WAL_MANAGER_HPP
 
 #include "config.hpp"
+#include "db_io_lock_service.hpp"
 #include "wal_manager.hpp"
 #include "wal_serializer.hpp"
 
 #include <condition_variable>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 
 namespace wal
 {
@@ -23,6 +25,8 @@ namespace wal
         std::string db_name_;
         types::LSN next_lsn_;
         types::LSN flushed_lsn_;
+        std::shared_ptr<storage::DatabaseIoLockService> io_lock_service_;
+        std::shared_ptr<storage::DatabaseIoLockService::Mutex> db_mutex_;
 
         mutable std::mutex mtx_;
         std::condition_variable cv_;
@@ -54,17 +58,28 @@ namespace wal
             types::Config::SerializerType serializer_type
         );
 
+        FileWalManager(
+            const fs::path& db_path,
+            const std::string& db_name,
+            types::Config::SerializerType serializer_type,
+            std::shared_ptr<storage::DatabaseIoLockService> io_lock_service
+        );
+
         // IWalManager interface
-        void
+        types::LSN
         append_log(const types::WALRecord& record) override;
 
-        void
+        types::LSN
         append_log(const std::vector<types::WALRecord>& records) override;
 
         types::WALRecord
         read_log(types::LSN lsn) override;
 
-        void commit_wait(types::LSN lsn);
+        void
+        wait_for_durable(types::LSN lsn) override;
+
+        void
+        commit_wait(types::LSN lsn);
 
         void
         flush() override;

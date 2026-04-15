@@ -14,8 +14,8 @@ namespace storage
     class CatalogCache
     {
         IIOManager& io_;
-        std::unordered_map<types::Uuid, types::MetaTable> tables_;
-        std::unordered_map<types::Uuid, types::MetaSchema> schemas_;
+        std::unordered_map<types::UUID, types::MetaTable> tables_;
+        std::unordered_map<types::UUID, types::MetaSchema> schemas_;
 
     public:
         explicit CatalogCache(IIOManager& io);
@@ -34,16 +34,16 @@ namespace storage
         put(types::MetaSchema schema);
 
         types::MetaTable*
-        get_table(const types::Uuid& id);
+        get_table(const types::UUID& id);
 
         types::MetaTable*
-        get_table(const std::string& name, const types::Uuid& schema_id);
+        get_table(const std::string& name, const types::UUID& schema_id);
 
         void
         save_table(const types::MetaTable& mt);
 
         types::MetaSchema*
-        get_schema(const types::Uuid& id);
+        get_schema(const types::UUID& id);
 
         types::MetaSchema*
         get_schema(const std::string& name);

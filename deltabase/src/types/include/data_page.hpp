@@ -4,10 +4,10 @@
 
 #ifndef DELTABASE_DATA_PAGE_HPP
 #define DELTABASE_DATA_PAGE_HPP
+#include "UUID.hpp"
 #include "data_row.hpp"
 #include "page_id.hpp"
 #include "typedefs.hpp"
-#include "uuid.hpp"
 
 #include <filesystem>
 
@@ -22,7 +22,7 @@ namespace types
             sizeof(uuid_t) * 2 + sizeof(RowId) * 2 + sizeof(uint64_t) + sizeof(LSN);
 
         DataPageId id;
-        Uuid table_id;
+        UUID table_id;
         RowId min_rid = 0;
         RowId max_rid = 0;
         uint64_t rows_count = 0;
@@ -36,7 +36,7 @@ namespace types
         DataPage() = default;
 
         static DataPage
-        make(const fs::path& base_path, const Uuid& table_id, const Uuid& page_id)
+        make(const fs::path& base_path, const UUID& table_id, const UUID& page_id)
         {
             DataPage page;
             page.id = page_id;

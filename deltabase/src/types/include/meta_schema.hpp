@@ -4,13 +4,13 @@
 
 #ifndef DELTABASE_META_SCHEMA_HPP
 #define DELTABASE_META_SCHEMA_HPP
-#include "uuid.hpp"
+#include "UUID.hpp"
 
 #include <string>
 
 namespace types
 {
-    using SchemaId = Uuid;
+    using SchemaId = UUID;
 
     struct MetaSchema
     {

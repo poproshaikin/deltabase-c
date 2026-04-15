@@ -33,9 +33,8 @@ public:
 
 class SchemaDoesntExist : public std::runtime_error
 {
-    public:
-    explicit
-    SchemaDoesntExist(const std::string& schema_name)
+public:
+    explicit SchemaDoesntExist(const std::string& schema_name)
         : std::runtime_error("Schema '" + schema_name + "' doesnt exist")
     {
     }
@@ -79,9 +78,17 @@ public:
 
 class IndexDoesntExist : public std::runtime_error
 {
-    public:
+public:
     IndexDoesntExist(const std::string& index_name, const std::string& table_name)
         : std::runtime_error("Index '" + index_name + "' does not exist on table " + table_name)
+    {
+    }
+};
+
+class NetworkError : public std::runtime_error
+{
+public:
+    NetworkError(const std::string& msg = "") : std::runtime_error(msg)
     {
     }
 };

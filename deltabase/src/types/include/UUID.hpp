@@ -11,7 +11,7 @@
 
 namespace types
 {
-    struct Uuid
+    struct UUID
     {
     private:
         uuid_t value_{};
@@ -23,20 +23,20 @@ namespace types
         }
 
     public:
-        Uuid() = default;
+        UUID() = default;
 
-        Uuid(uuid_t other)
+        UUID(uuid_t other)
         {
             std::memcpy(&value_, &other, sizeof(uuid_t));
         }
 
-        Uuid(const Uuid& other)
+        UUID(const UUID& other)
         {
             std::memcpy(&value_, &other.value_, sizeof(uuid_t));
         }
 
-        Uuid&
-        operator=(const Uuid& other)
+        UUID&
+        operator=(const UUID& other)
         {
             if (this != &other)
             {
@@ -46,24 +46,24 @@ namespace types
             return *this;
         }
 
-        explicit Uuid(const std::string& str)
+        explicit UUID(const std::string& str)
         {
             if (uuid_parse(str.c_str(), value_) != 0)
                 throw std::invalid_argument("Invalid UUID string: " + str);
         }
 
-        static Uuid
+        static UUID
         make()
         {
-            Uuid uuid;
+            UUID uuid;
             generate(uuid.value_);
             return uuid;
         }
 
-        static Uuid
+        static UUID
         null()
         {
-            Uuid uuid;
+            UUID uuid;
             uuid_clear(*uuid.raw());
             return uuid;
         }
@@ -77,13 +77,13 @@ namespace types
         }
 
         bool
-        operator==(const Uuid& other) const noexcept
+        operator==(const UUID& other) const noexcept
         {
             return uuid_compare(value_, other.value_) == 0;
         }
 
         bool
-        operator!=(const Uuid& other) const noexcept
+        operator!=(const UUID& other) const noexcept
         {
             return !(*this == other);
         }
@@ -104,10 +104,10 @@ namespace types
 
 namespace std
 {
-    template <> struct hash<types::Uuid>
+    template <> struct hash<types::UUID>
     {
         size_t
-        operator()(const types::Uuid& uuid) const noexcept
+        operator()(const types::UUID& uuid) const noexcept
         {
             auto sv = std::string_view(reinterpret_cast<const char*>(uuid.raw()), 16);
 

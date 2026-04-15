@@ -38,8 +38,7 @@ namespace txn
         // lsn/prev_lsn are assigned in the WAL manager.
         types::BeginTxnRecord record(0, last_lsn_, id_);
 
-        wal_manager_.append_log(record);
-        last_lsn_ = wal_manager_.get_next_lsn() - 1;
+        last_lsn_ = wal_manager_.append_log(record);
         state_ = TransactionState::ACTIVE;
     }
 
@@ -59,8 +58,7 @@ namespace txn
             record
         );
 
-        wal_manager_.append_log(record_with_txn_id);
-        last_lsn_ = wal_manager_.get_next_lsn() - 1;
+        last_lsn_ = wal_manager_.append_log(record_with_txn_id);
     }
 
     void
@@ -71,10 +69,9 @@ namespace txn
 
         types::CommitTxnRecord commit_record(0, last_lsn_, id_);
 
-        wal_manager_.append_log(commit_record);
-        last_lsn_ = wal_manager_.get_next_lsn() - 1;
-        wal_manager_.flush();
-        buffer_pool_.flush_dirty();
+        last_lsn_ = wal_manager_.append_log(commit_record);
+        wal_manager_.wait_for_durable(last_lsn_);
+        buffer_pool_.flush_dirty(last_lsn_);
         state_ = TransactionState::COMMITTED;
 
         auto* buffer_pool = &buffer_pool_;

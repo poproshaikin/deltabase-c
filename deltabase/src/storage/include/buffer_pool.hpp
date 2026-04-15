@@ -64,26 +64,33 @@ namespace storage
         prepare_dp(size_t size, const types::MetaTable& mt);
 
         std::vector<types::DataPage*>
-        get_table_data(const types::Uuid& table_id);
+        get_table_data(const types::UUID& table_id);
 
         types::DataPage*
         dirty_dp(const types::DataPageId& page_id);
 
         types::IndexFile*
-        get_table_index(const types::Uuid& table_id, const types::IndexId& index_id);
+        get_table_index(const types::UUID& table_id, const types::IndexId& index_id);
 
         void
         create_table_index(
             const std::string& schema_name,
             const types::MetaTable& table,
-            const types::MetaIndex& index
+            const types::MetaIndex& index,
+            types::LSN last_lsn
         );
 
         types::IndexFile*
         dirty_if(const types::IndexId& index_id);
 
         void
+        set_if_lsn(const types::IndexId& index_id, types::LSN last_lsn);
+
+        void
         flush_dirty();
+
+        void
+        flush_dirty(types::LSN max_lsn);
     };
 } // namespace storage
 

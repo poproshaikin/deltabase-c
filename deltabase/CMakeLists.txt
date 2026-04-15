@@ -79,6 +79,10 @@ function(add_cpp_module module_name)
         target_link_libraries(${module_name} PUBLIC wal)
     endif()
 
+    if (${module_name} STREQUAL "network")
+        target_link_libraries(${module_name} PUBLIC engine)
+    endif()
+
 endfunction()
 
 add_cpp_module(types)
@@ -91,6 +95,7 @@ add_cpp_module(executor)
 add_cpp_module(engine)
 add_cpp_module(cli)
 add_cpp_module(recovery)
+add_cpp_module(network)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
@@ -109,11 +114,12 @@ target_link_libraries(test.exe
     types
     cli
     recovery
+    network
 )
 
-# --- main ---
-add_executable(main.exe main.cpp)
-target_link_libraries(main.exe 
+# --- cli ---
+add_executable(cli.exe cli.cpp)
+target_link_libraries(cli.exe
     storage
     executor
     sql
@@ -122,6 +128,14 @@ target_link_libraries(main.exe
     types
     cli
     recovery
+)
+
+add_executable(server.exe server.cpp)
+target_link_libraries(server.exe
+    network
+    engine
+    types
+    misc
 )
 
 add_executable(wal_dump.exe wal_dump.cpp)

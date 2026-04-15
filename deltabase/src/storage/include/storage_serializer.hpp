@@ -14,10 +14,10 @@
 
 namespace storage
 {
-    class IBinarySerializer
+    class IStorageSerializer
     {
     public:
-        virtual ~IBinarySerializer() = default;
+        virtual ~IStorageSerializer() = default;
 
         virtual misc::MemoryStream
         serialize_mt(const types::MetaTable& table) const = 0;

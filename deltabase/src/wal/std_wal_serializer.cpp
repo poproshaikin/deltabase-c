@@ -436,7 +436,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
 
             if (!stream.read(&lsn, sizeof(lsn)))
                 return false;
@@ -453,7 +453,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
 
             if (!stream.read(&lsn, sizeof(lsn)))
                 return false;
@@ -470,7 +470,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
 
             if (!stream.read(&lsn, sizeof(lsn)))
                 return false;
@@ -487,9 +487,9 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
-            Uuid table_id;
-            Uuid page_id;
+            UUID txn_id;
+            UUID table_id;
+            UUID page_id;
             DataRow after;
 
             if (!stream.read(&lsn, sizeof(lsn)))
@@ -514,9 +514,9 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
-            Uuid table_id;
-            Uuid page_id;
+            UUID txn_id;
+            UUID table_id;
+            UUID page_id;
             DataRow before;
             DataRow after;
 
@@ -547,9 +547,9 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
-            Uuid table_id;
-            Uuid page_id;
+            UUID txn_id;
+            UUID table_id;
+            UUID page_id;
             DataRow before;
 
             if (!stream.read(&lsn, sizeof(lsn)))
@@ -574,7 +574,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             MetaSchema schema;
 
             if (!stream.read(&lsn, sizeof(lsn)))
@@ -595,7 +595,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             MetaSchema before;
             MetaSchema after;
 
@@ -619,7 +619,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             MetaSchema before;
 
             if (!stream.read(&lsn, sizeof(lsn)))
@@ -640,7 +640,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             MetaTable table;
 
             if (!stream.read(&lsn, sizeof(lsn)))
@@ -661,7 +661,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             MetaTable before;
             MetaTable after;
 
@@ -685,7 +685,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             MetaTable before;
 
             if (!stream.read(&lsn, sizeof(lsn)))
@@ -706,7 +706,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             MetaIndex after;
 
             if (!stream.read(&lsn, sizeof(lsn)))
@@ -726,9 +726,9 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
-            Uuid table_id;
-            Uuid page_id;
+            UUID txn_id;
+            UUID table_id;
+            UUID page_id;
             LSN undo_next_lsn;
             DataRow after;
 
@@ -757,9 +757,9 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
-            Uuid table_id;
-            Uuid page_id;
+            UUID txn_id;
+            UUID table_id;
+            UUID page_id;
             LSN undo_next_lsn;
             DataRow before;
             DataRow after;
@@ -798,9 +798,9 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
-            Uuid table_id;
-            Uuid page_id;
+            UUID txn_id;
+            UUID table_id;
+            UUID page_id;
             LSN undo_next_lsn;
             DataRow before;
 
@@ -829,7 +829,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             LSN undo_next_lsn;
             MetaSchema schema;
 
@@ -852,7 +852,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             LSN undo_next_lsn;
             MetaSchema before;
             MetaSchema after;
@@ -880,7 +880,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             LSN undo_next_lsn;
             MetaSchema before;
 
@@ -903,7 +903,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             LSN undo_next_lsn;
             MetaTable after;
 
@@ -926,7 +926,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             LSN undo_next_lsn;
             MetaTable before;
             MetaTable after;
@@ -954,7 +954,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             LSN undo_next_lsn;
             MetaTable before;
 
@@ -977,7 +977,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             LSN undo_next_lsn;
             MetaIndex after;
 
@@ -1000,7 +1000,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             MetaIndex before;
 
             if (!stream.read(&lsn, sizeof(lsn)))
@@ -1020,7 +1020,7 @@ namespace wal
         {
             LSN lsn;
             LSN prev_lsn;
-            Uuid txn_id;
+            UUID txn_id;
             LSN undo_next_lsn;
             MetaIndex before;
 

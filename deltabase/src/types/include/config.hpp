@@ -36,6 +36,23 @@ namespace types
             Std = 1
         };
 
+        enum class DomainType
+        {
+            IPv4 = 1,
+            IPv6,
+            UNIX,
+        };
+
+        enum class TransportType
+        {
+            Stream = 1,
+        };
+
+        enum class NetProtocolType
+        {
+            Std = 1,
+        };
+
     private:
         friend class engine::Engine;
 
