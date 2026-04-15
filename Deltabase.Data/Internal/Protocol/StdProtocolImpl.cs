@@ -137,6 +137,14 @@ internal class StdProtocolImpl : IProtocol
         }
     }
 
+    public Table ParseTable(IReadOnlyList<byte> payload)
+    {
+        using var stream = new MemoryStream(payload.ToArray(), writable: false);
+        using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
+        
+        if (!TryReadUInt64BigEndian())
+    }
+
     private static void WriteMessageType(BinaryWriter writer, MessageType messageType)
     {
         writer.Write((byte)messageType);

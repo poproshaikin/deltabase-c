@@ -6,4 +6,6 @@ internal interface IProtocol
 {
     byte[] Encode(DeltabaseMessage message); 
     DeltabaseMessage Parse(byte[] data);
+    
+    Table ParseTable(IReadOnlyList<byte> payload);
 }

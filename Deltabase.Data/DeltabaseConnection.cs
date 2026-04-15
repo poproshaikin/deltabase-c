@@ -12,15 +12,16 @@ public class DeltabaseConnection : DbConnection
     private string _connectionString;
     private ConnectionParams _connectionParams;
     private ConnectionState _connectionState = ConnectionState.Closed;
-    private DeltabaseConnector _connector;
     private Guid _sessionId;
     private bool _disposed;
+    
+    internal DeltabaseConnector Connector { get; set; }
 
     public DeltabaseConnection(string connectionString)
     {
         _connectionString = connectionString;
         _connectionParams = ParseConnectionString(connectionString);
-        _connector = new DeltabaseConnector(_connectionParams.Host, _connectionParams.Port, SocketType.Stream, ProtocolType.Tcp);
+        Connector = new DeltabaseConnector(_connectionParams.Host, _connectionParams.Port, SocketType.Stream, ProtocolType.Tcp);
         _disposed = false;
     }
 
@@ -40,10 +41,10 @@ public class DeltabaseConnection : DbConnection
 
     public override void Open()
     {
-        _connector.Connect();
-        _sessionId = _connector.Open();
+        Connector.Connect();
+        _sessionId = Connector.Open();
         _connectionState = ConnectionState.Open;
-        _connector.AttachDatabase(_connectionParams.Database, _sessionId);
+        Connector.AttachDatabase(_connectionParams.Database, _sessionId);
     }
 
     public override void ChangeDatabase(string databaseName)
@@ -53,12 +54,12 @@ public class DeltabaseConnection : DbConnection
 
     public override void Close()
     {
-        _connector.Close(_sessionId);
+        Connector.Close(_sessionId);
     }
 
     protected override DbCommand CreateDbCommand()
     {
-        throw new NotImplementedException();
+        return new DeltabaseCommand();
     }
     
     protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)

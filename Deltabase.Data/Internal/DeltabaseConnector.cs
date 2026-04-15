@@ -12,15 +12,14 @@ internal class DeltabaseConnector : IDisposable
     private ushort _port;
 
     private SocketWrapper _socketWrapper;
+    private IProtocol _protocol;
     
-    public DeltabaseConnector(string host, ushort port, SocketType socketType, ProtocolType protocol, IProtocol? binaryProtocol = null) 
+    public DeltabaseConnector(string host, ushort port, SocketType socketType, ProtocolType networkProtocol, IProtocol? binaryProtocol = null) 
     {
         _host = host;
         _port = port;
-        _socketWrapper = new SocketWrapper(
-            new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), 
-            binaryProtocol ?? new StdProtocolImpl()
-        );
+        _protocol = binaryProtocol ?? new StdProtocolImpl();
+        _socketWrapper = new SocketWrapper(AddressFamily.InterNetwork, socketType, networkProtocol, _protocol);
     }
 
     public void Connect()
@@ -65,5 +64,19 @@ internal class DeltabaseConnector : IDisposable
     public void Dispose()
     {
         _socketWrapper.Dispose();
+    }
+
+    public Table ExecuteCommand(string command, Guid sessionId)
+    {
+        var message = new QueryMessage(sessionId, command);
+        _socketWrapper.Send(message);
+        var response = _socketWrapper.Receive();
+        
+        if (response is not PongMessage pong)
+            throw new DeltabaseException();
+        if (pong.ErrorCode != NetErrorCode.Success)
+            throw new DeltabaseException(pong.ErrorCode);
+
+        return _protocol.ParseTable(pong.Payload);
     }
 }

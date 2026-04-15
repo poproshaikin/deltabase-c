@@ -19,6 +19,7 @@ internal class PongMessage(Guid sessionId, NetErrorCode errorCode = NetErrorCode
 {
     public Guid SessionId  { get; set; } = sessionId;
     public NetErrorCode ErrorCode { get; set; } = errorCode;
+    public IReadOnlyList<byte> Payload { get; set; } = [];
 }
 
 internal class QueryMessage(Guid sessionId, string query) : DeltabaseMessage(MessageType.Query)

@@ -10,9 +10,12 @@ internal class SocketWrapper : IDisposable
     public Socket Socket { get; set; }
     public IProtocol Protocol { get; set; }
 
-    public SocketWrapper(Socket socket, IProtocol protocol)
+    public SocketWrapper(AddressFamily family, 
+        SocketType socketType, 
+        ProtocolType networkProtocol, 
+        IProtocol protocol)
     {
-        Socket = socket;
+        Socket = new Socket(family, socketType, networkProtocol);
         Protocol = protocol;
     }
 
