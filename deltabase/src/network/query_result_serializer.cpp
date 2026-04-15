@@ -6,90 +6,17 @@ namespace net
 {
     using namespace misc;
 
-    namespace
-    {
-        void
-        write_u64(MemoryStream& stream, uint64_t value)
-        {
-            stream.write(&value, sizeof(value));
-        }
-
-        bool
-        read_u64(ReadOnlyMemoryStream& stream, uint64_t& out)
-        {
-            return stream.read(&out, sizeof(out)) == sizeof(out);
-        }
-
-        void
-        write_string(MemoryStream& stream, const std::string& value)
-        {
-            const auto size = static_cast<uint64_t>(value.size());
-            write_u64(stream, size);
-            if (!value.empty())
-            {
-                stream.write(value.data(), value.size());
-            }
-        }
-
-        bool
-        read_string(ReadOnlyMemoryStream& stream, std::string& out)
-        {
-            uint64_t size = 0;
-            if (!read_u64(stream, size))
-            {
-                return false;
-            }
-
-            out.resize(size);
-            if (size == 0)
-            {
-                return true;
-            }
-
-            return stream.read(out.data(), size) == size;
-        }
-
-        void
-        write_bytes(MemoryStream& stream, const types::Bytes& bytes)
-        {
-            const auto size = static_cast<uint64_t>(bytes.size());
-            write_u64(stream, size);
-            if (!bytes.empty())
-            {
-                stream.write(bytes.data(), bytes.size());
-            }
-        }
-
-        bool
-        read_bytes(ReadOnlyMemoryStream& stream, types::Bytes& out)
-        {
-            uint64_t size = 0;
-            if (!read_u64(stream, size))
-            {
-                return false;
-            }
-
-            out.resize(size);
-            if (size == 0)
-            {
-                return true;
-            }
-
-            return stream.read(out.data(), size) == size;
-        }
-    } // namespace
-
     types::Bytes
     QueryResultSerializer::serialize(types::IExecutionResult& result) const
     {
         MemoryStream stream;
 
         const auto schema = result.output_schema();
-        write_u64(stream, static_cast<uint64_t>(schema.size()));
+        stream.write_u64(schema.size(), true);
         for (const auto& column : schema)
         {
-            write_string(stream, column.name);
-            write_u64(stream, static_cast<uint64_t>(column.type));
+            stream.write_string(column.name, true);
+            stream.write_u64(static_cast<uint64_t>(column.type), true);
         }
 
         std::vector<types::DataRow> rows;
@@ -99,14 +26,13 @@ namespace net
             rows.push_back(row);
         }
 
-        write_u64(stream, static_cast<uint64_t>(rows.size()));
+        stream.write_u64(rows.size(), true);
         for (const auto& data_row : rows)
         {
-            write_u64(stream, static_cast<uint64_t>(data_row.tokens.size()));
+            stream.write_u64(data_row.tokens.size(), true);
             for (const auto& token : data_row.tokens)
             {
-                write_u64(stream, static_cast<uint64_t>(token.type));
-                write_bytes(stream, token.bytes);
+                stream.write_bytes(token.bytes, true);
             }
         }
 
@@ -123,7 +49,7 @@ namespace net
         ReadOnlyMemoryStream stream(bytes);
 
         uint64_t column_count = 0;
-        if (!read_u64(stream, column_count))
+        if (!stream.read_u64(column_count, true))
         {
             return false;
         }
@@ -133,13 +59,13 @@ namespace net
         for (uint64_t i = 0; i < column_count; ++i)
         {
             std::string name;
-            if (!read_string(stream, name))
+            if (!stream.read_string(name, true))
             {
                 return false;
             }
 
             uint64_t raw_type = 0;
-            if (!read_u64(stream, raw_type))
+            if (!stream.read_u64(raw_type, true))
             {
                 return false;
             }
@@ -151,7 +77,7 @@ namespace net
         }
 
         uint64_t row_count = 0;
-        if (!read_u64(stream, row_count))
+        if (!stream.read_u64(row_count, true))
         {
             return false;
         }
@@ -161,7 +87,7 @@ namespace net
         for (uint64_t i = 0; i < row_count; ++i)
         {
             uint64_t token_count = 0;
-            if (!read_u64(stream, token_count))
+            if (!stream.read_u64(token_count, true))
             {
                 return false;
             }
@@ -171,13 +97,9 @@ namespace net
             for (uint64_t j = 0; j < token_count; ++j)
             {
                 uint64_t raw_type = 0;
-                if (!read_u64(stream, raw_type))
-                {
-                    return false;
-                }
 
                 types::Bytes token_bytes;
-                if (!read_bytes(stream, token_bytes))
+                if (!stream.read_bytes(token_bytes, true))
                 {
                     return false;
                 }

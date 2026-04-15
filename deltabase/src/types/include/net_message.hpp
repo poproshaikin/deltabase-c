@@ -7,6 +7,7 @@
 
 #include "UUID.hpp"
 #include "net_error.hpp"
+#include "typedefs.hpp"
 
 #include <concepts>
 #include <variant>
@@ -27,7 +28,8 @@ namespace types
     namespace detail
     {
         template <typename T>
-        concept NetMessage_c = requires(const T& x) {
+        concept NetMessage_c = requires(const T& x)
+        {
             T::type;
 
             requires std::same_as<decltype(T::type), const NetMessageType>;
@@ -47,7 +49,10 @@ namespace types
         const UUID session_id;
         NetErrorCode err;
 
-        PongNetMessage(const UUID& session_id, NetErrorCode err) : session_id(session_id), err(err)
+        Bytes payload;
+
+        PongNetMessage(const UUID& session_id, NetErrorCode err, const Bytes& payload = {}) :
+            session_id(session_id), err(err), payload(payload)
         {
         }
     };

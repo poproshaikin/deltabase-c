@@ -4,6 +4,7 @@
 
 #include "memory_stream.hpp"
 
+#include "utils.hpp"
 #include "../types/include/typedefs.hpp"
 
 #include <cstring>
@@ -86,6 +87,49 @@ namespace misc
         return buffer_.size();
     }
 
+    void
+    MemoryStream::write_u64(uint64_t value, bool big_endian)
+    {
+        uint64_t effective = big_endian ? to_big_endian_u64(value) : value;
+        write(&effective, sizeof(effective));
+    }
+
+    void
+    MemoryStream::write_message_type(types::NetMessageType type)
+    {
+        const auto raw_type = static_cast<uint8_t>(type);
+        write(&raw_type, sizeof(raw_type));
+    }
+
+    void
+    MemoryStream::write_uuid(const types::UUID& session_id)
+    {
+        write(session_id.raw(), sizeof(*session_id.raw()));
+    }
+
+    void
+    MemoryStream::write_string(const std::string& value, bool big_endian)
+    {
+        const auto size = big_endian ? to_big_endian_u64(value.size()) : value.size();
+        write(&size, sizeof(size));
+        if (!value.empty())
+        {
+            write(value.data(), value.size());
+        }
+    }
+
+    void
+    MemoryStream::write_bytes(const types::Bytes& bytes, bool big_endian)
+    {
+        const auto size = big_endian ? to_big_endian_u64(bytes.size()) : bytes.size();
+        write(&size, sizeof(size));
+        write(&size, sizeof(size));
+        if (!bytes.empty())
+        {
+            write(bytes.data(), bytes.size());
+        }
+    }
+
     ReadOnlyMemoryStream::ReadOnlyMemoryStream(
         const std::vector<uint8_t>& buffer) : buffer_(buffer)
     {
@@ -153,5 +197,81 @@ namespace misc
     ReadOnlyMemoryStream::current() const noexcept
     {
         return buffer_.data() + position_;
+    }
+
+    bool
+    ReadOnlyMemoryStream::read_exact(void* out, uint64_t size)
+    {
+        return read(out, size) == size;
+    }
+
+    bool
+    ReadOnlyMemoryStream::read_u64(uint64_t& out, bool big_endian)
+    {
+        uint64_t effective = big_endian ? to_big_endian_u64(out) : out;
+        return read(&effective, sizeof(effective)) == sizeof(out);
+    }
+
+    bool
+    ReadOnlyMemoryStream::read_string(std::string& out, bool big_endian)
+    {
+        uint64_t size_be = 0;
+        if (!read_exact(&size_be, sizeof(size_be)))
+        {
+            return false;
+        }
+
+        const auto size = big_endian ? from_big_endian_u64(size_be) : size_be;
+        if (size > remaining())
+        {
+            return false;
+        }
+
+        out.resize(size);
+
+        if (size == 0)
+        {
+            return true;
+        }
+
+        return read_exact(out.data(), size);
+    }
+
+    bool
+    ReadOnlyMemoryStream::read_bytes(types::Bytes& out, bool big_endian)
+    {
+        uint64_t size_be = 0;
+        if (!read_exact(&size_be, sizeof(size_be)))
+        {
+            return false;
+        }
+
+        const auto size = big_endian ? from_big_endian_u64(size_be) : size_be;
+        if (size > remaining())
+        {
+            return false;
+        }
+
+        out.resize(size);
+
+        if (size == 0)
+        {
+            return true;
+        }
+
+        return read_exact(out.data(), size);
+    }
+
+    bool
+    ReadOnlyMemoryStream::read_uuid(types::UUID& out)
+    {
+        uuid_t raw{};
+        if (!read_exact(&raw, sizeof(raw)))
+        {
+            return false;
+        }
+
+        out = types::UUID(raw);
+        return true;
     }
 }

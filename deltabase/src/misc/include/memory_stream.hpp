@@ -4,7 +4,9 @@
 
 #ifndef DELTABASE_MEMORY_STREAM_HPP
 #define DELTABASE_MEMORY_STREAM_HPP
+#include "utils.hpp"
 #include "../../types/include/typedefs.hpp"
+#include "../../types/include/net_message.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -48,6 +50,22 @@ namespace misc
 
         size_t
         size() const;
+
+        void
+        write_u64(uint64_t value, bool big_endian);
+
+        void
+        write_message_type(types::NetMessageType type);
+
+        void
+        write_uuid(const types::UUID& session_id);
+
+        void
+        write_string(const std::string& value, bool big_endian);
+
+        void
+        write_bytes(const types::Bytes& bytes, bool big_endian);
+
     };
 
     class ReadOnlyMemoryStream
@@ -82,6 +100,21 @@ namespace misc
 
         const uint8_t*
         current() const noexcept;
+
+        bool
+        read_exact(void* out, uint64_t size);
+
+        bool
+        read_u64(uint64_t& out, bool big_endian);
+
+        bool
+        read_string(std::string& out, bool big_endian);
+
+        bool
+        read_bytes(types::Bytes& out, bool big_endian);
+
+        bool
+        read_uuid(types::UUID& out);
     };
 }
 

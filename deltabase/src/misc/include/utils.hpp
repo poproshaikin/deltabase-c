@@ -73,29 +73,23 @@ namespace misc
     *
     make_c_string(const std::string& str);
 
-    template <typename T>
-    inline T
-    *
-    make_c_arr(const std::vector<T>& vec)
+    inline uint64_t
+    to_big_endian_u64(uint64_t value)
     {
-        T* arr = new T[vec.size()];
-        std::copy(vec.begin(), vec.end(), arr);
-        return arr;
+        return ((value & 0x00000000000000FFULL) << 56)
+            | ((value & 0x000000000000FF00ULL) << 40)
+            | ((value & 0x0000000000FF0000ULL) << 24)
+            | ((value & 0x00000000FF000000ULL) << 8)
+            | ((value & 0x000000FF00000000ULL) >> 8)
+            | ((value & 0x0000FF0000000000ULL) >> 24)
+            | ((value & 0x00FF000000000000ULL) >> 40)
+            | ((value & 0xFF00000000000000ULL) >> 56);
     }
 
-    template <typename T>
-    inline T
-    **
-    make_c_ptr_arr(const std::vector<T>& vec)
+    inline uint64_t
+    from_big_endian_u64(uint64_t value)
     {
-        T** arr = new T*[vec.size()];
-
-        for (size_t i = 0; i < vec.size(); ++i)
-        {
-            arr[i] = new T(vec[i]);
-        }
-
-        return arr;
+        return to_big_endian_u64(value);
     }
 
     void

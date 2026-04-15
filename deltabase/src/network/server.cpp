@@ -91,6 +91,7 @@ namespace net
             {
                 auto result = engine->execute_query(query_message.query);
                 auto result_bytes = result_serializer.serialize(*result);
+                auto pong = PongNetMessage(query_message.session_id, NetErrorCode::SUCCESS, result_bytes);
                 handle.send_message(result_bytes);
             }
             catch (const std::exception& ex)
