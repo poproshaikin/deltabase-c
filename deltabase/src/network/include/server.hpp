@@ -29,6 +29,9 @@ namespace net
         void
         handle_client(SocketHandle handle);
 
+        void
+        handle_message(SocketHandle& handle, bool& stop);
+
     public:
         NetServer(
             uint16_t port,
