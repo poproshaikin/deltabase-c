@@ -14,6 +14,25 @@ namespace net
 
     namespace
     {
+        uint64_t
+        to_big_endian_u64(uint64_t value)
+        {
+            return ((value & 0x00000000000000FFULL) << 56)
+                | ((value & 0x000000000000FF00ULL) << 40)
+                | ((value & 0x0000000000FF0000ULL) << 24)
+                | ((value & 0x00000000FF000000ULL) << 8)
+                | ((value & 0x000000FF00000000ULL) >> 8)
+                | ((value & 0x0000FF0000000000ULL) >> 24)
+                | ((value & 0x00FF000000000000ULL) >> 40)
+                | ((value & 0xFF00000000000000ULL) >> 56);
+        }
+
+        uint64_t
+        from_big_endian_u64(uint64_t value)
+        {
+            return to_big_endian_u64(value);
+        }
+
         void
         write_message_type(MemoryStream& stream, types::NetMessageType type)
         {
@@ -31,7 +50,8 @@ namespace net
         write_string(MemoryStream& stream, const std::string& value)
         {
             const auto size = static_cast<uint64_t>(value.size());
-            stream.write(&size, sizeof(size));
+            const auto size_be = to_big_endian_u64(size);
+            stream.write(&size_be, sizeof(size_be));
             if (!value.empty())
             {
                 stream.write(value.data(), value.size());
@@ -42,6 +62,31 @@ namespace net
         read_exact(ReadOnlyMemoryStream& stream, void* out, uint64_t size)
         {
             return stream.read(out, size) == size;
+        }
+
+        bool
+        read_string(ReadOnlyMemoryStream& stream, std::string& out)
+        {
+            uint64_t size_be = 0;
+            if (!read_exact(stream, &size_be, sizeof(size_be)))
+            {
+                return false;
+            }
+
+            const auto size = from_big_endian_u64(size_be);
+            if (size > stream.remaining())
+            {
+                return false;
+            }
+
+            out.resize(size);
+
+            if (size == 0)
+            {
+                return true;
+            }
+
+            return read_exact(stream, out.data(), size);
         }
 
         bool
@@ -180,7 +225,7 @@ namespace net
             }
 
             std::string query;
-            if (stream.read(query) == 0)
+            if (!read_string(stream, query))
             {
                 return protocol_violation_message();
             }
@@ -197,7 +242,7 @@ namespace net
             }
 
             std::string db_name;
-            if (stream.read(db_name) == 0)
+            if (!read_string(stream, db_name))
             {
                 return protocol_violation_message();
             }
@@ -214,7 +259,7 @@ namespace net
             }
 
             std::string db_name;
-            if (stream.read(db_name) == 0)
+            if (!read_string(stream, db_name))
             {
                 return protocol_violation_message();
             }
