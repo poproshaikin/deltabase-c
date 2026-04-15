@@ -11,6 +11,7 @@ namespace types
     {
         SUCCESS = 0,
         PROTOCOL_VIOLATION = 1,
+        DB_NOT_EXISTS,
     };
 }
 

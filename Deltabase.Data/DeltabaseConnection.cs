@@ -14,12 +14,14 @@ public class DeltabaseConnection : DbConnection
     private ConnectionState _connectionState = ConnectionState.Closed;
     private DeltabaseConnector _connector;
     private Guid _sessionId;
+    private bool _disposed;
 
     public DeltabaseConnection(string connectionString)
     {
         _connectionString = connectionString;
         _connectionParams = ParseConnectionString(connectionString);
         _connector = new DeltabaseConnector(_connectionParams.Host, _connectionParams.Port, SocketType.Stream, ProtocolType.Tcp);
+        _disposed = false;
     }
 
     [AllowNull]
@@ -51,7 +53,7 @@ public class DeltabaseConnection : DbConnection
 
     public override void Close()
     {
-        throw new NotImplementedException();
+        _connector.Close(_sessionId);
     }
 
     protected override DbCommand CreateDbCommand()
@@ -68,5 +70,19 @@ public class DeltabaseConnection : DbConnection
     {
         var split = connectionString.Split(';');
         return new ConnectionParams(split[0], ushort.Parse(split[1]), split[2]); // host;port;database
-    } 
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+        
+        if (disposing)
+        {
+            Close();
+            _connector?.Dispose();
+        }
+        
+        _disposed = true;
+        base.Dispose(disposing);
+    }
 }

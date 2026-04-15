@@ -145,7 +145,11 @@ internal class StdProtocolImpl : IProtocol
     private static void WriteGuid(BinaryWriter writer, Guid value)
     {
         Span<byte> uuidBytes = stackalloc byte[16];
-        GuidToUuidBytes(value, uuidBytes);
+        if (!value.TryWriteBytes(uuidBytes, bigEndian: true, out var bytesWritten) || bytesWritten != 16)
+        {
+            throw new InvalidOperationException("Failed to serialize Guid to UUID bytes.");
+        }
+
         writer.Write(uuidBytes);
     }
 
@@ -190,55 +194,8 @@ internal class StdProtocolImpl : IProtocol
             return false;
         }
 
-        value = UuidBytesToGuid(uuidBytes);
+        value = new Guid(uuidBytes, bigEndian: true);
         return true;
-    }
-
-    private static Guid UuidBytesToGuid(ReadOnlySpan<byte> uuidBytes)
-    {
-        Span<byte> guidBytes = stackalloc byte[16];
-
-        guidBytes[0] = uuidBytes[3];
-        guidBytes[1] = uuidBytes[2];
-        guidBytes[2] = uuidBytes[1];
-        guidBytes[3] = uuidBytes[0];
-        guidBytes[4] = uuidBytes[5];
-        guidBytes[5] = uuidBytes[4];
-        guidBytes[6] = uuidBytes[7];
-        guidBytes[7] = uuidBytes[6];
-        guidBytes[8] = uuidBytes[8];
-        guidBytes[9] = uuidBytes[9];
-        guidBytes[10] = uuidBytes[10];
-        guidBytes[11] = uuidBytes[11];
-        guidBytes[12] = uuidBytes[12];
-        guidBytes[13] = uuidBytes[13];
-        guidBytes[14] = uuidBytes[14];
-        guidBytes[15] = uuidBytes[15];
-
-        return new Guid(guidBytes);
-    }
-
-    private static void GuidToUuidBytes(Guid guid, Span<byte> uuidBytes)
-    {
-        Span<byte> guidBytes = stackalloc byte[16];
-        _ = guid.TryWriteBytes(guidBytes);
-
-        uuidBytes[0] = guidBytes[3];
-        uuidBytes[1] = guidBytes[2];
-        uuidBytes[2] = guidBytes[1];
-        uuidBytes[3] = guidBytes[0];
-        uuidBytes[4] = guidBytes[5];
-        uuidBytes[5] = guidBytes[4];
-        uuidBytes[6] = guidBytes[7];
-        uuidBytes[7] = guidBytes[6];
-        uuidBytes[8] = guidBytes[8];
-        uuidBytes[9] = guidBytes[9];
-        uuidBytes[10] = guidBytes[10];
-        uuidBytes[11] = guidBytes[11];
-        uuidBytes[12] = guidBytes[12];
-        uuidBytes[13] = guidBytes[13];
-        uuidBytes[14] = guidBytes[14];
-        uuidBytes[15] = guidBytes[15];
     }
 
     private static bool TryReadString(BinaryReader reader, out string value)

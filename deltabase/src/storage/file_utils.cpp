@@ -7,10 +7,10 @@
 #include <fstream>
 #include <iostream>
 #ifdef _WIN32
-    #include <windows.h>
+#include <windows.h>
 #else
-    #include <unistd.h>
-    #include <fcntl.h>
+#include <unistd.h>
+#include <fcntl.h>
 #endif
 
 namespace storage
@@ -25,7 +25,7 @@ namespace storage
             throw std::runtime_error("Cannot open file: " + std::string(path));
 
         std::streamsize size = file.tellg(); // file size
-        file.seekg(0, std::ios::beg);        // return to start
+        file.seekg(0, std::ios::beg); // return to start
 
         std::vector<uint8_t> buffer(size);
 
@@ -44,6 +44,13 @@ namespace storage
         std::ofstream file(path, std::ios::binary);
         file.write(reinterpret_cast<const char*>(content.data()), content.size());
         file.close();
+    }
+
+    bool
+    exists_file(const fs::path& path)
+    {
+        return std::filesystem::exists(path) &&
+               std::filesystem::is_regular_file(path);
     }
 
     void

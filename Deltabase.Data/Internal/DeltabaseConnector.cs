@@ -6,7 +6,7 @@ using Deltabase.Data.Internal.Utils;
 
 namespace Deltabase.Data.Internal;
 
-internal class DeltabaseConnector
+internal class DeltabaseConnector : IDisposable
 {
     private string _host;
     private ushort _port;
@@ -53,5 +53,17 @@ internal class DeltabaseConnector
             throw new DeltabaseException();
         if (pong.ErrorCode != NetErrorCode.Success)
             throw new DeltabaseException(pong.ErrorCode);
+    }
+
+    public void Close(Guid sessionId)
+    {
+        var close = new CloseMessage(sessionId);
+        _socketWrapper.Send(close);
+        _socketWrapper.Close();
+    }
+
+    public void Dispose()
+    {
+        _socketWrapper.Dispose();
     }
 }

@@ -4,6 +4,7 @@ internal enum NetErrorCode : byte
 {
     Success = 0,
     ProtocolViolation = 1,
+    DbNotExist = 2,
 }
 
 internal abstract class DeltabaseMessage(MessageType type)

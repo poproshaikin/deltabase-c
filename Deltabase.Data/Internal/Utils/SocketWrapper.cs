@@ -5,10 +5,16 @@ using Deltabase.Data.Internal.Protocol;
 
 namespace Deltabase.Data.Internal.Utils;
 
-internal class SocketWrapper(Socket socket, IProtocol protocol)
+internal class SocketWrapper : IDisposable
 {
-    public Socket Socket { get; set; } = socket;
-    public IProtocol Protocol { get; set; } = protocol;
+    public Socket Socket { get; set; }
+    public IProtocol Protocol { get; set; }
+
+    public SocketWrapper(Socket socket, IProtocol protocol)
+    {
+        Socket = socket;
+        Protocol = protocol;
+    }
 
     public void Send(DeltabaseMessage message)
     {
@@ -77,5 +83,15 @@ internal class SocketWrapper(Socket socket, IProtocol protocol)
         }
 
         return buffer;
+    }
+
+    public void Close()
+    {
+        Socket.Close();
+    }
+
+    public void Dispose()
+    {
+        Socket.Dispose();
     }
 }

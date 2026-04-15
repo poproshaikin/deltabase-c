@@ -27,6 +27,9 @@ namespace engine
         auto data_path = path_data(executable_path);
         auto cfg_path = path_db_meta(data_path, name);
 
+        if (!exists_file(cfg_path))
+            throw DbDoesntExists(name);
+
         ReadOnlyMemoryStream stream(read_file(cfg_path));
         Config cfg;
         if (StdStorageSerializer serializer; !serializer.deserialize_cfg(stream, cfg))
