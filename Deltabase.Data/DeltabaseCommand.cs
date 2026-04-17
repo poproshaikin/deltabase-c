@@ -13,7 +13,7 @@ public class DeltabaseCommand : DbCommand
     [AllowNull]
     public override string CommandText
     {
-        get => _commandText;
+        get => _commandText ?? string.Empty;
         set => _commandText = value;
     }
     
@@ -28,9 +28,11 @@ public class DeltabaseCommand : DbCommand
     protected override DbConnection? DbConnection
     {
         get => _connection;
-        set => _connection = value as DeltabaseConnection ?? throw new DeltabaseException("DbConnection must be a DeltabaseConnection");
+        set => _connection = 
+            value as DeltabaseConnection ??
+            throw new DeltabaseException("DbConnection must be a DeltabaseConnection");
     }
-    
+
     protected override DbParameterCollection DbParameterCollection { get; }
     
     protected override DbTransaction? DbTransaction { get; set; }
@@ -47,22 +49,38 @@ public class DeltabaseCommand : DbCommand
 
     public DeltabaseCommand(string? commandText, DeltabaseConnection connection) : this(commandText)
     {
-        Connection = connection;
+        _connection = connection;
     }
 
     public override int ExecuteNonQuery()
     {
-        
+        ArgumentNullException.ThrowIfNull(_connection);
+        ArgumentNullException.ThrowIfNull(_commandText);
+
+        var table = _connection.Connector.ExecuteCommand(_commandText, _connection.SessionId);
+
+        if (table.Rows.Length > 0 && table.Rows[0].Values.Length > 0)
+            return (int)(table.Rows[0].Values[0] ?? 0);
+
+        return 0;
     }
 
     public override object? ExecuteScalar()
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(_connection);
+        ArgumentNullException.ThrowIfNull(_commandText);
+        
+        var table = _connection.Connector.ExecuteCommand(_commandText, _connection.SessionId);
+        
+        if (table.Rows.Length > 0 && table.Rows[0].Values.Length > 0)
+            return table.Rows[0].Values[0];
+
+        return null;
     }
 
     public override void Prepare()
     {
-        // Does not supported yet
+        // Does not support yet
     }
 
     protected override DbParameter CreateDbParameter()
@@ -72,19 +90,16 @@ public class DeltabaseCommand : DbCommand
 
     protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(_connection);
+        ArgumentNullException.ThrowIfNull(_commandText);
+
+        var table = _connection.Connector.ExecuteCommand(_commandText, _connection.SessionId);
+
+        return new DeltabaseDataReader(table);
     }
     
     public override void Cancel()
     {
         throw new NotImplementedException();
-    }
-
-    private void Execute()
-    {
-        ArgumentNullException.ThrowIfNull(_connection);
-        ArgumentNullException.ThrowIfNull(_commandText);
-
-        var data = _connection.Connector.ExecuteCommand();
     }
 }

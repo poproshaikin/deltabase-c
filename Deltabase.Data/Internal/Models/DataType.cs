@@ -1,6 +1,6 @@
 namespace Deltabase.Data.Internal.Models;
 
-internal enum DataType
+internal enum DataType : ulong
 {
     Undefined = 0,
     Null = 1,

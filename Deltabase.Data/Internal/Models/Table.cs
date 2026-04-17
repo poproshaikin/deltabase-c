@@ -1,3 +1,3 @@
 namespace Deltabase.Data.Internal.Models;
 
-internal record struct Table(Row Columns, IReadOnlyList<Row> Rows);
+internal record struct Table(Column[] Columns, Row[] Rows);

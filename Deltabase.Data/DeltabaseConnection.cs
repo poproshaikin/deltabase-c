@@ -12,8 +12,9 @@ public class DeltabaseConnection : DbConnection
     private string _connectionString;
     private ConnectionParams _connectionParams;
     private ConnectionState _connectionState = ConnectionState.Closed;
-    private Guid _sessionId;
     private bool _disposed;
+    
+    internal Guid SessionId { get; set; }
     
     internal DeltabaseConnector Connector { get; set; }
 
@@ -42,9 +43,9 @@ public class DeltabaseConnection : DbConnection
     public override void Open()
     {
         Connector.Connect();
-        _sessionId = Connector.Open();
+        SessionId = Connector.Open();
         _connectionState = ConnectionState.Open;
-        Connector.AttachDatabase(_connectionParams.Database, _sessionId);
+        Connector.AttachDatabase(_connectionParams.Database, SessionId);
     }
 
     public override void ChangeDatabase(string databaseName)
@@ -54,7 +55,7 @@ public class DeltabaseConnection : DbConnection
 
     public override void Close()
     {
-        Connector.Close(_sessionId);
+        Connector.Close(SessionId);
     }
 
     protected override DbCommand CreateDbCommand()
@@ -80,7 +81,7 @@ public class DeltabaseConnection : DbConnection
         if (disposing)
         {
             Close();
-            _connector?.Dispose();
+            Connector?.Dispose();
         }
         
         _disposed = true;

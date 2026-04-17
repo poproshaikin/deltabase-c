@@ -32,6 +32,7 @@ namespace net
             stream.write_u64(data_row.tokens.size(), true);
             for (const auto& token : data_row.tokens)
             {
+                stream.write_u64(static_cast<uint64_t>(token.type), true);
                 stream.write_bytes(token.bytes, true);
             }
         }
@@ -39,6 +40,7 @@ namespace net
         return stream.to_vector();
     }
 
+    // obsolete
     bool
     QueryResultSerializer::deserialize(
         const types::Bytes& bytes,

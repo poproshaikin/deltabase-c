@@ -1,6 +1,7 @@
 using Deltabase.Data.Internal.Models;
 using System.Buffers.Binary;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using Deltabase.Data.Internal.Utils;
@@ -147,16 +148,76 @@ internal class StdProtocolImpl : IProtocol
         if (!TryReadUInt64BigEndian(reader, out var schemaSize))
             throw new DeltabaseException();
 
+        if (schemaSize == 0)
+            return new Table();
+
         var columns = new Column[schemaSize];
         for (ulong i = 0; i < schemaSize; i++)
         {
             if (!TryReadColumn(reader, out columns[i]))
                 throw new DeltabaseException();
         }
+        
+        if (!TryReadUInt64BigEndian(reader, out var rowsCount))
+            throw new DeltabaseException();
+
+        if (rowsCount == 0)
+            return new Table(columns, []);
+
+        var rows = new Row[rowsCount];
+
+        for (ulong i = 0; i < rowsCount; i++)
+        {
+            if (!TryReadRow(reader, out rows[i]))
+                throw new DeltabaseException();
+        }
+        
+        return new Table(columns, rows);
+    }
+
+    private static bool TryReadRow(BinaryReader reader, out Row row)
+    {
+        row = new Row();
+        if (!TryReadUInt64BigEndian(reader, out var tokensCount))
+            return false;
+
+        row.Values = new object[tokensCount];
+
+        if (tokensCount == 0)
+            return true;
+
+        for (ulong i = 0; i < tokensCount; i++)
+            if (!TryReadToken(reader, out row.Values[i]))
+                return false;
+
+        return true;
+    }
+
+    private static bool TryReadToken(BinaryReader reader, out object? token)
+    {
+        token = null;
+        if (TryReadUInt64BigEndian(reader, out var rawType))
+            return false;
+
+        var type = (DataType)rawType;
+
+        if (!TryReadBytes(reader, out var bytes))
+            return false;
+
+        try
+        {
+            token = DataTypeMapper.ToObject(bytes, type);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("WARN: Exception catched in TryReadToken: " + ex.Message);
+            return false;
+        }
     }
     
 
-    private bool TryReadColumn(BinaryReader reader, out Column column)
+    private static bool TryReadColumn(BinaryReader reader, out Column column)
     {
         if (!TryReadString(reader, out var name))
         {
@@ -213,6 +274,29 @@ internal class StdProtocolImpl : IProtocol
         return true;
     }
 
+    private static bool TryReadBytes(BinaryReader reader, [NotNullWhen(true)] out byte[]? bytes)
+    {
+        bytes = null;
+        
+        if (reader.BaseStream.Position + sizeof(ulong) > reader.BaseStream.Length)
+            return false;
+
+        if (!TryReadUInt64BigEndian(reader, out var length))
+            return false;
+
+        if (length > int.MaxValue)
+            return false;
+
+        var payloadLength = (int)length;
+
+        if (reader.BaseStream.Position + payloadLength > reader.BaseStream.Length)
+            return false;
+
+        var payload = reader.ReadBytes(payloadLength);
+        bytes = payload;
+        return true;
+    }
+
     private static bool TryReadGuid(BinaryReader reader, out Guid value)
     {
         const int guidSize = 16;
@@ -240,26 +324,18 @@ internal class StdProtocolImpl : IProtocol
         value = string.Empty;
 
         if (reader.BaseStream.Position + sizeof(ulong) > reader.BaseStream.Length)
-        {
             return false;
-        }
 
         if (!TryReadUInt64BigEndian(reader, out var length))
-        {
             return false;
-        }
 
         if (length > int.MaxValue)
-        {
             return false;
-        }
 
         var payloadLength = (int)length;
 
         if (reader.BaseStream.Position + payloadLength > reader.BaseStream.Length)
-        {
             return false;
-        }
 
         var payload = reader.ReadBytes(payloadLength);
         value = payloadLength == 0 ? string.Empty : Encoding.UTF8.GetString(payload);

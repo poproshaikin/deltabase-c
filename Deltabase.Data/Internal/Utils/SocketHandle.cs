@@ -5,12 +5,12 @@ using Deltabase.Data.Internal.Protocol;
 
 namespace Deltabase.Data.Internal.Utils;
 
-internal class SocketWrapper : IDisposable
+internal class SocketHandle : IDisposable
 {
     public Socket Socket { get; set; }
     public IProtocol Protocol { get; set; }
 
-    public SocketWrapper(AddressFamily family, 
+    public SocketHandle(AddressFamily family, 
         SocketType socketType, 
         ProtocolType networkProtocol, 
         IProtocol protocol)
