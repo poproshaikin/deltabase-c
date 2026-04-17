@@ -2,6 +2,8 @@
 
 #include "memory_stream.hpp"
 
+#include <iostream>
+
 namespace net
 {
     using namespace misc;

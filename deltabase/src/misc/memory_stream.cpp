@@ -123,7 +123,6 @@ namespace misc
     {
         const auto size = big_endian ? to_big_endian_u64(bytes.size()) : bytes.size();
         write(&size, sizeof(size));
-        write(&size, sizeof(size));
         if (!bytes.empty())
         {
             write(bytes.data(), bytes.size());

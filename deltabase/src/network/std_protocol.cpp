@@ -7,6 +7,7 @@
 #include "memory_stream.hpp"
 
 #include <cstdint>
+#include <iostream>
 
 namespace net
 {
