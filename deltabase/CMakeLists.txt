@@ -83,6 +83,10 @@ function(add_cpp_module module_name)
         target_link_libraries(${module_name} PUBLIC engine)
     endif()
 
+    if (${module_name} STREQUAL "binaries")
+        target_link_libraries(${module_name} PUBLIC network)
+    endif()
+
 endfunction()
 
 add_cpp_module(types)
@@ -96,6 +100,7 @@ add_cpp_module(engine)
 add_cpp_module(cli)
 add_cpp_module(recovery)
 add_cpp_module(network)
+add_cpp_module(binaries)
 
 # --- tests --- 
 file(GLOB_RECURSE TESTS_SRC 
@@ -118,7 +123,7 @@ target_link_libraries(test.exe
 )
 
 # --- cli ---
-add_executable(cli.exe cli.cpp)
+add_executable(cli.exe src/binaries/cli.cpp)
 target_link_libraries(cli.exe
     storage
     executor
@@ -130,7 +135,7 @@ target_link_libraries(cli.exe
     recovery
 )
 
-add_executable(server.exe server.cpp)
+add_executable(server.exe src/binaries/server.cpp)
 target_link_libraries(server.exe
     network
     engine
@@ -138,7 +143,7 @@ target_link_libraries(server.exe
     misc
 )
 
-add_executable(wal_dump.exe wal_dump.cpp)
+add_executable(wal_dump.exe src/binaries/wal_dump.cpp)
 target_link_libraries(wal_dump.exe
     wal
     storage
@@ -146,21 +151,21 @@ target_link_libraries(wal_dump.exe
     misc
 )
 
-add_executable(dp_dump.exe dp_dump.cpp)
+add_executable(dp_dump.exe src/binaries/dp_dump.cpp)
 target_link_libraries(dp_dump.exe
     storage
     types
     misc
 )
 
-add_executable(mt_dump.exe mt_dump.cpp)
+add_executable(mt_dump.exe src/binaries/mt_dump.cpp)
 target_link_libraries(mt_dump.exe
     storage
     types
     misc
 )
 
-add_executable(index_dump.exe index_dump.cpp)
+add_executable(index_dump.exe src/binaries/index_dump.cpp)
 target_link_libraries(index_dump.exe
     storage
     types

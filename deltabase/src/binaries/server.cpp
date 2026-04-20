@@ -2,7 +2,7 @@
 // Created by poproshaikin on 4/13/26.
 //
 
-#include "src/network/include/server.hpp"
+#include "../network/include/server.hpp"
 
 #include "static_storage.hpp"
 
