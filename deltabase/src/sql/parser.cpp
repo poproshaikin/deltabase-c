@@ -132,8 +132,7 @@ namespace sql
                     break;
             }
         }
-        else
-            advance();
+        else advance();
 
         advance_or_throw();
         match_or_throw(SqlKeyword::FROM, "Expected 'FROM'");

@@ -30,24 +30,23 @@ namespace net
 
         auto message = protocol_->parse(message_bytes.value());
 
-        auto stop_with_error = [&](UUID session_id, NetErrorCode err)
+        auto stop_with_error = [&](const UUID& session_id, NetErrorCode err, const std::string& error = "")
         {
             Logger::info(
                 "Disconnecting session with error " + std::to_string(static_cast<int>(err)) + " : "
                 + session_id.
                 to_string());
-            auto pong_bytes = protocol_->encode(PongNetMessage(session_id, err));
+            auto pong = PongNetMessage(session_id, err);
+            if (!error.empty() && err != NetErrorCode::SUCCESS)
+                pong.payload = Bytes(error.begin(), error.end());
+
+            auto pong_bytes = protocol_->encode(pong);
             handle.send_message(pong_bytes);
             handle.close();
             stop = true;
         };
 
-        auto stop_with_protocol_violation = [&](UUID session_id)
-        {
-            stop_with_error(session_id, NetErrorCode::PROTOCOL_VIOLATION);
-        };
-
-        auto get_session = [&](UUID session_id)-> engine::Engine*
+        auto get_session = [&](const UUID& session_id)-> engine::Engine*
         {
             std::lock_guard lock(sessions_mutex_);
             if (!sessions_.contains(session_id))
@@ -57,7 +56,7 @@ namespace net
             return &sessions_.at(session_id);
         };
 
-        auto send_success = [&](UUID session_id)
+        auto send_success = [&](const UUID& session_id)
         {
             auto pong_bytes = protocol_->encode(PongNetMessage(session_id, NetErrorCode::SUCCESS));
             handle.send_message(pong_bytes);
@@ -67,13 +66,13 @@ namespace net
 
         if (std::holds_alternative<PingNetMessage>(message))
         {
-            stop_with_protocol_violation(UUID::null());
+            stop_with_error(UUID::null(), NetErrorCode::PROTOCOL_VIOLATION);
             return;
         }
 
         if (std::holds_alternative<PongNetMessage>(message))
         {
-            stop_with_protocol_violation(UUID::null());
+            stop_with_error(UUID::null(), NetErrorCode::PROTOCOL_VIOLATION);
             return;
         }
 
@@ -83,7 +82,7 @@ namespace net
             auto engine = get_session(query_message.session_id);
             if (!engine)
             {
-                stop_with_protocol_violation(query_message.session_id);
+                stop_with_error(query_message.session_id, NetErrorCode::UNINITIALIZED_SESSION);
                 return;
             }
 
@@ -98,7 +97,7 @@ namespace net
             catch (const std::exception& ex)
             {
                 Logger::error(std::string("QUERY failed: ") + ex.what());
-                stop_with_protocol_violation(query_message.session_id);
+                stop_with_error(query_message.session_id, NetErrorCode::SQL_ERROR, ex.what());
                 return;
             }
 
@@ -113,7 +112,7 @@ namespace net
             auto engine = get_session(create_db_message.session_id);
             if (!engine)
             {
-                stop_with_protocol_violation(create_db_message.session_id);
+                stop_with_error(create_db_message.session_id, NetErrorCode::UNINITIALIZED_SESSION);
                 return;
             }
 
@@ -125,7 +124,7 @@ namespace net
             catch (const std::exception& ex)
             {
                 Logger::error(std::string("CREATE_DB failed: ") + ex.what());
-                stop_with_protocol_violation(create_db_message.session_id);
+                stop_with_error(create_db_message.session_id, NetErrorCode::SQL_ERROR, ex.what());
                 return;
             }
 
@@ -143,7 +142,7 @@ namespace net
             auto engine = get_session(attach_db_message.session_id);
             if (!engine)
             {
-                stop_with_protocol_violation(attach_db_message.session_id);
+                stop_with_error(attach_db_message.session_id, NetErrorCode::UNINITIALIZED_SESSION);
                 return;
             }
 
@@ -160,7 +159,7 @@ namespace net
             catch (const std::exception& ex)
             {
                 Logger::error(std::string("ATTACH_DB failed: ") + ex.what());
-                stop_with_protocol_violation(attach_db_message.session_id);
+                stop_with_error(attach_db_message.session_id, NetErrorCode::SQL_ERROR, ex.what());
                 return;
             }
 
@@ -172,7 +171,7 @@ namespace net
             const auto& close_message = std::get<CloseNetMessage>(message);
             if (!get_session(close_message.session_id))
             {
-                stop_with_protocol_violation(close_message.session_id);
+                stop_with_error(close_message.session_id, NetErrorCode::UNINITIALIZED_SESSION);
                 return;
             }
 
@@ -186,7 +185,7 @@ namespace net
             return;
         }
 
-        stop_with_protocol_violation(UUID::null());
+        stop_with_error(UUID::null(), NetErrorCode::PROTOCOL_VIOLATION);
     }
 
     NetServer::NetServer(
