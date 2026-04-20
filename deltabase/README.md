@@ -76,15 +76,20 @@ cmake --build build -j
 
 Produced binaries:
 
-- `build/build/bin/main.exe`
-- `build/build/bin/test.exe`
+- `build/build/bin/cli.exe` - interactive CLI REPL
+- `build/build/bin/server.exe` - TCP server entrypoint
+- `build/build/bin/wal_dump.exe` - WAL inspection utility
+- `build/build/bin/dp_dump.exe` - data page inspection utility
+- `build/build/bin/mt_dump.exe` - metadata inspection utility
+- `build/build/bin/index_dump.exe` - index inspection utility
+- `build/build/bin/test.exe` - test runner
 
 Note: CMake in this project sets runtime output under `${CMAKE_BINARY_DIR}/build/bin`.
 
 ## Run
 
 ```bash
-./build/build/bin/main.exe
+./build/build/bin/cli.exe
 ```
 
 CLI meta commands:
@@ -92,7 +97,7 @@ CLI meta commands:
 - `.c <db_name>`: connect/attach database
 - `.q`: quit
 
-All other input is treated as SQL.
+All other input is treated as SQL. If you need the TCP mode, run `server.exe` instead of the CLI binary.
 
 ## SQL Support (Current)
 
