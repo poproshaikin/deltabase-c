@@ -25,9 +25,6 @@ namespace storage
 
         // Not supported methods
 
-        bool
-        needs_stream(types::IPlanNode& plan_node) override;
-
         types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) override;
 

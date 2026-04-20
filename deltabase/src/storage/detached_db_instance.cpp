@@ -31,12 +31,6 @@ namespace storage
         return config_;
     }
 
-    bool
-    DetachedDbInstance::needs_stream(types::IPlanNode& plan_node)
-    {
-        throw std::logic_error("DetachedDbInstance::needs_stream: this method is not supported");
-    }
-
     DataTable
     DetachedDbInstance::seq_scan(const std::string& table_name, const std::string& schema_name)
     {

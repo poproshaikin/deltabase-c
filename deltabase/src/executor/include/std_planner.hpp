@@ -15,6 +15,12 @@ namespace exq
         storage::IDbInstance& db_;
         types::Config db_config_;
 
+        static double
+        estimate_seq_scan_selectivity(const types::MetaTable& table, const types::IPlanNode& node);
+
+        static bool
+        should_stream_for_seq_scan(const types::MetaTable& table, const types::IPlanNode& node);
+
         types::QueryPlan
         plan(types::SelectStatement& stmt) const;
 

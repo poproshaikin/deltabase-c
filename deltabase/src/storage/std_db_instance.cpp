@@ -82,7 +82,7 @@ namespace storage
     {
         InstanceGuard guard(mtx_);
         const auto* ms = catalog_->get_schema(schema_name);
-        auto* mt = catalog_->get_table(table_name, ms->id);
+        const auto* mt = catalog_->get_table(table_name, ms->id);
         const auto pages = buffer_pool_->get_table_data(mt->id);
 
         ScanCursor cursor{};

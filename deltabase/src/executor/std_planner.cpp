@@ -6,6 +6,7 @@
 
 #include "meta_schema.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <format>
 
@@ -13,9 +14,66 @@ namespace exq
 {
     using namespace types;
 
+    namespace
+    {
+        constexpr double k_default_filter_selectivity = 0.3;
+        constexpr double k_project_selectivity = 1.0;
+        constexpr double k_seq_scan_stream_threshold_rows = 2048.0;
+    }
+
     StdPlanner::StdPlanner(const Config& db_config, storage::IDbInstance& db)
         : db_(db), db_config_(db_config)
     {
+    }
+
+    double
+    StdPlanner::estimate_seq_scan_selectivity(const MetaTable& table, const IPlanNode& node)
+    {
+        switch (node.type())
+        {
+        case IPlanNode::Type::SEQ_SCAN:
+            if (table.total_rows == 0)
+                return 0.0;
+
+            return static_cast<double>(table.live_rows) / static_cast<double>(table.total_rows);
+
+        case IPlanNode::Type::FILTER:
+        {
+            const auto& filter_node = static_cast<const FilterPlanNode&>(node);
+            return estimate_seq_scan_selectivity(table, *filter_node.child) *
+                   k_default_filter_selectivity;
+        }
+
+        case IPlanNode::Type::PROJECT:
+        {
+            const auto& project_node = static_cast<const ProjectPlanNode&>(node);
+            return estimate_seq_scan_selectivity(table, *project_node.child) *
+                   k_project_selectivity;
+        }
+
+        case IPlanNode::Type::LIMIT:
+        {
+            const auto& limit_node = static_cast<const LimitPlanNode&>(node);
+            if (table.live_rows == 0)
+                return 0.0;
+
+            const auto child_sel = estimate_seq_scan_selectivity(table, *limit_node.child);
+            const auto estimated_rows = static_cast<double>(table.live_rows) * child_sel;
+            const auto capped_rows = std::min(estimated_rows, static_cast<double>(limit_node.limit));
+            return capped_rows / static_cast<double>(table.live_rows);
+        }
+
+        default:
+            return 1.0;
+        }
+    }
+
+    bool
+    StdPlanner::should_stream_for_seq_scan(const MetaTable& table, const IPlanNode& node)
+    {
+        const auto sel = estimate_seq_scan_selectivity(table, node);
+        const auto estimated_rows = static_cast<double>(table.total_rows) * sel;
+        return estimated_rows >= k_seq_scan_stream_threshold_rows;
     }
 
     QueryPlan
@@ -218,7 +276,14 @@ namespace exq
 
         QueryPlan plan;
         plan.type = QueryPlan::Type::SELECT;
-        plan.needs_stream = db_.needs_stream(*node);
+        if (scan_type == IPlanNode::Type::SEQ_SCAN)
+        {
+            plan.needs_stream = should_stream_for_seq_scan(*table, *node);
+        }
+        else
+        {
+            plan.needs_stream = false;
+        }
         plan.root = std::move(node);
         plan.db_specific = true;
         return plan;
