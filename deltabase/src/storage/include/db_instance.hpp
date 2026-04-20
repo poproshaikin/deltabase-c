@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_STORAGE_HPP
 #define DELTABASE_STORAGE_HPP
+#include "scan_cursor.hpp"
 #include "../../transactions/include/transaction.hpp"
 #include "../../types/include/config.hpp"
 #include "../../types/include/data_row.hpp"
@@ -18,11 +19,14 @@ namespace storage
     public:
         virtual ~IDbInstance() = default;
 
-        virtual bool
-        needs_stream(types::IPlanNode& plan_node) = 0;
-
         virtual types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) = 0;
+
+        virtual types::ScanCursor
+        seq_scan_begin(const std::string& table_name, const std::string& schema_name) = 0;
+
+        virtual bool
+        seq_scan_next(types::ScanCursor& cursor, types::DataRow& out) = 0;
 
         virtual types::DataTable
         index_scan(

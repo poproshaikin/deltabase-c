@@ -17,25 +17,20 @@ namespace exq
     SeqScanNodeExecutor::SeqScanNodeExecutor(
         storage::IDbInstance& storage, const std::string& table_name, const std::string& schema_name
     )
-        : table_name_(table_name), schema_name_(schema_name), db_(storage)
+        : table_name_(table_name), schema_name_(schema_name), db_(storage), cursor_{}
     {
     }
 
     void
     SeqScanNodeExecutor::open()
     {
-        table_ = db_.seq_scan(table_name_, schema_name_);
+        cursor_ = db_.seq_scan_begin(table_name_, schema_name_);
     }
 
     bool
     SeqScanNodeExecutor::next(DataRow& out)
     {
-        if (index_ >= table_.rows.size())
-            return false;
-
-        out = table_.rows[index_];
-        index_++;
-        return true;
+        return db_.seq_scan_next(cursor_, out);
     }
 
     void

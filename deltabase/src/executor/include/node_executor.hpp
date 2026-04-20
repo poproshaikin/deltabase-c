@@ -36,8 +36,8 @@ namespace exq
         std::string table_name_;
         std::string schema_name_;
         storage::IDbInstance& db_;
-        types::DataTable table_;
-        uint64_t index_ = 0;
+
+        types::ScanCursor cursor_;
 
     public:
         explicit SeqScanNodeExecutor(

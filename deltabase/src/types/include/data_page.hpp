@@ -19,9 +19,10 @@ namespace types
     {
         static constexpr uint64_t MAX_SIZE = 32 * 1024; // 32 kB
         static constexpr uint64_t HEADER_SIZE =
-            sizeof(uuid_t) * 2 + sizeof(RowId) * 2 + sizeof(uint64_t) + sizeof(LSN);
+            sizeof(uuid_t) * 3 + sizeof(RowId) * 2 + sizeof(uint64_t) + sizeof(LSN);
 
         DataPageId id;
+        DataPageId next;
         UUID table_id;
         RowId min_rid = 0;
         RowId max_rid = 0;
@@ -40,6 +41,7 @@ namespace types
         {
             DataPage page;
             page.id = page_id;
+            page.next = DataPageId::null();
             page.table_id = table_id;
             page.size = HEADER_SIZE;
             page.path = base_path / page.id.to_string();

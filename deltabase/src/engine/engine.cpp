@@ -113,6 +113,11 @@ namespace engine
 
         auto executor = executor_factory_.from_plan(std::move(plan.root), *db_);
 
+        if (plan.needs_stream)
+        {
+            return std::make_unique<StreamedResult>(std::move(executor));
+        }
+
         DataTable result_table;
         DataRow row;
 

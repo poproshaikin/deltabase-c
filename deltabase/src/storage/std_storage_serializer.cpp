@@ -161,6 +161,7 @@ namespace storage
         MemoryStream stream;
 
         stream.write(page.id.raw(), sizeof(uuid_t));
+        stream.write(page.next.raw(), sizeof(uuid_t));
         stream.write(page.table_id.raw(), sizeof(uuid_t));
         stream.write(&page.min_rid, sizeof(page.min_rid));
         stream.write(&page.max_rid, sizeof(page.max_rid));
@@ -414,6 +415,9 @@ namespace storage
     StdStorageSerializer::deserialize_dp(ReadOnlyMemoryStream& stream, DataPage& out) const
     {
         if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
+            return false;
+
+        if (stream.read(out.next.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
             return false;
 
         if (stream.read(out.table_id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))

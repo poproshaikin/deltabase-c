@@ -27,6 +27,22 @@ namespace types
         return schema_;
     }
 
+    StreamedResult::StreamedResult(std::unique_ptr<exq::INodeExecutor>&& executor) : executor_(std::move(executor))
+    {
+    }
+
+    bool
+    StreamedResult::next(DataRow& out)
+    {
+        return executor_->next(out);
+    }
+
+    OutputSchema
+    StreamedResult::output_schema()
+    {
+        return executor_->output_schema();
+    }
+
     bool
     EmptyExecutionResult::next(DataRow& out)
     {

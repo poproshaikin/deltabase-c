@@ -170,7 +170,6 @@ namespace exq
 
         if (scan_type == IPlanNode::Type::INDEX_SCAN)
         {
-            std::cout << "Chosen INDEX SCAN on column " << table->get_column(chosen_index->column_id).name << std::endl;
             node = std::make_unique<IndexScanPlanNode>(
                 stmt.table.table_name,
                 stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
@@ -181,7 +180,6 @@ namespace exq
         }
         else
         {
-            std::cout << "Chosen SEQUENTIAL SCAN" << std::endl;
             node = std::make_unique<SeqScanPlanNode>(
                 stmt.table.table_name,
                 stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value

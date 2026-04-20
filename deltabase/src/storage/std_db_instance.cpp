@@ -58,38 +58,109 @@ namespace storage
         io_manager_->write_cfg(cfg_);
     }
 
-    bool
-    StdDbInstance::needs_stream(IPlanNode& plan_node)
-    {
-        InstanceGuard guard(mtx_);
-        // TODO
-        return false;
-    }
-
     DataTable
     StdDbInstance::seq_scan(const std::string& table_name, const std::string& schema_name)
     {
         InstanceGuard guard(mtx_);
         const auto* ms = catalog_->get_schema(schema_name);
         const auto* mt = catalog_->get_table(table_name, ms->id);
-        const auto pages = buffer_pool_->get_table_data(mt->id);
 
         DataTable dt;
         dt.output_schema = convert(*mt);
         dt.rows.reserve(mt->total_rows);
 
+        auto cursor = seq_scan_begin(table_name, schema_name);
+        DataRow row;
+        while (seq_scan_next(cursor, row))
+            dt.rows.push_back(row);
+
+        return dt;
+    }
+
+    ScanCursor
+    StdDbInstance::seq_scan_begin(const std::string& table_name, const std::string& schema_name)
+    {
+        InstanceGuard guard(mtx_);
+        const auto* ms = catalog_->get_schema(schema_name);
+        auto* mt = catalog_->get_table(table_name, ms->id);
+        const auto pages = buffer_pool_->get_table_data(mt->id);
+
+        ScanCursor cursor{};
+        cursor.page = DataPageId::null();
+        cursor.slot = 0;
+        cursor.chunk_size = 0;
+        cursor.initialized = true;
+
+        if (pages.empty())
+            return cursor;
+
+        std::unordered_set<DataPageId> referenced_pages;
+        referenced_pages.reserve(pages.size());
+
         for (const auto* page : pages)
         {
-            for (const auto& row : page->rows)
-            {
-                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
-                    continue;
+            if (!page)
+                continue;
 
-                dt.rows.push_back(row);
+            if (page->next != DataPageId::null())
+                referenced_pages.insert(page->next);
+        }
+
+        for (const auto* page : pages)
+        {
+            if (!page)
+                continue;
+
+            if (!referenced_pages.contains(page->id))
+            {
+                cursor.page = page->id;
+                return cursor;
             }
         }
 
-        return dt;
+        for (const auto* page : pages)
+        {
+            if (!page)
+                continue;
+
+            cursor.page = page->id;
+            return cursor;
+        }
+
+        return cursor;
+    }
+
+    bool
+    StdDbInstance::seq_scan_next(ScanCursor& cursor, DataRow& out)
+    {
+        InstanceGuard guard(mtx_);
+        if (!cursor.initialized)
+            return false;
+
+        while (cursor.page != DataPageId::null())
+        {
+            auto* page = buffer_pool_->get_dp(cursor.page);
+            if (!page)
+            {
+                cursor.page = DataPageId::null();
+                return false;
+            }
+
+            while (cursor.slot < static_cast<int>(page->rows.size()))
+            {
+                const auto& row = page->rows[static_cast<size_t>(cursor.slot++)];
+                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    continue;
+
+                out = row;
+                return true;
+            }
+
+            cursor.page = page->next;
+            cursor.slot = 0;
+        }
+
+        return false;
     }
 
     DataTable
@@ -307,7 +378,45 @@ namespace storage
         auto new_row = mt->make_row(cols, row);
         size_t row_size = io_manager_->estimate_size(new_row);
 
+        const auto pages_before = buffer_pool_->get_table_data(mt->id);
+
         auto* page = buffer_pool_->prepare_dp(row_size, *mt);
+
+        bool is_new_page = true;
+        for (const auto* existing_page : pages_before)
+        {
+            if (!existing_page)
+                continue;
+
+            if (existing_page->id == page->id)
+            {
+                is_new_page = false;
+                break;
+            }
+        }
+
+        if (is_new_page)
+        {
+            DataPage* tail_page = nullptr;
+
+            for (auto* existing_page : pages_before)
+            {
+                if (!existing_page)
+                    continue;
+
+                if (existing_page->next != DataPageId::null())
+                    continue;
+
+                if (!tail_page || existing_page->max_rid > tail_page->max_rid)
+                    tail_page = existing_page;
+            }
+
+            if (tail_page)
+            {
+                tail_page->next = page->id;
+                buffer_pool_->dirty_dp(tail_page->id);
+            }
+        }
 
         std::vector<IndexId> touched_indexes;
         if (mt->indexes.size() > 0)

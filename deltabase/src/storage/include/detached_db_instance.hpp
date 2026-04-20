@@ -31,6 +31,12 @@ namespace storage
         types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) override;
 
+        types::ScanCursor
+        seq_scan_begin(const std::string& table_name, const std::string& schema_name) override;
+
+        bool
+        seq_scan_next(types::ScanCursor& cursor, types::DataRow& out) override;
+
         types::DataTable
         index_scan(
             const std::string& table_name,

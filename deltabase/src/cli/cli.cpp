@@ -19,7 +19,6 @@ namespace cli
     void
     Cli::print_timer(std::chrono::time_point<std::chrono::steady_clock> started_at) const
     {
-
         const auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                     std::chrono::steady_clock::now() - started_at
         )
