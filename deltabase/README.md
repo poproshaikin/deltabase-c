@@ -11,6 +11,7 @@ It includes SQL parsing, planning/execution, file-backed storage, transactions, 
 - Transaction lifecycle and WAL integration
 - Recovery manager with REDO/UNDO flow and compensation records (CLR)
 - CLI REPL for interactive usage
+- Client integration target includes a C# ADO.NET driver for .NET applications
 
 ## Architecture At A Glance
 
@@ -168,3 +169,4 @@ UML and use-case diagrams:
 - SELECT results are currently materialized in memory in the standard plan executor.
 - Streaming execution and deeper optimization paths are still evolving.
 - WAL/recovery behavior is actively evolving with recent CLR integration.
+- The long-term client story includes a C# ADO.NET driver, so the protocol and result format should stay friendly to .NET consumers.
