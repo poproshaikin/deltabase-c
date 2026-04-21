@@ -30,7 +30,9 @@ namespace net
 
         auto message = protocol_->parse(message_bytes.value());
 
-        auto stop_with_error = [&](const UUID& session_id, NetErrorCode err, const std::string& error = "")
+        auto stop_with_error = [&](const UUID& session_id,
+                                   NetErrorCode err,
+                                   const std::string& error = "")
         {
             Logger::info(
                 "Disconnecting session with error " + std::to_string(static_cast<int>(err)) + " : "
@@ -88,9 +90,14 @@ namespace net
 
             try
             {
-                auto result = engine->execute_query(query_message.query);
-                auto result_bytes = result_serializer.serialize(*result);
-                auto pong = PongNetMessage(query_message.session_id, NetErrorCode::SUCCESS, result_bytes);
+                std::unique_ptr<IExecutionResult> result = engine->execute_query(
+                    query_message.query);
+                Bytes result_bytes = result_serializer.serialize(*result);
+
+                auto pong = PongNetMessage(query_message.session_id,
+                                           NetErrorCode::SUCCESS,
+                                           result_bytes);
+
                 auto pong_bytes = protocol_->encode(pong);
                 handle.send_message(pong_bytes);
             }

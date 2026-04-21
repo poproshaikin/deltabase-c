@@ -32,10 +32,12 @@ namespace exq
         switch (node.type())
         {
         case IPlanNode::Type::SEQ_SCAN:
+        {
             if (table.total_rows == 0)
                 return 0.0;
 
             return static_cast<double>(table.live_rows) / static_cast<double>(table.total_rows);
+        }
 
         case IPlanNode::Type::FILTER:
         {
@@ -277,13 +279,10 @@ namespace exq
         QueryPlan plan;
         plan.type = QueryPlan::Type::SELECT;
         if (scan_type == IPlanNode::Type::SEQ_SCAN)
-        {
             plan.needs_stream = should_stream_for_seq_scan(*table, *node);
-        }
         else
-        {
             plan.needs_stream = false;
-        }
+
         plan.root = std::move(node);
         plan.db_specific = true;
         return plan;
