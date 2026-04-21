@@ -22,7 +22,8 @@ namespace types
         QUERY,
         CREATE_DB,
         ATTACH_DB,
-        CLOSE
+        CLOSE,
+        CANCEL_STREAM
     };
 
     namespace detail
@@ -92,6 +93,16 @@ namespace types
 
         AttachDbNetMessage(const UUID& session_id, const std::string& db_name)
             : session_id(session_id), db_name(db_name)
+        {
+        }
+    };
+
+    struct CancelStreamMessage
+    {
+        static constexpr auto type = NetMessageType::CANCEL_STREAM;
+        const UUID session_id;
+
+        CancelStreamMessage(const UUID& session_id) : session_id(session_id)
         {
         }
     };

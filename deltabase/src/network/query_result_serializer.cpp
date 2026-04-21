@@ -9,27 +9,19 @@ namespace net
     using namespace misc;
 
     types::Bytes
-    QueryResultSerializer::serialize(types::IExecutionResult& result) const
+    QueryResultSerializer::serialize(const types::DataTable& table) const
     {
         MemoryStream stream;
 
-        const auto schema = result.output_schema();
-        stream.write_u64(schema.size(), true);
-        for (const auto& column : schema)
+        stream.write_u64(table.output_schema.size(), true);
+        for (const auto& column : table.output_schema)
         {
             stream.write_string(column.name, true);
             stream.write_u64(static_cast<uint64_t>(column.type), true);
         }
 
-        std::vector<types::DataRow> rows;
-        types::DataRow row;
-        while (result.next(row))
-        {
-            rows.push_back(row);
-        }
-
-        stream.write_u64(rows.size(), true);
-        for (const auto& data_row : rows)
+        stream.write_u64(table.rows.size(), true);
+        for (const auto& data_row : table.rows)
         {
             stream.write_u64(data_row.tokens.size(), true);
             for (const auto& token : data_row.tokens)

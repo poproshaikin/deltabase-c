@@ -32,6 +32,12 @@ namespace net
         void
         handle_message(SocketHandle& handle, bool& stop);
 
+        bool
+        next_chunk(types::IExecutionResult& result, types::DataTable& out, bool& has_more);
+
+        void
+        handle_stream(SocketHandle& handle, const types::UUID& session_id, std::unique_ptr<types::IExecutionResult>&& result, bool& stop);
+
     public:
         NetServer(
             uint16_t port,

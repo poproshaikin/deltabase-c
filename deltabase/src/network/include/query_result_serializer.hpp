@@ -14,7 +14,7 @@ namespace net
     {
     public:
         types::Bytes
-        serialize(types::IExecutionResult& result) const;
+        serialize(const types::DataTable& table) const;
 
         bool
         deserialize(

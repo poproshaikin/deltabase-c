@@ -54,4 +54,10 @@ namespace types
     {
         return {};
     }
+
+    bool
+    EmptyExecutionResult::is_exhausted()
+    {
+        return true;
+    }
 } // namespace types

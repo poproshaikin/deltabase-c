@@ -36,6 +36,9 @@ namespace types
 
         OutputSchema
         output_schema() override;
+
+        bool
+        is_exhausted() override;
     };
 
     class StreamedResult final : public IExecutionResult
@@ -50,6 +53,9 @@ namespace types
 
         OutputSchema
         output_schema() override;
+
+        bool
+        is_exhausted() override;
     };
 
     class EmptyExecutionResult final : public IExecutionResult
@@ -60,6 +66,9 @@ namespace types
 
         OutputSchema
         output_schema() override;
+
+        bool
+        is_exhausted() override;
     };
 }
 

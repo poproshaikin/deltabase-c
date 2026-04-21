@@ -64,8 +64,6 @@ namespace net
             handle.send_message(pong_bytes);
         };
 
-        QueryResultSerializer result_serializer;
-
         if (std::holds_alternative<PingNetMessage>(message))
         {
             stop_with_error(UUID::null(), NetErrorCode::PROTOCOL_VIOLATION);
@@ -92,14 +90,8 @@ namespace net
             {
                 std::unique_ptr<IExecutionResult> result = engine->execute_query(
                     query_message.query);
-                Bytes result_bytes = result_serializer.serialize(*result);
 
-                auto pong = PongNetMessage(query_message.session_id,
-                                           NetErrorCode::SUCCESS,
-                                           result_bytes);
-
-                auto pong_bytes = protocol_->encode(pong);
-                handle.send_message(pong_bytes);
+                handle_stream(handle, query_message.session_id, std::move(result), stop);
             }
             catch (const std::exception& ex)
             {
@@ -193,6 +185,123 @@ namespace net
         }
 
         stop_with_error(UUID::null(), NetErrorCode::PROTOCOL_VIOLATION);
+    }
+
+    bool
+    NetServer::next_chunk(IExecutionResult& result, DataTable& out, bool& has_more)
+    {
+        constexpr uint64_t batch_size = 1024;
+
+        out.rows.clear();
+
+        DataRow row;
+        has_more = false;
+
+        while (out.rows.size() < batch_size)
+        {
+            if (!result.next(row))
+            {
+                has_more = false;
+                break;
+            }
+
+            out.rows.push_back(row);
+            has_more = true;
+        }
+
+        return !out.rows.empty();
+    }
+
+    void
+    NetServer::handle_stream(
+        SocketHandle& handle,
+        const UUID& session_id,
+        std::unique_ptr<IExecutionResult>&& result,
+        bool& stop)
+    {
+        std::atomic cancelled(false);
+        std::atomic disconnected(false);
+
+        QueryResultSerializer result_serializer;
+
+        std::mutex send_mutex;
+
+        auto send_chunk = [&](const DataTable& chunk)
+        {
+            std::lock_guard lock(send_mutex);
+
+            auto serialized_chunk = result_serializer.serialize(chunk);
+            PongNetMessage chunk_message(
+                session_id,
+                NetErrorCode::STREAM_CHUNK,
+                serialized_chunk
+            );
+
+            auto serialized_msg = protocol_->encode(chunk_message);
+            handle.send_message(serialized_msg);
+        };
+
+        auto cancel_handler = [&]
+        {
+            auto msg_bytes = handle.receive_message();
+
+            if (!msg_bytes)
+            {
+                Logger::warn("Client disconnected: " + get_ip(handle.addr()));
+                disconnected.store(true);
+                cancelled.store(true);
+                stop = true;
+                return;
+            }
+
+            auto message = protocol_->parse(msg_bytes.value());
+
+            std::visit([&]<typename T>(const T& msg)
+            {
+                if constexpr (std::is_same_v<T, CancelStreamMessage>)
+                {
+                    if (msg.session_id != session_id)
+                        return;
+
+                    cancelled.store(true);
+
+                    PongNetMessage stream_cancelled(session_id, NetErrorCode::SUCCESS);
+                    auto stream_cancelled_bytes = protocol_->encode(stream_cancelled);
+                    handle.send_message(stream_cancelled_bytes);
+                }
+
+            }, message);
+        };
+
+        auto stream_handler = [&]
+        {
+            PongNetMessage start_stream(session_id, NetErrorCode::START_STREAM);
+            handle.send_message(protocol_->encode(start_stream));
+
+            DataTable chunk;
+            chunk.output_schema = result->output_schema();
+
+            bool has_more = false;
+
+            while (!cancelled.load() &&
+                   next_chunk(*result, chunk, has_more))
+            {
+                send_chunk(chunk);
+            }
+
+            if (!cancelled.load() && !disconnected.load())
+            {
+                PongNetMessage end_stream(session_id, NetErrorCode::END_STREAM);
+                handle.send_message(protocol_->encode(end_stream));
+            }
+        };
+
+        std::thread cancel_thread(cancel_handler);
+        std::thread stream_thread(stream_handler);
+
+        stream_thread.join();
+        cancelled.store(true);
+        cancel_thread.join();
     }
 
     NetServer::NetServer(
