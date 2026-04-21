@@ -30,14 +30,16 @@ namespace net
 
         auto message = protocol_->parse(message_bytes.value());
 
-        auto stop_with_error = [&](const UUID& session_id,
-                                   NetErrorCode err,
-                                   const std::string& error = "")
+        auto stop_with_error = [&](
+            const UUID& session_id,
+            NetErrorCode err,
+            const std::string& error = "")
         {
             Logger::info(
                 "Disconnecting session with error " + std::to_string(static_cast<int>(err)) + " : "
                 + session_id.
                 to_string());
+
             auto pong = PongNetMessage(session_id, err);
             if (!error.empty() && err != NetErrorCode::SUCCESS)
                 pong.payload = Bytes(error.begin(), error.end());
@@ -257,20 +259,21 @@ namespace net
             auto message = protocol_->parse(msg_bytes.value());
 
             std::visit([&]<typename T>(const T& msg)
-            {
-                if constexpr (std::is_same_v<T, CancelStreamMessage>)
-                {
-                    if (msg.session_id != session_id)
-                        return;
+                       {
+                           if constexpr (std::is_same_v<T, CancelStreamMessage>)
+                           {
+                               if (msg.session_id != session_id)
+                                   return;
 
-                    cancelled.store(true);
+                               cancelled.store(true);
 
-                    PongNetMessage stream_cancelled(session_id, NetErrorCode::SUCCESS);
-                    auto stream_cancelled_bytes = protocol_->encode(stream_cancelled);
-                    handle.send_message(stream_cancelled_bytes);
-                }
+                               PongNetMessage stream_cancelled(session_id, NetErrorCode::SUCCESS);
+                               auto stream_cancelled_bytes = protocol_->encode(stream_cancelled);
+                               handle.send_message(stream_cancelled_bytes);
+                           }
 
-            }, message);
+                       },
+                       message);
         };
 
         auto stream_handler = [&]
