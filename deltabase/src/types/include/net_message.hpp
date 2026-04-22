@@ -14,7 +14,7 @@
 
 namespace types
 {
-    enum class NetMessageType
+    enum class NetMessageType : uint8_t
     {
         UNDEFINED,
         PING,
@@ -42,6 +42,12 @@ namespace types
     struct PingNetMessage
     {
         static constexpr auto type = NetMessageType::PING;
+
+        int32_t request_id;
+
+        explicit PingNetMessage(const int32_t request_id) : request_id(request_id)
+        {
+        }
     };
 
     struct PongNetMessage
@@ -49,11 +55,12 @@ namespace types
         static constexpr auto type = NetMessageType::PONG;
         const UUID session_id;
         NetErrorCode err;
+        int32_t request_id;
 
         Bytes payload;
 
-        PongNetMessage(const UUID& session_id, NetErrorCode err, const Bytes& payload = {}) :
-            session_id(session_id), err(err), payload(payload)
+        PongNetMessage(const UUID& session_id, NetErrorCode err, int32_t request_id, const Bytes& payload = {}) :
+            session_id(session_id), err(err), request_id(request_id), payload(payload)
         {
         }
     };
@@ -62,11 +69,12 @@ namespace types
     {
         static constexpr auto type = NetMessageType::QUERY;
         const UUID session_id;
+        int32_t request_id;
 
         std::string query;
 
-        QueryNetMessage(const UUID& session_id, const std::string& query)
-            : session_id(session_id), query(query)
+        QueryNetMessage(const UUID& session_id, int32_t request_id, const std::string& query)
+            : session_id(session_id), request_id(request_id), query(query)
         {
         }
     };
@@ -75,11 +83,12 @@ namespace types
     {
         static constexpr auto type = NetMessageType::CREATE_DB;
         const UUID session_id;
+        int32_t request_id;
 
         std::string db_name;
 
-        CreateDbNetMessage(const UUID& session_id, const std::string& db_name)
-            : session_id(session_id), db_name(db_name)
+        CreateDbNetMessage(const UUID& session_id, int32_t request_id, const std::string& db_name)
+            : session_id(session_id), request_id(request_id), db_name(db_name)
         {
         }
     };
@@ -88,11 +97,12 @@ namespace types
     {
         static constexpr auto type = NetMessageType::ATTACH_DB;
         const UUID session_id;
+        int32_t request_id;
 
         std::string db_name;
 
-        AttachDbNetMessage(const UUID& session_id, const std::string& db_name)
-            : session_id(session_id), db_name(db_name)
+        AttachDbNetMessage(const UUID& session_id, int32_t request_id, const std::string& db_name)
+            : session_id(session_id), request_id(request_id), db_name(db_name)
         {
         }
     };
@@ -101,8 +111,10 @@ namespace types
     {
         static constexpr auto type = NetMessageType::CANCEL_STREAM;
         const UUID session_id;
+        int32_t request_id;
 
-        CancelStreamMessage(const UUID& session_id) : session_id(session_id)
+        CancelStreamMessage(const UUID& session_id, int32_t request_id)
+            : session_id(session_id), request_id(request_id)
         {
         }
     };
@@ -111,8 +123,10 @@ namespace types
     {
         static constexpr auto type = NetMessageType::CLOSE;
         const UUID session_id;
+        int32_t request_id;
 
-        CloseNetMessage(const UUID& session_id) : session_id(session_id)
+        CloseNetMessage(const UUID& session_id, int32_t request_id)
+            : session_id(session_id), request_id(request_id)
         {
         }
     };
@@ -123,6 +137,7 @@ namespace types
         QueryNetMessage,
         CreateDbNetMessage,
         AttachDbNetMessage,
+        CancelStreamMessage,
         CloseNetMessage>;
 } // namespace types
 

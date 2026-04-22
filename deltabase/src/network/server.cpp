@@ -4,9 +4,9 @@
 
 #include "include/server.hpp"
 
+#include "include/query_result_serializer.hpp"
 #include "logger.hpp"
 #include "protocol_factory.hpp"
-#include "include/query_result_serializer.hpp"
 #include "utils.hpp"
 
 #include <thread>
@@ -15,6 +15,214 @@ namespace net
 {
     using namespace types;
     using namespace misc;
+
+    engine::Engine*
+    NetServer::get_session(const UUID& session_id)
+    {
+        std::lock_guard lock(sessions_mutex_);
+        if (!sessions_.contains(session_id))
+        {
+            return nullptr;
+        }
+
+        return &sessions_.at(session_id);
+    }
+
+    void
+    NetServer::send_pong_and_stop(
+        SocketHandle& handle,
+        bool& stop,
+        const UUID& session_id,
+        NetErrorCode err,
+        int32_t request_id,
+        const std::string& error)
+    {
+        Logger::info(
+            "Disconnecting session with error " + std::to_string(static_cast<int>(err)) + " : "
+            + session_id.to_string());
+
+        auto pong = PongNetMessage(session_id, err, request_id);
+        if (!error.empty() && err != NetErrorCode::SUCCESS)
+        {
+            pong.payload = Bytes(error.begin(), error.end());
+        }
+
+        auto pong_bytes = protocol_->encode(pong);
+        handle.send_message(pong_bytes);
+        handle.close();
+        stop = true;
+    }
+
+    void
+    NetServer::send_success(
+        SocketHandle& handle,
+        const UUID& session_id,
+        int32_t request_id)
+    {
+        auto pong_bytes = protocol_->encode(
+            PongNetMessage(session_id, NetErrorCode::SUCCESS, request_id));
+        handle.send_message(pong_bytes);
+    }
+
+    void
+    NetServer::handle_query_message(
+        SocketHandle& handle,
+        bool& stop,
+        const QueryNetMessage& message)
+    {
+        auto engine = get_session(message.session_id);
+        if (!engine)
+        {
+            send_pong_and_stop(
+                handle,
+                stop,
+                message.session_id,
+                NetErrorCode::UNINITIALIZED_SESSION,
+                message.request_id);
+            return;
+        }
+
+        try
+        {
+            std::unique_ptr<IExecutionResult> result = engine->execute_query(message.query);
+            handle_stream(
+                handle,
+                message.session_id,
+                message.request_id,
+                std::move(result),
+                stop);
+        }
+        catch (const std::exception& ex)
+        {
+            Logger::error(std::string("QUERY failed: ") + ex.what());
+            send_pong_and_stop(
+                handle,
+                stop,
+                message.session_id,
+                NetErrorCode::SQL_ERROR,
+                message.request_id,
+                ex.what());
+            return;
+        }
+
+        Logger::info("Received QUERY message on session " + message.session_id.to_string());
+    }
+
+    void
+    NetServer::handle_create_db_message(
+        SocketHandle& handle,
+        bool& stop,
+        const CreateDbNetMessage& message)
+    {
+        auto engine = get_session(message.session_id);
+        if (!engine)
+        {
+            send_pong_and_stop(
+                handle,
+                stop,
+                message.session_id,
+                NetErrorCode::UNINITIALIZED_SESSION,
+                message.request_id);
+            return;
+        }
+
+        try
+        {
+            engine->create_db(Config::std(message.db_name));
+            send_success(handle, message.session_id, message.request_id);
+        }
+        catch (const std::exception& ex)
+        {
+            Logger::error(std::string("CREATE_DB failed: ") + ex.what());
+            send_pong_and_stop(
+                handle,
+                stop,
+                message.session_id,
+                NetErrorCode::SQL_ERROR,
+                message.request_id,
+                ex.what());
+            return;
+        }
+
+        Logger::info("Received CREATE_DB message");
+    }
+
+    void
+    NetServer::handle_attach_db_message(
+        SocketHandle& handle,
+        bool& stop,
+        const AttachDbNetMessage& message)
+    {
+        Logger::info(
+            "Received ATTACH_DB message on session " + message.session_id.to_string());
+
+        auto engine = get_session(message.session_id);
+        if (!engine)
+        {
+            send_pong_and_stop(
+                handle,
+                stop,
+                message.session_id,
+                NetErrorCode::UNINITIALIZED_SESSION,
+                message.request_id);
+            return;
+        }
+
+        try
+        {
+            engine->attach_db(message.db_name);
+            send_success(handle, message.session_id, message.request_id);
+        }
+        catch (DbDoesntExists)
+        {
+            send_pong_and_stop(
+                handle,
+                stop,
+                message.session_id,
+                NetErrorCode::DB_NOT_EXISTS,
+                message.request_id);
+            return;
+        }
+        catch (const std::exception& ex)
+        {
+            Logger::error(std::string("ATTACH_DB failed: ") + ex.what());
+            send_pong_and_stop(
+                handle,
+                stop,
+                message.session_id,
+                NetErrorCode::SQL_ERROR,
+                message.request_id,
+                ex.what());
+            return;
+        }
+    }
+
+    void
+    NetServer::handle_close_message(
+        SocketHandle& handle,
+        bool& stop,
+        const CloseNetMessage& message)
+    {
+        if (!get_session(message.session_id))
+        {
+            send_pong_and_stop(
+                handle,
+                stop,
+                message.session_id,
+                NetErrorCode::UNINITIALIZED_SESSION,
+                message.request_id);
+            return;
+        }
+
+        {
+            std::lock_guard lock(sessions_mutex_);
+            sessions_.erase(message.session_id);
+        }
+
+        handle.close();
+        stop = true;
+        Logger::info("Closed session " + message.session_id.to_string());
+    }
 
     void
     NetServer::handle_message(SocketHandle& handle, bool& stop)
@@ -29,164 +237,63 @@ namespace net
         }
 
         auto message = protocol_->parse(message_bytes.value());
-
-        auto stop_with_error = [&](
-            const UUID& session_id,
-            NetErrorCode err,
-            const std::string& error = "")
+        const auto request_id = std::visit([](const auto& msg)
         {
-            Logger::info(
-                "Disconnecting session with error " + std::to_string(static_cast<int>(err)) + " : "
-                + session_id.
-                to_string());
-
-            auto pong = PongNetMessage(session_id, err);
-            if (!error.empty() && err != NetErrorCode::SUCCESS)
-                pong.payload = Bytes(error.begin(), error.end());
-
-            auto pong_bytes = protocol_->encode(pong);
-            handle.send_message(pong_bytes);
-            handle.close();
-            stop = true;
-        };
-
-        auto get_session = [&](const UUID& session_id)-> engine::Engine*
-        {
-            std::lock_guard lock(sessions_mutex_);
-            if (!sessions_.contains(session_id))
-            {
-                return nullptr;
-            }
-            return &sessions_.at(session_id);
-        };
-
-        auto send_success = [&](const UUID& session_id)
-        {
-            auto pong_bytes = protocol_->encode(PongNetMessage(session_id, NetErrorCode::SUCCESS));
-            handle.send_message(pong_bytes);
-        };
+            return msg.request_id;
+        }, message);
 
         if (std::holds_alternative<PingNetMessage>(message))
         {
-            stop_with_error(UUID::null(), NetErrorCode::PROTOCOL_VIOLATION);
+            send_pong_and_stop(
+                handle,
+                stop,
+                UUID::null(),
+                NetErrorCode::PROTOCOL_VIOLATION,
+                request_id);
             return;
         }
 
         if (std::holds_alternative<PongNetMessage>(message))
         {
-            stop_with_error(UUID::null(), NetErrorCode::PROTOCOL_VIOLATION);
+            send_pong_and_stop(
+                handle,
+                stop,
+                UUID::null(),
+                NetErrorCode::PROTOCOL_VIOLATION,
+                request_id);
             return;
         }
 
         if (std::holds_alternative<QueryNetMessage>(message))
         {
-            const auto& query_message = std::get<QueryNetMessage>(message);
-            auto engine = get_session(query_message.session_id);
-            if (!engine)
-            {
-                stop_with_error(query_message.session_id, NetErrorCode::UNINITIALIZED_SESSION);
-                return;
-            }
-
-            try
-            {
-                std::unique_ptr<IExecutionResult> result = engine->execute_query(
-                    query_message.query);
-
-                handle_stream(handle, query_message.session_id, std::move(result), stop);
-            }
-            catch (const std::exception& ex)
-            {
-                Logger::error(std::string("QUERY failed: ") + ex.what());
-                stop_with_error(query_message.session_id, NetErrorCode::SQL_ERROR, ex.what());
-                return;
-            }
-
-            Logger::info(
-                "Received QUERY message on session " + query_message.session_id.to_string());
+            handle_query_message(handle, stop, std::get<QueryNetMessage>(message));
             return;
         }
 
         if (std::holds_alternative<CreateDbNetMessage>(message))
         {
-            const auto& create_db_message = std::get<CreateDbNetMessage>(message);
-            auto engine = get_session(create_db_message.session_id);
-            if (!engine)
-            {
-                stop_with_error(create_db_message.session_id, NetErrorCode::UNINITIALIZED_SESSION);
-                return;
-            }
-
-            try
-            {
-                engine->create_db(Config::std(create_db_message.db_name));
-                send_success(create_db_message.session_id);
-            }
-            catch (const std::exception& ex)
-            {
-                Logger::error(std::string("CREATE_DB failed: ") + ex.what());
-                stop_with_error(create_db_message.session_id, NetErrorCode::SQL_ERROR, ex.what());
-                return;
-            }
-
-            Logger::info("Received CREATE_DB message");
+            handle_create_db_message(handle, stop, std::get<CreateDbNetMessage>(message));
             return;
         }
 
         if (std::holds_alternative<AttachDbNetMessage>(message))
         {
-            const auto& attach_db_message = std::get<AttachDbNetMessage>(message);
-            Logger::info(
-                "Received ATTACH_DB message on session " + attach_db_message.session_id.
-                to_string());
-
-            auto engine = get_session(attach_db_message.session_id);
-            if (!engine)
-            {
-                stop_with_error(attach_db_message.session_id, NetErrorCode::UNINITIALIZED_SESSION);
-                return;
-            }
-
-            try
-            {
-                engine->attach_db(attach_db_message.db_name);
-                send_success(attach_db_message.session_id);
-            }
-            catch (DbDoesntExists)
-            {
-                stop_with_error(attach_db_message.session_id, NetErrorCode::DB_NOT_EXISTS);
-                return;
-            }
-            catch (const std::exception& ex)
-            {
-                Logger::error(std::string("ATTACH_DB failed: ") + ex.what());
-                stop_with_error(attach_db_message.session_id, NetErrorCode::SQL_ERROR, ex.what());
-                return;
-            }
-
+            handle_attach_db_message(handle, stop, std::get<AttachDbNetMessage>(message));
             return;
         }
 
         if (std::holds_alternative<CloseNetMessage>(message))
         {
-            const auto& close_message = std::get<CloseNetMessage>(message);
-            if (!get_session(close_message.session_id))
-            {
-                stop_with_error(close_message.session_id, NetErrorCode::UNINITIALIZED_SESSION);
-                return;
-            }
-
-            {
-                std::lock_guard lock(sessions_mutex_);
-                sessions_.erase(close_message.session_id);
-            }
-            handle.close();
-            stop = true;
-            Logger::info("Closed session " + close_message.session_id.to_string());
+            handle_close_message(handle, stop, std::get<CloseNetMessage>(message));
             return;
         }
 
-        stop_with_error(UUID::null(), NetErrorCode::PROTOCOL_VIOLATION);
+        send_pong_and_stop(
+            handle,
+            stop,
+            UUID::null(),
+            NetErrorCode::PROTOCOL_VIOLATION,
+            request_id);
     }
 
     bool
@@ -218,6 +325,7 @@ namespace net
     NetServer::handle_stream(
         SocketHandle& handle,
         const UUID& session_id,
+        int32_t request_id,
         std::unique_ptr<IExecutionResult>&& result,
         bool& stop)
     {
@@ -236,8 +344,8 @@ namespace net
             PongNetMessage chunk_message(
                 session_id,
                 NetErrorCode::STREAM_CHUNK,
-                serialized_chunk
-            );
+                request_id,
+                serialized_chunk);
 
             auto serialized_msg = protocol_->encode(chunk_message);
             handle.send_message(serialized_msg);
@@ -258,27 +366,32 @@ namespace net
 
             auto message = protocol_->parse(msg_bytes.value());
 
-            std::visit([&]<typename T>(const T& msg)
-                       {
-                           if constexpr (std::is_same_v<T, CancelStreamMessage>)
-                           {
-                               if (msg.session_id != session_id)
-                                   return;
+            std::visit(
+                [&]<typename T>(const T& msg)
+                {
+                    if constexpr (std::is_same_v<T, CancelStreamMessage>)
+                    {
+                        if (msg.session_id != session_id)
+                        {
+                            return;
+                        }
 
-                               cancelled.store(true);
+                        cancelled.store(true);
 
-                               PongNetMessage stream_cancelled(session_id, NetErrorCode::SUCCESS);
-                               auto stream_cancelled_bytes = protocol_->encode(stream_cancelled);
-                               handle.send_message(stream_cancelled_bytes);
-                           }
-
-                       },
-                       message);
+                        PongNetMessage stream_cancelled(
+                            session_id,
+                            NetErrorCode::SUCCESS,
+                            msg.request_id);
+                        auto stream_cancelled_bytes = protocol_->encode(stream_cancelled);
+                        handle.send_message(stream_cancelled_bytes);
+                    }
+                },
+                message);
         };
 
         auto stream_handler = [&]
         {
-            PongNetMessage start_stream(session_id, NetErrorCode::START_STREAM);
+            PongNetMessage start_stream(session_id, NetErrorCode::START_STREAM, request_id);
             handle.send_message(protocol_->encode(start_stream));
 
             DataTable chunk;
@@ -286,15 +399,14 @@ namespace net
 
             bool has_more = false;
 
-            while (!cancelled.load() &&
-                   next_chunk(*result, chunk, has_more))
+            while (!cancelled.load() && next_chunk(*result, chunk, has_more))
             {
                 send_chunk(chunk);
             }
 
             if (!cancelled.load() && !disconnected.load())
             {
-                PongNetMessage end_stream(session_id, NetErrorCode::END_STREAM);
+                PongNetMessage end_stream(session_id, NetErrorCode::END_STREAM, request_id);
                 handle.send_message(protocol_->encode(end_stream));
             }
         };
@@ -311,8 +423,7 @@ namespace net
         uint16_t port,
         Config::NetProtocolType protocol,
         Config::DomainType domain,
-        Config::TransportType type
-    )
+        Config::TransportType type)
         : listener_(SocketHandle::make_listener(port, domain, type)), port_(port)
     {
         NetProtocolFactory protocol_factory;
@@ -332,8 +443,8 @@ namespace net
                 [this, client = std::move(client)]() mutable
                 {
                     handle_client(std::move(client));
-                }
-            ).detach();
+                })
+                .detach();
         }
     }
 
@@ -356,13 +467,15 @@ namespace net
         {
             PongNetMessage pong(
                 UUID::null(),
-                NetErrorCode::PROTOCOL_VIOLATION
-            );
+                NetErrorCode::PROTOCOL_VIOLATION,
+                0);
             auto pong_bytes = protocol_->encode(pong);
             handle.send_message(pong_bytes);
             handle.close();
             return;
         }
+
+        const auto ping = std::get<PingNetMessage>(msg);
 
         auto session_id = UUID::make();
         {
@@ -370,7 +483,7 @@ namespace net
             sessions_[session_id] = engine::Engine();
         }
 
-        PongNetMessage pong(session_id, NetErrorCode::SUCCESS);
+        PongNetMessage pong(session_id, NetErrorCode::SUCCESS, ping.request_id);
         auto pong_bytes = protocol_->encode(pong);
         handle.send_message(pong_bytes);
 

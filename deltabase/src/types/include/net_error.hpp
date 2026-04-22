@@ -7,7 +7,7 @@
 
 namespace types
 {
-    enum class NetErrorCode
+    enum class NetErrorCode : uint8_t
     {
         // Success status codes
         SUCCESS = 0,

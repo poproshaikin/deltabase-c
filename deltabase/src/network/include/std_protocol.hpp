@@ -21,6 +21,8 @@ namespace net
         types::Bytes
         encode(const types::AttachDbNetMessage& msg) const;
         types::Bytes
+        encode(const types::CancelStreamMessage& msg) const;
+        types::Bytes
         encode(const types::CloseNetMessage& msg) const;
 
     public:

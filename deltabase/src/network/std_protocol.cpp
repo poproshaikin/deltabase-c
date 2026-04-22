@@ -21,7 +21,7 @@ namespace net
         NetMessage
         protocol_violation_message()
         {
-            return CloseNetMessage(types::UUID::null());
+            return CloseNetMessage(types::UUID::null(), 0);
         }
     } // namespace
 
@@ -30,6 +30,7 @@ namespace net
     {
         MemoryStream stream;
         stream.write_message_type(msg.type);
+        stream.write(&msg.request_id, sizeof(msg.request_id));
         return stream.to_vector();
     }
 
@@ -39,6 +40,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
+        stream.write(&msg.request_id, sizeof(msg.request_id));
 
         const auto raw_err = static_cast<uint8_t>(msg.err);
         stream.write(&raw_err, sizeof(raw_err));
@@ -54,6 +56,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
+        stream.write(&msg.request_id, sizeof(msg.request_id));
         stream.write_string(msg.query, true);
         return stream.to_vector();
     }
@@ -64,6 +67,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
+        stream.write(&msg.request_id, sizeof(msg.request_id));
         stream.write_string(msg.db_name, true);
 
         return stream.to_vector();
@@ -75,8 +79,19 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
+        stream.write(&msg.request_id, sizeof(msg.request_id));
         stream.write_string(msg.db_name, true);
 
+        return stream.to_vector();
+    }
+
+    Bytes
+    StdNetProtocol::encode(const CancelStreamMessage& msg) const
+    {
+        MemoryStream stream;
+        stream.write_message_type(msg.type);
+        stream.write_uuid(msg.session_id);
+        stream.write(&msg.request_id, sizeof(msg.request_id));
         return stream.to_vector();
     }
 
@@ -86,6 +101,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
+        stream.write(&msg.request_id, sizeof(msg.request_id));
         return stream.to_vector();
     }
 
@@ -115,12 +131,24 @@ namespace net
         switch (type)
         {
         case NetMessageType::PING:
-            return PingNetMessage();
+        {
+            int32_t request_id = 0;
+            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            {
+                return protocol_violation_message();
+            }
+
+            return PingNetMessage(request_id);
+        }
 
         case NetMessageType::PONG:
         {
             UUID session_id;
             if (!stream.read_uuid(session_id))
+                return protocol_violation_message();
+
+            int32_t request_id = 0;
+            if (!stream.read_exact(&request_id, sizeof(request_id)))
                 return protocol_violation_message();
 
             uint8_t raw_err = 0;
@@ -131,7 +159,7 @@ namespace net
             if (!stream.read_bytes(payload, true))
                 return protocol_violation_message();
 
-            return PongNetMessage(session_id, static_cast<NetErrorCode>(raw_err), payload);
+            return PongNetMessage(session_id, static_cast<NetErrorCode>(raw_err), request_id, payload);
         }
 
         case NetMessageType::QUERY:
@@ -142,13 +170,19 @@ namespace net
                 return protocol_violation_message();
             }
 
+            int32_t request_id = 0;
+            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            {
+                return protocol_violation_message();
+            }
+
             std::string query;
             if (!stream.read_string(query, true))
             {
                 return protocol_violation_message();
             }
 
-            return QueryNetMessage(session_id, query);
+            return QueryNetMessage(session_id, request_id, query);
         }
 
         case NetMessageType::CREATE_DB:
@@ -159,13 +193,19 @@ namespace net
                 return protocol_violation_message();
             }
 
+            int32_t request_id = 0;
+            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            {
+                return protocol_violation_message();
+            }
+
             std::string db_name;
             if (!stream.read_string(db_name, true))
             {
                 return protocol_violation_message();
             }
 
-            return CreateDbNetMessage(session_id, db_name);
+            return CreateDbNetMessage(session_id, request_id, db_name);
         }
 
         case NetMessageType::ATTACH_DB:
@@ -176,13 +216,36 @@ namespace net
                 return protocol_violation_message();
             }
 
+            int32_t request_id = 0;
+            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            {
+                return protocol_violation_message();
+            }
+
             std::string db_name;
             if (!stream.read_string(db_name, true))
             {
                 return protocol_violation_message();
             }
 
-            return AttachDbNetMessage(session_id, db_name);
+            return AttachDbNetMessage(session_id, request_id, db_name);
+        }
+
+        case NetMessageType::CANCEL_STREAM:
+        {
+            UUID session_id;
+            if (!stream.read_uuid(session_id))
+            {
+                return protocol_violation_message();
+            }
+
+            int32_t request_id = 0;
+            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            {
+                return protocol_violation_message();
+            }
+
+            return CancelStreamMessage(session_id, request_id);
         }
 
         case NetMessageType::CLOSE:
@@ -193,7 +256,13 @@ namespace net
                 return protocol_violation_message();
             }
 
-            return CloseNetMessage(session_id);
+            int32_t request_id = 0;
+            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            {
+                return protocol_violation_message();
+            }
+
+            return CloseNetMessage(session_id, request_id);
         }
 
         case NetMessageType::UNDEFINED:
