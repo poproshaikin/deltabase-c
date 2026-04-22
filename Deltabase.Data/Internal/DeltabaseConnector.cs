@@ -1,6 +1,7 @@
 using System.Data;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using Deltabase.Data.Internal.Models;
 using Deltabase.Data.Internal.Protocol;
 using Deltabase.Data.Internal.Utils;
@@ -34,27 +35,30 @@ internal class DeltabaseConnector : IDisposable
 
     public Guid Open()
     {
-        var ping = new PingMessage();
+        var requestId = NextRequestId();
+        var ping = new PingMessage(requestId);
         _socketHandle.Send(ping);
         
         var response = _socketHandle.Receive();
-        ThrowIfUnsuccessful(response, out var pong);
+        ThrowIfUnsuccessful(response, requestId, out var pong);
 
         return pong.SessionId;
     }
 
     public void AttachDatabase(string database, Guid sessionId)
     {
-        var attachDb = new AttachDbMessage(sessionId, database);
+        var requestId = NextRequestId();
+        var attachDb = new AttachDbMessage(sessionId, requestId, database);
         _socketHandle.Send(attachDb);
         var response = _socketHandle.Receive();
         
-        ThrowIfUnsuccessful(response);
+        ThrowIfUnsuccessful(response, requestId);
     }
 
     public void Close(Guid sessionId)
     {
-        var close = new CloseMessage(sessionId);
+        var requestId = NextRequestId();
+        var close = new CloseMessage(sessionId, requestId);
         _socketHandle.Send(close);
         _socketHandle.Close();
     }
@@ -64,31 +68,60 @@ internal class DeltabaseConnector : IDisposable
         _socketHandle.Dispose();
     }
 
-    public Task<IAsyncEnumerable<DataTable>> ExecuteCommand(string command, Guid sessionId)
+    public async Task<IAsyncEnumerable<Table>> ExecuteCommandAsync(string command, Guid sessionId, CancellationToken cancellationToken)
     {
-        var message = new QueryMessage(sessionId, command);
+        var requestId = NextRequestId();
+        var message = new QueryMessage(sessionId, requestId, command);
         _socketHandle.Send(message);
-        var response = _socketHandle.Receive();
-        ThrowIfUnsuccessful(response, out var pong);
+        var response = await _socketHandle.ReceiveAsync();
+        ThrowIfUnsuccessful(response, requestId, out var pong);
         
-        return ReceiveStreamAsync(message.SessionId);
+        return ReceiveStreamAsync(message.SessionId, requestId, cancellationToken);
     }
 
-    private async Task<IAsyncEnumerable<DataTable>> ReceiveStreamAsync(Guid sessionId)
+    private async IAsyncEnumerable<Table> ReceiveStreamAsync(Guid sessionId, 
+        int requestId, 
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var startStream = await _socketHandle.ReceiveAsync();
-        ThrowIfUnsuccessful(startStream, out var pong);
-        if (pong.ErrorCode != NetErrorCode.StartStream ||
-            pong.SessionId != sessionId)
+        ThrowIfUnsuccessful(startStream, requestId, out var startStreamPong);
+        if (startStreamPong.ErrorCode != NetErrorCode.StartStream ||
+            startStreamPong.SessionId != sessionId)
             throw new DeltabaseException(NetErrorCode.ProtocolViolation);
         
-        1
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var message = await _socketHandle.ReceiveAsync();
+            ThrowIfUnsuccessful(message, requestId, out var chunkPong);
+
+            if (chunkPong.ErrorCode == NetErrorCode.EndStream)
+                break;
+            
+            if (chunkPong.ErrorCode != NetErrorCode.StreamChunk ||
+                chunkPong.SessionId != sessionId ||
+                chunkPong.RequestId != requestId)
+                throw new DeltabaseException(NetErrorCode.ProtocolViolation);
+
+            yield return _protocol.ParseTable(chunkPong.Payload);
+        }
     }
 
     private void ThrowIfUnsuccessful(DeltabaseMessage response)
     {
         if (response is not PongMessage pong)
             throw new DeltabaseException(NetErrorCode.ProtocolViolation);
+        if (pong.ErrorCode >= (NetErrorCode)100) // Is a failure code
+            throw new DeltabaseException(pong.ErrorCode);
+    }
+
+    private void ThrowIfUnsuccessful(DeltabaseMessage response, int requestId)
+    {
+        if (response is not PongMessage pong)
+            throw new DeltabaseException(NetErrorCode.ProtocolViolation);
+
+        if (pong.RequestId != requestId)
+            throw new DeltabaseException(NetErrorCode.ProtocolViolation);
+
         if (pong.ErrorCode >= (NetErrorCode)100) // Is a failure code
             throw new DeltabaseException(pong.ErrorCode);
     }
@@ -101,5 +134,24 @@ internal class DeltabaseConnector : IDisposable
             throw new DeltabaseException(pong.ErrorCode);
         
         @out = pong;
+    }
+
+    private void ThrowIfUnsuccessful(DeltabaseMessage response, int requestId, out PongMessage @out)
+    {
+        if (response is not PongMessage pong)
+            throw new DeltabaseException(NetErrorCode.ProtocolViolation);
+
+        if (pong.RequestId != requestId)
+            throw new DeltabaseException(NetErrorCode.ProtocolViolation);
+
+        if (pong.ErrorCode >= (NetErrorCode)100) // Is a failure code
+            throw new DeltabaseException(pong.ErrorCode);
+
+        @out = pong;
+    }
+
+    private int NextRequestId()
+    {
+        return Interlocked.Increment(ref _lastRequestId);
     }
 }

@@ -8,5 +8,6 @@ internal enum MessageType
     Query,
     CreateDb,
     AttachDb,
+    CancelStream,
     Close
 }

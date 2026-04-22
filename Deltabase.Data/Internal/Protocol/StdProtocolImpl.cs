@@ -19,31 +19,42 @@ internal class StdProtocolImpl : IProtocol
 
         switch (message)
         {
-            case PingMessage:
+            case PingMessage ping:
+                writer.Write(ping.RequestId);
                 return stream.ToArray();
 
             case PongMessage pong:
                 WriteGuid(writer, pong.SessionId);
+                writer.Write(pong.RequestId);
                 writer.Write((byte)pong.ErrorCode);
                 return stream.ToArray();
 
             case QueryMessage query:
                 WriteGuid(writer, query.SessionId);
+                writer.Write(query.RequestId);
                 WriteString(writer, query.Query);
                 return stream.ToArray();
 
             case CreateDbMessage createDb:
                 WriteGuid(writer, createDb.SessionId);
+                writer.Write(createDb.RequestId);
                 WriteString(writer, createDb.DbName);
                 return stream.ToArray();
 
             case AttachDbMessage attachDb:
                 WriteGuid(writer, attachDb.SessionId);
+                writer.Write(attachDb.RequestId);
                 WriteString(writer, attachDb.DbName);
+                return stream.ToArray();
+
+            case CancelStreamMessage cancelStream:
+                WriteGuid(writer, cancelStream.SessionId);
+                writer.Write(cancelStream.RequestId);
                 return stream.ToArray();
 
             case CloseMessage close:
                 WriteGuid(writer, close.SessionId);
+                writer.Write(close.RequestId);
                 return stream.ToArray();
 
             default:
@@ -66,10 +77,16 @@ internal class StdProtocolImpl : IProtocol
         switch (messageType)
         {
             case MessageType.Ping:
-                return new PingMessage();
+                if (!TryReadInt32(reader, out var pingRequestId))
+                    throw new DeltabaseException();
+
+                return new PingMessage(pingRequestId);
 
             case MessageType.Pong:
                 if (!TryReadGuid(reader, out var pongSessionId))
+                    throw new DeltabaseException();
+
+                if (!TryReadInt32(reader, out var pongRequestId))
                     throw new DeltabaseException();
 
                 if (!TryReadByte(reader, out var rawErr))
@@ -78,25 +95,31 @@ internal class StdProtocolImpl : IProtocol
                 if (!TryReadBytes(reader, out var payload))
                     throw new DeltabaseException();
 
-                return new PongMessage(pongSessionId, (NetErrorCode)rawErr, payload);
+                return new PongMessage(pongSessionId, pongRequestId, (NetErrorCode)rawErr, payload);
 
             case MessageType.Query:
                 if (!TryReadGuid(reader, out var querySessionId))
                     throw new DeltabaseException();
 
+                if (!TryReadInt32(reader, out var queryRequestId))
+                    throw new DeltabaseException();
+
                 if (!TryReadString(reader, out var query))
                     throw new DeltabaseException();
 
-                return new QueryMessage(querySessionId, query);
+                return new QueryMessage(querySessionId, queryRequestId, query);
 
             case MessageType.CreateDb:
                 if (!TryReadGuid(reader, out var createSessionId))
                     throw new DeltabaseException();
 
+                if (!TryReadInt32(reader, out var createRequestId))
+                    throw new DeltabaseException();
+
                 if (!TryReadString(reader, out var createDbName))
                     throw new DeltabaseException();
 
-                return new CreateDbMessage(createSessionId, createDbName)
+                return new CreateDbMessage(createSessionId, createRequestId, createDbName)
                 {
                     SessionId = createSessionId,
                 };
@@ -105,19 +128,34 @@ internal class StdProtocolImpl : IProtocol
                 if (!TryReadGuid(reader, out var attachSessionId))
                     throw new DeltabaseException();
 
+                if (!TryReadInt32(reader, out var attachRequestId))
+                    throw new DeltabaseException();
+
                 if (!TryReadString(reader, out var attachDbName))
                     throw new DeltabaseException();
 
-                return new AttachDbMessage(attachSessionId, attachDbName)
+                return new AttachDbMessage(attachSessionId, attachRequestId, attachDbName)
                 {
                     SessionId = attachSessionId,
                 };
+
+            case MessageType.CancelStream:
+                if (!TryReadGuid(reader, out var cancelSessionId))
+                    throw new DeltabaseException();
+
+                if (!TryReadInt32(reader, out var cancelRequestId))
+                    throw new DeltabaseException();
+
+                return new CancelStreamMessage(cancelSessionId, cancelRequestId);
 
             case MessageType.Close:
                 if (!TryReadGuid(reader, out var closeSessionId))
                     throw new DeltabaseException();
 
-                return new CloseMessage(closeSessionId);
+                if (!TryReadInt32(reader, out var closeRequestId))
+                    throw new DeltabaseException();
+
+                return new CloseMessage(closeSessionId, closeRequestId);
 
             case MessageType.Undefined:
             default:
@@ -251,6 +289,18 @@ internal class StdProtocolImpl : IProtocol
         }
 
         value = reader.ReadByte();
+        return true;
+    }
+
+    private static bool TryReadInt32(BinaryReader reader, out int value)
+    {
+        if (reader.BaseStream.Position + sizeof(int) > reader.BaseStream.Length)
+        {
+            value = default;
+            return false;
+        }
+
+        value = reader.ReadInt32();
         return true;
     }
 

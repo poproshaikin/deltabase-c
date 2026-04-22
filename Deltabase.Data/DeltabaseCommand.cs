@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using Deltabase.Data.Internal.Models;
 using Deltabase.Data.Internal.Utils;
 
 namespace Deltabase.Data;
@@ -54,28 +55,12 @@ public class DeltabaseCommand : DbCommand
 
     public override int ExecuteNonQuery()
     {
-        ArgumentNullException.ThrowIfNull(_connection);
-        ArgumentNullException.ThrowIfNull(_commandText);
-
-        var table = _connection.Connector.ExecuteCommand(_commandText, _connection.SessionId);
-
-        if (table.Rows.Length > 0 && table.Rows[0].Values.Length > 0)
-            return (int)(table.Rows[0].Values[0] ?? 0);
-
-        return 0;
+        return ExecuteNonQueryAsync(CancellationToken.None).GetAwaiter().GetResult();
     }
 
     public override object? ExecuteScalar()
     {
-        ArgumentNullException.ThrowIfNull(_connection);
-        ArgumentNullException.ThrowIfNull(_commandText);
-        
-        var table = _connection.Connector.ExecuteCommand(_commandText, _connection.SessionId);
-        
-        if (table.Rows.Length > 0 && table.Rows[0].Values.Length > 0)
-            return table.Rows[0].Values[0];
-
-        return null;
+        return ExecuteScalarAsync(CancellationToken.None).GetAwaiter().GetResult();
     }
 
     public override void Prepare()
@@ -88,18 +73,77 @@ public class DeltabaseCommand : DbCommand
         throw new NotImplementedException();
     }
 
-    protected override DeltabaseDataReader ExecuteDbDataReader(CommandBehavior behavior)
+    protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
+    {
+        return ExecuteDbDataReaderAsync(behavior, CancellationToken.None).GetAwaiter().GetResult();
+    }
+
+    protected override async Task<DbDataReader> ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(_connection);
         ArgumentNullException.ThrowIfNull(_commandText);
 
-        var table = _connection.Connector.ExecuteCommand(_commandText, _connection.SessionId);
+        var dataEnumerator = await _connection.Connector.ExecuteCommandAsync(_commandText, 
+            _connection.SessionId, 
+            cancellationToken);
         
-        return new DeltabaseDataReader(table);
+        return new DeltabaseDataReader(dataEnumerator);
     }
-    
+
+    public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken)
+    {
+        return ExecuteNonQueryAsyncCore(cancellationToken);
+    }
+
+    public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken)
+    {
+        return ExecuteScalarAsyncCore(cancellationToken);
+    }
+
     public override void Cancel()
     {
         throw new NotImplementedException();
+    }
+
+    private async Task<int> ExecuteNonQueryAsyncCore(CancellationToken cancellationToken)
+    {
+        var table = await ReadFirstTableAsync(cancellationToken);
+
+        if (table is { Rows.Length: > 0 } && table.Value.Rows[0].Values.Length > 0)
+        {
+            return Convert.ToInt32(table.Value.Rows[0].Values[0] ?? 0);
+        }
+
+        return 0;
+    }
+
+    private async Task<object?> ExecuteScalarAsyncCore(CancellationToken cancellationToken)
+    {
+        var table = await ReadFirstTableAsync(cancellationToken);
+
+        if (table is { Rows.Length: > 0 } && table.Value.Rows[0].Values.Length > 0)
+        {
+            return table.Value.Rows[0].Values[0];
+        }
+
+        return null;
+    }
+
+    private async Task<Table?> ReadFirstTableAsync(CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(_connection);
+        ArgumentNullException.ThrowIfNull(_commandText);
+
+        var data = await _connection.Connector.ExecuteCommandAsync(
+            _commandText,
+            _connection.SessionId,
+            cancellationToken);
+
+        await foreach (var table in data.WithCancellation(cancellationToken))
+        {
+            return table;
+        }
+
+        return null;
     }
 }
