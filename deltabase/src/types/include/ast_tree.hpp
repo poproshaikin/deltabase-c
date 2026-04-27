@@ -29,6 +29,8 @@ namespace types
         CREATE_SCHEMA,
         CREATE_INDEX,
         DROP_INDEX,
+        ALTER_TABLE,
+        ADD_COLUMN
     };
 
     enum class AstOperator
@@ -71,7 +73,6 @@ namespace types
 
         return map;
     }
-
 
     struct AstNode;
 
@@ -152,6 +153,21 @@ namespace types
         std::vector<ColumnDefinition> columns;
     };
 
+    struct AddColumnOperation
+    {
+        ColumnDefinition column;
+    };
+
+    using AlterTableOperation = std::variant<
+        AddColumnOperation
+    >;
+
+    struct AlterTableStatement
+    {
+        TableIdentifier table;
+        std::vector<AlterTableOperation> operations;
+    };
+
     struct CreateSchemaStatement
     {
         SqlToken name;
@@ -188,7 +204,9 @@ namespace types
         CreateSchemaStatement,
         CreateIndexStatement,
         DropIndexStatement,
-        ColumnDefinition>;
+        ColumnDefinition,
+        AlterTableStatement
+    >;
 
     struct AstNode
     {

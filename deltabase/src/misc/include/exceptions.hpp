@@ -93,4 +93,12 @@ public:
     }
 };
 
+class SqlException : public std::runtime_error
+{
+    public:
+    SqlException(const std::string& msg) : std::runtime_error(msg)
+    {
+    }
+};
+
 #endif

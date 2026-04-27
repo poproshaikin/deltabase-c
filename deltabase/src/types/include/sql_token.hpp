@@ -53,7 +53,10 @@ namespace types
         SCHEMA,
         INDEX,
         ON,
-        IS
+        IS,
+        ALTER,
+        ADD,
+        COLUMN
     };
 
     enum class SqlSymbol

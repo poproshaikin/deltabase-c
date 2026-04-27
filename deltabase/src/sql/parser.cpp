@@ -11,6 +11,20 @@ using namespace types;
 
 namespace sql
 {
+    static bool
+    is_trailing_sequence_valid(const std::vector<SqlToken>& tokens, size_t start_index)
+    {
+        if (start_index >= tokens.size())
+            return true;
+
+        const SqlToken& token = tokens[start_index];
+        const auto* symbol = std::get_if<SqlSymbol>(&token.detail);
+
+        if (token.type != SqlTokenType::SYMBOL || symbol == nullptr || *symbol != SqlSymbol::SEMICOLON)
+            return false;
+
+        return start_index + 1 >= tokens.size();
+    }
 
     SqlParser::SqlParser(std::vector<SqlToken> tokens) : tokens_(std::move(tokens)), current_(0)
     {
@@ -43,13 +57,13 @@ namespace sql
         return true;
     }
 
-    const SqlToken&
+    const SqlToken*
     SqlParser::current() const
     {
         if (current_ >= tokens_.size())
-            throw std::out_of_range("Parser: current() out of bounds");
+            return nullptr;
 
-        return tokens_[current_];
+        return &tokens_[current_];
     }
 
     const SqlToken&
@@ -61,49 +75,78 @@ namespace sql
     AstNode
     SqlParser::parse()
     {
+        AstNode parsed;
+
         if (match(SqlKeyword::SELECT))
         {
-            return AstNode(AstNodeType::SELECT, parse_select());
+            parsed = AstNode(AstNodeType::SELECT, parse_select());
         }
-        if (match(SqlKeyword::INSERT))
+        else if (match(SqlKeyword::INSERT))
         {
-            return AstNode(AstNodeType::INSERT, parse_insert());
+            parsed = AstNode(AstNodeType::INSERT, parse_insert());
         }
-        if (match(SqlKeyword::UPDATE))
+        else if (match(SqlKeyword::UPDATE))
         {
-            return AstNode(AstNodeType::UPDATE, parse_update());
+            parsed = AstNode(AstNodeType::UPDATE, parse_update());
         }
-        if (match(SqlKeyword::DELETE))
+        else if (match(SqlKeyword::DELETE))
         {
-            return AstNode(AstNodeType::DELETE, parse_delete());
+            parsed = AstNode(AstNodeType::DELETE, parse_delete());
         }
-        if (match(SqlKeyword::CREATE))
+        else if (match(SqlKeyword::CREATE))
         {
             if (!advance())
                 throw InvalidStatementSyntax();
 
             if (match(SqlKeyword::TABLE))
-                return AstNode(AstNodeType::CREATE_TABLE, parse_create_table());
+                parsed = AstNode(AstNodeType::CREATE_TABLE, parse_create_table());
 
-            if (match(SqlKeyword::DATABASE))
-                return AstNode(AstNodeType::CREATE_DATABASE, parse_create_db());
+            else if (match(SqlKeyword::DATABASE))
+                parsed = AstNode(AstNodeType::CREATE_DATABASE, parse_create_db());
 
-            if (match(SqlKeyword::SCHEMA))
-                return AstNode(AstNodeType::CREATE_SCHEMA, parse_create_schema());
+            else if (match(SqlKeyword::SCHEMA))
+                parsed = AstNode(AstNodeType::CREATE_SCHEMA, parse_create_schema());
 
-            if (match(SqlKeyword::INDEX) || match(SqlKeyword::UNIQUE))
-                return AstNode(AstNodeType::CREATE_INDEX, parse_create_index());
+            else if (match(SqlKeyword::INDEX) || match(SqlKeyword::UNIQUE))
+                parsed = AstNode(AstNodeType::CREATE_INDEX, parse_create_index());
+
+            else
+                throw InvalidStatementSyntax("Unsupported statement");
         }
-        if (match(SqlKeyword::DROP))
+        else if (match(SqlKeyword::DROP))
         {
             if (!advance())
                 throw InvalidStatementSyntax();
 
             if (match(SqlKeyword::INDEX))
-                return AstNode(AstNodeType::DROP_INDEX, parse_drop_index());
+                parsed = AstNode(AstNodeType::DROP_INDEX, parse_drop_index());
+
+            else
+                throw InvalidStatementSyntax("Unsupported statement");
+        }
+        else if (match(SqlKeyword::ALTER))
+        {
+            if (!advance())
+                throw InvalidStatementSyntax();
+
+            if (match(SqlKeyword::TABLE))
+                parsed = AstNode(AstNodeType::ALTER_TABLE, parse_alter_table());
+
+            else
+                throw InvalidStatementSyntax("Unsupported statement");
+        }
+        else
+        {
+            throw InvalidStatementSyntax("Unsupported statement");
         }
 
-        throw std::runtime_error("Unsupported statement");
+        const bool valid_from_current = is_trailing_sequence_valid(tokens_, current_);
+        const bool valid_from_next = is_trailing_sequence_valid(tokens_, current_ + 1);
+
+        if (!valid_from_current && !valid_from_next)
+            throw InvalidStatementSyntax("Unexpected tokens after statement");
+
+        return parsed;
     }
 
     void
@@ -126,7 +169,7 @@ namespace sql
                 if (!match(SqlTokenType::IDENTIFIER))
                     break;
 
-                stmt.columns.push_back(current());
+                stmt.columns.push_back(*current());
 
                 if (!advance() || !match(SqlSymbol::COMMA))
                     break;
@@ -171,7 +214,7 @@ namespace sql
                 {
                     break;
                 }
-                stmt.columns.push_back(current());
+                stmt.columns.push_back(*current());
 
                 if (!advance() || !match(SqlSymbol::COMMA))
                 {
@@ -199,9 +242,9 @@ namespace sql
         {
             advance_or_throw("Invalid statement syntax");
             if (!match(SqlTokenType::LITERAL))
-                break;
+                throw InvalidStatementSyntax("Expected a literal in VALUES expression");
 
-            values.values.push_back(current());
+            values.values.push_back(*current());
 
             if (!advance() || !match(SqlSymbol::COMMA))
             {
@@ -301,17 +344,60 @@ namespace sql
         return stmt;
     }
 
+    AlterTableStatement
+    SqlParser::parse_alter_table()
+    {
+        AlterTableStatement stmt;
+
+        match_or_throw(SqlKeyword::TABLE, "Expected 'TABLE' after 'ALTER'");
+        advance_or_throw();
+
+        stmt.table = parse_table_identifier();
+
+        advance_or_throw("Expected statement for 'ALTER TABLE'");
+
+        while (true)
+        {
+            if (match(SqlKeyword::ADD))
+            {
+                advance_or_throw("You need to specify what to add in 'ALTER TABLE'");
+
+                if (match(SqlKeyword::COLUMN))
+                {
+                    advance_or_throw("Missing column definition");
+
+                    stmt.operations.push_back(
+                        AddColumnOperation{ .column = parse_column_def() }
+                    );
+                }
+                else
+                {
+                    throw InvalidStatementSyntax("Expected COLUMN after ADD");
+                }
+
+                continue;
+            }
+
+            if (!current())
+                break;
+
+            throw InvalidStatementSyntax("Unsupported ALTER TABLE operation");
+        }
+
+        return stmt;
+    }
+
     ColumnDefinition
     SqlParser::parse_column_def()
     {
         ColumnDefinition def;
 
         match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier");
-        def.name = current();
+        def.name = *current();
 
         advance_or_throw();
 
-        def.type = current();
+        def.type = *current();
         advance_or_throw();
 
         if (match(SqlSymbol::COMMA) || match(SqlSymbol::RPAREN))
@@ -321,18 +407,18 @@ namespace sql
 
         while (true)
         {
-            const SqlToken& cur = current();
+            auto cur = current();
 
             if (match(SqlSymbol::COMMA) || match(SqlSymbol::RPAREN))
                 return def;
 
-            if (!std::holds_alternative<SqlKeyword>(cur.detail))
+            if (!std::holds_alternative<SqlKeyword>(cur->detail))
                 throw InvalidStatementSyntax();
 
-            if (!cur.is_constraint() || !cur.is_data_type())
+            if (!cur->is_constraint() || !cur->is_data_type())
                 throw InvalidStatementSyntax();
 
-            SqlToken copy = cur;
+            SqlToken copy = *cur;
             def.constraints.push_back(copy);
             advance_or_throw();
         }
@@ -352,7 +438,7 @@ namespace sql
             if (!match(tokenType))
                 break;
 
-            tokens.emplace_back(nodeType, current());
+            tokens.emplace_back(nodeType, *current());
 
             if (!advance())
                 break;
@@ -375,7 +461,7 @@ namespace sql
         match_or_throw(SqlKeyword::DATABASE);
         advance_or_throw("Expected database identifier");
 
-        stmt.name = current();
+        stmt.name = *current();
 
         return stmt;
     }
@@ -384,7 +470,7 @@ namespace sql
     SqlParser::parse_table_identifier()
     {
         match_or_throw(SqlTokenType::IDENTIFIER);
-        SqlToken first_token = current();
+        SqlToken first_token = *current();
 
         advance();
 
@@ -392,7 +478,7 @@ namespace sql
         {
             advance_or_throw("Expected table name after schema");
             match_or_throw(SqlTokenType::IDENTIFIER, "Expected table identifier after schema name");
-            SqlToken second_token = current();
+            SqlToken second_token = *current();
             advance();
             return TableIdentifier(second_token, first_token);
         }
@@ -408,7 +494,7 @@ namespace sql
         match_or_throw(SqlKeyword::SCHEMA);
         advance_or_throw("Expected schema identifier");
 
-        stmt.name = current();
+        stmt.name = *current();
         return stmt;
     }
 
@@ -427,7 +513,7 @@ namespace sql
         advance_or_throw("Expected index identifier");
 
         match_or_throw(SqlTokenType::IDENTIFIER, "Expected index identifier");
-        stmt.index_name = current();
+        stmt.index_name = *current();
         advance_or_throw("Incomplete CREATE INDEX syntax");
 
         match_or_throw(SqlKeyword::ON);
@@ -439,7 +525,7 @@ namespace sql
         advance_or_throw("Expected column name after '('");
 
         match_or_throw(SqlTokenType::IDENTIFIER, "Expected column name after '('");
-        stmt.column_name = current();
+        stmt.column_name = *current();
         advance_or_throw("Expected ')' after column identifier");
 
         match_or_throw(SqlSymbol::RPAREN, "Expected ')' after column identifier");
@@ -456,7 +542,7 @@ namespace sql
         advance_or_throw("Expected index identifier");
 
         match_or_throw(SqlTokenType::IDENTIFIER, "Expected index identifier");
-        stmt.index_name = current();
+        stmt.index_name = *current();
         advance_or_throw("Expected 'ON' after index identifier");
 
         match_or_throw(SqlKeyword::ON, "Expected 'ON' after index identifier");
@@ -505,14 +591,14 @@ namespace sql
 
         while (true)
         {
-            const SqlToken& token = current();
+            auto token = current();
             std::optional<AstOperator> op_opt;
-            if (token.type == SqlTokenType::OPERATOR)
+            if (token->type == SqlTokenType::OPERATOR)
             {
-                op_opt = to_ast_operator(std::get<SqlOperator>(token.detail));
+                op_opt = to_ast_operator(std::get<SqlOperator>(token->detail));
             }
-            else if (token.type == SqlTokenType::KEYWORD &&
-                     std::get<SqlKeyword>(token.detail) == SqlKeyword::IS)
+            else if (token->type == SqlTokenType::KEYWORD &&
+                     std::get<SqlKeyword>(token->detail) == SqlKeyword::IS)
             {
                 op_opt = AstOperator::IS;
             }
@@ -570,7 +656,7 @@ namespace sql
     std::unique_ptr<AstNode>
     SqlParser::parse_primary()
     {
-        const SqlToken& token = current();
+        auto token = current();
 
         if (match(SqlSymbol::LPAREN))
         {
@@ -599,7 +685,7 @@ namespace sql
         {
             advance();
 
-            SqlToken copy = token;
+            SqlToken copy = *token;
             copy.type = SqlTokenType::LITERAL;
             copy.detail = SqlLiteral::NULL_;
 
@@ -609,14 +695,14 @@ namespace sql
         if (match(SqlTokenType::LITERAL))
         {
             advance();
-            SqlToken copy = token;
+            SqlToken copy = *token;
             return std::make_unique<AstNode>(AstNodeType::LITERAL, AstNodeValue(std::move(copy)));
         }
 
         if (match(SqlTokenType::IDENTIFIER))
         {
             advance();
-            SqlToken copy = token;
+            SqlToken copy = *token;
             return std::make_unique<AstNode>(
                 AstNodeType::IDENTIFIER, AstNodeValue(std::move(copy))
             );

@@ -4,6 +4,8 @@
 
 #ifndef DELTABASE_DICTIONARY_HPP
 #define DELTABASE_DICTIONARY_HPP
+#include "../../cli/include/cli_command.hpp"
+
 #include <string>
 #include <unordered_map>
 #include "../../types/include/sql_token.hpp"
@@ -17,35 +19,37 @@ namespace sql
     keywords_map()
     {
         static const std::unordered_map<std::string, SqlKeyword> dictionary = {
-            {"select", SqlKeyword::SELECT},
-            {"from", SqlKeyword::FROM},
-            {"insert", SqlKeyword::INSERT},
-            {"into", SqlKeyword::INTO},
-            {"values", SqlKeyword::VALUES},
-            {"update", SqlKeyword::UPDATE},
-            {"set", SqlKeyword::SET},
-            {"delete", SqlKeyword::DELETE},
-            {"where", SqlKeyword::WHERE},
-            {"create", SqlKeyword::CREATE},
-            {"drop", SqlKeyword::DROP},
-            {"database", SqlKeyword::DATABASE},
-            {"table", SqlKeyword::TABLE},
-            {"string", SqlKeyword::STRING},
-            {"integer", SqlKeyword::INTEGER},
-            {"real", SqlKeyword::REAL},
-            {"char", SqlKeyword::CHAR},
+            {"add", SqlKeyword::ADD},
+            {"alter", SqlKeyword::ALTER},
+            {"autoincrement", SqlKeyword::AUTOINCREMENT},
             {"bool", SqlKeyword::BOOL},
-            {"null", SqlKeyword::_NULL},
-            {"primary", SqlKeyword::PRIMARY},
+            {"char", SqlKeyword::CHAR},
+            {"column", SqlKeyword::COLUMN},
+            {"create", SqlKeyword::CREATE},
+            {"database", SqlKeyword::DATABASE},
+            {"delete", SqlKeyword::DELETE},
+            {"drop", SqlKeyword::DROP},
+            {"from", SqlKeyword::FROM},
+            {"index", SqlKeyword::INDEX},
+            {"insert", SqlKeyword::INSERT},
+            {"integer", SqlKeyword::INTEGER},
+            {"into", SqlKeyword::INTO},
+            {"is", SqlKeyword::IS},
             {"key", SqlKeyword::KEY},
             {"not", SqlKeyword::NOT},
-            {"autoincrement", SqlKeyword::AUTOINCREMENT},
-            {"unique", SqlKeyword::UNIQUE},
-            {"schema", SqlKeyword::SCHEMA},
-            {"index", SqlKeyword::INDEX},
+            {"null", SqlKeyword::_NULL},
             {"on", SqlKeyword::ON},
-            {"is", SqlKeyword::IS}
-        };
+            {"primary", SqlKeyword::PRIMARY},
+            {"real", SqlKeyword::REAL},
+            {"schema", SqlKeyword::SCHEMA},
+            {"select", SqlKeyword::SELECT},
+            {"set", SqlKeyword::SET},
+            {"string", SqlKeyword::STRING},
+            {"table", SqlKeyword::TABLE},
+            {"unique", SqlKeyword::UNIQUE},
+            {"update", SqlKeyword::UPDATE},
+            {"values", SqlKeyword::VALUES},
+            {"where", SqlKeyword::WHERE},        };
 
         return dictionary;
     }

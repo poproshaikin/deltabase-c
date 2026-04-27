@@ -34,6 +34,9 @@ namespace sql
         types::CreateTableStatement
         parse_create_table();
 
+        types::AlterTableStatement
+        parse_alter_table();
+
         types::CreateDbStatement
         parse_create_db();
 
@@ -92,7 +95,7 @@ namespace sql
         const types::SqlToken&
         previous() const noexcept;
 
-        const types::SqlToken&
+        const types::SqlToken*
         current() const;
 
         std::unique_ptr<types::AstNode>

@@ -5,6 +5,8 @@
 #ifndef DELTABASE_NET_ERROR_HPP
 #define DELTABASE_NET_ERROR_HPP
 
+#include <cstdint>
+
 namespace types
 {
     enum class NetErrorCode : uint8_t

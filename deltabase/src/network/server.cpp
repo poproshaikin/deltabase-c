@@ -238,9 +238,10 @@ namespace net
 
         auto message = protocol_->parse(message_bytes.value());
         const auto request_id = std::visit([](const auto& msg)
-        {
-            return msg.request_id;
-        }, message);
+                                           {
+                                               return msg.request_id;
+                                           },
+                                           message);
 
         if (std::holds_alternative<PingNetMessage>(message))
         {
@@ -393,6 +394,7 @@ namespace net
         {
             PongNetMessage start_stream(session_id, NetErrorCode::START_STREAM, request_id);
             handle.send_message(protocol_->encode(start_stream));
+            std::cout << "sent start stream\n";
 
             DataTable chunk;
             chunk.output_schema = result->output_schema();
@@ -402,13 +404,12 @@ namespace net
             while (!cancelled.load() && next_chunk(*result, chunk, has_more))
             {
                 send_chunk(chunk);
+                std::cout << "sent chunk\n";
             }
 
-            if (!cancelled.load() && !disconnected.load())
-            {
-                PongNetMessage end_stream(session_id, NetErrorCode::END_STREAM, request_id);
-                handle.send_message(protocol_->encode(end_stream));
-            }
+            PongNetMessage end_stream(session_id, NetErrorCode::END_STREAM, request_id);
+            handle.send_message(protocol_->encode(end_stream));
+                std::cout << "sent end stream\n";
         };
 
         std::thread cancel_thread(cancel_handler);
@@ -440,10 +441,10 @@ namespace net
         {
             auto client = listener_.accept();
             std::thread(
-                [this, client = std::move(client)]() mutable
-                {
-                    handle_client(std::move(client));
-                })
+                    [this, client = std::move(client)]() mutable
+                    {
+                        handle_client(std::move(client));
+                    })
                 .detach();
         }
     }
