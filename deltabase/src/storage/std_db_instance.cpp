@@ -239,13 +239,14 @@ namespace storage
             if (!page)
                 return;
 
-            for (const auto& row : page->rows)
+            for (auto it = page->rows.rbegin(); it != page->rows.rend(); ++it)
             {
+                const auto& row = *it;
                 if (row.id != row_ptr.second)
                     continue;
 
                 if (has_flag(row.flags, DataRowFlags::OBSOLETE))
-                    return;
+                    continue;
 
                 if (matches_condition(row))
                     dt.rows.push_back(row);
@@ -352,8 +353,9 @@ namespace storage
         if (!page)
             return false;
 
-        for (const auto& row : page->rows)
+        for (auto it = page->rows.rbegin(); it != page->rows.rend(); ++it)
         {
+            const auto& row = *it;
             if (row.id == row_ptr.second)
                 return has_flag(row.flags, DataRowFlags::OBSOLETE);
         }
@@ -439,7 +441,9 @@ namespace storage
 
     std::vector<IndexId>
     StdDbInstance::insert_row_into_indexes(
-        const MetaTable& mt, const DataRow& row, const DataPageId& page_id
+        const MetaTable& mt,
+        const DataRow& row,
+        const DataPageId& page_id
     )
     {
         InstanceGuard guard(mtx_);
@@ -453,11 +457,11 @@ namespace storage
                 throw std::runtime_error("Index column not found in table schema");
 
             const auto& key = row.tokens[static_cast<size_t>(col_idx)];
-            
+
             // NULL values are not indexed
             if (key.type == DataType::_NULL)
                 continue;
-            
+
             const RowPtr row_ptr{page_id, row.id};
 
             BPIndexPager pager(*buffer_pool_, mt.id, mi.id);
@@ -516,7 +520,11 @@ namespace storage
 
                 for (const auto& assignment : update)
                 {
-                    ColumnId col_id = std::visit([](auto& a) { return a.first; }, assignment);
+                    ColumnId col_id = std::visit([](auto& a)
+                                                 {
+                                                     return a.first;
+                                                 },
+                                                 assignment);
                     int64_t col_idx = mt->get_column_idx(col_id);
                     MetaColumn cola = mt->get_column(col_idx);
 
@@ -619,7 +627,8 @@ namespace storage
     {
         InstanceGuard guard(mtx_);
         auto* ms = get_schema(schema_name);
-        if (!ms) return nullptr;
+        if (!ms)
+            return nullptr;
         return catalog_->get_table(table_name, ms->id);
     }
 
@@ -629,9 +638,98 @@ namespace storage
         InstanceGuard guard(mtx_);
         return get_table(
             identifier.table_name.value,
-            identifier.schema_name.has_value() ? identifier.schema_name.value().value
-                                               : cfg_.default_schema
+            identifier.schema_name.has_value()
+                ? identifier.schema_name.value().value
+                : cfg_.default_schema
         );
+    }
+
+    void
+    StdDbInstance::add_column(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const ColumnDefinition& column,
+        txn::Transaction& txn)
+    {
+        auto* mt = get_table(table_name, schema_name);
+        const auto unchanged_mt = *mt;
+        auto data = buffer_pool_->get_table_data(mt->id);
+        std::unordered_set<DataPageId> linked_pages;
+
+        MetaColumn new_column = convert(column);
+
+        mt->columns.push_back(new_column);
+
+        if (mt->live_rows == 0)
+        {
+            UpdateTableRecord update_table_record(unchanged_mt, *mt);
+            txn.append_log(update_table_record);
+            return;
+        }
+
+        for (auto* reading_page : data)
+        {
+            for (auto& row : reading_page->rows)
+            {
+                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    continue;
+
+                auto old_row = row;
+                auto old_values = old_row.tokens;
+                if (new_column.has_constraint<MetaNotNullConstraint>())
+                {
+                    auto* default_constraint = new_column.get_constraint<MetaDefaultConstraint>();
+                    assert(
+                        default_constraint &&
+                        "Semantic analyzer invariant violated: NOT NULL column without default");
+
+                    old_values.push_back(default_constraint->value);
+                }
+                else
+                {
+                    old_values.push_back(DataToken({}, DataType::_NULL));
+                }
+
+                DataRow new_row = old_row;
+                new_row.tokens = std::move(old_values);
+                auto size = io_manager_->estimate_size(new_row);
+
+                DataPage* destination =
+                    reading_page->size + size <= DataPage::MAX_SIZE
+                        ? reading_page
+                        : buffer_pool_->prepare_dp(size, *mt);
+
+                row.flags |= DataRowFlags::OBSOLETE;
+                UpdateRecord update_record(mt->id, reading_page->id, old_row, row);
+                txn.append_log(update_record);
+                reading_page->last_lsn = txn.get_last_lsn();
+                buffer_pool_->dirty_dp(reading_page->id);
+
+                if (destination != reading_page && linked_pages.insert(destination->id).second)
+                {
+                    destination->next = reading_page->next;
+                    reading_page->next = destination->id;
+                    buffer_pool_->dirty_dp(reading_page->id);
+                }
+
+                destination->rows.push_back(new_row);
+                destination->rows_count = destination->rows.size();
+                destination->size += size;
+                destination->min_rid =
+                    destination->rows_count == 1 ? new_row.id : std::min(destination->min_rid, new_row.id);
+                destination->max_rid = std::max(destination->max_rid, new_row.id);
+
+                mt->total_rows++;
+
+                InsertRecord insert_record(mt->id, destination->id, new_row);
+                txn.append_log(insert_record);
+                destination->last_lsn = txn.get_last_lsn();
+                buffer_pool_->dirty_dp(destination->id);
+            }
+        }
+
+        UpdateTableRecord update_table_record(unchanged_mt, *mt);
+        txn.append_log(update_table_record);
     }
 
     const Config&
@@ -772,21 +870,21 @@ namespace storage
                         continue;
 
                     const auto& key = row.tokens[static_cast<size_t>(col_idx)];
-                    
+
                     // NULL values are not indexed and don't violate uniqueness
                     if (key.type == DataType::_NULL)
                         continue;
-                    
+
                     std::string key_str(key.bytes.begin(), key.bytes.end());
-                    
+
                     if (seen_values.count(key_str) > 0)
                     {
                         throw UniqueConstraintViolation(
-                            "Cannot create unique index '" + index_name + "' on column '" + 
+                            "Cannot create unique index '" + index_name + "' on column '" +
                             column_name + "': table '" + table_name + "' contains duplicate values"
                         );
                     }
-                    
+
                     seen_values.insert(key_str);
                 }
             }
@@ -805,11 +903,11 @@ namespace storage
                     continue;
 
                 const auto& key = row.tokens[static_cast<size_t>(col_idx)];
-                
+
                 // NULL values are not indexed
                 if (key.type == DataType::_NULL)
                     continue;
-                
+
                 const RowPtr row_ptr{page->id, row.id};
 
                 tree.insert(key, row_ptr);
@@ -823,7 +921,9 @@ namespace storage
 
     bool
     StdDbInstance::exists_index(
-        const std::string& index_name, const std::string& table_name, const std::string& schema_name
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& schema_name
     )
     {
         InstanceGuard guard(mtx_);
@@ -832,7 +932,8 @@ namespace storage
 
     bool
     StdDbInstance::exists_index(
-        const std::string& index_name, const TableIdentifier& table_identifier
+        const std::string& index_name,
+        const TableIdentifier& table_identifier
     )
     {
         InstanceGuard guard(mtx_);
@@ -841,7 +942,9 @@ namespace storage
 
     MetaIndex*
     StdDbInstance::get_index(
-        const std::string& index_name, const std::string& table_name, const std::string& schema_name
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& schema_name
     )
     {
         InstanceGuard guard(mtx_);
@@ -857,7 +960,8 @@ namespace storage
 
     MetaIndex*
     StdDbInstance::get_index(
-        const std::string& index_name, const TableIdentifier& identifier
+        const std::string& index_name,
+        const TableIdentifier& identifier
     )
     {
         InstanceGuard guard(mtx_);
@@ -884,7 +988,11 @@ namespace storage
 
         const auto index_unchanged = *index;
 
-        std::erase_if(table->indexes, [&index](MetaIndex& index_entry) { return index_entry.id == index->id; });
+        std::erase_if(table->indexes,
+                      [&index](MetaIndex& index_entry)
+                      {
+                          return index_entry.id == index->id;
+                      });
 
         DropIndexRecord record(index_unchanged);
         txn.append_log(record);

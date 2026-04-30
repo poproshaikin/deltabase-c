@@ -49,8 +49,8 @@ namespace cli
     void
     Cli::execute_query(const CliCommand& command) noexcept(true)
     {
-        try
-        {
+        // try
+        // {
             const auto started_at = std::chrono::steady_clock::now();
 
             auto [query] = std::get<SqlCommand>(command);
@@ -60,11 +60,11 @@ namespace cli
             io_.write(formatted);
 
             print_timer(started_at);
-        }
-        catch (const std::exception& e)
-        {
-            std::cerr << "ERR: " << e.what() << std::endl;
-        }
+        // }
+        // catch (const std::exception& e)
+        // {
+        //     std::cerr << "ERR: " << e.what() << std::endl;
+        // }
     }
 
     void

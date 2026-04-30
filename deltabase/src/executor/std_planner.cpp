@@ -61,7 +61,8 @@ namespace exq
 
             const auto child_sel = estimate_seq_scan_selectivity(table, *limit_node.child);
             const auto estimated_rows = static_cast<double>(table.live_rows) * child_sel;
-            const auto capped_rows = std::min(estimated_rows, static_cast<double>(limit_node.limit));
+            const auto capped_rows =
+                std::min(estimated_rows, static_cast<double>(limit_node.limit));
             return capped_rows / static_cast<double>(table.live_rows);
         }
 
@@ -113,6 +114,10 @@ namespace exq
         {
             return plan(std::get<DropIndexStatement>(ast.value));
         }
+        if (ast.type == AstNodeType::ALTER_TABLE)
+        {
+            return plan(std::get<AlterTableStatement>(ast.value));
+        }
 
         throw std::runtime_error(
             std::format(
@@ -147,7 +152,7 @@ namespace exq
 
         const auto& token = std::get<SqlToken>(node->value);
         return std::holds_alternative<SqlLiteral>(token.detail) &&
-               std::get<SqlLiteral>(token.detail) == SqlLiteral::NULL_;
+               std::get<SqlLiteral>(token.detail) == SqlLiteral::_NULL;
     }
 
     bool
@@ -183,7 +188,9 @@ namespace exq
 
     IPlanNode::Type
     choose_scan_type(
-        const MetaTable& table, const BinaryExpr* condition, const MetaIndex** chosen_index
+        const MetaTable& table,
+        const BinaryExpr* condition,
+        const MetaIndex** chosen_index
     )
     {
         double best_cost = table.total_rows;
@@ -232,8 +239,9 @@ namespace exq
         {
             node = std::make_unique<IndexScanPlanNode>(
                 stmt.table.table_name,
-                stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                                   : db_config_.default_schema,
+                stmt.table.schema_name.has_value()
+                    ? stmt.table.schema_name.value().value
+                    : db_config_.default_schema,
                 chosen_index->id,
                 std::move(*stmt.where)
             );
@@ -242,15 +250,18 @@ namespace exq
         {
             node = std::make_unique<SeqScanPlanNode>(
                 stmt.table.table_name,
-                stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                                   : db_config_.default_schema
+                stmt.table.schema_name.has_value()
+                    ? stmt.table.schema_name.value().value
+                    : db_config_.default_schema
             );
 
             // 2. WHERE
             if (stmt.where)
             {
                 auto filter = std::make_unique<FilterPlanNode>(
-                    *db_.get_table(stmt.table), std::move(*stmt.where), std::move(node)
+                    *db_.get_table(stmt.table),
+                    std::move(*stmt.where),
+                    std::move(node)
                 );
                 node = std::move(filter);
             }
@@ -264,7 +275,9 @@ namespace exq
                 cols.push_back(c.value);
 
             auto project = std::make_unique<ProjectPlanNode>(
-                *db_.get_table(stmt.table), cols, std::move(node)
+                *db_.get_table(stmt.table),
+                cols,
+                std::move(node)
             );
             node = std::move(project);
         }
@@ -308,8 +321,9 @@ namespace exq
 
         auto insert = std::make_unique<InsertPlanNode>(
             stmt.table.table_name.value,
-            stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                               : db_config_.default_schema,
+            stmt.table.schema_name.has_value()
+                ? stmt.table.schema_name.value().value
+                : db_config_.default_schema,
             cols,
             std::move(values_node)
         );
@@ -360,12 +374,17 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                *db_.get_table(stmt.table), std::move(*stmt.where), std::move(root)
+                *db_.get_table(stmt.table),
+                std::move(*stmt.where),
+                std::move(root)
             );
         }
 
         auto update = std::make_unique<UpdatePlanNode>(
-            stmt.table.table_name, schema_name, assignments, std::move(root)
+            stmt.table.table_name,
+            schema_name,
+            assignments,
+            std::move(root)
         );
 
         QueryPlan plan;
@@ -390,7 +409,9 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                *db_.get_table(stmt.table), std::move(*stmt.where), std::move(root)
+                *db_.get_table(stmt.table),
+                std::move(*stmt.where),
+                std::move(root)
             );
         }
 
@@ -422,14 +443,16 @@ namespace exq
     QueryPlan
     StdPlanner::plan(const CreateTableStatement& table) const
     {
-        auto name = table.table.schema_name.has_value() ? table.table.schema_name.value().value
-                                                        : db_config_.default_schema;
+        auto name = table.table.schema_name.has_value()
+                        ? table.table.schema_name.value().value
+                        : db_config_.default_schema;
 
         const auto* schema = db_.get_schema(name);
 
         std::unique_ptr<IPlanNode> root = std::make_unique<CreateTablePlanNode>(
-            table.table.table_name.value, *schema, table.columns
-        );
+            table.table.table_name.value,
+            *schema,
+            table.columns);
 
         QueryPlan plan;
         plan.root = std::move(root);
@@ -440,17 +463,44 @@ namespace exq
     }
 
     QueryPlan
+    StdPlanner::plan(const AlterTableStatement& stmt) const
+    {
+
+        auto schema_name = stmt.table.schema_name.has_value()
+                               ? stmt.table.schema_name.value().value
+                               : db_config_.default_schema;
+
+        const auto* schema = db_.get_schema(schema_name);
+
+        std::unique_ptr<IPlanNode> root = std::make_unique<AlterTablePlanNode>(
+            stmt.table.table_name.value,
+            *schema,
+            stmt.operations);
+
+        QueryPlan plan;
+        plan.root = std::move(root);
+        plan.type = QueryPlan::Type::ALTER_TABLE;
+        plan.needs_stream = false;
+        plan.db_specific = true;
+        return plan;
+    }
+
+    QueryPlan
     StdPlanner::plan(const CreateIndexStatement& stmt) const
     {
-        auto schema_name = stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                                              : db_config_.default_schema;
+        auto schema_name = stmt.table.schema_name.has_value()
+                               ? stmt.table.schema_name.value().value
+                               : db_config_.default_schema;
         auto table_name = stmt.table.table_name.value;
         auto column_name = stmt.column_name.value;
         auto index_name = stmt.index_name.value;
 
         std::unique_ptr<IPlanNode> root = std::make_unique<CreateIndexPlanNode>(
-            index_name, table_name, schema_name, column_name, stmt.is_unique
-        );
+            index_name,
+            table_name,
+            schema_name,
+            column_name,
+            stmt.is_unique);
 
         QueryPlan plan;
         plan.root = std::move(root);
@@ -464,8 +514,9 @@ namespace exq
     StdPlanner::plan(const DropIndexStatement& stmt) const
     {
 
-        auto schema_name = stmt.table.schema_name.has_value() ? stmt.table.schema_name.value().value
-                                                              : db_config_.default_schema;
+        auto schema_name = stmt.table.schema_name.has_value()
+                               ? stmt.table.schema_name.value().value
+                               : db_config_.default_schema;
         auto table_name = stmt.table.table_name.value;
         auto index_name = stmt.index_name.value;
 

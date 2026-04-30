@@ -40,7 +40,8 @@ namespace exq
         types::ScanCursor cursor_;
 
     public:
-        explicit SeqScanNodeExecutor(
+        explicit
+        SeqScanNodeExecutor(
             storage::IDbInstance& storage,
             const std::string& table_name,
             const std::string& schema_name
@@ -71,7 +72,8 @@ namespace exq
         uint64_t index_ = 0;
 
     public:
-        explicit IndexScanNodeExecutor(
+        explicit
+        IndexScanNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
             const types::IndexId& index_id,
@@ -100,7 +102,8 @@ namespace exq
         std::unique_ptr<INodeExecutor> child_;
 
     public:
-        explicit FilterNodeExecutor(
+        explicit
+        FilterNodeExecutor(
             const types::MetaTable& table,
             types::BinaryExpr&& condition,
             std::unique_ptr<INodeExecutor> child
@@ -127,7 +130,8 @@ namespace exq
         std::unique_ptr<INodeExecutor> child_;
 
     public:
-        explicit ProjectionNodeExecutor(
+        explicit
+        ProjectionNodeExecutor(
             const types::MetaTable& table,
             const std::vector<std::string>& columns,
             std::unique_ptr<INodeExecutor> child
@@ -153,7 +157,8 @@ namespace exq
         std::unique_ptr<INodeExecutor> child_;
 
     public:
-        explicit LimitNodeExecutor(uint64_t limit, std::unique_ptr<INodeExecutor> child);
+        explicit
+        LimitNodeExecutor(uint64_t limit, std::unique_ptr<INodeExecutor> child);
 
         void
         open() override;
@@ -178,7 +183,8 @@ namespace exq
         bool executed_ = false;
 
     public:
-        explicit InsertNodeExecutor(
+        explicit
+        InsertNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
             storage::IDbInstance& storage,
@@ -205,7 +211,8 @@ namespace exq
         size_t idx_ = 0;
 
     public:
-        explicit ValuesNodeExecutor(const std::vector<types::DataRow>& rows);
+        explicit
+        ValuesNodeExecutor(const std::vector<types::DataRow>& rows);
 
         void
         open() override;
@@ -230,7 +237,8 @@ namespace exq
         bool executed_;
 
     public:
-        explicit UpdateNodeExecutor(
+        explicit
+        UpdateNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
             storage::IDbInstance& db,
@@ -260,7 +268,8 @@ namespace exq
         bool executed_;
 
     public:
-        explicit DeleteNodeExecutor(
+        explicit
+        DeleteNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
             storage::IDbInstance& db,
@@ -288,12 +297,41 @@ namespace exq
         storage::IDbInstance& db_;
 
     public:
-        explicit CreateTableNodeExecutor(
+        explicit
+        CreateTableNodeExecutor(
             const std::string& table_name,
             const types::MetaSchema& schema,
             const std::vector<types::ColumnDefinition>& columns,
-            storage::IDbInstance& db
-        );
+            storage::IDbInstance& db);
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
+    class AlterTableNodeExecutor final : public INodeExecutor
+    {
+        std::string table_name_;
+        types::MetaSchema schema_;
+        std::vector<types::AlterTableOperation> operations_;
+        storage::IDbInstance& db_;
+        bool executed_ = false;
+
+    public:
+        explicit
+        AlterTableNodeExecutor(
+            const std::string& table_name,
+            const types::MetaSchema& schema,
+            const std::vector<types::AlterTableOperation>& columns,
+            storage::IDbInstance& db);
 
         void
         open() override;
@@ -313,7 +351,8 @@ namespace exq
         std::string db_name_;
 
     public:
-        explicit CreateDbNodeExecutor(const std::string& db_name);
+        explicit
+        CreateDbNodeExecutor(const std::string& db_name);
 
         void
         open() override;
@@ -339,7 +378,8 @@ namespace exq
         storage::IDbInstance& db_;
 
     public:
-        explicit CreateIndexNodeExecutor(
+        explicit
+        CreateIndexNodeExecutor(
             const std::string& index_name,
             const std::string& table_name,
             const std::string& column_name,
@@ -369,7 +409,8 @@ namespace exq
         storage::IDbInstance& db_;
 
     public:
-        explicit DropIndexNodeExecutor(
+        explicit
+        DropIndexNodeExecutor(
             const std::string& index_name,
             const std::string& table_name,
             const std::string& schema_name,

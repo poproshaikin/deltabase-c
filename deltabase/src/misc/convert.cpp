@@ -46,8 +46,23 @@ namespace misc
         MetaColumn column;
         column.name = column_def.name.value;
         column.type = convert_to_dt(column_def.type);
-        column.flags = convert_to_mcf(column_def.constraints);
+        column.constraints.clear();
+        for (const auto& constraint : column_def.constraints)
+            column.constraints.emplace_back(convert(constraint));
+
         return column;
+    }
+
+    ColumnConstraint
+    convert(const Constraint& constraint)
+    {
+        if (std::holds_alternative<NotNullConstraint>(constraint))
+            return MetaNotNullConstraint{};
+
+        if (const auto* default_constraint = std::get_if<DefaultConstraint>(&constraint))
+            return MetaDefaultConstraint{ DataToken(default_constraint->value) };
+
+        throw std::runtime_error("convert: unsupported column constraint");
     }
 
     DataType
@@ -68,45 +83,6 @@ namespace misc
             );
 
         return type;
-    }
-
-    MetaColumnFlags
-    convert_to_mcf(const std::vector<SqlToken>& tokens)
-    {
-        MetaColumnFlags flags = MetaColumnFlags::NONE;
-
-        for (size_t i = 0; i < tokens.size(); ++i)
-        {
-            if (!tokens[i].is_keyword())
-                continue;
-
-            auto keyword = tokens[i].get_detail<sql::SqlKeyword>();
-
-            switch (keyword)
-            {
-            case SqlKeyword::PRIMARY:
-                flags = flags | MetaColumnFlags::PK;
-                break;
-            case SqlKeyword::UNIQUE:
-                flags = flags | MetaColumnFlags::UN;
-                break;
-            case SqlKeyword::AUTOINCREMENT:
-                flags = flags | MetaColumnFlags::AI;
-                break;
-            case SqlKeyword::NOT:
-                if (i + 1 < tokens.size() &&
-                    tokens[i + 1].is_keyword() &&
-                    tokens[i + 1].get_detail<SqlKeyword>() == SqlKeyword::_NULL)
-                {
-                    flags = flags | MetaColumnFlags::NN;
-                }
-                break;
-            default:
-                break;
-            }
-        }
-
-        return flags;
     }
 
     DataRow

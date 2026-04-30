@@ -8,29 +8,27 @@
 #include "ast_tree.hpp"
 #include "data_type.hpp"
 #include "typedefs.hpp"
+#include "data_token.hpp"
+
+#include <optional>
+#include <vector>
 
 #include <string>
 
 namespace types
 {
-    enum class MetaColumnFlags
+    using ColumnId = UUID;
+
+    struct MetaNotNullConstraint {};
+
+    struct MetaDefaultConstraint
     {
-        NONE = 0,
-        PK = 1 << 0,
-        FK = 1 << 1,
-        AI = 1 << 2,
-        NN = 1 << 3,
-        UN = 1 << 4
+        DataToken value;
     };
 
-    inline MetaColumnFlags
-    operator|(MetaColumnFlags left, MetaColumnFlags right)
-    {
-        using T = std::underlying_type_t<MetaColumnFlags>;
-        return static_cast<MetaColumnFlags>(static_cast<T>(left) | static_cast<T>(right));
-    }
-
-    using ColumnId = UUID;
+    using ColumnConstraint = std::variant<
+        MetaNotNullConstraint,
+        MetaDefaultConstraint>;
 
     struct MetaColumn
     {
@@ -38,7 +36,7 @@ namespace types
         UUID table_id;
         std::string name;
         DataType type;
-        MetaColumnFlags flags;
+        std::vector<ColumnConstraint> constraints;
 
         explicit
         MetaColumn() = default;
@@ -47,7 +45,37 @@ namespace types
         MetaColumn(const ColumnDefinition& def);
 
         explicit
-        MetaColumn(const std::string& name, DataType type, MetaColumnFlags flags);
+        MetaColumn(const std::string& name, DataType type, const std::vector<ColumnConstraint>& constraints);
+
+        template <typename TConstraint>
+        bool
+        has_constraint() const
+        {
+            for (const auto& con : constraints)
+            {
+                if (std::holds_alternative<TConstraint>(con))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        template <typename TConstraint>
+        TConstraint*
+        get_constraint()
+        {
+            for (auto& con : constraints)
+            {
+                if (std::holds_alternative<TConstraint>(con))
+                {
+                    return &std::get<TConstraint>(con);
+                }
+            }
+
+            return nullptr;
+        }
     };
 }
 

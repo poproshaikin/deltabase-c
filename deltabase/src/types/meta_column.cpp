@@ -8,8 +8,8 @@
 
 namespace types
 {
-    MetaColumn::MetaColumn(const std::string& name, DataType type, MetaColumnFlags flags)
-        : name(name), type(type), flags(flags)
+    MetaColumn::MetaColumn(const std::string& name, DataType type, const std::vector<ColumnConstraint>& constraints)
+        : name(name), type(type), constraints(constraints)
     {
     }
 

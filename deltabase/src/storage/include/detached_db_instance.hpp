@@ -146,6 +146,12 @@ namespace storage
             const std::string& schema_name,
             txn::Transaction& txn
         ) override;
+
+        void
+        add_column(const std::string& table_name,
+            const std::string& schema_name,
+            const types::ColumnDefinition& column,
+            txn::Transaction& txn) override;
     };
 } // namespace storage
 

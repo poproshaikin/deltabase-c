@@ -216,4 +216,13 @@ namespace storage
     {
         throw std::logic_error("DetachedDbInstance::get_index: this method is not supported");
     }
+
+    void
+    DetachedDbInstance::add_column(const std::string& table_name,
+        const std::string& schema_name,
+        const types::ColumnDefinition& column,
+        txn::Transaction& txn)
+    {
+        throw std::logic_error("DetachedDbInstance::add_column: this method is not supported");
+    }
 } // namespace storage

@@ -67,7 +67,7 @@ namespace types
             type = DataType::CHAR;
             break;
         }
-        case SqlLiteral::NULL_:
+        case SqlLiteral::_NULL:
         {
             bytes.clear();
             type = DataType::_NULL;

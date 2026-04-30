@@ -39,7 +39,7 @@ namespace types
         DROP,
         DATABASE,
         TABLE,
-        STRING,
+        TEXT,
         INTEGER,
         REAL,
         CHAR,
@@ -56,7 +56,8 @@ namespace types
         IS,
         ALTER,
         ADD,
-        COLUMN
+        COLUMN,
+        DEFAULT
     };
 
     enum class SqlSymbol
@@ -101,7 +102,7 @@ namespace types
         BOOL,
         CHAR,
         REAL,
-        NULL_,
+        _NULL,
 
         COUNT
     };

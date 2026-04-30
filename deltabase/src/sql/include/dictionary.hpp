@@ -44,12 +44,13 @@ namespace sql
             {"schema", SqlKeyword::SCHEMA},
             {"select", SqlKeyword::SELECT},
             {"set", SqlKeyword::SET},
-            {"string", SqlKeyword::STRING},
+            {"text", SqlKeyword::TEXT},
             {"table", SqlKeyword::TABLE},
             {"unique", SqlKeyword::UNIQUE},
             {"update", SqlKeyword::UPDATE},
             {"values", SqlKeyword::VALUES},
-            {"where", SqlKeyword::WHERE},        };
+            {"where", SqlKeyword::WHERE},
+        };
 
         return dictionary;
     }
@@ -58,7 +59,7 @@ namespace sql
     data_types_map()
     {
         static const std::unordered_map<std::string, SqlKeyword> types_map = {
-            {"string", SqlKeyword::STRING},
+            {"text", SqlKeyword::TEXT},
             {"integer", SqlKeyword::INTEGER},
             {"real", SqlKeyword::REAL},
             {"char", SqlKeyword::CHAR},
@@ -73,7 +74,7 @@ namespace sql
     {
         static const std::unordered_map<SqlKeyword, DataType> types_map = {
             {SqlKeyword::INTEGER, DataType::INTEGER},
-            {SqlKeyword::STRING, DataType::STRING},
+            {SqlKeyword::TEXT, DataType::STRING},
             {SqlKeyword::REAL, DataType::REAL},
             {SqlKeyword::BOOL, DataType::BOOL},
             {SqlKeyword::CHAR, DataType::CHAR},

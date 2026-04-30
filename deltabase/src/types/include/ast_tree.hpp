@@ -140,11 +140,30 @@ namespace types
         std::optional<BinaryExpr> where;
     };
 
+    struct NotNullConstraint
+    {
+    };
+
+    struct DefaultConstraint
+    {
+        SqlToken value;
+
+        explicit DefaultConstraint(SqlToken value = SqlToken())
+            : value(std::move(value))
+        {
+        }
+    };
+
+    using Constraint = std::variant<
+        NotNullConstraint,
+        DefaultConstraint
+    >;
+
     struct ColumnDefinition
     {
         SqlToken name;
         SqlToken type;
-        std::vector<SqlToken> constraints;
+        std::vector<Constraint> constraints;
     };
 
     struct CreateTableStatement

@@ -33,11 +33,11 @@ namespace misc
     types::MetaColumn
     convert(const types::ColumnDefinition& column_def);
 
+    types::ColumnConstraint
+    convert(const types::Constraint& constraint);
+
     types::DataType
     convert_to_dt(const types::SqlToken& token);
-
-    types::MetaColumnFlags
-    convert_to_mcf(const std::vector<types::SqlToken>& tokens);
 
     types::DataRow
     convert(const types::ValuesExpr& values_expr);

@@ -40,6 +40,9 @@ namespace exq
         plan(const types::CreateTableStatement& table) const;
 
         types::QueryPlan
+        plan(const types::AlterTableStatement& stmt) const;
+
+        types::QueryPlan
         plan(const types::CreateIndexStatement& stmt) const;
 
         types::QueryPlan

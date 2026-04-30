@@ -15,7 +15,9 @@ namespace exq
     using namespace types;
 
     SeqScanNodeExecutor::SeqScanNodeExecutor(
-        storage::IDbInstance& storage, const std::string& table_name, const std::string& schema_name
+        storage::IDbInstance& storage,
+        const std::string& table_name,
+        const std::string& schema_name
     )
         : table_name_(table_name), schema_name_(schema_name), db_(storage), cursor_{}
     {
@@ -53,7 +55,9 @@ namespace exq
     }
 
     FilterNodeExecutor::FilterNodeExecutor(
-        const MetaTable& table, BinaryExpr&& condition, std::unique_ptr<INodeExecutor> child
+        const MetaTable& table,
+        BinaryExpr&& condition,
+        std::unique_ptr<INodeExecutor> child
     )
         : condition_(std::move(condition)), evaluator_(table), table_(table),
           child_(std::move(child))
@@ -488,6 +492,55 @@ namespace exq
         return OutputSchema{};
     }
 
+    AlterTableNodeExecutor::AlterTableNodeExecutor(
+        const std::string& table_name,
+        const MetaSchema& schema,
+        const std::vector<AlterTableOperation>& columns,
+        storage::IDbInstance& db) : table_name_(table_name),
+                                    schema_(schema), operations_(columns),
+                                    db_(db)
+    {
+    }
+
+    void
+    AlterTableNodeExecutor::open()
+    {
+    }
+
+    bool
+    AlterTableNodeExecutor::next(DataRow& out)
+    {
+        if (executed_)
+            return false;
+
+        auto txn = db_.make_txn();
+        txn.begin();
+
+        for (const auto& operation : this->operations_)
+        {
+            if (auto* add_col = std::get_if<AddColumnOperation>(&operation))
+            {
+                db_.add_column(table_name_, schema_.name, add_col->column, txn);
+                executed_ = true;
+            }
+        }
+
+        txn.commit();
+
+        return false;
+    }
+
+    void
+    AlterTableNodeExecutor::close()
+    {
+    }
+
+    OutputSchema
+    AlterTableNodeExecutor::output_schema()
+    {
+        return OutputSchema{};
+    }
+
     CreateDbNodeExecutor::CreateDbNodeExecutor(const std::string& db_name) : db_name_(db_name)
     {
     }
@@ -611,8 +664,7 @@ namespace exq
                 index_scan_node.schema_name,
                 index_scan_node.index_id,
                 std::move(index_scan_node.condition),
-                db
-            );
+                db);
 
             return std::make_unique<IndexScanNodeExecutor>(std::move(executor));
         }
@@ -622,8 +674,7 @@ namespace exq
             FilterNodeExecutor executor(
                 filter_node.table,
                 std::move(filter_node.where),
-                from_plan(std::move(filter_node.child), db)
-            );
+                from_plan(std::move(filter_node.child), db));
 
             return std::make_unique<FilterNodeExecutor>(std::move(executor));
         }
@@ -633,16 +684,17 @@ namespace exq
             ProjectionNodeExecutor executor(
                 project_node.table,
                 project_node.columns,
-                from_plan(std::move(project_node.child), db)
-            );
+                from_plan(std::move(project_node.child), db));
+
             return std::make_unique<ProjectionNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::LIMIT:
         {
             auto& limit_node = static_cast<LimitPlanNode&>(*node);
             LimitNodeExecutor executor(
-                limit_node.limit, from_plan(std::move(limit_node.child), db)
-            );
+                limit_node.limit,
+                from_plan(std::move(limit_node.child), db));
+
             return std::make_unique<LimitNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::INSERT:
@@ -653,8 +705,8 @@ namespace exq
                 insert_node.schema_name,
                 db,
                 insert_node.column_names,
-                from_plan(std::move(insert_node.child), db)
-            );
+                from_plan(std::move(insert_node.child), db));
+
             return std::make_unique<InsertNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::VALUES:
@@ -671,8 +723,8 @@ namespace exq
                 update_node.schema_name,
                 db,
                 update_node.assignments,
-                from_plan(std::move(update_node.child), db)
-            );
+                from_plan(std::move(update_node.child), db));
+
             return std::make_unique<UpdateNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::DELETE:
@@ -682,8 +734,8 @@ namespace exq
                 delete_node.table_name,
                 delete_node.schema_name,
                 db,
-                from_plan(std::move(delete_node.child), db)
-            );
+                from_plan(std::move(delete_node.child), db));
+
             return std::make_unique<DeleteNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::CREATE_TABLE:
@@ -693,9 +745,20 @@ namespace exq
                 create_table_node.table_name,
                 create_table_node.schema,
                 create_table_node.columns,
-                db
-            );
+                db);
+
             return std::make_unique<CreateTableNodeExecutor>(std::move(executor));
+        }
+        case IPlanNode::Type::ALTER_TABLE:
+        {
+            auto& alter_table_node = static_cast<AlterTablePlanNode&>(*node);
+            AlterTableNodeExecutor executor(
+                alter_table_node.table_name,
+                alter_table_node.schema,
+                alter_table_node.operations,
+                db);
+
+            return std::make_unique<AlterTableNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::CREATE_DB:
         {
@@ -712,8 +775,8 @@ namespace exq
                 create_index_node.column_name,
                 create_index_node.schema_name,
                 create_index_node.is_unique,
-                db
-            );
+                db);
+
             return std::make_unique<CreateIndexNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::DROP_INDEX:
@@ -723,16 +786,15 @@ namespace exq
                 drop_index_node.index_name,
                 drop_index_node.table_name,
                 drop_index_node.schema_name,
-                db
-            );
+                db);
+
             return std::make_unique<DropIndexNodeExecutor>(std::move(executor));
         }
         default:
             throw std::runtime_error(
                 "NodeExecutorFactory::from_plan: failed to create executor tree for plan node of "
                 "type " +
-                std::to_string(static_cast<int>(node->type()))
-            );
+                std::to_string(static_cast<int>(node->type())));
         }
     }
 

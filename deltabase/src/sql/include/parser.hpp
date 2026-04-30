@@ -95,8 +95,8 @@ namespace sql
         const types::SqlToken&
         previous() const noexcept;
 
-        const types::SqlToken*
-        current() const;
+        types::SqlToken*
+        current();
 
         std::unique_ptr<types::AstNode>
         parse_primary();
@@ -106,6 +106,9 @@ namespace sql
 
         types::ColumnDefinition
         parse_column_def();
+
+        types::Constraint
+        parse_constraint();
 
         types::TableIdentifier
         parse_table_identifier();

@@ -4,10 +4,12 @@
 
 #include "semantic_analyzer.hpp"
 
+#include "evaluator.hpp"
+#include "../misc/include/convert.hpp"
 #include "../misc/include/exceptions.hpp"
 
 #include <format>
-#include <iostream>
+#include <unordered_set>
 
 namespace exq
 {
@@ -44,6 +46,9 @@ namespace exq
         case AstNodeType::CREATE_INDEX:
             return analyze_create_index(std::get<CreateIndexStatement>(node.value));
 
+        case AstNodeType::ALTER_TABLE:
+            return analyze_alter_table(std::get<AlterTableStatement>(node.value));
+
         case AstNodeType::DROP_INDEX:
             return analyze_drop_index(std::get<DropIndexStatement>(node.value));
 
@@ -67,7 +72,7 @@ namespace exq
 
         for (const SqlToken& col : stmt.columns)
             if (!table->has_column(col.value))
-                return AnalysisResult(ColumnDoesntExists(col.value));
+                return AnalysisResult(ColumnDoesntExist(col.value));
 
         if (stmt.where.has_value())
         {
@@ -92,21 +97,54 @@ namespace exq
 
         for (const SqlToken& col : stmt.columns)
             if (!table->has_column(col.value))
-                return AnalysisResult(ColumnDoesntExists(col.value));
+                return AnalysisResult(ColumnDoesntExist(col.value));
 
-        auto get_column = [&stmt, &table](
-                              int value_idx
-                          ) -> std::optional<std::reference_wrapper<const MetaColumn>>
+        const bool has_explicit_columns = !stmt.columns.empty();
+        const size_t expected_value_count = has_explicit_columns ? stmt.columns.size() : table->columns.size();
+
+        for (const auto& values : stmt.values)
         {
-            const auto& name = stmt.columns.at(value_idx);
-            if (!table->has_column(name.value))
+            if (has_explicit_columns)
+            {
+                if (values.values.size() != expected_value_count)
+                    return AnalysisResult(
+                        std::runtime_error("VALUES count does not match columns count"));
+            }
+            else if (values.values.size() > expected_value_count)
+            {
+                return AnalysisResult(
+                    std::runtime_error("VALUES count exceeds table column count"));
+            }
+        }
+
+        auto get_column = [&stmt, &table, has_explicit_columns](size_t value_idx)
+            -> std::optional<std::reference_wrapper<const MetaColumn>>
+        {
+            if (has_explicit_columns)
+            {
+                if (value_idx >= stmt.columns.size())
+                    return std::nullopt;
+
+                const auto& name = stmt.columns[value_idx];
+                if (!table->has_column(name.value))
+                    return std::nullopt;
+
+                return std::cref(table->get_column(name.value));
+            }
+
+            if (value_idx >= table->columns.size())
                 return std::nullopt;
 
-            return std::cref(table->get_column(name.value));
+            return std::cref(table->get_column(static_cast<int64_t>(value_idx)));
         };
 
         for (const auto& values : stmt.values)
         {
+            std::unordered_set<std::string> specified_columns;
+            specified_columns.reserve(stmt.columns.size());
+            for (const auto& col : stmt.columns)
+                specified_columns.insert(col.value);
+
             for (size_t i = 0; i < values.values.size(); ++i)
             {
                 const SqlToken& value = values.values[i];
@@ -119,6 +157,12 @@ namespace exq
 
                 auto literal_type = std::get<SqlLiteral>(value.detail);
                 auto column_type = column.value().get().type;
+                auto is_not_null = has_not_null_constraint(column.value().get());
+
+                if (is_not_null && literal_type == SqlLiteral::_NULL)
+                    return AnalysisResult(
+                        std::runtime_error(
+                            "Cannot insert NULL to non-nullable column"));
 
                 if (!is_compatible(literal_type, column_type))
                     return AnalysisResult(
@@ -127,9 +171,36 @@ namespace exq
                                 "Incompatible types conversion: {} to {}",
                                 static_cast<int>(literal_type),
                                 static_cast<int>(column_type)
-                            )
-                        )
-                    );
+                            )));
+            }
+
+            if (!has_explicit_columns)
+            {
+                for (size_t i = values.values.size(); i < table->columns.size(); ++i)
+                {
+                    const auto& column = table->get_column(static_cast<int64_t>(i));
+                    if (has_not_null_constraint(column) && !has_default_constraint(column))
+                    {
+                        return AnalysisResult(std::runtime_error(
+                            "INSERT is missing a value for NOT NULL column '" + column.name +
+                            "' without DEFAULT"));
+                    }
+                }
+            }
+            else
+            {
+                for (const auto& column : table->columns)
+                {
+                    if (specified_columns.contains(column.name))
+                        continue;
+
+                    if (has_not_null_constraint(column) && !has_default_constraint(column))
+                    {
+                        return AnalysisResult(std::runtime_error(
+                            "INSERT is missing a value for NOT NULL column '" + column.name +
+                            "' without DEFAULT"));
+                    }
+                }
             }
         }
 
@@ -197,6 +268,89 @@ namespace exq
         return AnalysisResult(true);
     }
 
+    bool
+    SemanticAnalyzer::has_not_null_constraint(const MetaColumn& column) const
+    {
+        for (const auto& constraint : column.constraints)
+        {
+            if (std::holds_alternative<MetaNotNullConstraint>(constraint))
+                return true;
+        }
+        return false;
+    }
+
+    bool
+    SemanticAnalyzer::has_default_constraint(const MetaColumn& column) const
+    {
+        for (const auto& constraint : column.constraints)
+        {
+            if (std::holds_alternative<MetaDefaultConstraint>(constraint))
+                return true;
+        }
+        return false;
+    }
+
+    AnalysisResult
+    SemanticAnalyzer::analyze_alter_table(const AlterTableStatement& stmt) const
+    {
+        if (!db_.exists_table(stmt.table))
+            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+
+        const auto* mt = db_.get_table(stmt.table);
+
+        for (const auto& operation : stmt.operations)
+        {
+            if (auto* add_col = std::get_if<AddColumnOperation>(&operation))
+            {
+                if (mt->has_column(add_col->column.name.value))
+                    return AnalysisResult(ColumnExists(add_col->column.name.value));
+
+                bool has_not_null = false;
+                bool has_default = false;
+
+                for (const auto& constraint : add_col->column.constraints)
+                {
+                    if (std::holds_alternative<NotNullConstraint>(constraint))
+                    {
+                        has_not_null = true;
+                    }
+                    else if (auto* default_value = std::get_if<DefaultConstraint>(&constraint))
+                    {
+                        has_default = true;
+
+                        auto value_type = default_value->value.get_detail<SqlLiteral>();
+                        DataType col_type = misc::convert_to_dt(add_col->column.type);
+                        if (!is_compatible(value_type, col_type))
+                            return AnalysisResult(
+                                std::runtime_error(
+                                    "Type of the default value is not compatible with the column's type"));
+                    }
+                }
+
+                if (has_not_null && mt->live_rows > 0 && !has_default)
+                {
+                    return AnalysisResult(std::runtime_error(
+                        "Cannot add NOT NULL column to non-empty table without DEFAULT value"));
+                }
+
+                if (mt->live_rows > 0)
+                {
+                    for (const auto& existing_col : mt->columns)
+                    {
+                        if (has_not_null_constraint(existing_col) && !has_default_constraint(existing_col))
+                        {
+                            return AnalysisResult(std::runtime_error(
+                                "Cannot add column to non-empty table: existing column '" + existing_col.name +
+                                "' has NOT NULL constraint without DEFAULT value"));
+                        }
+                    }
+                }
+            }
+        }
+
+        return AnalysisResult(true);
+    }
+
     AnalysisResult
     SemanticAnalyzer::analyze_create_index(const CreateIndexStatement& stmt) const
     {
@@ -222,7 +376,8 @@ namespace exq
             return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
 
         if (!db_.exists_index(stmt.index_name.value, stmt.table))
-            return AnalysisResult(IndexDoesntExist(stmt.index_name.value, stmt.table.table_name.value));
+            return AnalysisResult(
+                IndexDoesntExist(stmt.index_name.value, stmt.table.table_name.value));
 
         return AnalysisResult(true);
     }
@@ -242,12 +397,12 @@ namespace exq
             if (!where.left || !where.right)
                 return AnalysisResult(std::runtime_error("Incomplete comparison expression"));
 
-                auto comparison_analysis = analyze_column_comparison(
-                    where.op,
-                    where.left,
-                    where.right,
-                    table
-                );
+            auto comparison_analysis = analyze_column_comparison(
+                where.op,
+                where.left,
+                where.right,
+                table
+            );
             if (!comparison_analysis.is_valid)
                 return AnalysisResult(*comparison_analysis.err);
         }
@@ -285,7 +440,8 @@ namespace exq
 
     AnalysisResult
     SemanticAnalyzer::analyze_column_assignment(
-        const BinaryExpr& expr, const MetaTable& table
+        const BinaryExpr& expr,
+        const MetaTable& table
     ) const
     {
         if (expr.op != AstOperator::ASSIGN)
@@ -305,7 +461,7 @@ namespace exq
 
         const std::string& col_name = std::get<SqlToken>(column_node->value).value;
         if (!table.has_column(col_name))
-            return AnalysisResult(ColumnDoesntExists(std::string(col_name)));
+            return AnalysisResult(ColumnDoesntExist(std::string(col_name)));
 
         const auto& column = table.get_column(col_name);
 
@@ -322,10 +478,10 @@ namespace exq
 
     AnalysisResult
     SemanticAnalyzer::analyze_column_comparison(
-            types::AstOperator op,
-            const std::unique_ptr<AstNode>& left,
-            const std::unique_ptr<AstNode>& right,
-            const MetaTable& table
+        types::AstOperator op,
+        const std::unique_ptr<AstNode>& left,
+        const std::unique_ptr<AstNode>& right,
+        const MetaTable& table
     ) const
     {
         const AstNode* column_node = nullptr;
@@ -352,11 +508,11 @@ namespace exq
         const auto& value_token = std::get<SqlToken>(value_node->value);
 
         const auto literal_type = std::get<SqlLiteral>(value_token.detail);
-            if (op == AstOperator::IS && literal_type != SqlLiteral::NULL_)
+        if (op == AstOperator::IS && literal_type != SqlLiteral::_NULL)
             return AnalysisResult(std::runtime_error("IS operator can only be used with NULL"));
 
         if (!table.has_column(column_token.value))
-            return AnalysisResult(ColumnDoesntExists(column_token.value));
+            return AnalysisResult(ColumnDoesntExist(column_token.value));
 
         const auto& column = table.get_column(column_token.value);
         if (!is_compatible(literal_type, column.type))
@@ -368,7 +524,7 @@ namespace exq
     bool
     SemanticAnalyzer::is_compatible(SqlLiteral lit, DataType col) const
     {
-        if (lit == SqlLiteral::NULL_)
+        if (lit == SqlLiteral::_NULL)
             return true;
 
         const auto& table = compat_table();

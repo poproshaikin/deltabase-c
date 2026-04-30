@@ -51,25 +51,29 @@ namespace
     }
 
     std::string
-    column_flags_to_string(MetaColumnFlags flags)
+    constraints_to_string(const std::vector<ColumnConstraint>& constraints)
     {
-        using Underlying = std::underlying_type_t<MetaColumnFlags>;
-        const auto value = static_cast<Underlying>(flags);
+        if (constraints.empty())
+            return "NONE";
 
         std::vector<std::string> parts;
-        if ((value & static_cast<Underlying>(MetaColumnFlags::PK)) != 0)
-            parts.emplace_back("PK");
-        if ((value & static_cast<Underlying>(MetaColumnFlags::FK)) != 0)
-            parts.emplace_back("FK");
-        if ((value & static_cast<Underlying>(MetaColumnFlags::AI)) != 0)
-            parts.emplace_back("AI");
-        if ((value & static_cast<Underlying>(MetaColumnFlags::NN)) != 0)
-            parts.emplace_back("NN");
-        if ((value & static_cast<Underlying>(MetaColumnFlags::UN)) != 0)
-            parts.emplace_back("UN");
-
-        if (parts.empty())
-            return "NONE";
+        for (const auto& c : constraints)
+        {
+            if (std::holds_alternative<MetaNotNullConstraint>(c))
+                parts.emplace_back("NN");
+            else if (std::holds_alternative<MetaDefaultConstraint>(c))
+            {
+                const auto& dc = std::get<MetaDefaultConstraint>(c);
+                if (dc.value.bytes.empty())
+                    parts.emplace_back("DEFAULT");
+                else
+                {
+                    parts.emplace_back(std::string("DEFAULT=") + std::string(dc.value.bytes.begin(), dc.value.bytes.end()));
+                }
+            }
+            else
+                parts.emplace_back("UNKNOWN");
+        }
 
         std::ostringstream out;
         for (size_t i = 0; i < parts.size(); ++i)
@@ -234,7 +238,7 @@ main(int argc, char** argv)
                     {
                         std::cout << "    COLUMN " << column.name << " id=" << column.id.to_string()
                                   << " type=" << data_type_to_string(column.type)
-                                  << " flags=" << column_flags_to_string(column.flags) << "\n";
+                                  << " constraints=" << constraints_to_string(column.constraints) << "\n";
                         printed_columns += 1;
                     }
                 }

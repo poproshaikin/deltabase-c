@@ -40,11 +40,20 @@ public:
     }
 };
 
-class ColumnDoesntExists : public std::runtime_error
+class ColumnDoesntExist : public std::runtime_error
 {
 public:
-    ColumnDoesntExists(const std::string& col_name)
+    ColumnDoesntExist(const std::string& col_name)
         : std::runtime_error("Column '" + col_name + "' doesn't exists")
+    {
+    }
+};
+
+class ColumnExists : public std::runtime_error
+{
+public:
+    ColumnExists(const std::string& col_name)
+        : std::runtime_error("Column '" + col_name + "' already exists")
     {
     }
 };

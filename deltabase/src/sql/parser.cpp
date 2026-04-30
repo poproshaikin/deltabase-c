@@ -20,7 +20,8 @@ namespace sql
         const SqlToken& token = tokens[start_index];
         const auto* symbol = std::get_if<SqlSymbol>(&token.detail);
 
-        if (token.type != SqlTokenType::SYMBOL || symbol == nullptr || *symbol != SqlSymbol::SEMICOLON)
+        if (token.type != SqlTokenType::SYMBOL || symbol == nullptr || *symbol !=
+            SqlSymbol::SEMICOLON)
             return false;
 
         return start_index + 1 >= tokens.size();
@@ -57,8 +58,8 @@ namespace sql
         return true;
     }
 
-    const SqlToken*
-    SqlParser::current() const
+    SqlToken*
+    SqlParser::current()
     {
         if (current_ >= tokens_.size())
             return nullptr;
@@ -175,7 +176,8 @@ namespace sql
                     break;
             }
         }
-        else advance();
+        else
+            advance();
 
         advance_or_throw();
         match_or_throw(SqlKeyword::FROM, "Expected 'FROM'");
@@ -212,7 +214,7 @@ namespace sql
                 advance_or_throw("Invalid statement syntax");
                 if (!match(SqlTokenType::IDENTIFIER))
                 {
-                    break;
+                    throw InvalidStatementSyntax("Expected column identifier in INSERT");
                 }
                 stmt.columns.push_back(*current());
 
@@ -240,7 +242,14 @@ namespace sql
         ValuesExpr values{};
         while (true)
         {
-            advance_or_throw("Invalid statement syntax");
+            advance_or_throw();
+
+            if (match(SqlKeyword::_NULL))
+            {
+                current()->type = SqlTokenType::LITERAL;
+                current()->detail = SqlLiteral::_NULL;
+            }
+
             if (!match(SqlTokenType::LITERAL))
                 throw InvalidStatementSyntax("Expected a literal in VALUES expression");
 
@@ -277,7 +286,8 @@ namespace sql
 
             if (expr.op != AstOperator::ASSIGN)
             {
-                misc::Logger::warn("[parse_update] ERROR: Expected assignment expression (col = value)");
+                misc::Logger::warn(
+                    "[parse_update] ERROR: Expected assignment expression (col = value)");
                 throw std::runtime_error("Expected assignment expression (col = value)");
             }
 
@@ -328,16 +338,13 @@ namespace sql
 
         if (match(SqlSymbol::LPAREN))
         {
-            advance_or_throw();
-            bool stop = false;
-            while (!stop)
+            advance_or_throw("Expected column expression");
+            while (true)
             {
+                if (match(SqlSymbol::SEMICOLON) || !current())
+                    break;
+
                 stmt.columns.push_back(parse_column_def());
-
-                if (match(SqlSymbol::RPAREN))
-                    stop = true;
-
-                advance();
             }
         }
 
@@ -354,10 +361,11 @@ namespace sql
 
         stmt.table = parse_table_identifier();
 
-        advance_or_throw("Expected statement for 'ALTER TABLE'");
-
         while (true)
         {
+            if (!current() || match(SqlSymbol::SEMICOLON))
+                break;
+
             if (match(SqlKeyword::ADD))
             {
                 advance_or_throw("You need to specify what to add in 'ALTER TABLE'");
@@ -367,7 +375,7 @@ namespace sql
                     advance_or_throw("Missing column definition");
 
                     stmt.operations.push_back(
-                        AddColumnOperation{ .column = parse_column_def() }
+                        AddColumnOperation{.column = parse_column_def()}
                     );
                 }
                 else
@@ -377,9 +385,6 @@ namespace sql
 
                 continue;
             }
-
-            if (!current())
-                break;
 
             throw InvalidStatementSyntax("Unsupported ALTER TABLE operation");
         }
@@ -395,33 +400,104 @@ namespace sql
         match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier");
         def.name = *current();
 
-        advance_or_throw();
+        advance_or_throw("Expected data type after column name");
 
         def.type = *current();
-        advance_or_throw();
+        advance_or_throw("Expected constraint after data type");
 
-        if (match(SqlSymbol::COMMA) || match(SqlSymbol::RPAREN))
+        if (match(SqlSymbol::COMMA) ||
+            match(SqlSymbol::RPAREN) ||
+            match(SqlSymbol::SEMICOLON))
+        {
+            advance();
             return def;
-
-        advance_or_throw();
+        }
 
         while (true)
         {
             auto cur = current();
 
-            if (match(SqlSymbol::COMMA) || match(SqlSymbol::RPAREN))
-                return def;
+            if (!cur || match(SqlSymbol::COMMA) || match(SqlSymbol::RPAREN))
+                break;
 
             if (!std::holds_alternative<SqlKeyword>(cur->detail))
                 throw InvalidStatementSyntax();
 
-            if (!cur->is_constraint() || !cur->is_data_type())
-                throw InvalidStatementSyntax();
+            def.constraints.push_back(parse_constraint());
 
-            SqlToken copy = *cur;
-            def.constraints.push_back(copy);
-            advance_or_throw();
+            std::cout << current()->value << std::endl;
+
+            if (match(SqlSymbol::RPAREN))
+                break;
         }
+
+        advance();
+
+        return def;
+    }
+
+    Constraint
+    SqlParser::parse_constraint()
+    {
+        auto cur = current();
+
+        if (!std::holds_alternative<SqlKeyword>(cur->detail))
+            throw InvalidStatementSyntax();
+
+        auto kw = cur->get_detail<SqlKeyword>();
+
+        if (kw == SqlKeyword::NOT)
+        {
+            advance_or_throw("Expected constraint after NOT");
+            auto next = current();
+
+            if (!std::holds_alternative<SqlKeyword>(next->detail))
+                throw InvalidStatementSyntax("Expected keyword after NOT");
+
+            auto next_kw = next->get_detail<SqlKeyword>();
+
+            if (next_kw == SqlKeyword::_NULL)
+            {
+                advance();
+                return NotNullConstraint();
+            }
+
+            throw InvalidStatementSyntax("Expected NULL after NOT");
+        }
+        if (kw == SqlKeyword::PRIMARY)
+        {
+            advance_or_throw("Expected KEY after PRIMARY");
+            auto key = current();
+
+            if (!std::holds_alternative<SqlKeyword>(key->detail))
+                throw InvalidStatementSyntax("Expected KEY keyword");
+
+            if (key->get_detail<SqlKeyword>() != SqlKeyword::KEY)
+                throw InvalidStatementSyntax("Expected KEY after PRIMARY");
+
+            advance();
+
+            // return PrimaryKeyConstraint();
+            throw InvalidStatementSyntax("Primary keys are not supported yet");
+        }
+        if (kw == SqlKeyword::DEFAULT)
+        {
+            const auto err = "Expected default value expression";
+
+            advance_or_throw(err);
+            match_or_throw(SqlSymbol::LPAREN, err);
+            advance_or_throw(err);
+            match_or_throw(SqlTokenType::LITERAL, err);
+            const auto* default_value = current();
+            advance_or_throw(err);
+            match_or_throw(SqlSymbol::RPAREN, err);
+
+            advance();
+
+            return DefaultConstraint(*default_value);
+        }
+
+        throw InvalidStatementSyntax("Unknown constraint");
     }
 
     std::vector<AstNode>
@@ -687,7 +763,7 @@ namespace sql
 
             SqlToken copy = *token;
             copy.type = SqlTokenType::LITERAL;
-            copy.detail = SqlLiteral::NULL_;
+            copy.detail = SqlLiteral::_NULL;
 
             return std::make_unique<AstNode>(AstNodeType::LITERAL, AstNodeValue(std::move(copy)));
         }
@@ -704,12 +780,13 @@ namespace sql
             advance();
             SqlToken copy = *token;
             return std::make_unique<AstNode>(
-                AstNodeType::IDENTIFIER, AstNodeValue(std::move(copy))
+                AstNodeType::IDENTIFIER,
+                AstNodeValue(std::move(copy))
             );
         }
 
         char buffer[256];
-        snprintf(buffer, 256, "Unexpected token in expression: %s", token.to_string().data());
+        snprintf(buffer, 256, "Unexpected token in expression: %s", token->to_string().data());
         throw std::runtime_error(buffer);
     }
 } // namespace sql

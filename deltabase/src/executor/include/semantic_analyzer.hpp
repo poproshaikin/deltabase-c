@@ -32,6 +32,9 @@ namespace exq
         analyze_create_table(const types::CreateTableStatement& stmt) const;
 
         types::AnalysisResult
+        analyze_alter_table(const types::AlterTableStatement& get) const;
+
+        types::AnalysisResult
         analyze_create_index(const types::CreateIndexStatement& stmt) const;
 
         types::AnalysisResult
@@ -84,7 +87,7 @@ namespace exq
                 { types::SqlLiteral::CHAR, types::DataType::CHAR },
                 { types::SqlLiteral::BOOL, types::DataType::BOOL },
                 { types::SqlLiteral::REAL, types::DataType::REAL },
-                { types::SqlLiteral::NULL_, types::DataType::_NULL },
+                { types::SqlLiteral::_NULL, types::DataType::_NULL },
             };
             return data_type_table;
         }
@@ -92,6 +95,12 @@ namespace exq
 
         bool
         is_compatible(types::SqlLiteral lit, types::DataType col) const;
+
+        bool
+        has_not_null_constraint(const types::MetaColumn& column) const;
+
+        bool
+        has_default_constraint(const types::MetaColumn& column) const;
 
     public:
         explicit

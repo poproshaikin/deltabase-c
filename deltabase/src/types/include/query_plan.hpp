@@ -33,7 +33,8 @@ namespace types
             CREATE_DB,
             CREATE_TABLE,
             CREATE_INDEX,
-            DROP_INDEX
+            DROP_INDEX,
+            ALTER_TABLE
         };
 
         virtual constexpr Type
@@ -54,8 +55,9 @@ namespace types
             DELETE,
             CREATE_DB,
             CREATE_TABLE,
+            ALTER_TABLE,
             CREATE_INDEX,
-            DROP_INDEX
+            DROP_INDEX,
         };
 
         Type type = Type::UNDEFINED;
@@ -66,7 +68,10 @@ namespace types
     {
         std::unique_ptr<IPlanNode> child;
 
-        explicit UnaryPlanNode(std::unique_ptr<IPlanNode> child) : child(std::move(child)) {};
+        explicit
+        UnaryPlanNode(std::unique_ptr<IPlanNode> child) : child(std::move(child))
+        {
+        };
     };
 
     struct LeafPlanNode : IPlanNode
@@ -78,7 +83,8 @@ namespace types
         std::string table_name;
         std::string schema_name;
 
-        explicit SeqScanPlanNode(std::string table, std::string schema)
+        explicit
+        SeqScanPlanNode(std::string table, std::string schema)
             : table_name(std::move(table)), schema_name(std::move(schema))
         {
         }
@@ -97,7 +103,8 @@ namespace types
         IndexId index_id;
         BinaryExpr condition;
 
-        explicit IndexScanPlanNode(
+        explicit
+        IndexScanPlanNode(
             const std::string& table_name,
             const std::string& schema_name,
             const IndexId& index_id,
@@ -119,7 +126,8 @@ namespace types
     {
         std::vector<DataRow> values;
 
-        explicit ValuesPlanNode(std::vector<DataRow>&& values) : values(std::move(values))
+        explicit
+        ValuesPlanNode(std::vector<DataRow>&& values) : values(std::move(values))
         {
         }
 
@@ -135,8 +143,11 @@ namespace types
         BinaryExpr where;
         MetaTable table;
 
-        explicit FilterPlanNode(
-            const MetaTable& table, BinaryExpr expr, std::unique_ptr<IPlanNode> child
+        explicit
+        FilterPlanNode(
+            const MetaTable& table,
+            BinaryExpr expr,
+            std::unique_ptr<IPlanNode> child
         )
             : UnaryPlanNode(std::move(child)), where(std::move(expr)), table(table)
         {
@@ -154,8 +165,11 @@ namespace types
         const MetaTable table;
         std::vector<std::string> columns;
 
-        explicit ProjectPlanNode(
-            const MetaTable& table, std::vector<std::string> cols, std::unique_ptr<IPlanNode> child
+        explicit
+        ProjectPlanNode(
+            const MetaTable& table,
+            std::vector<std::string> cols,
+            std::unique_ptr<IPlanNode> child
         )
             : UnaryPlanNode(std::move(child)), table(table), columns(std::move(cols))
         {
@@ -172,7 +186,8 @@ namespace types
     {
         uint64_t limit;
 
-        explicit LimitPlanNode(uint64_t limit, std::unique_ptr<IPlanNode> child)
+        explicit
+        LimitPlanNode(uint64_t limit, std::unique_ptr<IPlanNode> child)
             : UnaryPlanNode(std::move(child)), limit(limit)
         {
         }
@@ -190,7 +205,8 @@ namespace types
         std::string schema_name;
         std::optional<std::vector<std::string>> column_names;
 
-        explicit InsertPlanNode(
+        explicit
+        InsertPlanNode(
             std::string table,
             std::string schema,
             std::optional<std::vector<std::string>> cols,
@@ -214,7 +230,8 @@ namespace types
         std::string schema_name;
         std::vector<Assignment> assignments;
 
-        explicit UpdatePlanNode(
+        explicit
+        UpdatePlanNode(
             const std::string& table_name,
             const std::string& schema_name,
             const std::vector<Assignment>& asg,
@@ -237,7 +254,8 @@ namespace types
         std::string table_name;
         std::string schema_name;
 
-        explicit DeletePlanNode(
+        explicit
+        DeletePlanNode(
             const std::string& table_name,
             const std::string& schema_name,
             std::unique_ptr<IPlanNode> child
@@ -257,7 +275,8 @@ namespace types
     {
         std::string db_name;
 
-        explicit CreateDbPlanNode(const std::string& db_name) : db_name(db_name)
+        explicit
+        CreateDbPlanNode(const std::string& db_name) : db_name(db_name)
         {
         }
 
@@ -274,7 +293,8 @@ namespace types
         MetaSchema schema;
         std::vector<ColumnDefinition> columns;
 
-        explicit CreateTablePlanNode(
+        explicit
+        CreateTablePlanNode(
             const std::string& table_name,
             const MetaSchema& schema,
             const std::vector<ColumnDefinition>& columns
@@ -290,6 +310,28 @@ namespace types
         }
     };
 
+    struct AlterTablePlanNode final : LeafPlanNode
+    {
+        std::string table_name;
+        MetaSchema schema;
+        std::vector<AlterTableOperation> operations;
+
+        explicit
+        AlterTablePlanNode(
+            const std::string& table_name,
+            const MetaSchema& schema,
+            const std::vector<AlterTableOperation>& operations)
+            : table_name(table_name), schema(schema), operations(operations)
+        {
+        }
+
+        constexpr Type
+        type() const override
+        {
+            return Type::ALTER_TABLE;
+        }
+    };
+
     struct CreateIndexPlanNode final : LeafPlanNode
     {
         std::string index_name;
@@ -298,7 +340,8 @@ namespace types
         std::string column_name;
         bool is_unique;
 
-        explicit CreateIndexPlanNode(
+        explicit
+        CreateIndexPlanNode(
             const std::string& index_name,
             const std::string& table_name,
             const std::string& schema_name,
@@ -323,7 +366,8 @@ namespace types
         std::string table_name;
         std::string schema_name;
 
-        explicit DropIndexPlanNode(
+        explicit
+        DropIndexPlanNode(
             const std::string& index_name,
             const std::string& table_name,
             const std::string& schema_name

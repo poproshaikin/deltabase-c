@@ -118,7 +118,30 @@ namespace storage
         stream.write(column.table_id.raw(), sizeof(uuid_t));
         write_str(column.name, stream);
         stream.write(&column.type, sizeof(column.type));
-        stream.write(&column.flags, sizeof(column.flags));
+        uint64_t constraints_count = column.constraints.size();
+        stream.write(&constraints_count, sizeof(uint64_t));
+        for (const auto& c : column.constraints)
+        {
+            // write a tag and payload depending on variant
+            if (std::holds_alternative<MetaNotNullConstraint>(c))
+            {
+                uint8_t tag = 0;
+                stream.write(&tag, sizeof(uint8_t));
+            }
+            else if (std::holds_alternative<MetaDefaultConstraint>(c))
+            {
+                uint8_t tag = 1;
+                stream.write(&tag, sizeof(uint8_t));
+                const auto& dc = std::get<MetaDefaultConstraint>(c);
+                auto serialized_token = serialize_dt(dc.value);
+                stream.append(serialized_token, serialized_token.size());
+            }
+            else
+            {
+                uint8_t tag = 255;
+                stream.write(&tag, sizeof(uint8_t));
+            }
+        }
         stream.seek(0);
         return stream;
     }
@@ -370,8 +393,37 @@ namespace storage
 
         if (stream.read(&out.type, sizeof(out.type)) != sizeof(out.type))
             return false;
-        if (stream.read(&out.flags, sizeof(out.flags)) != sizeof(out.flags))
+
+        uint64_t constraints_count = 0;
+        if (stream.read(&constraints_count, sizeof(uint64_t)) != sizeof(uint64_t))
             return false;
+
+        out.constraints.clear();
+        out.constraints.reserve(constraints_count);
+        for (uint64_t i = 0; i < constraints_count; ++i)
+        {
+            uint8_t tag = 0;
+            if (stream.read(&tag, sizeof(uint8_t)) != sizeof(uint8_t))
+                return false;
+
+            switch (tag)
+            {
+            case 0: // NotNull
+                out.constraints.emplace_back(MetaNotNullConstraint{});
+                break;
+            case 1: // Default
+            {
+                DataToken token;
+                if (!deserialize_dt(stream, token))
+                    return false;
+                out.constraints.emplace_back(MetaDefaultConstraint{token});
+                break;
+            }
+            default:
+                // unknown tag; fail
+                return false;
+            }
+        }
 
         return true;
     }

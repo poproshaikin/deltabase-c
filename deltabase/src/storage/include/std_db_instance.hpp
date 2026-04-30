@@ -100,6 +100,11 @@ namespace storage
         types::MetaTable*
         get_table(const types::TableIdentifier& identifier) override;
 
+        void
+        add_column(const std::string& table_name,
+                   const std::string& schema_name,
+                   const types::ColumnDefinition& column, txn::Transaction& txn) override;
+
         const types::Config&
         get_config() const override;
 
