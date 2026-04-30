@@ -27,6 +27,7 @@ namespace sql
             {"column", SqlKeyword::COLUMN},
             {"create", SqlKeyword::CREATE},
             {"database", SqlKeyword::DATABASE},
+            {"default", SqlKeyword::DEFAULT},
             {"delete", SqlKeyword::DELETE},
             {"drop", SqlKeyword::DROP},
             {"from", SqlKeyword::FROM},

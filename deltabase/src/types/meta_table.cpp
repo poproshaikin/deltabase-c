@@ -6,6 +6,33 @@
 
 #include <stdexcept>
 
+namespace
+{
+    bool
+    has_not_null_constraint(const types::MetaColumn& column)
+    {
+        for (const auto& constraint : column.constraints)
+        {
+            if (std::holds_alternative<types::MetaNotNullConstraint>(constraint))
+                return true;
+        }
+
+        return false;
+    }
+
+    const types::MetaDefaultConstraint*
+    get_default_constraint(const types::MetaColumn& column)
+    {
+        for (const auto& constraint : column.constraints)
+        {
+            if (const auto* default_constraint = std::get_if<types::MetaDefaultConstraint>(&constraint))
+                return default_constraint;
+        }
+
+        return nullptr;
+    }
+}
+
 namespace types
 {
     MetaTable::MetaTable()
@@ -26,8 +53,10 @@ namespace types
         total_rows++;
         live_rows++;
 
-        // Always reorder tokens according to schema and fill missing values with NULL tokens
+        // Always reorder tokens according to schema and fill missing values with NULL tokens.
+        // Missing values can then be materialized from DEFAULT constraints.
         std::vector<DataToken> reordered_tokens(columns.size(), null_token);
+        std::vector<bool> provided(columns.size(), false);
 
         if (!cols.has_value())
         {
@@ -35,6 +64,7 @@ namespace types
             for (size_t i = 0; i < row.size() && i < columns.size(); ++i)
             {
                 reordered_tokens[i] = row[i];
+                provided[i] = true;
             }
         }
         else
@@ -46,7 +76,26 @@ namespace types
                 if (col_idx != -1 && i < row.size())
                 {
                     reordered_tokens[col_idx] = row[i];
+                    provided[static_cast<size_t>(col_idx)] = true;
                 }
+            }
+        }
+
+        for (size_t i = 0; i < columns.size(); ++i)
+        {
+            const auto& column = columns[i];
+
+            if (!provided[i])
+            {
+                if (const auto* default_constraint = get_default_constraint(column))
+                    reordered_tokens[i] = default_constraint->value;
+            }
+
+            if (has_not_null_constraint(column) && reordered_tokens[i].type == DataType::_NULL)
+            {
+                throw std::runtime_error(
+                    "MetaTable::make_row: NOT NULL column '" + column.name + "' has no value"
+                );
             }
         }
 
