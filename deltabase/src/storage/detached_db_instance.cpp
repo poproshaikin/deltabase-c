@@ -218,6 +218,16 @@ namespace storage
     }
 
     void
+    DetachedDbInstance::drop_table(
+        const std::string& table_name,
+        const std::string& schema_name,
+        txn::Transaction& txn
+    )
+    {
+        throw std::logic_error("DetachedDbInstance::drop_table: this method is not supported");
+    }
+
+    void
     DetachedDbInstance::add_column(const std::string& table_name,
         const std::string& schema_name,
         const types::ColumnDefinition& column,

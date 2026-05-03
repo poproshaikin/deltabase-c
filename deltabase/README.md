@@ -108,10 +108,21 @@ The parser and execution pipeline include support for common operations such as:
 - `UPDATE`
 - `DELETE`
 - `CREATE TABLE`
+- `ALTER TABLE ... ADD COLUMN`
 - `CREATE SCHEMA`
 - `CREATE DATABASE`
+- Column constraints: `DEFAULT`, `NOT NULL`
 
 See parser entry points in [src/sql/include/parser.hpp](src/sql/include/parser.hpp).
+
+### Constraints Behavior
+
+- `DEFAULT` values are materialized when a column is omitted in `INSERT`.
+- `NOT NULL` is enforced during semantic validation and during row materialization.
+- For `ALTER TABLE ... ADD COLUMN`, existing rows are extended with:
+    - the declared `DEFAULT` value when present;
+    - `NULL` when the column is nullable.
+    - non-nullable columns require a `DEFAULT` value.
 
 ## Recovery and WAL
 

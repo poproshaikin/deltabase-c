@@ -34,6 +34,7 @@ namespace types
             CREATE_TABLE,
             CREATE_INDEX,
             DROP_INDEX,
+            DROP_TABLE,
             ALTER_TABLE
         };
 
@@ -58,6 +59,7 @@ namespace types
             ALTER_TABLE,
             CREATE_INDEX,
             DROP_INDEX,
+            DROP_TABLE,
         };
 
         Type type = Type::UNDEFINED;
@@ -380,6 +382,27 @@ namespace types
         type() const override
         {
             return Type::DROP_INDEX;
+        }
+    };
+
+    struct DropTablePlanNode final : LeafPlanNode
+    {
+        std::string table_name;
+        std::string schema_name;
+
+        explicit
+        DropTablePlanNode(
+            const std::string& table_name,
+            const std::string& schema_name
+        )
+            : table_name(table_name), schema_name(schema_name)
+        {
+        }
+
+        constexpr Type
+        type() const override
+        {
+            return Type::DROP_TABLE;
         }
     };
 } // namespace types

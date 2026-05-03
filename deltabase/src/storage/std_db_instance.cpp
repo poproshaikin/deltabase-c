@@ -997,4 +997,25 @@ namespace storage
         DropIndexRecord record(index_unchanged);
         txn.append_log(record);
     }
+
+    void
+    StdDbInstance::drop_table(
+        const std::string& table_name,
+        const std::string& schema_name,
+        txn::Transaction& txn
+    )
+    {
+        InstanceGuard guard(mtx_);
+        auto* table = get_table(table_name, schema_name);
+        if (!table)
+            throw std::runtime_error("StdDbInstance::drop_table");
+
+        const auto table_unchanged = *table;
+
+        io_manager_->delete_mt(table_unchanged);
+        catalog_->delete_table(table_unchanged.id);
+
+        DeleteTableRecord record(table_unchanged);
+        txn.append_log(record);
+    }
 } // namespace storage

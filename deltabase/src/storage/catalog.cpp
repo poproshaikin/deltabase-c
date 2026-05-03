@@ -90,6 +90,12 @@ namespace storage
         }
     }
 
+    void
+    CatalogCache::delete_table(const types::UUID& table_id)
+    {
+        tables_.erase(table_id);
+    }
+
     types::MetaSchema*
     CatalogCache::get_schema(const types::UUID& id)
     {

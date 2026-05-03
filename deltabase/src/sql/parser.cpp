@@ -122,6 +122,9 @@ namespace sql
             if (match(SqlKeyword::INDEX))
                 parsed = AstNode(AstNodeType::DROP_INDEX, parse_drop_index());
 
+            else if (match(SqlKeyword::TABLE))
+                parsed = AstNode(AstNodeType::DROP_TABLE, parse_drop_table());
+
             else
                 throw InvalidStatementSyntax("Unsupported statement");
         }
@@ -425,8 +428,6 @@ namespace sql
 
             def.constraints.push_back(parse_constraint());
 
-            std::cout << current()->value << std::endl;
-
             if (match(SqlSymbol::RPAREN))
                 break;
         }
@@ -623,6 +624,18 @@ namespace sql
 
         match_or_throw(SqlKeyword::ON, "Expected 'ON' after index identifier");
         advance_or_throw("Expected table identifier after 'ON'");
+        stmt.table = parse_table_identifier();
+
+        return stmt;
+    }
+
+    DropTableStatement
+    SqlParser::parse_drop_table()
+    {
+        DropTableStatement stmt;
+
+        match_or_throw(SqlKeyword::TABLE);
+        advance_or_throw("Expected table identifier");
         stmt.table = parse_table_identifier();
 
         return stmt;

@@ -48,6 +48,9 @@ namespace exq
         types::QueryPlan
         plan(const types::DropIndexStatement& stmt) const;
 
+        types::QueryPlan
+        plan(const types::DropTableStatement& stmt) const;
+
     public:
         explicit
         StdPlanner(const types::Config& db_config, storage::IDbInstance& db);

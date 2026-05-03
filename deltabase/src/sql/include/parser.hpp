@@ -49,6 +49,9 @@ namespace sql
         types::DropIndexStatement
         parse_drop_index();
 
+        types::DropTableStatement
+        parse_drop_table();
+
         std::unique_ptr<types::AstNode>
         parse_binary_tree(int min_priority);
 

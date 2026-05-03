@@ -29,6 +29,7 @@ namespace types
         CREATE_SCHEMA,
         CREATE_INDEX,
         DROP_INDEX,
+        DROP_TABLE,
         ALTER_TABLE,
         ADD_COLUMN
     };
@@ -206,6 +207,11 @@ namespace types
         SqlToken index_name;
     };
 
+    struct DropTableStatement
+    {
+        TableIdentifier table;
+    };
+
     struct CreateDbStatement
     {
         SqlToken name;
@@ -223,6 +229,7 @@ namespace types
         CreateSchemaStatement,
         CreateIndexStatement,
         DropIndexStatement,
+        DropTableStatement,
         ColumnDefinition,
         AlterTableStatement
     >;

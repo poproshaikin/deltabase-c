@@ -41,6 +41,9 @@ namespace exq
         analyze_drop_index(const types::DropIndexStatement& stmt) const;
 
         types::AnalysisResult
+        analyze_drop_table(const types::DropTableStatement& stmt) const;
+
+        types::AnalysisResult
         analyze_create_db(const types::CreateDbStatement& stmt) const;
 
         types::AnalysisResult

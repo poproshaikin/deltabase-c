@@ -644,6 +644,41 @@ namespace exq
         return {};
     }
 
+    DropTableNodeExecutor::DropTableNodeExecutor(
+        const std::string& table_name,
+        const std::string& schema_name,
+        storage::IDbInstance& db
+    )
+        : table_name_(table_name), schema_name_(schema_name), db_(db)
+    {
+    }
+
+    void
+    DropTableNodeExecutor::open()
+    {
+    }
+
+    bool
+    DropTableNodeExecutor::next(DataRow& out)
+    {
+        auto txn = db_.make_txn();
+        txn.begin();
+        db_.drop_table(table_name_, schema_name_, txn);
+        txn.commit();
+        return false;
+    }
+
+    void
+    DropTableNodeExecutor::close()
+    {
+    }
+
+    OutputSchema
+    DropTableNodeExecutor::output_schema()
+    {
+        return {};
+    }
+
     std::unique_ptr<INodeExecutor>
     NodeExecutorFactory::from_plan(std::unique_ptr<IPlanNode>&& node, storage::IDbInstance& db)
     {
@@ -789,6 +824,16 @@ namespace exq
                 db);
 
             return std::make_unique<DropIndexNodeExecutor>(std::move(executor));
+        }
+        case IPlanNode::Type::DROP_TABLE:
+        {
+            auto& drop_table_node = static_cast<DropTablePlanNode&>(*node);
+            DropTableNodeExecutor executor(
+                drop_table_node.table_name,
+                drop_table_node.schema_name,
+                db);
+
+            return std::make_unique<DropTableNodeExecutor>(std::move(executor));
         }
         default:
             throw std::runtime_error(

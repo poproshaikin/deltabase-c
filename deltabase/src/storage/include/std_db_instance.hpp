@@ -175,6 +175,13 @@ namespace storage
             const std::string& schema_name,
             txn::Transaction& txn
         ) override;
+
+        void
+        drop_table(
+            const std::string& table_name,
+            const std::string& schema_name,
+            txn::Transaction& txn
+        ) override;
     };
 } // namespace storage
 

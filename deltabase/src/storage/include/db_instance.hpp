@@ -153,6 +153,13 @@ namespace storage
             const std::string& schema_name,
             txn::Transaction& txn
         ) = 0;
+
+        virtual void
+        drop_table(
+            const std::string& table_name,
+            const std::string& schema_name,
+            txn::Transaction& txn
+        ) = 0;
     };
 } // namespace storage
 

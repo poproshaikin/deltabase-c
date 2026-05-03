@@ -114,6 +114,10 @@ namespace exq
         {
             return plan(std::get<DropIndexStatement>(ast.value));
         }
+        if (ast.type == AstNodeType::DROP_TABLE)
+        {
+            return plan(std::get<DropTableStatement>(ast.value));
+        }
         if (ast.type == AstNodeType::ALTER_TABLE)
         {
             return plan(std::get<AlterTableStatement>(ast.value));
@@ -526,6 +530,25 @@ namespace exq
         QueryPlan plan;
         plan.root = std::move(root);
         plan.type = QueryPlan::Type::DROP_INDEX;
+        plan.needs_stream = false;
+        plan.db_specific = true;
+        return plan;
+    }
+
+    QueryPlan
+    StdPlanner::plan(const DropTableStatement& stmt) const
+    {
+        auto schema_name = stmt.table.schema_name.has_value()
+                               ? stmt.table.schema_name.value().value
+                               : db_config_.default_schema;
+        auto table_name = stmt.table.table_name.value;
+
+        std::unique_ptr<IPlanNode> root =
+            std::make_unique<DropTablePlanNode>(table_name, schema_name);
+
+        QueryPlan plan;
+        plan.root = std::move(root);
+        plan.type = QueryPlan::Type::DROP_TABLE;
         plan.needs_stream = false;
         plan.db_specific = true;
         return plan;
