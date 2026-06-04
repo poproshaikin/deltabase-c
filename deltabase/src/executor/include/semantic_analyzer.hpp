@@ -5,6 +5,7 @@
 #ifndef DELTABASE_SEMANTIC_ANALYZER_HPP
 #define DELTABASE_SEMANTIC_ANALYZER_HPP
 #include "generic_query_validator.hpp"
+#include "information_schema_provider.hpp"
 #include "../../types/include/analysis_result.hpp"
 #include "../../storage/include/db_instance.hpp"
 
@@ -14,6 +15,7 @@ namespace exq
     {
         storage::IDbInstance& db_;
         GenericQueryValidator generic_validator_;
+        InformationSchemaProvider info_schema_provider_;
         types::Config config_;
 
         types::AnalysisResult
@@ -71,10 +73,10 @@ namespace exq
                 {
                     { types::DataType::INTEGER, { types::DataType::INTEGER } },
                     { types::DataType::REAL, { types::DataType::REAL, types::DataType::INTEGER } },
-                    { types::DataType::STRING, { types::DataType::STRING, types::DataType::CHAR } },
+                    { types::DataType::TEXT, { types::DataType::TEXT, types::DataType::CHAR } },
                     { types::DataType::CHAR, { types::DataType::CHAR } },
                     { types::DataType::BOOL, { types::DataType::BOOL } },
-                    { types::DataType::_NULL, { types::DataType::_NULL, types::DataType::INTEGER, types::DataType::REAL, types::DataType::STRING, types::DataType::CHAR, types::DataType::BOOL } }
+                    { types::DataType::_NULL, { types::DataType::_NULL, types::DataType::INTEGER, types::DataType::REAL, types::DataType::TEXT, types::DataType::CHAR, types::DataType::BOOL } }
                 };
 
             return table;
@@ -86,7 +88,7 @@ namespace exq
             static const std::unordered_map<types::SqlLiteral, types::DataType> data_type_table =
             {
                 { types::SqlLiteral::INTEGER, types::DataType::INTEGER },
-                { types::SqlLiteral::STRING, types::DataType::STRING },
+                { types::SqlLiteral::STRING, types::DataType::TEXT },
                 { types::SqlLiteral::CHAR, types::DataType::CHAR },
                 { types::SqlLiteral::BOOL, types::DataType::BOOL },
                 { types::SqlLiteral::REAL, types::DataType::REAL },

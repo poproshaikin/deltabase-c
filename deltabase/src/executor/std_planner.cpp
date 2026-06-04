@@ -22,7 +22,7 @@ namespace exq
     }
 
     StdPlanner::StdPlanner(const Config& db_config, storage::IDbInstance& db)
-        : db_(db), db_config_(db_config)
+        : db_(db), db_config_(db_config), info_schema_provider_(db_)
     {
     }
 
@@ -231,58 +231,72 @@ namespace exq
     QueryPlan
     StdPlanner::plan(SelectStatement& stmt) const
     {
-        auto table = db_.get_table(stmt.table);
-        const auto* condition_ptr = stmt.where ? &(*stmt.where) : nullptr;
-
-        const MetaIndex* chosen_index = nullptr;
-        auto scan_type = choose_scan_type(*table, condition_ptr, &chosen_index);
-
         std::unique_ptr<IPlanNode> node;
+        bool index = false;
 
-        if (scan_type == IPlanNode::Type::INDEX_SCAN)
+        const std::string schema_name = stmt.table.schema_name.has_value()
+                                                ? stmt.table.schema_name.value().value
+                                                : db_config_.default_schema;
+
+        IPlanNode::Type scan_type = IPlanNode::Type::SEQ_SCAN;
+        const MetaTable* table = nullptr;
+        std::optional<MetaTable> virtual_table_storage;
+
+        if (info_schema_provider_.is_virtual(stmt.table))
         {
-            node = std::make_unique<IndexScanPlanNode>(
-                stmt.table.table_name,
-                stmt.table.schema_name.has_value()
-                    ? stmt.table.schema_name.value().value
-                    : db_config_.default_schema,
-                chosen_index->id,
-                std::move(*stmt.where)
-            );
+            // Virtual table: minimal plan node, no index optimization
+            node = std::make_unique<VirtualTablePlanNode>(stmt.table.table_name, schema_name);
+            virtual_table_storage = info_schema_provider_.get_virtual_table(stmt.table);
+            table = &virtual_table_storage.value();
         }
         else
         {
-            node = std::make_unique<SeqScanPlanNode>(
-                stmt.table.table_name,
-                stmt.table.schema_name.has_value()
-                    ? stmt.table.schema_name.value().value
-                    : db_config_.default_schema
-            );
+            // Real table: full planning with index optimization
+            table = db_.get_table(stmt.table);
+            const auto* condition_ptr = stmt.where ? &(*stmt.where) : nullptr;
 
-            // 2. WHERE
-            if (stmt.where)
+            const MetaIndex* chosen_index = nullptr;
+            scan_type = choose_scan_type(*table, condition_ptr, &chosen_index);
+
+            if (scan_type == IPlanNode::Type::INDEX_SCAN)
             {
-                auto filter = std::make_unique<FilterPlanNode>(
-                    *db_.get_table(stmt.table),
-                    std::move(*stmt.where),
-                    std::move(node)
-                );
-                node = std::move(filter);
+                node = std::make_unique<IndexScanPlanNode>(
+                    stmt.table.table_name,
+                    schema_name,
+                    chosen_index->id,
+                    std::move(*stmt.where));
+
+                index = true;
+            }
+            else
+            {
+                node = std::make_unique<SeqScanPlanNode>(stmt.table.table_name, schema_name);
             }
         }
 
+        // 2. WHERE
+        if (stmt.where && !index && table)
+        {
+            auto filter = std::make_unique<FilterPlanNode>(
+                *table,
+                std::move(*stmt.where),
+                std::move(node));
+
+            node = std::move(filter);
+        }
+
         // 3. PROJECT
-        if (!stmt.columns.empty())
+        if (!stmt.columns.empty() && table)
         {
             std::vector<std::string> cols;
             for (auto& c : stmt.columns)
                 cols.push_back(c.value);
 
             auto project = std::make_unique<ProjectPlanNode>(
-                *db_.get_table(stmt.table),
+                *table,
                 cols,
-                std::move(node)
-            );
+                std::move(node));
+
             node = std::move(project);
         }
 
@@ -295,7 +309,7 @@ namespace exq
 
         QueryPlan plan;
         plan.type = QueryPlan::Type::SELECT;
-        if (scan_type == IPlanNode::Type::SEQ_SCAN)
+        if (scan_type == IPlanNode::Type::SEQ_SCAN && table != nullptr && node->type() == IPlanNode::Type::SEQ_SCAN)
             plan.needs_stream = should_stream_for_seq_scan(*table, *node);
         else
             plan.needs_stream = false;

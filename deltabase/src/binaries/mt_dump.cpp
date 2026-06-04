@@ -43,7 +43,7 @@ namespace
             return "CHAR";
         case DataType::BOOL:
             return "BOOL";
-        case DataType::STRING:
+        case DataType::TEXT:
             return "STRING";
         default:
             return "UNKNOWN";

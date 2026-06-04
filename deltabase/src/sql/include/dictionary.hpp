@@ -75,7 +75,7 @@ namespace sql
     {
         static const std::unordered_map<SqlKeyword, DataType> types_map = {
             {SqlKeyword::INTEGER, DataType::INTEGER},
-            {SqlKeyword::TEXT, DataType::STRING},
+            {SqlKeyword::TEXT, DataType::TEXT},
             {SqlKeyword::REAL, DataType::REAL},
             {SqlKeyword::BOOL, DataType::BOOL},
             {SqlKeyword::CHAR, DataType::CHAR},

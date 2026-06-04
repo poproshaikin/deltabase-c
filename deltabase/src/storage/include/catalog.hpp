@@ -54,6 +54,12 @@ namespace storage
         exists_schema(const std::string& name);
         void
         save_schema(const types::MetaSchema& ms);
+
+        std::vector<types::MetaTable*>
+        get_all_tables();
+
+        std::vector<types::MetaSchema*>
+        get_all_schemas();
     };
 } // namespace storage
 

@@ -49,7 +49,7 @@ namespace types
         {
             bytes.resize(sql_token.value.size());
             std::memcpy(bytes.data(), sql_token.value.data(), sql_token.value.size());
-            type = DataType::STRING;
+            type = DataType::TEXT;
             break;
         }
         case SqlLiteral::BOOL:
@@ -102,7 +102,7 @@ namespace types
             return lhs.as<char>() == rhs.as<char>();
         case DataType::BOOL:
             return lhs.as<bool>() == rhs.as<bool>();
-        case DataType::STRING:
+        case DataType::TEXT:
             return lhs.as<std::string>() == rhs.as<std::string>();
         default:
         {
@@ -137,7 +137,7 @@ namespace types
             return lhs.as<char>() < rhs.as<char>();
         case DataType::BOOL:
             return lhs.as<bool>() < rhs.as<bool>();
-        case DataType::STRING:
+        case DataType::TEXT:
             return lhs.as<std::string>() < rhs.as<std::string>();
         default:
         {

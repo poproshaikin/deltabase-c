@@ -25,21 +25,29 @@ namespace cli
             return "No results.\n";
         }
 
-        size_t num_columns = result.output_schema().size();
+        const auto schema = result.output_schema();
+        size_t num_columns = schema.size();
         std::vector<size_t> col_widths(num_columns, 0);
+
+        for (size_t i = 0; i < num_columns; ++i)
+            col_widths[i] = schema[i].name.length();
 
         for (const auto& r : rows)
         {
             for (size_t i = 0; i < r.tokens.size() && i < num_columns; ++i)
-            {
-                size_t len = format_token(r.tokens[i]).length();
-                col_widths[i] = std::max(col_widths[i], len);
-            }
+                col_widths[i] = std::max(col_widths[i], format_token(r.tokens[i]).length());
         }
 
         std::ostringstream oss;
 
         draw_border(oss, col_widths, true);
+
+        oss << "│";
+        for (size_t i = 0; i < num_columns; ++i)
+            oss << " " << std::left << std::setw(col_widths[i]) << schema[i].name << " │";
+        oss << "\n";
+
+        draw_separator(oss, col_widths);
 
         for (const auto& r : rows)
         {
@@ -76,7 +84,7 @@ namespace cli
             return std::string(1, token.as<char>());
         case types::DataType::BOOL:
             return token.as<bool>() ? "true" : "false";
-        case types::DataType::STRING:
+        case types::DataType::TEXT:
             return token.as<std::string>();
         case types::DataType::_NULL:
         case types::DataType::UNDEFINED:
@@ -92,11 +100,22 @@ namespace cli
         for (size_t i = 0; i < col_widths.size(); ++i)
         {
             if (i > 0)
-            {
                 oss << (is_top ? "┬" : "┴");
-            }
             oss << std::string(col_widths[i] + 2, '-');
         }
         oss << (is_top ? "┐" : "┘") << "\n";
+    }
+
+    void
+    ResultFormatter::draw_separator(std::ostringstream& oss, const std::vector<size_t>& col_widths)
+    {
+        oss << "├";
+        for (size_t i = 0; i < col_widths.size(); ++i)
+        {
+            if (i > 0)
+                oss << "┼";
+            oss << std::string(col_widths[i] + 2, '-');
+        }
+        oss << "┤\n";
     }
 }

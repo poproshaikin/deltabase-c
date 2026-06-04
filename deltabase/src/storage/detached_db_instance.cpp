@@ -235,4 +235,16 @@ namespace storage
     {
         throw std::logic_error("DetachedDbInstance::add_column: this method is not supported");
     }
+
+    std::vector<MetaTable*>
+    DetachedDbInstance::get_all_tables()
+    {
+        throw std::logic_error("DetachedDbInstance::get_all_tables: this method is not supported");
+    }
+
+    std::vector<MetaSchema*>
+    DetachedDbInstance::get_all_schemas()
+    {
+        throw std::logic_error("DetachedDbInstance::get_all_schemas: this method is not supported");
+    }
 } // namespace storage

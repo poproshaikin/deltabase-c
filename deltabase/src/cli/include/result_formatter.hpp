@@ -21,6 +21,9 @@ namespace cli
         void
         draw_border(std::ostringstream& oss, const std::vector<size_t>& col_widths, bool is_top);
 
+        void
+        draw_separator(std::ostringstream& oss, const std::vector<size_t>& col_widths);
+
     public:
         std::string
         format(types::IExecutionResult& result);

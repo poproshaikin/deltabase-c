@@ -24,9 +24,6 @@ namespace misc
     types::Bytes
     convert(const std::string& value);
 
-    types::Bytes
-    stob(const std::string& value);
-
     types::OutputSchema
     convert(const types::MetaTable& meta);
 

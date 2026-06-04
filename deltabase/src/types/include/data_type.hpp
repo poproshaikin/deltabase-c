@@ -17,7 +17,7 @@ namespace types
         REAL,
         CHAR,
         BOOL,
-        STRING
+        TEXT
     };
 }
 

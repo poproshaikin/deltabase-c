@@ -4,9 +4,11 @@
 
 #include "include/catalog.hpp"
 
+#include <ranges>
+
 namespace storage
 {
-    CatalogCache::CatalogCache(storage::IIOManager& io) : io_(io)
+    CatalogCache::CatalogCache(IIOManager& io) : io_(io)
     {
     }
 
@@ -131,5 +133,29 @@ namespace storage
         {
             it->second = ms;
         }
+    }
+
+    std::vector<types::MetaTable*>
+    CatalogCache::get_all_tables()
+    {
+        std::vector<types::MetaTable*> tables;
+        tables.reserve(tables_.size());
+
+        for (auto& table : tables_ | std::views::values)
+            tables.push_back(&table);
+
+        return tables;
+    }
+
+    std::vector<types::MetaSchema*>
+    CatalogCache::get_all_schemas()
+    {
+        std::vector<types::MetaSchema*> schemas;
+        schemas.reserve(schemas_.size());
+
+        for (auto& schema : schemas_ | std::views::values)
+            schemas.push_back(&schema);
+
+        return schemas;
     }
 } // namespace storage

@@ -109,6 +109,7 @@ The parser and execution pipeline include support for common operations such as:
 - `DELETE`
 - `CREATE TABLE`
 - `ALTER TABLE ... ADD COLUMN`
+- `DROP TABLE`
 - `CREATE SCHEMA`
 - `CREATE DATABASE`
 - Column constraints: `DEFAULT`, `NOT NULL`

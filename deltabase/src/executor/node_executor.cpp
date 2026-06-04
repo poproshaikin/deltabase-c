@@ -6,6 +6,7 @@
 
 #include "../misc/include/convert.hpp"
 #include "../storage/include/std_db_instance.hpp"
+#include "include/information_schema_provider.hpp"
 
 #include <algorithm>
 #include <ranges>
@@ -76,19 +77,67 @@ namespace exq
     {
     }
 
+    VirtualTableNodeExecutor::VirtualTableNodeExecutor(
+        const std::string& table_name,
+        const std::string& schema_name,
+        storage::IDbInstance& db
+    ) : table_name_(table_name), schema_name_(schema_name), db_(db), index_(0)
+    {
+    }
+
+    void
+    VirtualTableNodeExecutor::open()
+    {
+        InformationSchemaProvider prov(db_);
+        TableIdentifier tid(
+            SqlToken(SqlTokenType::IDENTIFIER, table_name_, 0, 0),
+            SqlToken(SqlTokenType::IDENTIFIER, schema_name_, 0, 0)
+        );
+        mt_ = prov.get_virtual_table(tid);
+        data_ = prov.get_virtual_data(tid);
+        index_ = 0;
+    }
+
+    bool
+    VirtualTableNodeExecutor::next(DataRow& out)
+    {
+        if (index_ >= data_.rows.size())
+            return false;
+
+        out = data_.rows[index_++];
+        return true;
+    }
+
+    void
+    VirtualTableNodeExecutor::close()
+    {
+    }
+
+    OutputSchema
+    VirtualTableNodeExecutor::output_schema()
+    {
+        OutputSchema schema;
+        schema.reserve(mt_.columns.size());
+
+        for (const auto& col : mt_.columns)
+            schema.push_back({.name = col.name, .type = col.type});
+
+        return schema;
+    }
+
     void
     IndexScanNodeExecutor::open()
     {
-        table_ = db_.index_scan(table_name_, schema_name_, index_id_, condition_);
+        data_ = db_.index_scan(table_name_, schema_name_, index_id_, condition_);
     }
 
     bool
     IndexScanNodeExecutor::next(DataRow& out)
     {
-        if (index_ >= table_.rows.size())
+        if (index_ >= data_.rows.size())
             return false;
 
-        out = table_.rows[index_++];
+        out = data_.rows[index_++];
         return true;
     }
 
@@ -702,6 +751,12 @@ namespace exq
                 db);
 
             return std::make_unique<IndexScanNodeExecutor>(std::move(executor));
+        }
+        case IPlanNode::Type::VIRTUAL_TABLE:
+        {
+            const auto& v_node = static_cast<const VirtualTablePlanNode&>(*node);
+            VirtualTableNodeExecutor executor(v_node.table_name, v_node.schema_name, db);
+            return std::make_unique<VirtualTableNodeExecutor>(std::move(executor));
         }
         case IPlanNode::Type::FILTER:
         {

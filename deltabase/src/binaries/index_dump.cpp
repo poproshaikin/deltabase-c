@@ -87,7 +87,7 @@ namespace
             else
                 out << "bool?";
             break;
-        case DataType::STRING:
+        case DataType::TEXT:
             out << '"' << std::string(token.bytes.begin(), token.bytes.end()) << '"';
             break;
         default:

@@ -1018,4 +1018,16 @@ namespace storage
         DeleteTableRecord record(table_unchanged);
         txn.append_log(record);
     }
+
+    std::vector<MetaTable*>
+    StdDbInstance::get_all_tables()
+    {
+        return catalog_->get_all_tables();
+    }
+
+    std::vector<MetaSchema*>
+    StdDbInstance::get_all_schemas()
+    {
+        return catalog_->get_all_schemas();
+    }
 } // namespace storage

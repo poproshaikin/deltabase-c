@@ -68,7 +68,8 @@ namespace exq
         types::BinaryExpr condition_;
         storage::IDbInstance& db_;
 
-        types::DataTable table_;
+        types::MetaTable* mt_ = nullptr;
+        types::DataTable data_;
         uint64_t index_ = 0;
 
     public:
@@ -78,6 +79,37 @@ namespace exq
             const std::string& schema_name,
             const types::IndexId& index_id,
             types::BinaryExpr condition,
+            storage::IDbInstance& db
+        );
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
+    class VirtualTableNodeExecutor final : public INodeExecutor
+    {
+        std::string table_name_;
+        std::string schema_name_;
+        storage::IDbInstance& db_;
+
+        types::MetaTable mt_;
+        types::DataTable data_;
+        uint64_t index_ = 0;
+
+    public:
+        explicit
+        VirtualTableNodeExecutor(
+            const std::string& table_name,
+            const std::string& schema_name,
             storage::IDbInstance& db
         );
 

@@ -97,7 +97,7 @@ namespace exq
         case DataType::REAL:
             return eq(left.as<double>(), right.as<double>());
 
-        case DataType::STRING:
+        case DataType::TEXT:
             return eq(left.as<std::string>(), right.as<std::string>());
 
         case DataType::BOOL:
@@ -159,7 +159,7 @@ namespace exq
         case DataType::REAL:
             return lt(left.as<double>(), right.as<double>());
 
-        case DataType::STRING:
+        case DataType::TEXT:
             return lt(left.as<std::string>(), right.as<std::string>());
 
         case DataType::CHAR:
@@ -212,7 +212,7 @@ namespace exq
         case DataType::REAL:
             return lte(left.as<double>(), right.as<double>());
 
-        case DataType::STRING:
+        case DataType::TEXT:
             return lte(left.as<std::string>(), right.as<std::string>());
 
         case DataType::CHAR:
@@ -265,7 +265,7 @@ namespace exq
         case DataType::REAL:
             return gr(left.as<double>(), right.as<double>());
 
-        case DataType::STRING:
+        case DataType::TEXT:
             return gr(left.as<std::string>(), right.as<std::string>());
 
         case DataType::CHAR:
@@ -318,7 +318,7 @@ namespace exq
         case DataType::REAL:
             return gre(left.as<double>(), right.as<double>());
 
-        case DataType::STRING:
+        case DataType::TEXT:
             return gre(left.as<std::string>(), right.as<std::string>());
 
         case DataType::CHAR:

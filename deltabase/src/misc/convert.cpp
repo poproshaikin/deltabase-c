@@ -19,15 +19,6 @@ namespace misc
         return bytes;
     }
 
-    Bytes
-    stob(const std::string& literal)
-    {
-        bool value = literal == "true" || literal == "1";
-        Bytes bytes(1);
-        bytes[0] = value;
-        return bytes;
-    }
-
     OutputSchema
     convert(const MetaTable& meta)
     {

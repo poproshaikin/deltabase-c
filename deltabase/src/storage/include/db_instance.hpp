@@ -19,7 +19,7 @@ namespace storage
     public:
         virtual ~IDbInstance() = default;
 
-        // Obsolete, use seq_scan_begin instead
+        // Deprecated, use seq_scan_begin instead
         virtual types::DataTable
         seq_scan(const std::string& table_name, const std::string& schema_name) = 0;
 
@@ -160,6 +160,12 @@ namespace storage
             const std::string& schema_name,
             txn::Transaction& txn
         ) = 0;
+
+        virtual std::vector<types::MetaTable*>
+        get_all_tables() = 0;
+
+        virtual std::vector<types::MetaSchema*>
+        get_all_schemas() = 0;
     };
 } // namespace storage
 

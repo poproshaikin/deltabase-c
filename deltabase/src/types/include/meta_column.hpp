@@ -26,9 +26,27 @@ namespace types
         DataToken value;
     };
 
+    struct MetaPrimaryKeyConstraint {};
+
+    struct MetaUniqueConstraint {};
+
+    struct MetaAutoIncrementConstraint {};
+
+    struct MetaForeignKeyConstraint
+    {
+        UUID referenced_table_id;
+        ColumnId referenced_column_id;
+        // if referenced ids are not known at parse time, they can be left null/zero
+    };
+
     using ColumnConstraint = std::variant<
         MetaNotNullConstraint,
-        MetaDefaultConstraint>;
+        MetaDefaultConstraint,
+        MetaPrimaryKeyConstraint,
+        MetaUniqueConstraint,
+        MetaAutoIncrementConstraint,
+        MetaForeignKeyConstraint
+    >;
 
     struct MetaColumn
     {
@@ -47,33 +65,30 @@ namespace types
         explicit
         MetaColumn(const std::string& name, DataType type, const std::vector<ColumnConstraint>& constraints);
 
-        template <typename TConstraint>
+        template <typename T>
         bool
         has_constraint() const
         {
-            for (const auto& con : constraints)
-            {
-                if (std::holds_alternative<TConstraint>(con))
-                {
-                    return true;
-                }
-            }
-
+            for (const auto& c : constraints)
+                if (std::holds_alternative<T>(c)) return true;
             return false;
         }
 
-        template <typename TConstraint>
-        TConstraint*
+        template <typename T>
+        const T*
+        get_constraint() const
+        {
+            for (const auto& c : constraints)
+                if (const T* p = std::get_if<T>(&c)) return p;
+            return nullptr;
+        }
+
+        template <typename T>
+        T*
         get_constraint()
         {
-            for (auto& con : constraints)
-            {
-                if (std::holds_alternative<TConstraint>(con))
-                {
-                    return &std::get<TConstraint>(con);
-                }
-            }
-
+            for (auto& c : constraints)
+                if (T* p = std::get_if<T>(&c)) return p;
             return nullptr;
         }
     };

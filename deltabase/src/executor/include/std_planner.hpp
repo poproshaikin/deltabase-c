@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_SIMPLE_PLANNER_HPP
 #define DELTABASE_SIMPLE_PLANNER_HPP
+#include "information_schema_provider.hpp"
 #include "planner.hpp"
 #include "../../types/include/config.hpp"
 #include "../../storage/include/db_instance.hpp"
@@ -14,6 +15,7 @@ namespace exq
     {
         storage::IDbInstance& db_;
         types::Config db_config_;
+        InformationSchemaProvider info_schema_provider_;
 
         static double
         estimate_seq_scan_selectivity(const types::MetaTable& table, const types::IPlanNode& node);

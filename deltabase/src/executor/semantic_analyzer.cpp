@@ -16,7 +16,7 @@ namespace exq
     using namespace types;
 
     SemanticAnalyzer::SemanticAnalyzer(const Config& config, storage::IDbInstance& db)
-        : db_(db), config_(config), generic_validator_(config)
+        : db_(db), config_(config), generic_validator_(config), info_schema_provider_(db)
     {
     }
 
@@ -68,10 +68,20 @@ namespace exq
         if (stmt.table.table_name.value.empty())
             return AnalysisResult(std::runtime_error("Select statement missing target table"));
 
-        if (!db_.exists_table(stmt.table))
-            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+        const MetaTable* table = nullptr;
+        std::optional<MetaTable> virtual_table_storage;
 
-        const auto* table = db_.get_table(stmt.table);
+        if (info_schema_provider_.is_virtual(stmt.table))
+        {
+            virtual_table_storage = info_schema_provider_.get_virtual_table(stmt.table);
+            table = &virtual_table_storage.value();
+        }
+        else
+        {
+            if (!db_.exists_table(stmt.table))
+                return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+            table = db_.get_table(stmt.table);
+        }
 
         for (const SqlToken& col : stmt.columns)
             if (!table->has_column(col.value))

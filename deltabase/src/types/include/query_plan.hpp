@@ -35,7 +35,8 @@ namespace types
             CREATE_INDEX,
             DROP_INDEX,
             DROP_TABLE,
-            ALTER_TABLE
+            ALTER_TABLE,
+            VIRTUAL_TABLE
         };
 
         virtual constexpr Type
@@ -95,6 +96,24 @@ namespace types
         type() const override
         {
             return Type::SEQ_SCAN;
+        }
+    };
+
+    struct VirtualTablePlanNode final : LeafPlanNode
+    {
+        std::string table_name;
+        std::string schema_name;
+
+        explicit
+        VirtualTablePlanNode(std::string table, std::string schema)
+            : table_name(std::move(table)), schema_name(std::move(schema))
+        {
+        }
+
+        constexpr Type
+        type() const override
+        {
+            return Type::VIRTUAL_TABLE;
         }
     };
 

@@ -36,7 +36,7 @@ namespace storage
     {
         switch (data_type)
         {
-        case DataType::STRING:
+        case DataType::TEXT:
             return true;
         default:
             return false;

@@ -182,6 +182,12 @@ namespace storage
             const std::string& schema_name,
             txn::Transaction& txn
         ) override;
+
+        std::vector<types::MetaTable*>
+        get_all_tables() override;
+
+        std::vector<types::MetaSchema*>
+        get_all_schemas() override;
     };
 } // namespace storage
 
