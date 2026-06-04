@@ -471,7 +471,7 @@ namespace storage
             {
                 auto existing = tree.find(key);
                 if (existing.has_value() && !is_row_obsolete(existing.value()))
-                    throw UniqueConstraintViolation(mi.name);
+                    throw EngineException("Unique constraint violation: " + mi.name, EngineException::Code::UNIQUE_VIOLATION);
             }
 
             tree.insert(key, row_ptr);
@@ -879,9 +879,10 @@ namespace storage
 
                     if (seen_values.count(key_str) > 0)
                     {
-                        throw UniqueConstraintViolation(
+                        throw EngineException(
                             "Cannot create unique index '" + index_name + "' on column '" +
-                            column_name + "': table '" + table_name + "' contains duplicate values"
+                            column_name + "': table '" + table_name + "' contains duplicate values",
+                            EngineException::Code::UNIQUE_VIOLATION
                         );
                     }
 

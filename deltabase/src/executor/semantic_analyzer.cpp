@@ -66,7 +66,7 @@ namespace exq
     SemanticAnalyzer::analyze_select(const SelectStatement& stmt)
     {
         if (stmt.table.table_name.value.empty())
-            return AnalysisResult(std::runtime_error("Select statement missing target table"));
+            return AnalysisResult(EngineException("Select statement missing target table", EngineException::Code::SYNTAX_ERROR));
 
         const MetaTable* table = nullptr;
         std::optional<MetaTable> virtual_table_storage;
@@ -79,13 +79,13 @@ namespace exq
         else
         {
             if (!db_.exists_table(stmt.table))
-                return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+                return AnalysisResult(EngineException("Table '" + stmt.table.table_name.value + "' doesn't exist", EngineException::Code::TABLE_NOT_EXISTS));
             table = db_.get_table(stmt.table);
         }
 
         for (const SqlToken& col : stmt.columns)
             if (!table->has_column(col.value))
-                return AnalysisResult(ColumnDoesntExist(col.value));
+                return AnalysisResult(EngineException("Column '" + col.value + "' doesn't exist", EngineException::Code::COLUMN_NOT_EXISTS));
 
         if (stmt.where.has_value())
         {
@@ -101,16 +101,16 @@ namespace exq
     SemanticAnalyzer::analyze_insert(const InsertStatement& stmt) const
     {
         if (stmt.table.table_name.value.empty())
-            return AnalysisResult(std::runtime_error("Insert statement missing target table"));
+            return AnalysisResult(EngineException("Insert statement missing target table", EngineException::Code::SYNTAX_ERROR));
 
         if (!db_.exists_table(stmt.table))
-            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+            return AnalysisResult(EngineException("Table '" + stmt.table.table_name.value + "' doesn't exist", EngineException::Code::TABLE_NOT_EXISTS));
 
         const auto* table = db_.get_table(stmt.table);
 
         for (const SqlToken& col : stmt.columns)
             if (!table->has_column(col.value))
-                return AnalysisResult(ColumnDoesntExist(col.value));
+                return AnalysisResult(EngineException("Column '" + col.value + "' doesn't exist", EngineException::Code::COLUMN_NOT_EXISTS));
 
         const bool has_explicit_columns = !stmt.columns.empty();
         const size_t expected_value_count = has_explicit_columns ? stmt.columns.size() : table->columns.size();
@@ -120,13 +120,11 @@ namespace exq
             if (has_explicit_columns)
             {
                 if (values.values.size() != expected_value_count)
-                    return AnalysisResult(
-                        std::runtime_error("VALUES count does not match columns count"));
+                    return AnalysisResult(EngineException("VALUES count does not match columns count", EngineException::Code::COLUMN_COUNT_MISMATCH));
             }
             else if (values.values.size() > expected_value_count)
             {
-                return AnalysisResult(
-                    std::runtime_error("VALUES count exceeds table column count"));
+                return AnalysisResult(EngineException("VALUES count exceeds table column count", EngineException::Code::COLUMN_COUNT_MISMATCH));
             }
         }
 
@@ -162,29 +160,25 @@ namespace exq
             {
                 const SqlToken& value = values.values[i];
                 if (!std::holds_alternative<SqlLiteral>(value.detail))
-                    return AnalysisResult(std::runtime_error("Invalid literal token type"));
+                    return AnalysisResult(EngineException("Invalid literal token type", EngineException::Code::TYPE_MISMATCH));
 
                 auto column = get_column(i);
                 if (!column.has_value())
-                    return AnalysisResult("What the fuck is happened");
+                    return AnalysisResult(EngineException("Internal error: unexpected column state", EngineException::Code::GENERIC));
 
                 auto literal_type = std::get<SqlLiteral>(value.detail);
                 auto column_type = column.value().get().type;
                 auto is_not_null = has_not_null_constraint(column.value().get());
 
                 if (is_not_null && literal_type == SqlLiteral::_NULL)
-                    return AnalysisResult(
-                        std::runtime_error(
-                            "Cannot insert NULL to non-nullable column"));
+                    return AnalysisResult(EngineException("Cannot insert NULL to non-nullable column", EngineException::Code::NOT_NULL_VIOLATION));
 
                 if (!is_compatible(literal_type, column_type))
-                    return AnalysisResult(
-                        std::runtime_error(
-                            std::format(
-                                "Incompatible types conversion: {} to {}",
-                                static_cast<int>(literal_type),
-                                static_cast<int>(column_type)
-                            )));
+                    return AnalysisResult(EngineException(
+                        std::format("Incompatible types conversion: {} to {}",
+                            static_cast<int>(literal_type),
+                            static_cast<int>(column_type)),
+                        EngineException::Code::TYPE_MISMATCH));
             }
 
             if (!has_explicit_columns)
@@ -193,11 +187,7 @@ namespace exq
                 {
                     const auto& column = table->get_column(static_cast<int64_t>(i));
                     if (has_not_null_constraint(column) && !has_default_constraint(column))
-                    {
-                        return AnalysisResult(std::runtime_error(
-                            "INSERT is missing a value for NOT NULL column '" + column.name +
-                            "' without DEFAULT"));
-                    }
+                        return AnalysisResult(EngineException("INSERT is missing a value for NOT NULL column '" + column.name + "' without DEFAULT", EngineException::Code::NOT_NULL_VIOLATION));
                 }
             }
             else
@@ -208,11 +198,7 @@ namespace exq
                         continue;
 
                     if (has_not_null_constraint(column) && !has_default_constraint(column))
-                    {
-                        return AnalysisResult(std::runtime_error(
-                            "INSERT is missing a value for NOT NULL column '" + column.name +
-                            "' without DEFAULT"));
-                    }
+                        return AnalysisResult(EngineException("INSERT is missing a value for NOT NULL column '" + column.name + "' without DEFAULT", EngineException::Code::NOT_NULL_VIOLATION));
                 }
             }
         }
@@ -224,13 +210,13 @@ namespace exq
     SemanticAnalyzer::analyze_update(const UpdateStatement& stmt)
     {
         if (stmt.table.table_name.value.empty())
-            return AnalysisResult(std::runtime_error("Update statement missing target table"));
+            return AnalysisResult(EngineException("Update statement missing target table", EngineException::Code::SYNTAX_ERROR));
 
         if (stmt.assignments.empty())
-            return AnalysisResult(std::runtime_error("Update statement missing assignments"));
+            return AnalysisResult(EngineException("Update statement missing assignments", EngineException::Code::SYNTAX_ERROR));
 
         if (!db_.exists_table(stmt.table))
-            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+            return AnalysisResult(EngineException("Table '" + stmt.table.table_name.value + "' doesn't exist", EngineException::Code::TABLE_NOT_EXISTS));
 
         const auto* table = db_.get_table(stmt.table);
 
@@ -255,10 +241,10 @@ namespace exq
     SemanticAnalyzer::analyze_delete(const DeleteStatement& stmt)
     {
         if (stmt.table.table_name.value.empty())
-            return AnalysisResult(std::runtime_error("Delete statement missing target table"));
+            return AnalysisResult(EngineException("Delete statement missing target table", EngineException::Code::SYNTAX_ERROR));
 
         if (!db_.exists_table(stmt.table))
-            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+            return AnalysisResult(EngineException("Table '" + stmt.table.table_name.value + "' doesn't exist", EngineException::Code::TABLE_NOT_EXISTS));
 
         const auto* table = db_.get_table(stmt.table);
 
@@ -276,7 +262,7 @@ namespace exq
     SemanticAnalyzer::analyze_create_table(const CreateTableStatement& stmt) const
     {
         if (db_.exists_table(stmt.table))
-            return AnalysisResult(TableExists(stmt.table.table_name.value));
+            return AnalysisResult(EngineException("Table '" + stmt.table.table_name.value + "' already exists", EngineException::Code::TABLE_EXISTS));
 
         return AnalysisResult(true);
     }
@@ -307,7 +293,7 @@ namespace exq
     SemanticAnalyzer::analyze_alter_table(const AlterTableStatement& stmt) const
     {
         if (!db_.exists_table(stmt.table))
-            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+            return AnalysisResult(EngineException("Table '" + stmt.table.table_name.value + "' doesn't exist", EngineException::Code::TABLE_NOT_EXISTS));
 
         const auto* mt = db_.get_table(stmt.table);
 
@@ -316,7 +302,7 @@ namespace exq
             if (auto* add_col = std::get_if<AddColumnOperation>(&operation))
             {
                 if (mt->has_column(add_col->column.name.value))
-                    return AnalysisResult(ColumnExists(add_col->column.name.value));
+                    return AnalysisResult(EngineException("Column '" + add_col->column.name.value + "' already exists", EngineException::Code::COLUMN_EXISTS));
 
                 bool has_not_null = false;
                 bool has_default = false;
@@ -334,28 +320,19 @@ namespace exq
                         auto value_type = default_value->value.get_detail<SqlLiteral>();
                         DataType col_type = misc::convert_to_dt(add_col->column.type);
                         if (!is_compatible(value_type, col_type))
-                            return AnalysisResult(
-                                std::runtime_error(
-                                    "Type of the default value is not compatible with the column's type"));
+                            return AnalysisResult(EngineException("Type of the default value is not compatible with the column's type", EngineException::Code::TYPE_MISMATCH));
                     }
                 }
 
                 if (has_not_null && mt->live_rows > 0 && !has_default)
-                {
-                    return AnalysisResult(std::runtime_error(
-                        "Cannot add NOT NULL column to non-empty table without DEFAULT value"));
-                }
+                    return AnalysisResult(EngineException("Cannot add NOT NULL column to non-empty table without DEFAULT value", EngineException::Code::NOT_NULL_VIOLATION));
 
                 if (mt->live_rows > 0)
                 {
                     for (const auto& existing_col : mt->columns)
                     {
                         if (has_not_null_constraint(existing_col) && !has_default_constraint(existing_col))
-                        {
-                            return AnalysisResult(std::runtime_error(
-                                "Cannot add column to non-empty table: existing column '" + existing_col.name +
-                                "' has NOT NULL constraint without DEFAULT value"));
-                        }
+                            return AnalysisResult(EngineException("Cannot add column to non-empty table: existing column '" + existing_col.name + "' has NOT NULL constraint without DEFAULT value", EngineException::Code::NOT_NULL_VIOLATION));
                     }
                 }
             }
@@ -368,16 +345,16 @@ namespace exq
     SemanticAnalyzer::analyze_create_index(const CreateIndexStatement& stmt) const
     {
         if (!db_.exists_table(stmt.table))
-            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+            return AnalysisResult(EngineException("Table '" + stmt.table.table_name.value + "' doesn't exist", EngineException::Code::TABLE_NOT_EXISTS));
 
         const auto* table = db_.get_table(stmt.table);
 
         for (const auto& index : table->indexes)
             if (index.name == stmt.index_name.value)
-                return AnalysisResult(std::runtime_error("Index already exists"));
+                return AnalysisResult(EngineException("Index '" + stmt.index_name.value + "' already exists", EngineException::Code::INDEX_EXISTS));
 
         if (!table->has_column(stmt.column_name.value))
-            return AnalysisResult(std::runtime_error("Column doesn't exists"));
+            return AnalysisResult(EngineException("Column '" + stmt.column_name.value + "' doesn't exist", EngineException::Code::COLUMN_NOT_EXISTS));
 
         return AnalysisResult(true);
     }
@@ -386,11 +363,10 @@ namespace exq
     SemanticAnalyzer::analyze_drop_index(const DropIndexStatement& stmt) const
     {
         if (!db_.exists_table(stmt.table))
-            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+            return AnalysisResult(EngineException("Table '" + stmt.table.table_name.value + "' doesn't exist", EngineException::Code::TABLE_NOT_EXISTS));
 
         if (!db_.exists_index(stmt.index_name.value, stmt.table))
-            return AnalysisResult(
-                IndexDoesntExist(stmt.index_name.value, stmt.table.table_name.value));
+            return AnalysisResult(EngineException("Index '" + stmt.index_name.value + "' does not exist on table " + stmt.table.table_name.value, EngineException::Code::INDEX_NOT_EXISTS));
 
         return AnalysisResult(true);
     }
@@ -399,7 +375,7 @@ namespace exq
     SemanticAnalyzer::analyze_drop_table(const DropTableStatement& stmt) const
     {
         if (!db_.exists_table(stmt.table))
-            return AnalysisResult(TableDoesntExist(stmt.table.table_name.value));
+            return AnalysisResult(EngineException("Table '" + stmt.table.table_name.value + "' doesn't exist", EngineException::Code::TABLE_NOT_EXISTS));
 
         return AnalysisResult(true);
     }
@@ -408,7 +384,7 @@ namespace exq
     SemanticAnalyzer::analyze_where(const BinaryExpr& where, const MetaTable& table)
     {
         if (where.op == AstOperator::ASSIGN)
-            return AnalysisResult(std::runtime_error("Invalid condition operator"));
+            return AnalysisResult(EngineException("Invalid condition operator: ASSIGN cannot be used in WHERE clause", EngineException::Code::INVALID_COMPARISON));
 
         if (where.op == AstOperator::EQ || where.op == AstOperator::NEQ ||
             where.op == AstOperator::GR || where.op == AstOperator::LT ||
@@ -417,7 +393,7 @@ namespace exq
         {
 
             if (!where.left || !where.right)
-                return AnalysisResult(std::runtime_error("Incomplete comparison expression"));
+                return AnalysisResult(EngineException("Incomplete comparison expression", EngineException::Code::SYNTAX_ERROR));
 
             auto comparison_analysis = analyze_column_comparison(
                 where.op,
@@ -455,7 +431,7 @@ namespace exq
     SemanticAnalyzer::analyze_create_db(const CreateDbStatement& stmt) const
     {
         if (generic_validator_.exists_db(stmt.name.value))
-            return AnalysisResult(static_cast<std::runtime_error>(DbExists(stmt.name.value)), true);
+            return AnalysisResult(EngineException("Database '" + stmt.name.value + "' already exists", EngineException::Code::DB_EXISTS), true);
 
         return AnalysisResult(true, true);
     }
@@ -467,14 +443,10 @@ namespace exq
     ) const
     {
         if (expr.op != AstOperator::ASSIGN)
-            return AnalysisResult(std::runtime_error("Invalid assignment: expected '='"));
+            return AnalysisResult(EngineException("Invalid assignment: expected '='", EngineException::Code::SYNTAX_ERROR));
 
         if (expr.left->type != AstNodeType::IDENTIFIER || expr.right->type != AstNodeType::LITERAL)
-            return AnalysisResult(
-                std::runtime_error(
-                    "Invalid assignment: you can assign only literal to a identifier"
-                )
-            );
+            return AnalysisResult(EngineException("Invalid assignment: you can assign only literal to a identifier", EngineException::Code::SYNTAX_ERROR));
 
         expr.left->type = AstNodeType::COLUMN_IDENTIFIER;
 
@@ -483,7 +455,7 @@ namespace exq
 
         const std::string& col_name = std::get<SqlToken>(column_node->value).value;
         if (!table.has_column(col_name))
-            return AnalysisResult(ColumnDoesntExist(std::string(col_name)));
+            return AnalysisResult(EngineException("Column '" + std::string(col_name) + "' doesn't exist", EngineException::Code::COLUMN_NOT_EXISTS));
 
         const auto& column = table.get_column(col_name);
 
@@ -491,9 +463,7 @@ namespace exq
         const auto& value_token = std::get<SqlToken>(value_node->value);
         auto literal_type = std::get<SqlLiteral>(value_token.detail);
         if (!is_compatible(literal_type, column.type))
-            return AnalysisResult(
-                std::runtime_error("Incompatible types conversion in assignment")
-            );
+            return AnalysisResult(EngineException("Incompatible types conversion in assignment", EngineException::Code::TYPE_MISMATCH));
 
         return AnalysisResult(true);
     }
@@ -520,25 +490,21 @@ namespace exq
             value_node = left.get();
         }
         else
-            return AnalysisResult(
-                std::runtime_error(
-                    "Invalid WHERE expression: comparison must be between column and literal"
-                )
-            );
+            return AnalysisResult(EngineException("Invalid WHERE expression: comparison must be between column and literal", EngineException::Code::SYNTAX_ERROR));
 
         const auto& column_token = std::get<SqlToken>(column_node->value);
         const auto& value_token = std::get<SqlToken>(value_node->value);
 
         const auto literal_type = std::get<SqlLiteral>(value_token.detail);
         if (op == AstOperator::IS && literal_type != SqlLiteral::_NULL)
-            return AnalysisResult(std::runtime_error("IS operator can only be used with NULL"));
+            return AnalysisResult(EngineException("IS operator can only be used with NULL", EngineException::Code::INVALID_COMPARISON));
 
         if (!table.has_column(column_token.value))
-            return AnalysisResult(ColumnDoesntExist(column_token.value));
+            return AnalysisResult(EngineException("Column '" + column_token.value + "' doesn't exist", EngineException::Code::COLUMN_NOT_EXISTS));
 
         const auto& column = table.get_column(column_token.value);
         if (!is_compatible(literal_type, column.type))
-            return AnalysisResult(std::runtime_error("Incompatible types conversion"));
+            return AnalysisResult(EngineException("Incompatible types conversion", EngineException::Code::TYPE_MISMATCH));
 
         return AnalysisResult(true);
     }

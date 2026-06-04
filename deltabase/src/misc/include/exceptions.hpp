@@ -4,110 +4,51 @@
 #include <stdexcept>
 #include <string>
 
-class InvalidStatementSyntax : public std::runtime_error
+class EngineException : public std::runtime_error
 {
 public:
-    InvalidStatementSyntax(const std::string& msg = "Invalid statement syntax")
-        : std::runtime_error(msg)
+    enum class Code
     {
-    }
-};
+        GENERIC,
 
-class TableExists : public std::runtime_error
-{
-public:
-    TableExists(const std::string& table_name)
-        : std::runtime_error("Table '" + table_name + "' already exists")
-    {
-    }
-};
+        // Object existence
+        DB_NOT_EXISTS,
+        DB_EXISTS,
+        SCHEMA_NOT_EXISTS,
+        SCHEMA_EXISTS,
+        TABLE_NOT_EXISTS,
+        TABLE_EXISTS,
+        COLUMN_NOT_EXISTS,
+        COLUMN_EXISTS,
+        INDEX_NOT_EXISTS,
+        INDEX_EXISTS,
 
-class TableDoesntExist : public std::runtime_error
-{
-public:
-    TableDoesntExist(const std::string& table_name)
-        : std::runtime_error("Table '" + table_name + "' doesnt exist")
-    {
-    }
-};
+        // Constraint violations
+        UNIQUE_VIOLATION,
+        NOT_NULL_VIOLATION,
+        CHECK_VIOLATION,
 
-class SchemaDoesntExist : public std::runtime_error
-{
-public:
-    explicit SchemaDoesntExist(const std::string& schema_name)
-        : std::runtime_error("Schema '" + schema_name + "' doesnt exist")
-    {
-    }
-};
+        // SQL syntax / parsing
+        SYNTAX_ERROR,
+        UNSUPPORTED_STATEMENT,
+        UNEXPECTED_TOKEN,
 
-class ColumnDoesntExist : public std::runtime_error
-{
-public:
-    ColumnDoesntExist(const std::string& col_name)
-        : std::runtime_error("Column '" + col_name + "' doesn't exists")
-    {
-    }
-};
+        // Semantic / query errors
+        TYPE_MISMATCH,
+        COLUMN_COUNT_MISMATCH,
+        AMBIGUOUS_COLUMN,
+        INVALID_COMPARISON,
+    };
 
-class ColumnExists : public std::runtime_error
-{
-public:
-    ColumnExists(const std::string& col_name)
-        : std::runtime_error("Column '" + col_name + "' already exists")
+    explicit EngineException(const std::string& msg, Code code)
+        : std::runtime_error(msg), code_(code)
     {
     }
-};
 
-class DbDoesntExists : public std::runtime_error
-{
-public:
-    DbDoesntExists(const std::string& db_name)
-        : std::runtime_error("Database '" + db_name + "' doesn't exists")
-    {
-    }
-};
+    Code code() const { return code_; }
 
-class DbExists : public std::runtime_error
-{
-public:
-    DbExists(const std::string& db_name)
-        : std::runtime_error("Database '" + db_name + "' already exists")
-    {
-    }
-};
-
-class UniqueConstraintViolation : public std::runtime_error
-{
-public:
-    UniqueConstraintViolation(const std::string& constraint_name)
-        : std::runtime_error("Unique constraint violation: " + constraint_name)
-    {
-    }
-};
-
-class IndexDoesntExist : public std::runtime_error
-{
-public:
-    IndexDoesntExist(const std::string& index_name, const std::string& table_name)
-        : std::runtime_error("Index '" + index_name + "' does not exist on table " + table_name)
-    {
-    }
-};
-
-class NetworkError : public std::runtime_error
-{
-public:
-    NetworkError(const std::string& msg = "") : std::runtime_error(msg)
-    {
-    }
-};
-
-class SqlException : public std::runtime_error
-{
-    public:
-    SqlException(const std::string& msg) : std::runtime_error(msg)
-    {
-    }
+private:
+    Code code_;
 };
 
 #endif

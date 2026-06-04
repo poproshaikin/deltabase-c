@@ -3,6 +3,7 @@
 //
 
 #include "include/server.hpp"
+#include "exceptions.hpp"
 
 #include "include/query_result_serializer.hpp"
 #include "logger.hpp"
@@ -173,14 +174,13 @@ namespace net
             engine->attach_db(message.db_name);
             send_success(handle, message.session_id, message.request_id);
         }
-        catch (DbDoesntExists)
+        catch (const EngineException& ex)
         {
-            send_pong_and_stop(
-                handle,
-                stop,
-                message.session_id,
-                NetErrorCode::DB_NOT_EXISTS,
-                message.request_id);
+            auto net_code = ex.code() == EngineException::Code::DB_NOT_EXISTS
+                ? NetErrorCode::DB_NOT_EXISTS
+                : NetErrorCode::SQL_ERROR;
+            Logger::error(std::string("ATTACH_DB failed: ") + ex.what());
+            send_pong_and_stop(handle, stop, message.session_id, net_code, message.request_id, ex.what());
             return;
         }
         catch (const std::exception& ex)

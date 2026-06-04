@@ -28,7 +28,7 @@ namespace engine
         auto cfg_path = path_db_meta(data_path, name);
 
         if (!exists_file(cfg_path))
-            throw DbDoesntExists(name);
+            throw EngineException("Database " + name + " doesn't exists", EngineException::Code::DB_NOT_EXISTS);
 
         ReadOnlyMemoryStream stream(read_file(cfg_path));
         Config cfg;

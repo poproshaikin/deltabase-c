@@ -106,7 +106,7 @@ namespace net
         uint32_t net_len = htonl(len);
 
         if (send_full(fd(), &net_len, sizeof(net_len), 0) != sizeof(net_len))
-            throw NetworkError("Failed to write length to socket");
+            throw std::runtime_error("Failed to write length to socket");
 
         if (content.empty())
             return;
@@ -114,7 +114,7 @@ namespace net
         ssize_t sent = send_full(fd(), content.data(), content.size(), 0);
 
         if (sent != static_cast<ssize_t>(content.size()))
-            throw NetworkError("Failed to write message body");
+            throw std::runtime_error("Failed to write message body");
     }
 
     SocketHandle

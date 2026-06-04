@@ -86,7 +86,7 @@ namespace sql
         match_or_throw(TEnum expected, std::string error_msg = "Invalid syntax") const
         {
             if (!match<TEnum>(expected))
-                throw InvalidStatementSyntax(error_msg);
+                throw EngineException(error_msg, EngineException::Code::SYNTAX_ERROR);
         }
 
         bool

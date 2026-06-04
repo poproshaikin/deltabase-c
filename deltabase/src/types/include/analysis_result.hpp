@@ -4,8 +4,8 @@
 
 #ifndef DELTABASE_ANALYSIS_RESULT_HPP
 #define DELTABASE_ANALYSIS_RESULT_HPP
+#include "../../misc/include/exceptions.hpp"
 #include <optional>
-#include <stdexcept>
 
 namespace types
 {
@@ -13,7 +13,7 @@ namespace types
     {
         bool is_valid;
 
-        std::optional<std::runtime_error> err;
+        std::optional<EngineException> err;
 
         std::optional<bool> is_system_query;
 
@@ -30,21 +30,13 @@ namespace types
         }
 
         explicit
-        AnalysisResult(std::runtime_error err) : is_valid(false), err(err)
+        AnalysisResult(EngineException err) : is_valid(false), err(err)
         {
         }
 
         explicit
-        AnalysisResult(std::runtime_error err, bool is_system_query)
+        AnalysisResult(EngineException err, bool is_system_query)
             : is_valid(false), err(err), is_system_query(is_system_query)
-        {
-        }
-
-        explicit
-        AnalysisResult(bool is_valid,
-                       std::optional<std::runtime_error> err,
-                       std::optional<bool> is_system_query)
-            : is_valid(is_valid), err(std::move(err)), is_system_query(is_system_query)
         {
         }
     };
