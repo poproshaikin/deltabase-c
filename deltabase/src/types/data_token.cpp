@@ -4,19 +4,124 @@
 
 #include "include/data_token.hpp"
 
-#include "../misc/include/logger.hpp"
-
 #include <cstring>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace types
 {
     namespace
     {
-        bool
-        is_same_type(const DataToken& lhs, const DataToken& rhs)
+        // Maps (left_type, right_type) → common type for comparison.
+        // Add a new pair here to support cross-type comparisons.
+        const std::unordered_map<DataType, std::unordered_map<DataType, DataType>>&
+        coerce_table()
         {
-            return lhs.type == rhs.type;
+            static const std::unordered_map<DataType, std::unordered_map<DataType, DataType>> table =
+            {
+                { DataType::INTEGER, {
+                    { DataType::INTEGER, DataType::INTEGER },
+                    { DataType::REAL,    DataType::REAL    },  // int op real → widen to real
+                }},
+                { DataType::REAL, {
+                    { DataType::REAL,    DataType::REAL    },
+                    { DataType::INTEGER, DataType::REAL    },  // real op int → widen to real
+                }},
+                { DataType::TEXT, {
+                    { DataType::TEXT,    DataType::TEXT    },
+                }},
+                { DataType::CHAR, {
+                    { DataType::CHAR,    DataType::CHAR    },
+                }},
+                { DataType::BOOL, {
+                    { DataType::BOOL,    DataType::BOOL    },
+                }},
+            };
+            return table;
+        }
+
+        // Widen token to target type. Only non-trivial case: INTEGER → REAL.
+        DataToken widen(const DataToken& token, DataType target)
+        {
+            if (token.type == target)
+                return token;
+
+            if (token.type == DataType::INTEGER && target == DataType::REAL)
+            {
+                int iv;
+                std::memcpy(&iv, token.bytes.data(), sizeof(int));
+                double dv = static_cast<double>(iv);
+                Bytes b(sizeof(double));
+                std::memcpy(b.data(), &dv, sizeof(double));
+                return DataToken(b, DataType::REAL);
+            }
+
+            return token; // no-op for same-type calls
+        }
+
+        // Signed integer stored in little-endian 2's complement.
+        int compare_signed_le(const uint8_t* a, const uint8_t* b, size_t n)
+        {
+            const bool a_neg = (a[n - 1] & 0x80) != 0;
+            const bool b_neg = (b[n - 1] & 0x80) != 0;
+            if (a_neg != b_neg)
+                return a_neg ? -1 : 1;
+            for (int i = static_cast<int>(n) - 1; i >= 0; --i)
+            {
+                if (a[i] != b[i])
+                    return (a[i] < b[i]) ? -1 : 1;
+            }
+            return 0;
+        }
+
+        // IEEE 754 floating-point stored in little-endian.
+        int compare_ieee754_le(const uint8_t* a, const uint8_t* b, size_t n)
+        {
+            const bool a_neg = (a[n - 1] & 0x80) != 0;
+            const bool b_neg = (b[n - 1] & 0x80) != 0;
+            if (a_neg != b_neg)
+                return a_neg ? -1 : 1;
+            for (int i = static_cast<int>(n) - 1; i >= 0; --i)
+            {
+                if (a[i] != b[i])
+                {
+                    const int cmp = (a[i] < b[i]) ? -1 : 1;
+                    return a_neg ? -cmp : cmp;
+                }
+            }
+            return 0;
+        }
+
+        // Lexicographic byte comparison (TEXT).
+        int compare_bytes_lex(const Bytes& a, const Bytes& b)
+        {
+            const size_t n = std::min(a.size(), b.size());
+            for (size_t i = 0; i < n; ++i)
+            {
+                if (a[i] != b[i])
+                    return (a[i] < b[i]) ? -1 : 1;
+            }
+            if (a.size() != b.size())
+                return (a.size() < b.size()) ? -1 : 1;
+            return 0;
+        }
+
+        int compare_same_type(const DataToken& a, const DataToken& b)
+        {
+            switch (a.type)
+            {
+            case DataType::INTEGER:
+                return compare_signed_le(a.bytes.data(), b.bytes.data(), a.bytes.size());
+            case DataType::REAL:
+                return compare_ieee754_le(a.bytes.data(), b.bytes.data(), a.bytes.size());
+            case DataType::TEXT:
+                return compare_bytes_lex(a.bytes, b.bytes);
+            case DataType::CHAR:
+            case DataType::BOOL:
+                return static_cast<int>(a.bytes[0]) - static_cast<int>(b.bytes[0]);
+            default:
+                return 0;
+            }
         }
     } // namespace
 
@@ -47,23 +152,21 @@ namespace types
         }
         case SqlLiteral::STRING:
         {
-            bytes.resize(sql_token.value.size());
-            std::memcpy(bytes.data(), sql_token.value.data(), sql_token.value.size());
+            bytes.assign(sql_token.value.begin(), sql_token.value.end());
             type = DataType::TEXT;
             break;
         }
         case SqlLiteral::BOOL:
         {
-            bool value = sql_token.value == "true" || sql_token.value == "1";
             bytes.resize(1);
-            bytes[0] = value ? 1 : 0;
+            bytes[0] = (sql_token.value == "true" || sql_token.value == "1") ? 1 : 0;
             type = DataType::BOOL;
             break;
         }
         case SqlLiteral::CHAR:
         {
             bytes.resize(1);
-            bytes[0] = static_cast<unsigned char>(sql_token.value[0]);
+            bytes[0] = static_cast<uint8_t>(sql_token.value[0]);
             type = DataType::CHAR;
             break;
         }
@@ -84,87 +187,47 @@ namespace types
     {
     }
 
-    bool
-    operator==(const DataToken& lhs, const DataToken& rhs)
+    DataType DataToken::common_type(DataType a, DataType b)
     {
-        if (!is_same_type(lhs, rhs))
-            return false;
-
-        switch (lhs.type)
-        {
-        case DataType::_NULL:
-            return true;
-        case DataType::INTEGER:
-            return lhs.as<int>() == rhs.as<int>();
-        case DataType::REAL:
-            return lhs.as<double>() == rhs.as<double>();
-        case DataType::CHAR:
-            return lhs.as<char>() == rhs.as<char>();
-        case DataType::BOOL:
-            return lhs.as<bool>() == rhs.as<bool>();
-        case DataType::TEXT:
-            return lhs.as<std::string>() == rhs.as<std::string>();
-        default:
-        {
-            misc::Logger::warn(
-                "Missing comparison operator for data token type " +
-                std::to_string(static_cast<int>(lhs.type))
-            );
-            return lhs.bytes == rhs.bytes;
-        }
-        }
+        const auto& table = coerce_table();
+        auto outer = table.find(a);
+        if (outer == table.end()) return DataType::UNDEFINED;
+        auto inner = outer->second.find(b);
+        if (inner == outer->second.end()) return DataType::UNDEFINED;
+        return inner->second;
     }
 
-    bool
-    operator!=(const DataToken& lhs, const DataToken& rhs)
+    int DataToken::compare(const DataToken& a, const DataToken& b)
+    {
+        if (a.type == b.type)
+            return compare_same_type(a, b);
+
+        const DataType common = common_type(a.type, b.type);
+        return compare_same_type(widen(a, common), widen(b, common));
+    }
+
+    bool operator==(const DataToken& lhs, const DataToken& rhs)
+    {
+        if (lhs.type == DataType::_NULL && rhs.type == DataType::_NULL) return true;
+        if (DataToken::common_type(lhs.type, rhs.type) == DataType::UNDEFINED) return false;
+        return DataToken::compare(lhs, rhs) == 0;
+    }
+
+    bool operator!=(const DataToken& lhs, const DataToken& rhs)
     {
         return !(lhs == rhs);
     }
 
-    bool
-    operator<(const DataToken& lhs, const DataToken& rhs)
+    bool operator<(const DataToken& lhs, const DataToken& rhs)
     {
-        if (!is_same_type(lhs, rhs))
-            return static_cast<uint64_t>(lhs.type) < static_cast<uint64_t>(rhs.type);
-
-        switch (lhs.type)
-        {
-        case DataType::INTEGER:
-            return lhs.as<int>() < rhs.as<int>();
-        case DataType::REAL:
-            return lhs.as<double>() < rhs.as<double>();
-        case DataType::CHAR:
-            return lhs.as<char>() < rhs.as<char>();
-        case DataType::BOOL:
-            return lhs.as<bool>() < rhs.as<bool>();
-        case DataType::TEXT:
-            return lhs.as<std::string>() < rhs.as<std::string>();
-        default:
-        {
-            misc::Logger::warn(
-                "Missing comparison operator for data token type " +
-                std::to_string(static_cast<int>(lhs.type))
-            );
-            return lhs.bytes < rhs.bytes;
-        }
-        }
+        if (lhs.type == DataType::_NULL || rhs.type == DataType::_NULL) return false;
+        if (DataToken::common_type(lhs.type, rhs.type) == DataType::UNDEFINED)
+            return static_cast<int>(lhs.type) < static_cast<int>(rhs.type);
+        return DataToken::compare(lhs, rhs) < 0;
     }
 
-    bool
-    operator<=(const DataToken& lhs, const DataToken& rhs)
-    {
-        return lhs < rhs || lhs == rhs;
-    }
+    bool operator<=(const DataToken& lhs, const DataToken& rhs) { return !(rhs < lhs); }
+    bool operator>(const DataToken& lhs, const DataToken& rhs)  { return rhs < lhs; }
+    bool operator>=(const DataToken& lhs, const DataToken& rhs) { return !(lhs < rhs); }
 
-    bool
-    operator>(const DataToken& lhs, const DataToken& rhs)
-    {
-        return rhs < lhs;
-    }
-
-    bool
-    operator>=(const DataToken& lhs, const DataToken& rhs)
-    {
-        return !(lhs < rhs);
-    }
 } // namespace types

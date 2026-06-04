@@ -4,6 +4,8 @@
 
 #include "std_db_instance.hpp"
 
+#include <cassert>
+
 #include "BP_index_pager.hpp"
 #include "exceptions.hpp"
 #include "index_bplus_tree.hpp"

@@ -32,199 +32,48 @@ namespace exq
         if (left.is_identifier() && right.is_literal())
         {
             int64_t col_idx = table.get_column_idx(left);
-            DataToken left_value(row.tokens.at(col_idx));
-            DataToken right_literal(right);
-            return evaluate(left_value, right_literal, expr.op);
+            return evaluate(DataToken(row.tokens.at(col_idx)), DataToken(right), expr.op);
         }
         if (left.is_identifier() && right.is_identifier())
         {
-            int64_t left_col_idx  = table_.get_column_idx(left);
-            int64_t right_col_idx = table_.get_column_idx(right);
-            DataToken left_value(row.tokens[left_col_idx]);
-            DataToken right_value(row.tokens[right_col_idx]);
-            return evaluate(left_value, right_value, expr.op);
+            int64_t left_idx  = table_.get_column_idx(left);
+            int64_t right_idx = table_.get_column_idx(right);
+            return evaluate(DataToken(row.tokens[left_idx]), DataToken(row.tokens[right_idx]), expr.op);
         }
         if (left.is_literal() && right.is_literal())
         {
-            DataToken left_literal(left);
-            DataToken right_literal(right);
-            return evaluate(left_literal, right_literal, expr.op);
+            return evaluate(DataToken(left), DataToken(right), expr.op);
         }
 
         throw std::runtime_error("Evaluator::evaluate: Invalid comparison");
     }
 
     bool
-    Evaluator::evaluate(const DataToken& left,
-                        const DataToken& right,
-                        AstOperator op) const
+    Evaluator::evaluate(const DataToken& left, const DataToken& right, AstOperator op) const
     {
+        // NULL semantics: EQ/IS treat NULL=NULL as true; ordered comparisons return false.
+        if (left.type == DataType::_NULL || right.type == DataType::_NULL)
+        {
+            if (op == AstOperator::EQ || op == AstOperator::IS)
+                return left.type == right.type;
+            return false;
+        }
+
+        if (DataToken::common_type(left.type, right.type) == DataType::UNDEFINED)
+            return false;
+
+        const int c = DataToken::compare(left, right);
+
         switch (op)
         {
-        case AstOperator::EQ:
-            return eq(left, right);
-        case AstOperator::NEQ:
-            return !eq(left, right);
-        case AstOperator::LT:
-            return lt(left, right);
-        case AstOperator::LTE:
-            return lte(left, right);
-        case AstOperator::GR:
-            return gr(left, right);
-        case AstOperator::GRE:
-            return gre(left, right);
-        case AstOperator::IS:
-            return eq(left, right);
-        default:
-            return false;
+        case AstOperator::EQ:  return c == 0;
+        case AstOperator::NEQ: return c != 0;
+        case AstOperator::LT:  return c <  0;
+        case AstOperator::LTE: return c <= 0;
+        case AstOperator::GR:  return c >  0;
+        case AstOperator::GRE: return c >= 0;
+        case AstOperator::IS:  return c == 0;
+        default:               return false;
         }
     }
-
-    bool
-    Evaluator::eq(const DataToken& left, const DataToken& right) const
-    {
-        if (left.type == DataType::_NULL || right.type == DataType::_NULL)
-            return left.type == right.type;
-
-        if (left.type != right.type)
-            return false;
-
-        switch (left.type)
-        {
-        case DataType::INTEGER:
-            return eq(left.as<int>(), right.as<int>());
-        case DataType::REAL:
-            return eq(left.as<double>(), right.as<double>());
-        case DataType::TEXT:
-            return eq(left.as<std::string>(), right.as<std::string>());
-        case DataType::BOOL:
-            return eq(left.as<bool>(), right.as<bool>());
-        case DataType::CHAR:
-            return eq(left.as<char>(), right.as<char>());
-        default:
-            return false;
-        }
-    }
-
-    bool Evaluator::eq(const int left,         const int right)         const { return left == right; }
-    bool Evaluator::eq(const double left,       const double right)      const { return left == right; }
-    bool Evaluator::eq(const std::string& left, const std::string& right)const { return left == right; }
-    bool Evaluator::eq(const bool left,         const bool right)        const { return left == right; }
-    bool Evaluator::eq(const char left,         const char right)        const { return left == right; }
-
-    bool
-    Evaluator::lt(const DataToken& left, const DataToken& right) const
-    {
-        if (left.type == DataType::_NULL || right.type == DataType::_NULL)
-            return false;
-
-        if (left.type != right.type)
-            return false;
-
-        switch (left.type)
-        {
-        case DataType::INTEGER:
-            return lt(left.as<int>(), right.as<int>());
-        case DataType::REAL:
-            return lt(left.as<double>(), right.as<double>());
-        case DataType::TEXT:
-            return lt(left.as<std::string>(), right.as<std::string>());
-        case DataType::CHAR:
-            return lt(left.as<char>(), right.as<char>());
-        default:
-            return false;
-        }
-    }
-
-    bool Evaluator::lt(const int left,         const int right)         const { return left < right; }
-    bool Evaluator::lt(const double left,       const double right)      const { return left < right; }
-    bool Evaluator::lt(const std::string& left, const std::string& right)const { return left < right; }
-    bool Evaluator::lt(const char left,         const char right)        const { return left < right; }
-
-    bool
-    Evaluator::lte(const DataToken& left, const DataToken& right) const
-    {
-        if (left.type == DataType::_NULL || right.type == DataType::_NULL)
-            return false;
-
-        if (left.type != right.type)
-            return false;
-
-        switch (left.type)
-        {
-        case DataType::INTEGER:
-            return lte(left.as<int>(), right.as<int>());
-        case DataType::REAL:
-            return lte(left.as<double>(), right.as<double>());
-        case DataType::TEXT:
-            return lte(left.as<std::string>(), right.as<std::string>());
-        case DataType::CHAR:
-            return lte(left.as<char>(), right.as<char>());
-        default:
-            return false;
-        }
-    }
-
-    bool Evaluator::lte(const int left,         const int right)         const { return left <= right; }
-    bool Evaluator::lte(const double left,       const double right)      const { return left <= right; }
-    bool Evaluator::lte(const std::string& left, const std::string& right)const { return left <= right; }
-    bool Evaluator::lte(const char left,         const char right)        const { return left <= right; }
-
-    bool
-    Evaluator::gr(const DataToken& left, const DataToken& right) const
-    {
-        if (left.type == DataType::_NULL || right.type == DataType::_NULL)
-            return false;
-
-        if (left.type != right.type)
-            return false;
-
-        switch (left.type)
-        {
-        case DataType::INTEGER:
-            return gr(left.as<int>(), right.as<int>());
-        case DataType::REAL:
-            return gr(left.as<double>(), right.as<double>());
-        case DataType::TEXT:
-            return gr(left.as<std::string>(), right.as<std::string>());
-        case DataType::CHAR:
-            return gr(left.as<char>(), right.as<char>());
-        default:
-            return false;
-        }
-    }
-
-    bool Evaluator::gr(const int left,         const int right)         const { return left > right; }
-    bool Evaluator::gr(const double left,       const double right)      const { return left > right; }
-    bool Evaluator::gr(const std::string& left, const std::string& right)const { return left > right; }
-    bool Evaluator::gr(const char left,         const char right)        const { return left > right; }
-
-    bool
-    Evaluator::gre(const DataToken& left, const DataToken& right) const
-    {
-        if (left.type == DataType::_NULL || right.type == DataType::_NULL)
-            return false;
-
-        if (left.type != right.type)
-            return false;
-
-        switch (left.type)
-        {
-        case DataType::INTEGER:
-            return gre(left.as<int>(), right.as<int>());
-        case DataType::REAL:
-            return gre(left.as<double>(), right.as<double>());
-        case DataType::TEXT:
-            return gre(left.as<std::string>(), right.as<std::string>());
-        case DataType::CHAR:
-            return gre(left.as<char>(), right.as<char>());
-        default:
-            return false;
-        }
-    }
-
-    bool Evaluator::gre(const int left,         const int right)         const { return left >= right; }
-    bool Evaluator::gre(const double left,       const double right)      const { return left >= right; }
-    bool Evaluator::gre(const std::string& left, const std::string& right)const { return left >= right; }
-    bool Evaluator::gre(const char left,         const char right)        const { return left >= right; }
 }

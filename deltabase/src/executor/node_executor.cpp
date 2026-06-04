@@ -4,6 +4,8 @@
 
 #include "node_executor.hpp"
 
+#include <cassert>
+
 #include "../misc/include/convert.hpp"
 #include "../storage/include/std_db_instance.hpp"
 #include "include/information_schema_provider.hpp"

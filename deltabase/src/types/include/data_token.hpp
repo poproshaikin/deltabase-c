@@ -9,8 +9,8 @@
 #include "typedefs.hpp"
 #include "data_type.hpp"
 
-#include <cassert>
 #include <cstring>
+#include <stdexcept>
 
 namespace types
 {
@@ -35,39 +35,45 @@ namespace types
         explicit
         DataToken(const Bytes& bytes, DataType type);
 
-        template <AllowedDataTypes_c T>
-        T
-        as() const
-        {
-            static_assert(std::is_same_v<T, int>
-                          || std::is_same_v<T, double>
-                          || std::is_same_v<T, bool>
-                          || std::is_same_v<T, char>
-                          || std::is_same_v<T, std::string>,
-                          "DataToken::as<T>() not implemented for this type");
+        // Returns the common type to use when comparing a and b.
+        // Returns DataType::UNDEFINED if the types are not comparable.
+        static DataType common_type(DataType a, DataType b);
 
+        // Type-aware comparison. Widens operands to common_type if needed.
+        // Precondition: both tokens are non-NULL and common_type(a.type, b.type) != UNDEFINED.
+        // For NULL handling see Evaluator::evaluate.
+        static int compare(const DataToken& a, const DataToken& b);
+
+        // For display only (result_formatter). Do not use in comparisons.
+        template <AllowedDataTypes_c T>
+        T as() const
+        {
             if constexpr (std::is_same_v<T, int>)
             {
-                assert(bytes.size() == sizeof(int));
+                if (bytes.size() != sizeof(int))
+                    throw std::runtime_error("DataToken::as<int>: size mismatch");
                 int v;
                 std::memcpy(&v, bytes.data(), sizeof(int));
                 return v;
             }
             else if constexpr (std::is_same_v<T, double>)
             {
-                assert(bytes.size() == sizeof(double));
+                if (bytes.size() != sizeof(double))
+                    throw std::runtime_error("DataToken::as<double>: size mismatch");
                 double v;
                 std::memcpy(&v, bytes.data(), sizeof(double));
                 return v;
             }
             else if constexpr (std::is_same_v<T, bool>)
             {
-                assert(!bytes.empty());
+                if (bytes.empty())
+                    throw std::runtime_error("DataToken::as<bool>: empty buffer");
                 return bytes[0] != 0;
             }
             else if constexpr (std::is_same_v<T, char>)
             {
-                assert(!bytes.empty());
+                if (bytes.empty())
+                    throw std::runtime_error("DataToken::as<char>: empty buffer");
                 return static_cast<char>(bytes[0]);
             }
             else
@@ -77,24 +83,12 @@ namespace types
         }
     };
 
-    bool
-    operator==(const DataToken& lhs, const DataToken& rhs);
-
-    bool
-    operator!=(const DataToken& lhs, const DataToken& rhs);
-
-    bool
-    operator<(const DataToken& lhs, const DataToken& rhs);
-
-    bool
-    operator<=(const DataToken& lhs, const DataToken& rhs);
-
-    bool
-    operator>(const DataToken& lhs, const DataToken& rhs);
-
-    bool
-    operator>=(const DataToken& lhs, const DataToken& rhs);
-
+    bool operator==(const DataToken& lhs, const DataToken& rhs);
+    bool operator!=(const DataToken& lhs, const DataToken& rhs);
+    bool operator<(const DataToken& lhs, const DataToken& rhs);
+    bool operator<=(const DataToken& lhs, const DataToken& rhs);
+    bool operator>(const DataToken& lhs, const DataToken& rhs);
+    bool operator>=(const DataToken& lhs, const DataToken& rhs);
 }
 
 #endif //DELTABASE_DATA_TOKEN_HPP
