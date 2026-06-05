@@ -19,25 +19,11 @@ leading up to the maturita defense. Items are grouped by visibility and ordered 
 - Implicit per-query transactions
 - TCP server + .NET client protocol
 
-### Known bugs
-- `AND` / `OR` logical operators are broken (silently evaluate to false)
-- `<` and `<=` comparison operators are inverted
-- `NULL` not handled correctly in ordered comparisons
-- `CreateTableRecord` was logged before columns were added (fixed June 2026)
-
 ---
 
 ## Group 1 — Visible SQL Features
 
 These are user-facing features. Without them the database feels incomplete.
-
-### Fix existing bugs (Month 1)
-- Fix `AND` / `OR` evaluation in `Evaluator`
-- Fix inverted `lt` / `lte` operators
-- Fix `NULL` handling in comparisons
-
-These are easy wins — the infrastructure exists, the logic just has off-by-one or inverted
-branch bugs.
 
 ### `AUTO_INCREMENT` / `SERIAL` (Month 1–2)
 The constraint struct already exists in the codebase. It needs to be enforced during `INSERT`:
