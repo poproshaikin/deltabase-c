@@ -9,6 +9,7 @@
 #include "meta_table.hpp"
 
 #include <cstring>
+#include <optional>
 
 namespace misc
 {
@@ -30,7 +31,7 @@ namespace misc
     types::MetaColumn
     convert(const types::ColumnDefinition& column_def);
 
-    types::ColumnConstraint
+    std::optional<types::ColumnConstraint>
     convert(const types::Constraint& constraint);
 
     types::DataType

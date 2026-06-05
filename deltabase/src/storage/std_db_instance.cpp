@@ -796,16 +796,13 @@ namespace storage
         mt.last_rid = 0;
         mt.columns.reserve(columns.size());
 
-        CreateTableRecord record(mt);
-        txn.append_log(record);
-
-        auto* saved_mt = catalog_->save_table(std::move(mt));
+        std::vector<std::string> pk_column_names;
 
         for (const auto& col_def : columns)
         {
             MetaColumn column(col_def);
             column.id = UUID::make();
-            column.table_id = saved_mt->id;
+            column.table_id = mt.id;
 
             bool is_pk = false;
             for (const auto& c : col_def.constraints)
@@ -813,20 +810,28 @@ namespace storage
                     is_pk = true;
 
             if (is_pk)
+            {
                 column.constraints.emplace_back(MetaNotNullConstraint());
+                pk_column_names.push_back(column.name);
+            }
 
-            saved_mt->columns.emplace_back(column);
-
-            if (is_pk)
-                create_index(
-                    saved_mt->name + "_" + column.name + "_pkey",
-                    saved_mt->name,
-                    column.name,
-                    schema->name,
-                    true,
-                    true,
-                    txn);
+            mt.columns.emplace_back(std::move(column));
         }
+
+        CreateTableRecord record(mt);
+        txn.append_log(record);
+
+        auto* saved_mt = catalog_->save_table(std::move(mt));
+
+        for (const auto& col_name : pk_column_names)
+            create_index(
+                saved_mt->name + "_" + col_name + "_pkey",
+                saved_mt->name,
+                col_name,
+                schema->name,
+                true,
+                true,
+                txn);
     }
 
     void

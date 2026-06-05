@@ -260,11 +260,13 @@ main(int argc, char** argv)
 
                 std::string index_name = "<unknown_index>";
                 bool is_unique = false;
+                bool is_primary = false;
                 const auto meta_idx_it = meta_index_by_id.find(index_id.to_string());
                 if (meta_idx_it != meta_index_by_id.end())
                 {
                     index_name = meta_idx_it->second.name;
                     is_unique = meta_idx_it->second.is_unique;
+                    is_primary = meta_idx_it->second.is_primary;
                 }
 
                 std::cout << "INDEX " << index_name
@@ -275,6 +277,7 @@ main(int argc, char** argv)
                           << " last_page=" << index_file->last_page
                           << " pages=" << index_file->pages.size()
                           << " unique=" << (is_unique ? "true" : "false")
+                          << " primary=" << (is_primary ? "true" : "false")
                           << "\n";
 
                 index_files_printed += 1;

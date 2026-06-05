@@ -39,12 +39,13 @@ namespace misc
         column.type = convert_to_dt(column_def.type);
         column.constraints.clear();
         for (const auto& constraint : column_def.constraints)
-            column.constraints.emplace_back(convert(constraint));
+            if (auto mc = convert(constraint))
+                column.constraints.emplace_back(std::move(*mc));
 
         return column;
     }
 
-    ColumnConstraint
+    std::optional<ColumnConstraint>
     convert(const Constraint& constraint)
     {
         if (std::holds_alternative<NotNullConstraint>(constraint))
@@ -52,6 +53,9 @@ namespace misc
 
         if (const auto* default_constraint = std::get_if<DefaultConstraint>(&constraint))
             return MetaDefaultConstraint{ DataToken(default_constraint->value) };
+
+        if (std::holds_alternative<PrimaryKeyConstraint>(constraint))
+            return std::nullopt;
 
         throw std::runtime_error("convert: unsupported column constraint");
     }

@@ -46,6 +46,7 @@ namespace exq
                 MetaColumn("table_schema",  DataType::TEXT,    {}),
                 MetaColumn("table_name",    DataType::TEXT,    {}),
                 MetaColumn("table_type",    DataType::TEXT,    {}),
+                MetaColumn("primary_key",   DataType::TEXT,    {}),
                 MetaColumn("column_count",  DataType::INTEGER, {}),
                 MetaColumn("index_count",   DataType::INTEGER, {}),
                 MetaColumn("total_rows",    DataType::INTEGER, {}),
@@ -134,6 +135,7 @@ namespace exq
             {"table_schema",  DataType::TEXT},
             {"table_name",    DataType::TEXT},
             {"table_type",    DataType::TEXT},
+            {"primary_key",   DataType::TEXT},
             {"column_count",  DataType::INTEGER},
             {"index_count",   DataType::INTEGER},
             {"total_rows",    DataType::INTEGER},
@@ -147,12 +149,18 @@ namespace exq
             auto it = schema_names.find(mt->schema_id);
             const std::string mt_schema = it != schema_names.end() ? it->second : "";
 
+            const MetaColumn* pkey = nullptr;
+            for (const auto& idx : mt->indexes)
+                if (idx.is_primary)
+                    pkey = &mt->get_column(idx.column_id);
+
             DataRow row;
             row.tokens = {
                 db_name.empty() ? make_null() : make_text(db_name),
                 make_text(mt_schema),
                 make_text(mt->name),
                 make_text("BASE TABLE"),
+                make_text(pkey ? pkey->name : "NULL"),
                 make_int(static_cast<int>(mt->columns.size())),
                 make_int(static_cast<int>(mt->indexes.size())),
                 make_int(static_cast<int>(mt->total_rows)),
