@@ -145,6 +145,10 @@ namespace types
     {
     };
 
+    struct PrimaryKeyConstraint
+    {
+    };
+
     struct DefaultConstraint
     {
         SqlToken value;
@@ -157,6 +161,7 @@ namespace types
 
     using Constraint = std::variant<
         NotNullConstraint,
+        PrimaryKeyConstraint,
         DefaultConstraint
     >;
 
@@ -199,6 +204,7 @@ namespace types
         SqlToken index_name;
         SqlToken column_name;
         bool is_unique;
+        bool is_primary;
     };
 
     struct DropIndexStatement

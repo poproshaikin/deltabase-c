@@ -3,6 +3,8 @@
 //
 
 #include "index_bplus_tree.hpp"
+#include <optional>
+
 namespace storage
 {
     std::optional<types::RowPtr>

@@ -626,10 +626,11 @@ namespace exq
         const std::string& column_name,
         const std::string& schema_name,
         bool is_unique,
+        bool is_primary,
         storage::IDbInstance& db
     )
         : index_name_(index_name), column_name_(column_name), table_name_(table_name),
-          schema_name_(schema_name), is_unique_(is_unique), db_(db)
+          schema_name_(schema_name), is_unique_(is_unique), is_primary_(is_primary), db_(db)
     {
     }
 
@@ -643,7 +644,7 @@ namespace exq
     {
         auto txn = db_.make_txn();
         txn.begin();
-        db_.create_index(index_name_, table_name_, column_name_, schema_name_, is_unique_, txn);
+        db_.create_index(index_name_, table_name_, column_name_, schema_name_, is_unique_, is_primary_, txn);
         txn.commit();
         return false;
     }
@@ -867,6 +868,7 @@ namespace exq
                 create_index_node.column_name,
                 create_index_node.schema_name,
                 create_index_node.is_unique,
+                create_index_node.is_primary,
                 db);
 
             return std::make_unique<CreateIndexNodeExecutor>(std::move(executor));

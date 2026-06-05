@@ -107,7 +107,7 @@ namespace storage
             const std::string& column_name,
             const std::string& schema_name,
             bool is_unique,
-            txn::Transaction& txn
+            bool is_primary, txn::Transaction& txn
         ) override;
 
         std::vector<types::IndexId>

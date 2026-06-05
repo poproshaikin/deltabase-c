@@ -406,6 +406,7 @@ namespace exq
         std::string table_name_;
         std::string schema_name_;
         bool is_unique_;
+        bool is_primary_;
 
         storage::IDbInstance& db_;
 
@@ -417,6 +418,7 @@ namespace exq
             const std::string& column_name,
             const std::string& schema_name,
             bool is_unique,
+            bool is_primary,
             storage::IDbInstance& db
         );
 

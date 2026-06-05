@@ -187,7 +187,8 @@ namespace types
     {
     }
 
-    DataType DataToken::common_type(DataType a, DataType b)
+    DataType
+    DataToken::common_type(DataType a, DataType b)
     {
         const auto& table = coerce_table();
         auto outer = table.find(a);
@@ -197,7 +198,8 @@ namespace types
         return inner->second;
     }
 
-    int DataToken::compare(const DataToken& a, const DataToken& b)
+    int
+    DataToken::compare(const DataToken& a, const DataToken& b)
     {
         if (a.type == b.type)
             return compare_same_type(a, b);
@@ -206,19 +208,22 @@ namespace types
         return compare_same_type(widen(a, common), widen(b, common));
     }
 
-    bool operator==(const DataToken& lhs, const DataToken& rhs)
+    bool
+    operator==(const DataToken& lhs, const DataToken& rhs)
     {
         if (lhs.type == DataType::_NULL && rhs.type == DataType::_NULL) return true;
         if (DataToken::common_type(lhs.type, rhs.type) == DataType::UNDEFINED) return false;
         return DataToken::compare(lhs, rhs) == 0;
     }
 
-    bool operator!=(const DataToken& lhs, const DataToken& rhs)
+    bool
+    operator!=(const DataToken& lhs, const DataToken& rhs)
     {
         return !(lhs == rhs);
     }
 
-    bool operator<(const DataToken& lhs, const DataToken& rhs)
+    bool
+    operator<(const DataToken& lhs, const DataToken& rhs)
     {
         if (lhs.type == DataType::_NULL || rhs.type == DataType::_NULL) return false;
         if (DataToken::common_type(lhs.type, rhs.type) == DataType::UNDEFINED)
@@ -226,8 +231,11 @@ namespace types
         return DataToken::compare(lhs, rhs) < 0;
     }
 
-    bool operator<=(const DataToken& lhs, const DataToken& rhs) { return !(rhs < lhs); }
-    bool operator>(const DataToken& lhs, const DataToken& rhs)  { return rhs < lhs; }
-    bool operator>=(const DataToken& lhs, const DataToken& rhs) { return !(lhs < rhs); }
+    bool
+    operator<=(const DataToken& lhs, const DataToken& rhs) { return !(rhs < lhs); }
+    bool
+    operator>(const DataToken& lhs, const DataToken& rhs)  { return rhs < lhs; }
+    bool
+    operator>=(const DataToken& lhs, const DataToken& rhs) { return !(lhs < rhs); }
 
 } // namespace types

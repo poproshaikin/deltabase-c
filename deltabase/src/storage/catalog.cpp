@@ -78,17 +78,19 @@ namespace storage
         return nullptr;
     }
 
-    void
-    CatalogCache::save_table(const types::MetaTable& mt)
+    types::MetaTable
+    *
+    CatalogCache::save_table(types::MetaTable&& mt)
     {
         auto it = tables_.find(mt.id);
         if (it == tables_.end())
         {
-            tables_.emplace(mt.id, mt);
+            return &tables_.emplace(mt.id, mt).first->second;
         }
         else
         {
             it->second = mt;
+            return &it->second;
         }
     }
 

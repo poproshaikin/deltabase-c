@@ -39,8 +39,9 @@ namespace storage
         types::MetaTable*
         get_table(const std::string& name, const types::UUID& schema_id);
 
-        void
-        save_table(const types::MetaTable& mt);
+        types::MetaTable
+        *
+        save_table(types::MetaTable&& mt);
 
         void
         delete_table(const types::UUID& table_id);

@@ -24,6 +24,7 @@ namespace types
         std::string name;
         DataType key_type;
         bool is_unique;
+        bool is_primary;
     };
 }
 

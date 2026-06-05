@@ -156,6 +156,7 @@ namespace storage
         stream.write(index.root_page_id.raw(), sizeof(uuid_t));
         write_str(index.name, stream);
         stream.write(&index.is_unique, sizeof(bool));
+        stream.write(&index.is_primary, sizeof(bool));
         stream.write(&index.key_type, sizeof(index.key_type));
 
         stream.seek(0);
@@ -437,6 +438,7 @@ namespace storage
         // stream.write(index.root_page_id.raw(), sizeof(uuid_t));
         // write_str(index.name, stream);
         // stream.write(&index.is_unique, sizeof(bool));
+        // stream.write(&index.is_primary, sizeof(bool));
         // stream.write(&index.key_type, sizeof(index.key_type));
 
         if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
@@ -455,6 +457,9 @@ namespace storage
             return false;
 
         if (stream.read(&out.is_unique, sizeof(out.is_unique)) != sizeof(out.is_unique))
+            return false;
+
+        if (stream.read(&out.is_primary, sizeof(out.is_primary)) != sizeof(out.is_primary))
             return false;
 
         if (stream.read(&out.key_type, sizeof(out.key_type)) != sizeof(out.key_type))

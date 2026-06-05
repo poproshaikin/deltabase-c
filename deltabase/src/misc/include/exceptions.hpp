@@ -38,6 +38,8 @@ public:
         COLUMN_COUNT_MISMATCH,
         AMBIGUOUS_COLUMN,
         INVALID_COMPARISON,
+        NULLABLE_PK,
+        MULTIPLE_PK
     };
 
     explicit EngineException(const std::string& msg, Code code)

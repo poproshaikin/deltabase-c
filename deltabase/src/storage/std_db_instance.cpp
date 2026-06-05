@@ -460,9 +460,14 @@ namespace storage
 
             const auto& key = row.tokens[static_cast<size_t>(col_idx)];
 
-            // NULL values are not indexed
             if (key.type == DataType::_NULL)
+            {
+                if (mi.is_primary)
+                    throw EngineException(
+                        "PRIMARY KEY column cannot be NULL",
+                        EngineException::Code::NOT_NULL_VIOLATION);
                 continue;
+            }
 
             const RowPtr row_ptr{page_id, row.id};
 
@@ -790,18 +795,38 @@ namespace storage
         mt.schema_id = schema->id;
         mt.last_rid = 0;
         mt.columns.reserve(columns.size());
-        for (const auto& col_def : columns)
-        {
-            MetaColumn column(col_def);
-            column.id = UUID::make();
-            column.table_id = mt.id;
-            mt.columns.emplace_back(column);
-        }
 
         CreateTableRecord record(mt);
         txn.append_log(record);
 
-        catalog_->save_table(mt);
+        auto* saved_mt = catalog_->save_table(std::move(mt));
+
+        for (const auto& col_def : columns)
+        {
+            MetaColumn column(col_def);
+            column.id = UUID::make();
+            column.table_id = saved_mt->id;
+
+            bool is_pk = false;
+            for (const auto& c : col_def.constraints)
+                if (std::holds_alternative<PrimaryKeyConstraint>(c))
+                    is_pk = true;
+
+            if (is_pk)
+                column.constraints.emplace_back(MetaNotNullConstraint());
+
+            saved_mt->columns.emplace_back(column);
+
+            if (is_pk)
+                create_index(
+                    saved_mt->name + "_" + column.name + "_pkey",
+                    saved_mt->name,
+                    column.name,
+                    schema->name,
+                    true,
+                    true,
+                    txn);
+        }
     }
 
     void
@@ -833,6 +858,7 @@ namespace storage
         const std::string& column_name,
         const std::string& schema_name,
         bool is_unique,
+        bool is_primary,
         txn::Transaction& txn
     )
     {
@@ -847,6 +873,7 @@ namespace storage
         mi.column_id = column.id;
         mi.key_type = column.type;
         mi.is_unique = is_unique;
+        mi.is_primary = is_primary;
         mi.table_id = table->id;
 
         CreateIndexRecord record(mi);
@@ -859,7 +886,7 @@ namespace storage
             throw std::runtime_error("Index column not found in table schema");
 
         // Pre-validate unique constraint on existing data before creating index file
-        if (is_unique)
+        if (is_primary || is_unique)
         {
             auto pages = buffer_pool_->get_table_data(table->id);
             std::unordered_set<std::string> seen_values;
@@ -879,7 +906,7 @@ namespace storage
 
                     std::string key_str(key.bytes.begin(), key.bytes.end());
 
-                    if (seen_values.count(key_str) > 0)
+                    if (seen_values.contains(key_str))
                     {
                         throw EngineException(
                             "Cannot create unique index '" + index_name + "' on column '" +

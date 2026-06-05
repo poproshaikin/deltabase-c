@@ -478,8 +478,7 @@ namespace sql
 
             advance();
 
-            // return PrimaryKeyConstraint();
-            throw EngineException("Primary keys are not supported yet", EngineException::Code::UNSUPPORTED_STATEMENT);
+            return PrimaryKeyConstraint();
         }
         if (kw == SqlKeyword::DEFAULT)
         {
@@ -578,7 +577,7 @@ namespace sql
     CreateIndexStatement
     SqlParser::parse_create_index()
     {
-        CreateIndexStatement stmt;
+        CreateIndexStatement stmt{};
 
         if (match(SqlKeyword::UNIQUE))
         {

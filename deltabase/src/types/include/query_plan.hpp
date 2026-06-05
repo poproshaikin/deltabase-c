@@ -360,6 +360,7 @@ namespace types
         std::string schema_name;
         std::string column_name;
         bool is_unique;
+        bool is_primary;
 
         explicit
         CreateIndexPlanNode(
@@ -367,10 +368,11 @@ namespace types
             const std::string& table_name,
             const std::string& schema_name,
             const std::string& column_name,
-            bool is_unique
+            bool is_unique,
+            bool is_primary
         )
             : index_name(index_name), table_name(table_name), schema_name(schema_name),
-              column_name(column_name), is_unique(is_unique)
+              column_name(column_name), is_unique(is_unique), is_primary(is_primary)
         {
         }
 

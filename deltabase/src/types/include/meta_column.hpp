@@ -26,10 +26,6 @@ namespace types
         DataToken value;
     };
 
-    struct MetaPrimaryKeyConstraint {};
-
-    struct MetaUniqueConstraint {};
-
     struct MetaAutoIncrementConstraint {};
 
     struct MetaForeignKeyConstraint
@@ -42,8 +38,6 @@ namespace types
     using ColumnConstraint = std::variant<
         MetaNotNullConstraint,
         MetaDefaultConstraint,
-        MetaPrimaryKeyConstraint,
-        MetaUniqueConstraint,
         MetaAutoIncrementConstraint,
         MetaForeignKeyConstraint
     >;
