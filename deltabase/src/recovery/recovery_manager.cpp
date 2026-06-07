@@ -222,7 +222,8 @@ namespace recovery
         io_.write_mt(table);
     }
 
-    static MetaSequence with_schema_name(MetaSequence seq, storage::IIOManager& io)
+    static MetaSequence
+    with_schema_name(MetaSequence seq, storage::IIOManager& io)
     {
         if (seq.schema_name.empty())
             seq.schema_name = io.read_schema_meta(seq.schema_id).name;
@@ -250,7 +251,7 @@ namespace recovery
     void
     RecoveryManager::redo(const CLRUpdateSequenceRecord& record)
     {
-        io_.write_seq(record.before, true);
+        io_.write_seq(with_schema_name(record.before, io_), true);
     }
 
     void
@@ -528,13 +529,13 @@ namespace recovery
     void
     RecoveryManager::undo_record(const CreateSequenceRecord& record)
     {
-        io_.delete_seq(record.after);
+        io_.delete_seq(with_schema_name(record.after, io_));
     }
 
     void
     RecoveryManager::undo_record(const UpdateSequenceRecord& record)
     {
-        io_.write_seq(record.before, true);
+        io_.write_seq(with_schema_name(record.before, io_), true);
     }
 
     WALRecord
