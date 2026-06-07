@@ -102,9 +102,9 @@ namespace misc
     }
 
     void
-    MemoryStream::write_uuid(const types::UUID& session_id)
+    MemoryStream::write_uuid(const types::UUID& id)
     {
-        write(session_id.raw(), sizeof(*session_id.raw()));
+        write(id.raw(), sizeof(*id.raw()));
     }
 
     void
@@ -116,6 +116,13 @@ namespace misc
         {
             write(value.data(), value.size());
         }
+    }
+
+    void
+    MemoryStream::write_i32(int32_t value, bool big_endian)
+    {
+        int32_t effective = big_endian ? to_big_endian_i32(value) : value;
+        write(&effective, sizeof(effective));
     }
 
     void
@@ -271,6 +278,17 @@ namespace misc
         }
 
         out = types::UUID(raw);
+        return true;
+    }
+
+    bool
+    ReadOnlyMemoryStream::read_i32(int32_t& out, bool big_endian)
+    {
+        int32_t raw = 0;
+        if (!read_exact(&raw, sizeof(raw)))
+            return false;
+
+        out = big_endian ? from_big_endian_i32(raw) : raw;
         return true;
     }
 }

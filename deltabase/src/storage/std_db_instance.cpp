@@ -366,6 +366,64 @@ namespace storage
     }
 
     void
+    StdDbInstance::fill_autoincrement_columns(
+        const MetaTable& mt,
+        std::optional<std::vector<std::string>>& cols,
+        std::vector<DataToken>& row,
+        txn::Transaction& txn
+    )
+    {
+        for (size_t i = 0; i < mt.columns.size(); ++i)
+        {
+            const auto& column = mt.columns[i];
+            const auto* ai = column.get_constraint<MetaAutoIncrementConstraint>();
+            if (!ai)
+                continue;
+
+            bool caller_provided = false;
+            if (cols.has_value())
+            {
+                for (const auto& col_name : *cols)
+                    if (col_name == column.name) { caller_provided = true; break; }
+            }
+            else
+            {
+                caller_provided = (i < row.size() && row[i].type != DataType::_NULL);
+            }
+
+            if (caller_provided)
+                continue;
+
+            auto* seq = catalog_->get_sequence(ai->sequence_id);
+            if (!seq)
+                throw std::runtime_error("Sequence for autoincrement column not found");
+
+            const MetaSequence before = *seq;
+            const int new_val = ++seq->current_value;
+
+            Bytes val_bytes(sizeof(int));
+            std::memcpy(val_bytes.data(), &new_val, sizeof(int));
+            DataToken token(val_bytes, DataType::INTEGER);
+
+            if (cols.has_value())
+            {
+                cols->push_back(column.name);
+                row.push_back(token);
+            }
+            else
+            {
+                if (row.size() <= i)
+                    row.resize(i + 1, DataToken(Bytes{}, DataType::_NULL));
+                row[i] = token;
+            }
+
+            UpdateSequenceRecord seq_record(before, *seq);
+            txn.append_log(seq_record);
+            io_manager_->write_seq(*seq);
+        }
+    }
+
+    void
     StdDbInstance::insert_row(
         const std::string& table_name,
         const std::string& schema_name,
@@ -379,7 +437,11 @@ namespace storage
         auto* mt = catalog_->get_table(table_name, ms->id);
         const auto mt_unchanged = *mt;
 
-        auto new_row = mt->make_row(cols, row);
+        std::optional<std::vector<std::string>> effective_cols = cols;
+        std::vector<DataToken> effective_row = row;
+        fill_autoincrement_columns(*mt, effective_cols, effective_row, txn);
+
+        auto new_row = mt->make_row(effective_cols, effective_row);
         size_t row_size = io_manager_->estimate_size(new_row);
 
         const auto pages_before = buffer_pool_->get_table_data(mt->id);
@@ -805,14 +867,28 @@ namespace storage
             column.table_id = mt.id;
 
             bool is_pk = false;
+            bool is_ai = false;
             for (const auto& c : col_def.constraints)
                 if (std::holds_alternative<PrimaryKeyConstraint>(c))
                     is_pk = true;
+                else if (std::holds_alternative<AutoIncrementConstraint>(c))
+                    is_ai = true;
 
             if (is_pk)
             {
                 column.constraints.emplace_back(MetaNotNullConstraint());
                 pk_column_names.push_back(column.name);
+            }
+
+            if (is_ai)
+            {
+                auto seq_id = create_sequence(
+                    mt.name + "_" + column.name + "_seq",
+                    schema->name,
+                    txn);
+
+                auto constraint = MetaAutoIncrementConstraint{.column_id = column.id, .table_id = mt.id, .sequence_id = seq_id};
+                column.constraints.push_back(constraint);
             }
 
             mt.columns.emplace_back(std::move(column));
@@ -1043,7 +1119,7 @@ namespace storage
         InstanceGuard guard(mtx_);
         auto* table = get_table(table_name, schema_name);
         if (!table)
-            throw std::runtime_error("StdDbInstance::drop_table");
+            throw EngineException("Table " + table_name + " does not exist", EngineException::Code::TABLE_NOT_EXISTS);
 
         const auto table_unchanged = *table;
 
@@ -1052,6 +1128,29 @@ namespace storage
 
         DeleteTableRecord record(table_unchanged);
         txn.append_log(record);
+    }
+
+    UUID
+    StdDbInstance::create_sequence(
+        const std::string& sequence_name,
+        const std::string& schema_name,
+        txn::Transaction& txn)
+    {
+        InstanceGuard guard(mtx_);
+        auto* ms = catalog_->get_schema(schema_name);
+
+        MetaSequence sequence{};
+        sequence.id = UUID::make();
+        sequence.name = sequence_name;
+        sequence.schema_id = ms->id;
+        sequence.schema_name = ms->name;
+        sequence.current_value = 0;
+
+        catalog_->put(sequence);
+        CreateSequenceRecord record(sequence);
+        txn.append_log(record);
+
+        return sequence.id;
     }
 
     std::vector<MetaTable*>

@@ -92,6 +92,24 @@ namespace misc
         return to_big_endian_u64(value);
     }
 
+    inline int32_t
+    to_big_endian_i32(int32_t value)
+    {
+        const auto u = static_cast<uint32_t>(value);
+        return static_cast<int32_t>(
+            ((u & 0x000000FFu) << 24)
+          | ((u & 0x0000FF00u) << 8)
+          | ((u & 0x00FF0000u) >> 8)
+          | ((u & 0xFF000000u) >> 24)
+        );
+    }
+
+    inline int32_t
+    from_big_endian_i32(int32_t value)
+    {
+        return to_big_endian_i32(value);
+    }
+
     void
     print_ram_usage();
 }

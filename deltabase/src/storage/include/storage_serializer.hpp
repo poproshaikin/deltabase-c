@@ -49,6 +49,9 @@ namespace storage
         virtual misc::MemoryStream
         serialize_dt(const types::DataToken& token) const = 0;
 
+        virtual misc::MemoryStream
+        serialize_seq(const types::MetaSequence& sequence) const = 0;
+
         virtual bool
         deserialize_mt(misc::ReadOnlyMemoryStream& content, types::MetaTable &out) const = 0;
 
@@ -78,6 +81,9 @@ namespace storage
 
         virtual bool
         deserialize_dt(misc::ReadOnlyMemoryStream& content, types::DataToken& out) const = 0;
+
+        virtual bool
+        deserialize_seq(misc::ReadOnlyMemoryStream& content, types::MetaSequence& out) const = 0;
 
         virtual uint64_t
         estimate_size(const types::DataRow& row) const = 0;

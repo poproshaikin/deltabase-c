@@ -6,6 +6,7 @@
 #define DELTABASE_CATALOG_HPP
 
 #include "io_manager.hpp"
+#include "meta_sequence.hpp"
 
 #include <unordered_map>
 
@@ -16,6 +17,7 @@ namespace storage
         IIOManager& io_;
         std::unordered_map<types::UUID, types::MetaTable> tables_;
         std::unordered_map<types::UUID, types::MetaSchema> schemas_;
+        std::unordered_map<types::UUID, types::MetaSequence> sequences_;
 
     public:
         explicit CatalogCache(IIOManager& io);
@@ -29,28 +31,30 @@ namespace storage
 
         void
         put(types::MetaTable table);
-
         void
         put(types::MetaSchema schema);
+        void
+        put(types::MetaSequence sequence);
 
         types::MetaTable*
         get_table(const types::UUID& id);
-
         types::MetaTable*
         get_table(const std::string& name, const types::UUID& schema_id);
 
         types::MetaTable
         *
         save_table(types::MetaTable&& mt);
-
         void
         delete_table(const types::UUID& table_id);
 
         types::MetaSchema*
         get_schema(const types::UUID& id);
-
         types::MetaSchema*
         get_schema(const std::string& name);
+
+        types::MetaSequence*
+        get_sequence(const types::UUID& id);
+
         bool
         exists_schema(const std::string& name);
         void

@@ -9,6 +9,7 @@
 #include "data_type.hpp"
 #include "typedefs.hpp"
 #include "data_token.hpp"
+#include "table_id.hpp"
 
 #include <optional>
 #include <vector>
@@ -26,7 +27,12 @@ namespace types
         DataToken value;
     };
 
-    struct MetaAutoIncrementConstraint {};
+    struct MetaAutoIncrementConstraint
+    {
+        ColumnId column_id;
+        TableId table_id;
+        UUID sequence_id;
+    };
 
     struct MetaForeignKeyConstraint
     {

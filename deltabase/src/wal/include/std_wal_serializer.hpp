@@ -91,6 +91,18 @@ namespace wal
         misc::MemoryStream
         serialize(const types::CLRDropIndexRecord& record) const;
 
+        misc::MemoryStream
+        serialize(const types::CreateSequenceRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRCreateSequenceRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::UpdateSequenceRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRUpdateSequenceRecord& record) const;
+
     public:
         misc::MemoryStream
         serialize(const types::WALRecord& record) const override;

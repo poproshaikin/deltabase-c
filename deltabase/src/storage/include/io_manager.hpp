@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_IO_MANAGER_HPP
 #define DELTABASE_IO_MANAGER_HPP
+#include "../../types/include/meta_sequence.hpp"
 #include "../../types/include/config.hpp"
 #include "../../types/include/data_page.hpp"
 #include "../../types/include/meta_schema.hpp"
@@ -104,6 +105,18 @@ namespace storage
 
         virtual void
         write_index_file(const types::IndexFile& index_file, bool fsync = false) = 0;
+
+        virtual types::MetaSequence
+        read_seq(const std::string& name, const std::string& schema_name) = 0;
+
+        virtual void
+        write_seq(const types::MetaSequence& sequence, bool fsync = false) = 0;
+
+        virtual void
+        delete_seq(const types::MetaSequence& sequence) = 0;
+
+        virtual std::vector<types::MetaSequence>
+        read_sequences() = 0;
     };
 } // namespace storage
 

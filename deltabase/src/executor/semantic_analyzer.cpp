@@ -7,6 +7,7 @@
 #include "evaluator.hpp"
 #include "../misc/include/convert.hpp"
 #include "../misc/include/exceptions.hpp"
+#include "../sql/include/dictionary.hpp"
 
 #include <format>
 #include <unordered_set>
@@ -203,7 +204,10 @@ namespace exq
                 for (size_t i = values.values.size(); i < table->columns.size(); ++i)
                 {
                     const auto& column = table->get_column(static_cast<int64_t>(i));
-                    if (has_not_null_constraint(column) && !has_default_constraint(column))
+
+                    if (has_not_null_constraint(column) &&
+                        !has_default_constraint(column) &&
+                        !has_autoincrement_constraint(column))
                         return AnalysisResult(EngineException(
                             "INSERT is missing a value for NOT NULL column '" + column.name +
                             "' without DEFAULT",
@@ -217,7 +221,9 @@ namespace exq
                     if (specified_columns.contains(column.name))
                         continue;
 
-                    if (has_not_null_constraint(column) && !has_default_constraint(column))
+                    if (has_not_null_constraint(column) &&
+                        !has_default_constraint(column) &&
+                        !has_autoincrement_constraint(column))
                         return AnalysisResult(EngineException(
                             "INSERT is missing a value for NOT NULL column '" + column.name +
                             "' without DEFAULT",
@@ -308,6 +314,14 @@ namespace exq
                             "Table can have at most one primary key",
                             EngineException::Code::MULTIPLE_PK));
                 }
+                else if (std::holds_alternative<AutoIncrementConstraint>(c))
+                {
+                    auto data_type = sql::to_data_type(col_def.type.get_detail<SqlKeyword>());
+                    if (data_type != DataType::INTEGER && data_type != DataType::REAL)
+                        return AnalysisResult(EngineException(
+                            "Auto incremented column can only be of a numerical type",
+                            EngineException::Code::INVALID_AUTOINCREMENT_TYPE));
+                }
 
         if (pk_col)
             for (const auto& c : pk_col->constraints)
@@ -337,6 +351,17 @@ namespace exq
         for (const auto& constraint : column.constraints)
         {
             if (std::holds_alternative<MetaDefaultConstraint>(constraint))
+                return true;
+        }
+        return false;
+    }
+
+    bool
+    SemanticAnalyzer::has_autoincrement_constraint(const MetaColumn& column) const
+    {
+        for (const auto& constraint : column.constraints)
+        {
+            if (std::holds_alternative<MetaAutoIncrementConstraint>(constraint))
                 return true;
         }
         return false;

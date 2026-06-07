@@ -55,8 +55,8 @@ namespace types
 
         // Always reorder tokens according to schema and fill missing values with NULL tokens.
         // Missing values can then be materialized from DEFAULT constraints.
-        std::vector<DataToken> reordered_tokens(columns.size(), null_token);
-        std::vector<bool> provided(columns.size(), false);
+        std::vector reordered_tokens(columns.size(), null_token);
+        std::vector provided(columns.size(), false);
 
         if (!cols.has_value())
         {

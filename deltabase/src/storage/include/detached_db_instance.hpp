@@ -160,6 +160,13 @@ namespace storage
             const types::ColumnDefinition& column,
             txn::Transaction& txn) override;
 
+        types::UUID
+        create_sequence(
+            const std::string& sequence_name,
+            const std::string& schema_name,
+            txn::Transaction& txn
+        ) override;
+
         std::vector<types::MetaTable*>
         get_all_tables() override;
 

@@ -12,6 +12,7 @@ public:
         GENERIC,
 
         // Object existence
+        DB_NOT_ATTACHED,
         DB_NOT_EXISTS,
         DB_EXISTS,
         SCHEMA_NOT_EXISTS,
@@ -39,7 +40,8 @@ public:
         AMBIGUOUS_COLUMN,
         INVALID_COMPARISON,
         NULLABLE_PK,
-        MULTIPLE_PK
+        MULTIPLE_PK,
+        INVALID_AUTOINCREMENT_TYPE
     };
 
     explicit EngineException(const std::string& msg, Code code)

@@ -6,10 +6,16 @@
 
 #include "detached_db_instance.hpp"
 #include "path.hpp"
+#include "../../misc/include/exceptions.hpp"
 
 namespace storage
 {
     using DbGuard = std::lock_guard<DatabaseIoLockService::Mutex>;
+
+    [[noreturn]] static void unsupported()
+    {
+        throw EngineException("no database attached", EngineException::Code::DB_NOT_ATTACHED);
+    }
 
     DetachedFileIOManager::DetachedFileIOManager(const fs::path& db_path)
         : DetachedFileIOManager(db_path, DatabaseIoLockService::shared())
@@ -41,164 +47,95 @@ namespace storage
     }
 
     std::vector<types::MetaTable>
-    DetachedFileIOManager::read_tables_meta()
-    {
-        throw std::logic_error("DetachedFileIOManager::load_tables_meta: unsupported method");
-    }
+    DetachedFileIOManager::read_tables_meta() { unsupported(); }
 
     std::vector<types::MetaSchema>
-    DetachedFileIOManager::read_schemas_meta()
-    {
-        throw std::logic_error("DetachedFileIOManager::load_schemas_meta: unsupported method");
-    }
+    DetachedFileIOManager::read_schemas_meta() { unsupported(); }
 
     types::MetaSchema
-    DetachedFileIOManager::read_schema_meta(const std::string& schema_name)
-    {
-        throw std::logic_error("DetachedFileIOManager::load_schema_meta: unsupported method");
-    }
+    DetachedFileIOManager::read_schema_meta(const std::string&) { unsupported(); }
+
+    types::MetaSchema
+    DetachedFileIOManager::read_schema_meta(const types::UUID&) { unsupported(); }
 
     bool
-    DetachedFileIOManager::exists_table(
-        const std::string& table_name, const std::string& schema_name
-    )
-    {
-        throw std::logic_error("DetachedFileIOManager::exists_table: unsupported method");
-    }
+    DetachedFileIOManager::exists_table(const std::string&, const std::string&) { unsupported(); }
 
     types::MetaTable
-    DetachedFileIOManager::read_table_meta(
-        const std::string& table_name, const std::string& schema_name
-    )
-    {
-        throw std::logic_error("DetachedFileIOManager::load_table_meta: unsupported method");
-    }
+    DetachedFileIOManager::read_table_meta(const std::string&, const std::string&) { unsupported(); }
+
+    types::MetaTable
+    DetachedFileIOManager::read_table_meta(const types::UUID&) { unsupported(); }
+
     std::vector<types::DataPage>
-    DetachedFileIOManager::read_table_data(
-        const std::string& table_name, const std::string& schema_name
-    )
-    {
-        throw std::logic_error("DetachedFileIOManager::load_table_data: unsupported method");
-    }
+    DetachedFileIOManager::read_table_data(const std::string&, const std::string&) { unsupported(); }
 
     std::vector<std::pair<types::UUID, std::vector<types::DataPage>>>
-    DetachedFileIOManager::read_tables_data()
-    {
-        throw std::logic_error("DetachedFileIOManager::load_tables_data: unsupported method");
-    }
-
-    uint64_t
-    DetachedFileIOManager::estimate_size(const types::DataRow& row)
-    {
-        throw std::logic_error("DetachedFileIOManager::estimate_size: unsupported method");
-    }
-
-    void
-    DetachedFileIOManager::write_page(const types::DataPage& page, bool fsync)
-    {
-        throw std::logic_error("DetachedFileIOManager::write_page: unsupported method");
-    }
-
-    void
-    DetachedFileIOManager::write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync)
-    {
-        throw std::logic_error("DetachedFileIOManager::write_mt: unsupported method");
-    }
-
-    void
-    DetachedFileIOManager::write_mt(const types::MetaTable& table, bool fsync)
-    {
-        throw std::logic_error("DetachedFileIOManager::write_mt: unsupported method");
-    }
-
-    void
-    DetachedFileIOManager::write_cfg(const types::Config& cfg)
-    {
-        throw std::logic_error("DetachedFileIOManager::write_cfg: unsupported method");
-    }
-
-    void
-    DetachedFileIOManager::write_ms(const types::MetaSchema& ms, bool fsync)
-    {
-        throw std::logic_error("DetachedFileIOManager::write_ms: unsupported method");
-    }
-
-    void
-    DetachedFileIOManager::delete_mt(const types::MetaTable& table)
-    {
-        throw std::logic_error("DetachedFileIOManager::delete_mt: unsupported method");
-    }
-
-    void
-    DetachedFileIOManager::delete_ms(const types::MetaSchema& schema)
-    {
-        throw std::logic_error("DetachedFileIOManager::delete_ms: unsupported method");
-    }
-
-    types::MetaSchema
-    DetachedFileIOManager::read_schema_meta(const types::UUID& schema_id)
-    {
-        throw std::logic_error("DetachedFileIOManager::load_schema_meta: unsupported method");
-    }
-
-    types::DataPage
-    DetachedFileIOManager::create_page(const types::MetaTable& mt)
-    {
-        throw std::logic_error("DetachedFileIOManager::create_page: unsupported method");
-    }
-
-    types::DataPage
-    DetachedFileIOManager::create_page(const types::MetaTable& mt, const types::DataPageId& page_id)
-    {
-        throw std::logic_error("DetachedFileIOManager::create_page: unsupported method");
-    }
-
-    bool
-    DetachedFileIOManager::exists_schema(const std::string& schema_name)
-    {
-        throw std::logic_error("DetachedFileIOManager::exists_schema: unsupported method");
-    }
-
-    types::MetaTable
-    DetachedFileIOManager::read_table_meta(const types::UUID& table_id)
-    {
-        throw std::logic_error("DetachedFileIOManager::read_table_meta: unsupported method");
-    }
+    DetachedFileIOManager::read_tables_data() { unsupported(); }
 
     std::unique_ptr<types::DataPage>
-    DetachedFileIOManager::read_data_page(types::DataPageId id)
-    {
-        throw std::logic_error("DetachedFileIOManager::read_data_page: unsupported method");
-    }
+    DetachedFileIOManager::read_data_page(types::DataPageId) { unsupported(); }
+
+    uint64_t
+    DetachedFileIOManager::estimate_size(const types::DataRow&) { unsupported(); }
+
+    void
+    DetachedFileIOManager::write_page(const types::DataPage&, bool) { unsupported(); }
+
+    void
+    DetachedFileIOManager::write_mt(const types::MetaTable&, const std::string&, bool) { unsupported(); }
+
+    void
+    DetachedFileIOManager::write_mt(const types::MetaTable&, bool) { unsupported(); }
+
+    void
+    DetachedFileIOManager::write_cfg(const types::Config&) { unsupported(); }
+
+    void
+    DetachedFileIOManager::write_ms(const types::MetaSchema&, bool) { unsupported(); }
+
+    void
+    DetachedFileIOManager::delete_mt(const types::MetaTable&) { unsupported(); }
+
+    void
+    DetachedFileIOManager::delete_ms(const types::MetaSchema&) { unsupported(); }
+
+    types::DataPage
+    DetachedFileIOManager::create_page(const types::MetaTable&) { unsupported(); }
+
+    types::DataPage
+    DetachedFileIOManager::create_page(const types::MetaTable&, const types::DataPageId&) { unsupported(); }
+
+    bool
+    DetachedFileIOManager::exists_schema(const std::string&) { unsupported(); }
+
     std::unordered_map<types::TableId, std::vector<types::DataPageId>>
-    DetachedFileIOManager::map_data_pages_for_table()
-    {
-        throw std::logic_error("DetachedFileIOManager::map_tables_pages: unsupported method");
-    }
+    DetachedFileIOManager::map_data_pages_for_table() { unsupported(); }
 
     std::unordered_map<types::TableId, std::vector<types::IndexId>>
-    DetachedFileIOManager::map_index_files_for_table()
-    {
-        throw std::logic_error("DetachedFileIOManager::map_index_files_for_table: unsupported method");
-    }
+    DetachedFileIOManager::map_index_files_for_table() { unsupported(); }
 
     types::IndexFile
     DetachedFileIOManager::create_index_file(
-        const std::string& string, const std::string& table_name, const types::MetaIndex& mi
-    )
-    {
-        throw std::logic_error("DetachedFileIOManager::create_index_file: unsupported method");
-    }
+        const std::string&, const std::string&, const types::MetaIndex&
+    ) { unsupported(); }
 
     std::unique_ptr<types::IndexFile>
-    DetachedFileIOManager::read_index_file(const types::IndexId& index_id)
-    {
-        throw std::logic_error("DetachedFileIOManager::read_index_file: unsupported method");
-    }
+    DetachedFileIOManager::read_index_file(const types::IndexId&) { unsupported(); }
 
     void
-    DetachedFileIOManager::write_index_file(const types::IndexFile& index_file, bool fsync)
-    {
-        throw std::logic_error("DetachedFileIOManager::write_index_file: unsupported method");
-    }
+    DetachedFileIOManager::write_index_file(const types::IndexFile&, bool) { unsupported(); }
+
+    types::MetaSequence
+    DetachedFileIOManager::read_seq(const std::string&, const std::string&) { unsupported(); }
+
+    void
+    DetachedFileIOManager::write_seq(const types::MetaSequence&, bool) { unsupported(); }
+
+    void
+    DetachedFileIOManager::delete_seq(const types::MetaSequence&) { unsupported(); }
+
+    std::vector<types::MetaSequence>
+    DetachedFileIOManager::read_sequences() { unsupported(); }
+
 } // namespace storage

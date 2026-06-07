@@ -208,6 +208,15 @@ namespace
             return "CREATE_INDEX";
         case WALRecordType::CLR_CREATE_INDEX:
             return "CLR_CREATE_INDEX";
+        case WALRecordType::CREATE_SEQUENCE:
+            return "CREATE_SEQUENCE";
+        case WALRecordType::CLR_CREATE_SEQUENCE:
+            return "CLR_CREATE_SEQUENCE";
+        case WALRecordType::UPDATE_SEQUENCE:
+            return "UPDATE_SEQUENCE";
+        case WALRecordType::CLR_UPDATE_SEQUENCE:
+            return "CLR_UPDATE_SEQUENCE";
+
         default:
             return "UNKNOWN";
         }

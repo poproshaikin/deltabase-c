@@ -29,12 +29,16 @@ namespace storage
     {
         tables_.clear();
         schemas_.clear();
+        sequences_.clear();
 
         for (auto&& table : io_.read_tables_meta())
             tables_.emplace(table.id, std::move(table));
 
         for (auto&& schema : io_.read_schemas_meta())
             schemas_.emplace(schema.id, std::move(schema));
+
+        for (auto&& sequence : io_.read_sequences())
+            sequences_.emplace(sequence.id, sequence);
     }
 
     void
@@ -45,6 +49,9 @@ namespace storage
 
         for (const auto& [_, table] : tables_)
             io_.write_mt(table, true);
+
+        for (const auto& [_, sequence] : sequences_)
+            io_.write_seq(sequence, true);
     }
 
     void
@@ -57,6 +64,12 @@ namespace storage
     CatalogCache::put(types::MetaSchema schema)
     {
         schemas_[schema.id] = std::move(schema);
+    }
+
+    void
+    CatalogCache::put(types::MetaSequence sequence)
+    {
+        sequences_[sequence.id] = std::move(sequence);
     }
 
     types::MetaTable*
@@ -118,6 +131,14 @@ namespace storage
 
         return nullptr;
     }
+
+    types::MetaSequence*
+    CatalogCache::get_sequence(const types::UUID& id)
+    {
+        const auto it = sequences_.find(id);
+        return it == sequences_.end() ? nullptr : &it->second;
+    }
+
     bool
     CatalogCache::exists_schema(const std::string& name)
     {

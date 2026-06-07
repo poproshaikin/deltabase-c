@@ -57,6 +57,9 @@ namespace misc
         if (std::holds_alternative<PrimaryKeyConstraint>(constraint))
             return std::nullopt;
 
+        if (std::holds_alternative<AutoIncrementConstraint>(constraint))
+            return std::nullopt;
+
         throw std::runtime_error("convert: unsupported column constraint");
     }
 

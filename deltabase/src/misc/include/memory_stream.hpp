@@ -58,10 +58,13 @@ namespace misc
         write_message_type(types::NetMessageType type);
 
         void
-        write_uuid(const types::UUID& session_id);
+        write_uuid(const types::UUID& id);
 
         void
         write_string(const std::string& value, bool big_endian);
+
+        void
+        write_i32(int32_t value, bool big_endian);
 
         void
         write_bytes(const types::Bytes& bytes, bool big_endian);
@@ -115,6 +118,9 @@ namespace misc
 
         bool
         read_uuid(types::UUID& out);
+
+        bool
+        read_i32(int32_t& out, bool big_endian);
     };
 }
 

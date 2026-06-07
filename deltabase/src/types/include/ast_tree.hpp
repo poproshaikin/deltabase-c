@@ -149,6 +149,10 @@ namespace types
     {
     };
 
+    struct AutoIncrementConstraint
+    {
+    };
+
     struct DefaultConstraint
     {
         SqlToken value;
@@ -162,6 +166,7 @@ namespace types
     using Constraint = std::variant<
         NotNullConstraint,
         PrimaryKeyConstraint,
+        AutoIncrementConstraint,
         DefaultConstraint
     >;
 

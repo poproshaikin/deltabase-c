@@ -2,6 +2,7 @@
 #include "io_manager_factory.hpp"
 #include "meta_column.hpp"
 #include "meta_schema.hpp"
+#include "meta_sequence.hpp"
 #include "meta_table.hpp"
 #include "static_storage.hpp"
 
@@ -26,6 +27,7 @@ namespace
         std::optional<std::string> table_name;
         bool show_columns = true;
         bool show_indexes = true;
+        bool show_sequences = true;
     };
 
     std::string
@@ -70,6 +72,11 @@ namespace
                 {
                     parts.emplace_back(std::string("DEFAULT=") + std::string(dc.value.bytes.begin(), dc.value.bytes.end()));
                 }
+            }
+            else if (std::holds_alternative<MetaAutoIncrementConstraint>(c))
+            {
+                const auto& ai = std::get<MetaAutoIncrementConstraint>(c);
+                parts.emplace_back("AUTOINCREMENT(seq=" + ai.sequence_id.to_string() + ")");
             }
             else
                 parts.emplace_back("UNKNOWN");
@@ -127,6 +134,12 @@ namespace
             if (opt == "--no-indexes")
             {
                 args.show_indexes = false;
+                continue;
+            }
+
+            if (opt == "--no-sequences")
+            {
+                args.show_sequences = false;
                 continue;
             }
 
@@ -196,16 +209,17 @@ main(int argc, char** argv)
 
         const auto schemas = io->read_schemas_meta();
         const auto tables = io->read_tables_meta();
+        const auto sequences = io->read_sequences();
 
-        std::unordered_map<std::string, MetaSchema> schema_by_id;
-        schema_by_id.reserve(schemas.size());
-        for (const auto& schema : schemas)
-            schema_by_id.emplace(schema.id.to_string(), schema);
+        std::unordered_map<std::string, std::vector<MetaSequence>> seqs_by_schema_id;
+        for (const auto& seq : sequences)
+            seqs_by_schema_id[seq.schema_id.to_string()].push_back(seq);
 
         size_t printed_schemas = 0;
         size_t printed_tables = 0;
         size_t printed_columns = 0;
         size_t printed_indexes = 0;
+        size_t printed_sequences = 0;
 
         std::cout << "=== META DUMP ===\n";
         std::cout << "db=" << db_name << "\n\n";
@@ -258,6 +272,21 @@ main(int argc, char** argv)
                 }
             }
 
+            if (args.show_sequences)
+            {
+                const auto it = seqs_by_schema_id.find(schema.id.to_string());
+                if (it != seqs_by_schema_id.end())
+                {
+                    for (const auto& seq : it->second)
+                    {
+                        std::cout << "  SEQUENCE " << seq.name
+                                  << " id=" << seq.id.to_string()
+                                  << " current_value=" << seq.current_value << "\n";
+                        printed_sequences += 1;
+                    }
+                }
+            }
+
             std::cout << "\n";
         }
 
@@ -266,7 +295,8 @@ main(int argc, char** argv)
 
         std::cout << "=== META SUMMARY ===\n";
         std::cout << "schemas=" << printed_schemas << " tables=" << printed_tables
-                  << " columns=" << printed_columns << " indexes=" << printed_indexes << "\n";
+                  << " columns=" << printed_columns << " indexes=" << printed_indexes
+                  << " sequences=" << printed_sequences << "\n";
 
         return 0;
     }

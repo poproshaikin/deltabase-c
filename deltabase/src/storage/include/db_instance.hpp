@@ -161,6 +161,13 @@ namespace storage
             txn::Transaction& txn
         ) = 0;
 
+        virtual types::UUID
+        create_sequence(
+            const std::string& sequence_name,
+            const std::string& schema_name,
+            txn::Transaction& txn
+        ) = 0;
+
         virtual std::vector<types::MetaTable*>
         get_all_tables() = 0;
 

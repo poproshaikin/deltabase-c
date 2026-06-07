@@ -6,6 +6,7 @@
 #define DELTABASE_FILEIOMANAGER_HPP
 #include "../../types/include/config.hpp"
 #include "db_io_lock_service.hpp"
+#include "db_path_resolver.hpp"
 #include "io_manager.hpp"
 #include "storage_serializer.hpp"
 
@@ -24,6 +25,7 @@ namespace storage
         std::unique_ptr<IStorageSerializer> serializer_;
         std::shared_ptr<DatabaseIoLockService> io_lock_service_;
         std::shared_ptr<DatabaseIoLockService::Mutex> db_mutex_;
+        DbPathResolver paths_;
 
         void
         for_each_in_db(const std::function<void(fs::directory_entry)>& func) const;
@@ -32,27 +34,7 @@ namespace storage
         for_each_schema(const std::function<void(fs::directory_entry)>& func) const;
 
         void
-        for_each_in_schema(
-            const std::string& schema_name,
-            const std::function<void(fs::directory_entry)>& func
-        ) const;
-
-        void
         for_each_table(const std::function<void(fs::directory_entry)>& func) const;
-
-        void
-        for_each_in_table(
-            const std::string& schema_name,
-            const std::string& table_name,
-            const std::function<void(fs::directory_entry)>& func
-        ) const;
-
-        void
-        for_each_in_table_data(
-            const std::string& schema_name,
-            const std::string& table_name,
-            const std::function<void(fs::directory_entry)>& func
-        ) const;
 
     public:
         explicit
@@ -151,6 +133,18 @@ namespace storage
 
         void
         write_index_file(const types::IndexFile& index_file, bool fsync) override;
+
+        types::MetaSequence
+        read_seq(const std::string& name, const std::string& schema_name) override;
+
+        void
+        write_seq(const types::MetaSequence& sequence, bool fsync) override;
+
+        void
+        delete_seq(const types::MetaSequence& sequence) override;
+
+        std::vector<types::MetaSequence>
+        read_sequences() override;
     };
 }
 

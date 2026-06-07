@@ -38,6 +38,14 @@ namespace storage
         bool
         is_row_obsolete(const types::RowPtr& row_ptr) const;
 
+        void
+        fill_autoincrement_columns(
+            const types::MetaTable& mt,
+            std::optional<std::vector<std::string>>& cols,
+            std::vector<types::DataToken>& row,
+            txn::Transaction& txn
+        );
+
     public:
         explicit StdDbInstance(const types::Config& cfg);
 
@@ -179,6 +187,13 @@ namespace storage
         void
         drop_table(
             const std::string& table_name,
+            const std::string& schema_name,
+            txn::Transaction& txn
+        ) override;
+
+        types::UUID
+        create_sequence(
+            const std::string& sequence_name,
             const std::string& schema_name,
             txn::Transaction& txn
         ) override;

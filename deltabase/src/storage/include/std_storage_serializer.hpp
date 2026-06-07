@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_STD_BINARY_SERIALIZER_HPP
 #define DELTABASE_STD_BINARY_SERIALIZER_HPP
+#include "meta_sequence.hpp"
 #include "../../misc/include/memory_stream.hpp"
 #include "storage_serializer.hpp"
 
@@ -54,6 +55,9 @@ namespace storage
         misc::MemoryStream
         serialize_cfg(const types::Config& db) const override;
 
+        misc::MemoryStream
+        serialize_seq(const types::MetaSequence& sequence) const;
+
         bool
         deserialize_mt(misc::ReadOnlyMemoryStream &content, types::MetaTable &out) const override;
 
@@ -83,6 +87,9 @@ namespace storage
 
         bool
         deserialize_dt(misc::ReadOnlyMemoryStream& stream, types::DataToken& out) const override;
+
+        bool
+        deserialize_seq(misc::ReadOnlyMemoryStream& stream, types::MetaSequence& out) const override;
 
         uint64_t
         estimate_size(const types::DataRow& row) const override;

@@ -107,6 +107,9 @@ namespace exq
         bool
         has_default_constraint(const types::MetaColumn& column) const;
 
+        bool
+        has_autoincrement_constraint(const types::MetaColumn& column) const;
+
     public:
         explicit
         SemanticAnalyzer(const types::Config& config, storage::IDbInstance& db);

@@ -222,6 +222,37 @@ namespace recovery
         io_.write_mt(table);
     }
 
+    static MetaSequence with_schema_name(MetaSequence seq, storage::IIOManager& io)
+    {
+        if (seq.schema_name.empty())
+            seq.schema_name = io.read_schema_meta(seq.schema_id).name;
+        return seq;
+    }
+
+    void
+    RecoveryManager::redo(const CreateSequenceRecord& record)
+    {
+        io_.write_seq(with_schema_name(record.after, io_), true);
+    }
+
+    void
+    RecoveryManager::redo(const CLRCreateSequenceRecord& record)
+    {
+        io_.delete_seq(with_schema_name(record.after, io_));
+    }
+
+    void
+    RecoveryManager::redo(const UpdateSequenceRecord& record)
+    {
+        io_.write_seq(with_schema_name(record.after, io_), true);
+    }
+
+    void
+    RecoveryManager::redo(const CLRUpdateSequenceRecord& record)
+    {
+        io_.write_seq(record.before, true);
+    }
+
     void
     RecoveryManager::redo(const BeginTxnRecord&)
     {
@@ -494,6 +525,18 @@ namespace recovery
         io_.write_mt(table);
     }
 
+    void
+    RecoveryManager::undo_record(const CreateSequenceRecord& record)
+    {
+        io_.delete_seq(record.after);
+    }
+
+    void
+    RecoveryManager::undo_record(const UpdateSequenceRecord& record)
+    {
+        io_.write_seq(record.before, true);
+    }
+
     WALRecord
     RecoveryManager::make_clr(const InsertRecord& record) const
     {
@@ -587,6 +630,20 @@ namespace recovery
     RecoveryManager::make_clr(const DropIndexRecord& record) const
     {
         return CLRDropIndexRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.before);
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const CreateSequenceRecord& record) const
+    {
+        return CLRCreateSequenceRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.after);
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const UpdateSequenceRecord& record) const
+    {
+        return CLRUpdateSequenceRecord(
+            record.lsn, 0, record.txn_id, record.prev_lsn, record.before, record.after
+        );
     }
 
     std::unordered_map<TxnId, LSN>

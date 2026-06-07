@@ -136,6 +136,13 @@ namespace storage
                 auto serialized_token = serialize_dt(dc.value);
                 stream.append(serialized_token, serialized_token.size());
             }
+            else if (std::holds_alternative<MetaAutoIncrementConstraint>(c))
+            {
+                uint8_t tag = 2;
+                stream.write(&tag, sizeof(uint8_t));
+                const auto& ai = std::get<MetaAutoIncrementConstraint>(c);
+                stream.write_uuid(ai.sequence_id);
+            }
             else
             {
                 uint8_t tag = 255;
@@ -318,6 +325,17 @@ namespace storage
         return stream;
     }
 
+    MemoryStream
+    StdStorageSerializer::serialize_seq(const MetaSequence& sequence) const
+    {
+        MemoryStream stream;
+        stream.write_uuid(sequence.id);
+        stream.write_uuid(sequence.schema_id);
+        stream.write_string(sequence.name, false);
+        stream.write_i32(sequence.current_value, false);
+        return stream;
+    }
+
     bool
     StdStorageSerializer::deserialize_mt(ReadOnlyMemoryStream& stream, MetaTable& out) const
     {
@@ -418,6 +436,16 @@ namespace storage
                 if (!deserialize_dt(stream, token))
                     return false;
                 out.constraints.emplace_back(MetaDefaultConstraint{token});
+                break;
+            }
+            case 2:
+            {
+                MetaAutoIncrementConstraint constraint;
+                constraint.column_id = out.id;
+                constraint.table_id = out.table_id;
+                if (!stream.read_uuid(constraint.sequence_id))
+                    return false;
+                out.constraints.push_back(std::move(constraint));
                 break;
             }
             default:
@@ -717,10 +745,32 @@ namespace storage
             if (stream.read(out.bytes.data(), size) != size)
             {
                 std::cout << "    [deserialize_dt] ERROR: failed to read " << size << " bytes"
-                          << std::endl;
+                    << std::endl;
                 return false;
             }
         }
+
+        return true;
+    }
+
+    bool
+    StdStorageSerializer::deserialize_seq(ReadOnlyMemoryStream& stream, MetaSequence& out) const
+    {
+        // stream.write_uuid(sequence.id);
+        // stream.write_uuid(sequence.schema_id);
+        // stream.write_string(sequence.name, false);
+        // stream.write_i32(sequence.current_value, false);
+        if (!stream.read_uuid(out.id))
+            return false;
+
+        if (!stream.read_uuid(out.schema_id))
+            return false;
+
+        if (!stream.read_string(out.name, false))
+            return false;
+
+        if (!stream.read_i32(out.current_value, false))
+            return false;
 
         return true;
     }

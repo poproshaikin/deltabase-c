@@ -393,6 +393,74 @@ namespace wal
     }
 
     MemoryStream
+    StdWalSerializer::serialize(const CreateSequenceRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+
+        auto serialized_seq = binary_serializer_.serialize_seq(record.after);
+        stream.append(serialized_seq, serialized_seq.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const CLRCreateSequenceRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_seq = binary_serializer_.serialize_seq(record.after);
+        stream.append(serialized_seq, serialized_seq.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const UpdateSequenceRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+
+        auto serialized_before = binary_serializer_.serialize_seq(record.before);
+        stream.append(serialized_before, serialized_before.size());
+
+        auto serialized_after = binary_serializer_.serialize_seq(record.after);
+        stream.append(serialized_after, serialized_after.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const CLRUpdateSequenceRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_before = binary_serializer_.serialize_seq(record.before);
+        stream.append(serialized_before, serialized_before.size());
+
+        auto serialized_after = binary_serializer_.serialize_seq(record.after);
+        stream.append(serialized_after, serialized_after.size());
+
+        return stream;
+    }
+
+    MemoryStream
     StdWalSerializer::serialize(const CommitTxnRecord& record) const
     {
         MemoryStream stream;
@@ -1036,6 +1104,98 @@ namespace wal
                 return false;
 
             out = CLRDropIndexRecord(lsn, prev_lsn, txn_id, undo_next_lsn, std::move(before));
+            return true;
+        }
+
+        case WALRecordType::CREATE_SEQUENCE:
+        {
+            LSN lsn;
+            LSN prev_lsn;
+            UUID txn_id;
+            MetaSequence seq;
+
+            if (!stream.read(&lsn, sizeof(lsn)))
+                return false;
+            if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                return false;
+            if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!binary_serializer_.deserialize_seq(stream, seq))
+                return false;
+
+            out = CreateSequenceRecord(lsn, prev_lsn, txn_id, seq);
+            return true;
+        }
+
+        case WALRecordType::CLR_CREATE_SEQUENCE:
+        {
+            LSN lsn;
+            LSN prev_lsn;
+            UUID txn_id;
+            LSN undo_next_lsn;
+            MetaSequence seq;
+
+            if (!stream.read(&lsn, sizeof(lsn)))
+                return false;
+            if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                return false;
+            if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                return false;
+            if (!binary_serializer_.deserialize_seq(stream, seq))
+                return false;
+
+            out = CLRCreateSequenceRecord(lsn, prev_lsn, txn_id, undo_next_lsn, seq);
+            return true;
+        }
+
+        case WALRecordType::UPDATE_SEQUENCE:
+        {
+            LSN lsn;
+            LSN prev_lsn;
+            UUID txn_id;
+            MetaSequence before;
+            MetaSequence after;
+
+            if (!stream.read(&lsn, sizeof(lsn)))
+                return false;
+            if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                return false;
+            if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!binary_serializer_.deserialize_seq(stream, before))
+                return false;
+            if (!binary_serializer_.deserialize_seq(stream, after))
+                return false;
+
+            out = UpdateSequenceRecord(lsn, prev_lsn, txn_id, before, after);
+            return true;
+        }
+
+        case WALRecordType::CLR_UPDATE_SEQUENCE:
+        {
+            LSN lsn;
+            LSN prev_lsn;
+            UUID txn_id;
+            LSN undo_next_lsn;
+            MetaSequence before;
+            MetaSequence after;
+
+            if (!stream.read(&lsn, sizeof(lsn)))
+                return false;
+            if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                return false;
+            if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                return false;
+            if (!binary_serializer_.deserialize_seq(stream, before))
+                return false;
+            if (!binary_serializer_.deserialize_seq(stream, after))
+                return false;
+
+            out = CLRUpdateSequenceRecord(lsn, prev_lsn, txn_id, undo_next_lsn, before, after);
             return true;
         }
 

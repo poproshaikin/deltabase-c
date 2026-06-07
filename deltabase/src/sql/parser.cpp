@@ -496,6 +496,11 @@ namespace sql
 
             return DefaultConstraint(*default_value);
         }
+        if (kw == SqlKeyword::AUTOINCREMENT)
+        {
+            advance();
+            return AutoIncrementConstraint();
+        }
 
         throw EngineException("Unknown constraint", EngineException::Code::SYNTAX_ERROR);
     }

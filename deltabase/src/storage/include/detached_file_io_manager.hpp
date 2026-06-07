@@ -118,6 +118,18 @@ namespace storage
 
         void
         write_index_file(const types::IndexFile& index_file, bool fsync) override;
+
+        types::MetaSequence
+        read_seq(const std::string& name, const std::string& schema_name) override;
+
+        void
+        write_seq(const types::MetaSequence& sequence, bool fsync) override;
+        void
+
+        delete_seq(const types::MetaSequence& sequence) override;
+        std::vector<types::MetaSequence>
+
+        read_sequences() override;
     };
 } // namespace storage
 

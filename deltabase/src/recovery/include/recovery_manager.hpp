@@ -75,6 +75,15 @@ namespace recovery
         redo(const types::CLRDropIndexRecord& record);
 
         void
+        redo(const types::CreateSequenceRecord& record);
+        void
+        redo(const types::CLRCreateSequenceRecord& record);
+        void
+        redo(const types::UpdateSequenceRecord& record);
+        void
+        redo(const types::CLRUpdateSequenceRecord& record);
+
+        void
         redo(const types::BeginTxnRecord& record);
         void
         redo(const types::CommitTxnRecord& record);
@@ -103,6 +112,10 @@ namespace recovery
         make_clr(const types::CreateIndexRecord& record) const;
         types::WALRecord
         make_clr(const types::DropIndexRecord& record) const;
+        types::WALRecord
+        make_clr(const types::CreateSequenceRecord& record) const;
+        types::WALRecord
+        make_clr(const types::UpdateSequenceRecord& record) const;
         types::WALRecord
         make_clr(const types::RollbackTxnRecord& record) const;
 
@@ -143,6 +156,10 @@ namespace recovery
         undo_record(const types::CreateIndexRecord& record);
         void
         undo_record(const types::DropIndexRecord& record);
+        void
+        undo_record(const types::CreateSequenceRecord& record);
+        void
+        undo_record(const types::UpdateSequenceRecord& record);
         void
         undo_record(const types::RollbackTxnRecord& record);
 
