@@ -392,7 +392,33 @@ namespace storage
             }
 
             if (caller_provided)
+            {
+                if (cols.has_value())
+                {
+                    auto it = std::ranges::find(*cols, column.name);
+                    if (it != cols->end())
+                    {
+                        const size_t idx = static_cast<size_t>(std::distance(cols->begin(), it));
+                        if (idx < row.size() && row[idx].type == DataType::INTEGER)
+                        {
+                            int32_t provided_val = 0;
+                            std::memcpy(&provided_val, row[idx].bytes.data(), sizeof(int32_t));
+
+                            auto* seq = catalog_->get_sequence(ai->sequence_id);
+                            if (seq && provided_val >= seq->current_value)
+                            {
+                                const MetaSequence before = *seq;
+                                seq->current_value = provided_val;
+
+                                UpdateSequenceRecord seq_record(before, *seq);
+                                txn.append_log(seq_record);
+                                io_manager_->write_seq(*seq);
+                            }
+                        }
+                    }
+                }
                 continue;
+            }
 
             auto* seq = catalog_->get_sequence(ai->sequence_id);
             if (!seq)
