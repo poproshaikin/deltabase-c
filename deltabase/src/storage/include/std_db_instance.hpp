@@ -44,7 +44,7 @@ namespace storage
             std::optional<std::vector<std::string>>& cols,
             std::vector<types::DataToken>& row,
             txn::Transaction& txn
-        );
+        ) const;
 
     public:
         explicit StdDbInstance(const types::Config& cfg);

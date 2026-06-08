@@ -28,7 +28,8 @@ namespace engine
         auto cfg_path = path_db_meta(data_path, name);
 
         if (!exists_file(cfg_path))
-            throw EngineException("Database " + name + " doesn't exists", EngineException::Code::DB_NOT_EXISTS);
+            throw EngineException("Database " + name + " doesn't exists",
+                                  EngineException::Code::DB_NOT_EXISTS);
 
         ReadOnlyMemoryStream stream(read_file(cfg_path));
         Config cfg;
@@ -97,6 +98,12 @@ namespace engine
     }
 
     std::unique_ptr<IExecutionResult>
+    Engine::make_ok_result(const std::string& tag)
+    {
+        return std::make_unique<EmptyExecutionResult>();
+    }
+
+    std::unique_ptr<IExecutionResult>
     Engine::execute_query(const std::string& query)
     {
         auto tokens = sql::lex(query);
@@ -105,26 +112,88 @@ namespace engine
         parser_.set_tokens(tokens);
         auto ast = parser_.parse();
 
+        if (ast.type == AstNodeType::BEGIN)
+        {
+            if (active_txn_.has_value())
+                throw EngineException("Another transaction is being in progress",
+                                      EngineException::Code::MULTIPLE_BEGIN);
+
+            active_txn_.emplace(db_->make_txn());
+            active_txn_->begin();
+            return make_ok_result("BEGIN");
+        }
+        if (ast.type == AstNodeType::COMMIT)
+        {
+            if (!active_txn_.has_value())
+                throw EngineException("There is no transaction in progress",
+                                      EngineException::Code::NO_ACTIVE_TXN);
+
+            active_txn_->commit();
+            active_txn_.reset();
+            return make_ok_result("COMMIT");
+        }
+        if (ast.type == AstNodeType::ROLLBACK)
+        {
+            if (!active_txn_.has_value())
+                throw EngineException("There is no transaction in progress",
+                                      EngineException::Code::NO_ACTIVE_TXN);
+            active_txn_->rollback();
+            active_txn_.reset();
+            return make_ok_result("ROLLBACK");
+        }
+
+        bool implicit_txn = !active_txn_.has_value();
+        if (implicit_txn)
+        {
+            active_txn_.emplace(db_->make_txn());
+            active_txn_->begin();
+        }
+
+        ctx_.txn = &*active_txn_;
+
         auto analysis = analyzer_->analyze(ast);
         if (!analysis.is_valid)
             throw *analysis.err;
 
         auto plan = planner_->plan(std::move(ast));
 
-        auto executor = executor_factory_.from_plan(std::move(plan.root), *db_);
+        auto executor = executor_factory_.from_plan(std::move(plan.root), *db_, ctx_);
 
-        if (plan.needs_stream)
-            return std::make_unique<StreamedResult>(std::move(executor));
+        try
+        {
+            std::unique_ptr<IExecutionResult> result;
 
-        DataTable result_table;
-        DataRow row;
+            if (!plan.needs_stream)
+            {
+                DataTable result_table;
+                DataRow row;
 
-        executor->open();
-        while (executor->next(row))
-            result_table.rows.push_back(row);
-        executor->close();
-        result_table.output_schema = executor->output_schema();
+                executor->open();
+                while (executor->next(row))
+                    result_table.rows.push_back(row);
+                executor->close();
+                result_table.output_schema = executor->output_schema();
+                result = std::make_unique<MaterializedResult>(std::move(result_table));
 
-        return std::make_unique<MaterializedResult>(std::move(result_table));
+                if (implicit_txn)
+                {
+                    active_txn_->commit();
+                    active_txn_.reset();
+                }
+            }
+            else
+                result = std::make_unique<StreamedResult>(std::move(executor));
+
+            return result;
+        }
+        catch (...)
+        {
+            if (implicit_txn)
+            {
+                active_txn_->rollback();
+                active_txn_.reset();
+            }
+            throw;
+        }
     }
 } // namespace engine

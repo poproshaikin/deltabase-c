@@ -72,6 +72,54 @@ namespace storage
         sequences_[sequence.id] = std::move(sequence);
     }
 
+    void
+    CatalogCache::put(types::MetaTable table, const types::UUID& txn_id)
+    {
+        txn_deltas_[txn_id].added_tables.push_back(table.id);
+        put(std::move(table));
+    }
+
+    void
+    CatalogCache::put(types::MetaSchema schema, const types::UUID& txn_id)
+    {
+        txn_deltas_[txn_id].added_schemas.push_back(schema.id);
+        put(std::move(schema));
+    }
+
+    void
+    CatalogCache::put(types::MetaSequence sequence, const types::UUID& txn_id)
+    {
+        txn_deltas_[txn_id].added_sequences.push_back(sequence.id);
+        put(std::move(sequence));
+    }
+
+    void
+    CatalogCache::commit_txn(const types::UUID& txn_id)
+    {
+        txn_deltas_.erase(txn_id);
+    }
+
+    void
+    CatalogCache::rollback_txn(const types::UUID& txn_id)
+    {
+        auto it = txn_deltas_.find(txn_id);
+        if (it == txn_deltas_.end())
+            return;
+
+        auto& delta = it->second;
+
+        for (const auto& id : delta.added_tables)    tables_.erase(id);
+        for (const auto& id : delta.added_schemas)   schemas_.erase(id);
+        for (const auto& id : delta.added_sequences) sequences_.erase(id);
+
+        for (auto& t : delta.removed_tables)         tables_[t.id]  = std::move(t);
+        for (auto& s : delta.removed_schemas)        schemas_[s.id] = std::move(s);
+        for (auto& s : delta.removed_sequences)      sequences_[s.id] = std::move(s);
+        for (auto& t : delta.updated_tables_before)  tables_[t.id]  = std::move(t);
+
+        txn_deltas_.erase(it);
+    }
+
     types::MetaTable*
     CatalogCache::get_table(const types::UUID& id)
     {
@@ -91,26 +139,43 @@ namespace storage
         return nullptr;
     }
 
-    types::MetaTable
-    *
-    CatalogCache::save_table(types::MetaTable&& mt)
+    void
+    CatalogCache::put_or_update(types::MetaTable table, const types::UUID& txn_id)
     {
-        auto it = tables_.find(mt.id);
+        auto it = tables_.find(table.id);
         if (it == tables_.end())
         {
-            return &tables_.emplace(mt.id, mt).first->second;
+            txn_deltas_[txn_id].added_tables.push_back(table.id);
         }
         else
         {
-            it->second = mt;
-            return &it->second;
+            txn_deltas_[txn_id].updated_tables_before.push_back(it->second);
         }
+        tables_[table.id] = std::move(table);
+    }
+
+    types::MetaTable*
+    CatalogCache::save_table(types::MetaTable&& mt, const types::UUID& txn_id)
+    {
+        put_or_update(mt, txn_id);
+        return &tables_[mt.id];
     }
 
     void
     CatalogCache::delete_table(const types::UUID& table_id)
     {
         tables_.erase(table_id);
+    }
+
+    void
+    CatalogCache::delete_table(const types::UUID& table_id, const types::UUID& txn_id)
+    {
+        auto it = tables_.find(table_id);
+        if (it == tables_.end())
+            return;
+
+        txn_deltas_[txn_id].removed_tables.push_back(it->second);
+        tables_.erase(it);
     }
 
     types::MetaSchema*
@@ -132,6 +197,28 @@ namespace storage
         return nullptr;
     }
 
+    void
+    CatalogCache::delete_schema(const types::UUID& schema_id, const types::UUID& txn_id)
+    {
+        auto it = schemas_.find(schema_id);
+        if (it == schemas_.end())
+            return;
+
+        txn_deltas_[txn_id].removed_schemas.push_back(it->second);
+        schemas_.erase(it);
+    }
+
+    void
+    CatalogCache::delete_sequence(const types::UUID& sequence_id, const types::UUID& txn_id)
+    {
+        auto it = sequences_.find(sequence_id);
+        if (it == sequences_.end())
+            return;
+
+        txn_deltas_[txn_id].removed_sequences.push_back(it->second);
+        sequences_.erase(it);
+    }
+
     types::MetaSequence*
     CatalogCache::get_sequence(const types::UUID& id)
     {
@@ -145,17 +232,13 @@ namespace storage
         return get_schema(name) != nullptr;
     }
     void
-    CatalogCache::save_schema(const types::MetaSchema& ms)
+    CatalogCache::save_schema(const types::MetaSchema& ms, const types::UUID& txn_id)
     {
         auto it = schemas_.find(ms.id);
         if (it == schemas_.end())
-        {
-            schemas_.emplace(ms.id, ms);
-        }
-        else
-        {
-            it->second = ms;
-        }
+            txn_deltas_[txn_id].added_schemas.push_back(ms.id);
+
+        schemas_[ms.id] = ms;
     }
 
     std::vector<types::MetaTable*>

@@ -5,6 +5,7 @@
 #ifndef DELTABASE_ENGINE_HPP
 #define DELTABASE_ENGINE_HPP
 
+#include "execution_context.hpp"
 #include "planner_factory.hpp"
 #include "semantic_analyzer.hpp"
 #include "../../sql/include/parser.hpp"
@@ -25,11 +26,17 @@ namespace engine
         exq::NodeExecutorFactory executor_factory_;
         exq::PlannerFactory planner_factory_;
 
+        std::optional<txn::Transaction> active_txn_;
+        types::ExecutionContext ctx_;
+
         types::Config
         load_config(const std::string& name, const std::filesystem::path& executable_path) const;
 
         void
         set_db_instance(std::unique_ptr<storage::IDbInstance> db = nullptr);
+
+        std::unique_ptr<types::IExecutionResult>
+        make_ok_result(const std::string& tag);
 
     public:
         Engine();

@@ -19,37 +19,37 @@ namespace sql
         std::vector<types::SqlToken> tokens_;
         size_t current_;
 
-        types::SelectStatement
+        types::SelectStmt
         parse_select();
 
-        types::InsertStatement
+        types::InsertStmt
         parse_insert();
 
-        types::UpdateStatement
+        types::UpdateStmt
         parse_update();
 
-        types::DeleteStatement
+        types::DeleteStmt
         parse_delete();
 
-        types::CreateTableStatement
+        types::CreateTableStmt
         parse_create_table();
 
-        types::AlterTableStatement
+        types::AlterTableStmt
         parse_alter_table();
 
-        types::CreateDbStatement
+        types::CreateDatabaseStmt
         parse_create_db();
 
-        types::CreateSchemaStatement
+        types::CreateSchemaStmt
         parse_create_schema();
 
-        types::CreateIndexStatement
+        types::CreateIndexStmt
         parse_create_index();
 
-        types::DropIndexStatement
+        types::DropIndexStmt
         parse_drop_index();
 
-        types::DropTableStatement
+        types::DropTableStmt
         parse_drop_table();
 
         std::unique_ptr<types::AstNode>

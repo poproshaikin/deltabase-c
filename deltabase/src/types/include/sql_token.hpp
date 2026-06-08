@@ -57,7 +57,10 @@ namespace types
         ALTER,
         ADD,
         COLUMN,
-        DEFAULT
+        DEFAULT,
+        BEGIN,
+        COMMIT,
+        ROLLBACK
     };
 
     enum class SqlSymbol

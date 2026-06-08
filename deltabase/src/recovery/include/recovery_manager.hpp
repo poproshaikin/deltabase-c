@@ -6,7 +6,7 @@
 #define DELTABASE_RECOVERY_MANAGER_HPP
 #include "../../storage/include/io_manager.hpp"
 #include "../../wal/include/wal_manager.hpp"
-#include "../../transactions/include/transaction.hpp"
+#include "../../types/include/UUID.hpp"
 
 namespace recovery
 {
@@ -19,7 +19,7 @@ namespace recovery
         void
         redo(
             const types::WALRecord& record,
-            const std::unordered_map<txn::TxnId, types::LSN>& commit_lsns
+            const std::unordered_map<types::TxnId, types::LSN>& commit_lsns
         );
         void
         redo_data(const types::WALDataRecord& record);
@@ -119,27 +119,21 @@ namespace recovery
         types::WALRecord
         make_clr(const types::RollbackTxnRecord& record) const;
 
-        std::unordered_map<txn::TxnId, types::LSN>
+        std::unordered_map<types::TxnId, types::LSN>
         get_commit_lsns(const std::vector<types::WALRecord>& wal) const;
-        std::unordered_map<txn::TxnId, types::LSN>
+        std::unordered_map<types::TxnId, types::LSN>
         get_rollback_lsns(const std::vector<types::WALRecord>& wal) const;
-        std::unordered_map<txn::TxnId, types::LSN>
+        std::unordered_map<types::TxnId, types::LSN>
         get_last_lsns(const std::vector<types::WALRecord>& wal) const;
-        std::unordered_map<txn::TxnId, types::LSN>
+        std::unordered_map<types::TxnId, types::LSN>
         get_active_txns(
-            const std::unordered_map<txn::TxnId, types::LSN>& last,
-            const std::unordered_map<txn::TxnId, types::LSN>& commit,
-            const std::unordered_map<txn::TxnId, types::LSN>& rollback);
+            const std::unordered_map<types::TxnId, types::LSN>& last,
+            const std::unordered_map<types::TxnId, types::LSN>& commit,
+            const std::unordered_map<types::TxnId, types::LSN>& rollback);
 
         void
-        undo(const std::unordered_map<txn::TxnId, types::LSN>& active_lsns);
+        undo(const std::unordered_map<types::TxnId, types::LSN>& active_lsns);
 
-        void
-        undo_record(const types::InsertRecord& record, types::DataPage& page);
-        void
-        undo_record(const types::UpdateRecord& record, types::DataPage& page);
-        void
-        undo_record(const types::DeleteRecord& record, types::DataPage& page);
         void
         undo_record(const types::CreateSchemaRecord& record);
         void
@@ -169,6 +163,13 @@ namespace recovery
 
         void
         recover();
+
+        void
+        undo_record(const types::InsertRecord& record, types::DataPage& page);
+        void
+        undo_record(const types::UpdateRecord& record, types::DataPage& page);
+        void
+        undo_record(const types::DeleteRecord& record, types::DataPage& page);
     };
 } // namespace recovery
 

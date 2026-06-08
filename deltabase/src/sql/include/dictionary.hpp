@@ -51,6 +51,9 @@ namespace sql
             {"update", SqlKeyword::UPDATE},
             {"values", SqlKeyword::VALUES},
             {"where", SqlKeyword::WHERE},
+            {"begin", SqlKeyword::BEGIN},
+            {"commit", SqlKeyword::COMMIT},
+            {"rollback", SqlKeyword::ROLLBACK}
         };
 
         return dictionary;

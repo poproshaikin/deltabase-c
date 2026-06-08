@@ -10,6 +10,8 @@
 #include "../../types/include/data_page.hpp"
 #include "../../types/include/index_file.hpp"
 #include "io_manager.hpp"
+#include "../../types/include/UUID.hpp"
+#include <unordered_set>
 
 namespace storage
 {
@@ -22,26 +24,29 @@ namespace storage
     {
         DataPageBuffer data_pages_;
         IndexFileBuffer index_files_;
+
         IIOManager& io_;
 
-        std::unordered_map<types::TableId, std::vector<types::DataPageId>> data_pages_per_table_;
+        std::unordered_map<types::TxnId, std::unordered_set<types::DataPageId>> txn_dirty_pages_;
 
+        std::unordered_map<types::TableId, std::vector<types::DataPageId>> data_pages_per_table_;
         std::unordered_map<types::TableId, std::vector<types::IndexId>> index_files_per_table_;
 
         void
         flush(DataPageBuffer::CacheEntry& page_entry);
-
         void
         flush(IndexFileBuffer::CacheEntry& index_file_entry);
 
         std::function<void(DataPageBuffer::CacheEntry&)> data_page_flusher_ =
             [this](DataPageBuffer::CacheEntry& page_entry) { flush(page_entry); };
-
         std::function<void(IndexFileBuffer::CacheEntry&)> index_file_flusher_ =
             [this](IndexFileBuffer::CacheEntry& index_file_entry) { flush(index_file_entry); };
 
         types::DataPage*
         create_dp(const types::MetaTable& mt);
+
+        types::DataPage*
+        mark_dirty(const types::DataPageId& page_id);
 
     public:
         BufferPool(IIOManager& io)
@@ -67,7 +72,7 @@ namespace storage
         get_table_data(const types::UUID& table_id);
 
         types::DataPage*
-        dirty_dp(const types::DataPageId& page_id);
+        dirty_dp(const types::DataPageId& page_id, const types::TxnId& txn);
 
         types::IndexFile*
         get_table_index(const types::UUID& table_id, const types::IndexId& index_id);
@@ -88,9 +93,13 @@ namespace storage
 
         void
         flush_dirty();
-
         void
         flush_dirty(types::LSN max_lsn);
+
+        void
+        rollback_txn(const types::TxnId& txn_id);
+        void
+        commit_txn(const types::TxnId& txn_id);
     };
 } // namespace storage
 

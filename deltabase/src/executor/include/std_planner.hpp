@@ -24,34 +24,34 @@ namespace exq
         should_stream_for_seq_scan(const types::MetaTable& table, const types::IPlanNode& node);
 
         types::QueryPlan
-        plan(types::SelectStatement& stmt) const;
+        plan(types::SelectStmt& stmt) const;
 
         types::QueryPlan
-        plan(types::InsertStatement& stmt) const;
+        plan(types::InsertStmt& stmt) const;
 
         types::QueryPlan
-        plan(types::UpdateStatement& stmt) const;
+        plan(types::UpdateStmt& stmt) const;
 
         types::QueryPlan
-        plan(types::DeleteStatement& stmt) const;
+        plan(types::DeleteStmt& stmt) const;
 
         types::QueryPlan
-        plan(types::CreateDbStatement& stmt) const;
+        plan(types::CreateDatabaseStmt& stmt) const;
 
         types::QueryPlan
-        plan(const types::CreateTableStatement& table) const;
+        plan(const types::CreateTableStmt& table) const;
 
         types::QueryPlan
-        plan(const types::AlterTableStatement& stmt) const;
+        plan(const types::AlterTableStmt& stmt) const;
 
         types::QueryPlan
-        plan(const types::CreateIndexStatement& stmt) const;
+        plan(const types::CreateIndexStmt& stmt) const;
 
         types::QueryPlan
-        plan(const types::DropIndexStatement& stmt) const;
+        plan(const types::DropIndexStmt& stmt) const;
 
         types::QueryPlan
-        plan(const types::DropTableStatement& stmt) const;
+        plan(const types::DropTableStmt& stmt) const;
 
     public:
         explicit

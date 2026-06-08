@@ -41,7 +41,9 @@ public:
         INVALID_COMPARISON,
         NULLABLE_PK,
         MULTIPLE_PK,
-        INVALID_AUTOINCREMENT_TYPE
+        INVALID_AUTOINCREMENT_TYPE,
+        MULTIPLE_BEGIN,
+        NO_ACTIVE_TXN
     };
 
     explicit EngineException(const std::string& msg, Code code)

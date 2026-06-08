@@ -184,11 +184,19 @@ namespace storage
     }
 
     DataPage*
-    BufferPool::dirty_dp(const DataPageId& page_id)
+    BufferPool::mark_dirty(const DataPageId& page_id)
     {
         data_pages_.mark_dirty(page_id);
         auto* entry = data_pages_.get(page_id);
         return entry ? &entry->value : nullptr;
+    }
+
+    DataPage*
+    BufferPool::dirty_dp(const DataPageId& page_id, const TxnId& txn)
+    {
+        auto* dirty = mark_dirty(page_id);
+        txn_dirty_pages_[txn].insert(page_id);
+        return dirty;
     }
 
     void
@@ -231,4 +239,15 @@ namespace storage
         }
     }
 
+    void
+    BufferPool::rollback_txn(const TxnId& txn_id)
+    {
+        txn_dirty_pages_.erase(txn_id);
+    }
+
+    void
+    BufferPool::commit_txn(const TxnId& txn_id)
+    {
+        txn_dirty_pages_.erase(txn_id);
+    }
 } // namespace storage

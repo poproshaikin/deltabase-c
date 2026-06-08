@@ -31,7 +31,10 @@ namespace types
         DROP_INDEX,
         DROP_TABLE,
         ALTER_TABLE,
-        ADD_COLUMN
+        ADD_COLUMN,
+        BEGIN,
+        COMMIT,
+        ROLLBACK
     };
 
     enum class AstOperator
@@ -85,7 +88,8 @@ namespace types
 
         BinaryExpr() = default;
         BinaryExpr(BinaryExpr&&) = default;
-        BinaryExpr& operator=(BinaryExpr&&) = default;
+        BinaryExpr&
+        operator=(BinaryExpr&&) = default;
 
         std::string
         to_string() const;
@@ -108,7 +112,7 @@ namespace types
         }
     };
 
-    struct SelectStatement
+    struct SelectStmt
     {
         TableIdentifier table;
         std::vector<SqlToken> columns;
@@ -121,21 +125,21 @@ namespace types
         std::vector<SqlToken> values;
     };
 
-    struct InsertStatement
+    struct InsertStmt
     {
         TableIdentifier table;
         std::vector<SqlToken> columns;
         std::vector<ValuesExpr> values;
     };
 
-    struct UpdateStatement
+    struct UpdateStmt
     {
         TableIdentifier table;
         std::vector<BinaryExpr> assignments;
         std::optional<BinaryExpr> where;
     };
 
-    struct DeleteStatement
+    struct DeleteStmt
     {
         TableIdentifier table;
         std::optional<BinaryExpr> where;
@@ -157,7 +161,8 @@ namespace types
     {
         SqlToken value;
 
-        explicit DefaultConstraint(SqlToken value = SqlToken())
+        explicit
+        DefaultConstraint(SqlToken value = SqlToken())
             : value(std::move(value))
         {
         }
@@ -177,7 +182,7 @@ namespace types
         std::vector<Constraint> constraints;
     };
 
-    struct CreateTableStatement
+    struct CreateTableStmt
     {
         TableIdentifier table;
         std::vector<ColumnDefinition> columns;
@@ -192,18 +197,18 @@ namespace types
         AddColumnOperation
     >;
 
-    struct AlterTableStatement
+    struct AlterTableStmt
     {
         TableIdentifier table;
         std::vector<AlterTableOperation> operations;
     };
 
-    struct CreateSchemaStatement
+    struct CreateSchemaStmt
     {
         SqlToken name;
     };
 
-    struct CreateIndexStatement
+    struct CreateIndexStmt
     {
         TableIdentifier table;
         SqlToken index_name;
@@ -212,37 +217,52 @@ namespace types
         bool is_primary;
     };
 
-    struct DropIndexStatement
+    struct DropIndexStmt
     {
         TableIdentifier table;
         SqlToken index_name;
     };
 
-    struct DropTableStatement
+    struct DropTableStmt
     {
         TableIdentifier table;
     };
 
-    struct CreateDbStatement
+    struct CreateDatabaseStmt
     {
         SqlToken name;
+    };
+
+    struct BeginTxnStmt
+    {
+    };
+
+    struct CommitTxnStmt
+    {
+    };
+
+    struct RollbackTxnStmt
+    {
     };
 
     using AstNodeValue = std::variant<
         SqlToken,
         BinaryExpr,
-        SelectStatement,
-        InsertStatement,
-        UpdateStatement,
-        DeleteStatement,
-        CreateTableStatement,
-        CreateDbStatement,
-        CreateSchemaStatement,
-        CreateIndexStatement,
-        DropIndexStatement,
-        DropTableStatement,
+        SelectStmt,
+        InsertStmt,
+        UpdateStmt,
+        DeleteStmt,
+        CreateTableStmt,
+        CreateDatabaseStmt,
+        CreateSchemaStmt,
+        CreateIndexStmt,
+        DropIndexStmt,
+        DropTableStmt,
         ColumnDefinition,
-        AlterTableStatement
+        AlterTableStmt,
+        BeginTxnStmt,
+        CommitTxnStmt,
+        RollbackTxnStmt
     >;
 
     struct AstNode

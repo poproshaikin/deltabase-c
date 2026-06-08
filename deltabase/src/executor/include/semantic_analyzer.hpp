@@ -19,34 +19,34 @@ namespace exq
         types::Config config_;
 
         types::AnalysisResult
-        analyze_select(const types::SelectStatement& stmt);
+        analyze_select(const types::SelectStmt& stmt);
 
         types::AnalysisResult
-        analyze_insert(const types::InsertStatement& stmt) const;
+        analyze_insert(const types::InsertStmt& stmt) const;
 
         types::AnalysisResult
-        analyze_update(const types::UpdateStatement& stmt);
+        analyze_update(const types::UpdateStmt& stmt);
 
         types::AnalysisResult
-        analyze_delete(const types::DeleteStatement& stmt);
+        analyze_delete(const types::DeleteStmt& stmt);
 
         types::AnalysisResult
-        analyze_create_table(const types::CreateTableStatement& stmt) const;
+        analyze_create_table(const types::CreateTableStmt& stmt) const;
 
         types::AnalysisResult
-        analyze_alter_table(const types::AlterTableStatement& get) const;
+        analyze_alter_table(const types::AlterTableStmt& get) const;
 
         types::AnalysisResult
-        analyze_create_index(const types::CreateIndexStatement& stmt) const;
+        analyze_create_index(const types::CreateIndexStmt& stmt) const;
 
         types::AnalysisResult
-        analyze_drop_index(const types::DropIndexStatement& stmt) const;
+        analyze_drop_index(const types::DropIndexStmt& stmt) const;
 
         types::AnalysisResult
-        analyze_drop_table(const types::DropTableStatement& stmt) const;
+        analyze_drop_table(const types::DropTableStmt& stmt) const;
 
         types::AnalysisResult
-        analyze_create_db(const types::CreateDbStatement& stmt) const;
+        analyze_create_db(const types::CreateDatabaseStmt& stmt) const;
 
         types::AnalysisResult
         analyze_where(const types::BinaryExpr& where, const types::MetaTable& table);

@@ -8,8 +8,8 @@
 #include "../../types/include/data_row.hpp"
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/query_plan.hpp"
+#include "../../types/include/execution_context.hpp"
 #include "evaluator.hpp"
-#include "meta_table.hpp"
 
 namespace exq
 {
@@ -212,6 +212,7 @@ namespace exq
         storage::IDbInstance& db_;
         std::optional<std::vector<std::string>> col_names_;
         std::unique_ptr<INodeExecutor> child_;
+        types::ExecutionContext& ctx_;
         bool executed_ = false;
 
     public:
@@ -221,6 +222,7 @@ namespace exq
             const std::string& schema_name,
             storage::IDbInstance& storage,
             const std::optional<std::vector<std::string>>& col_names,
+            types::ExecutionContext& ctx,
             std::unique_ptr<INodeExecutor> child
         );
 
@@ -266,6 +268,7 @@ namespace exq
         storage::IDbInstance& db_;
         std::vector<types::Assignment> assignments_;
         std::unique_ptr<INodeExecutor> child_;
+        types::ExecutionContext& ctx_;
         bool executed_;
 
     public:
@@ -275,6 +278,7 @@ namespace exq
             const std::string& schema_name,
             storage::IDbInstance& db,
             const std::vector<types::Assignment>& asg,
+            types::ExecutionContext& ctx,
             std::unique_ptr<INodeExecutor> child
         );
 
@@ -297,6 +301,7 @@ namespace exq
         std::string schema_name_;
         storage::IDbInstance& db_;
         std::unique_ptr<INodeExecutor> child_;
+        types::ExecutionContext& ctx_;
         bool executed_;
 
     public:
@@ -305,6 +310,7 @@ namespace exq
             const std::string& table_name,
             const std::string& schema_name,
             storage::IDbInstance& db,
+            types::ExecutionContext& ctx,
             std::unique_ptr<INodeExecutor> child
         );
 
@@ -326,6 +332,7 @@ namespace exq
         std::string table_name_;
         types::MetaSchema schema_;
         std::vector<types::ColumnDefinition> columns_;
+        types::ExecutionContext& ctx_;
         storage::IDbInstance& db_;
 
     public:
@@ -334,6 +341,7 @@ namespace exq
             const std::string& table_name,
             const types::MetaSchema& schema,
             const std::vector<types::ColumnDefinition>& columns,
+            types::ExecutionContext& ctx,
             storage::IDbInstance& db);
 
         void
@@ -355,6 +363,7 @@ namespace exq
         types::MetaSchema schema_;
         std::vector<types::AlterTableOperation> operations_;
         storage::IDbInstance& db_;
+        types::ExecutionContext& ctx_;
         bool executed_ = false;
 
     public:
@@ -363,6 +372,7 @@ namespace exq
             const std::string& table_name,
             const types::MetaSchema& schema,
             const std::vector<types::AlterTableOperation>& columns,
+            types::ExecutionContext& ctx,
             storage::IDbInstance& db);
 
         void
@@ -409,6 +419,7 @@ namespace exq
         bool is_primary_;
 
         storage::IDbInstance& db_;
+        types::ExecutionContext& ctx_;
 
     public:
         explicit
@@ -419,7 +430,8 @@ namespace exq
             const std::string& schema_name,
             bool is_unique,
             bool is_primary,
-            storage::IDbInstance& db
+            storage::IDbInstance& db,
+            types::ExecutionContext& ctx
         );
 
         void
@@ -441,6 +453,7 @@ namespace exq
         std::string table_name_;
         std::string schema_name_;
         storage::IDbInstance& db_;
+        types::ExecutionContext& ctx_;
 
     public:
         explicit
@@ -448,7 +461,8 @@ namespace exq
             const std::string& index_name,
             const std::string& table_name,
             const std::string& schema_name,
-            storage::IDbInstance& db
+            storage::IDbInstance& db,
+            types::ExecutionContext& ctx
         );
 
         void
@@ -469,13 +483,15 @@ namespace exq
         std::string table_name_;
         std::string schema_name_;
         storage::IDbInstance& db_;
+        types::ExecutionContext& ctx_;
 
     public:
         explicit
         DropTableNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
-            storage::IDbInstance& db
+            storage::IDbInstance& db,
+            types::ExecutionContext& ctx
         );
 
         void
@@ -495,7 +511,7 @@ namespace exq
     {
     public:
         std::unique_ptr<INodeExecutor>
-        from_plan(std::unique_ptr<types::IPlanNode>&& node, storage::IDbInstance& db);
+        from_plan(std::unique_ptr<types::IPlanNode>&& node, storage::IDbInstance& db, types::ExecutionContext& ctx);
     };
 } // namespace exq
 

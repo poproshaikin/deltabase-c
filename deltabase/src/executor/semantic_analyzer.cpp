@@ -27,34 +27,34 @@ namespace exq
         switch (node.type)
         {
         case AstNodeType::SELECT:
-            return analyze_select(std::get<SelectStatement>(node.value));
+            return analyze_select(std::get<SelectStmt>(node.value));
 
         case AstNodeType::INSERT:
-            return analyze_insert(std::get<InsertStatement>(node.value));
+            return analyze_insert(std::get<InsertStmt>(node.value));
 
         case AstNodeType::UPDATE:
-            return analyze_update(std::get<UpdateStatement>(node.value));
+            return analyze_update(std::get<UpdateStmt>(node.value));
 
         case AstNodeType::DELETE:
-            return analyze_delete(std::get<DeleteStatement>(node.value));
+            return analyze_delete(std::get<DeleteStmt>(node.value));
 
         case AstNodeType::CREATE_DATABASE:
-            return analyze_create_db(std::get<CreateDbStatement>(node.value));
+            return analyze_create_db(std::get<CreateDatabaseStmt>(node.value));
 
         case AstNodeType::CREATE_TABLE:
-            return analyze_create_table(std::get<CreateTableStatement>(node.value));
+            return analyze_create_table(std::get<CreateTableStmt>(node.value));
 
         case AstNodeType::CREATE_INDEX:
-            return analyze_create_index(std::get<CreateIndexStatement>(node.value));
+            return analyze_create_index(std::get<CreateIndexStmt>(node.value));
 
         case AstNodeType::ALTER_TABLE:
-            return analyze_alter_table(std::get<AlterTableStatement>(node.value));
+            return analyze_alter_table(std::get<AlterTableStmt>(node.value));
 
         case AstNodeType::DROP_INDEX:
-            return analyze_drop_index(std::get<DropIndexStatement>(node.value));
+            return analyze_drop_index(std::get<DropIndexStmt>(node.value));
 
         case AstNodeType::DROP_TABLE:
-            return analyze_drop_table(std::get<DropTableStatement>(node.value));
+            return analyze_drop_table(std::get<DropTableStmt>(node.value));
 
         default:
             throw std::runtime_error(
@@ -64,7 +64,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_select(const SelectStatement& stmt)
+    SemanticAnalyzer::analyze_select(const SelectStmt& stmt)
     {
         if (stmt.table.table_name.value.empty())
             return AnalysisResult(EngineException("Select statement missing target table",
@@ -103,7 +103,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_insert(const InsertStatement& stmt) const
+    SemanticAnalyzer::analyze_insert(const InsertStmt& stmt) const
     {
         if (stmt.table.table_name.value.empty())
             return AnalysisResult(EngineException("Insert statement missing target table",
@@ -236,7 +236,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_update(const UpdateStatement& stmt)
+    SemanticAnalyzer::analyze_update(const UpdateStmt& stmt)
     {
         if (stmt.table.table_name.value.empty())
             return AnalysisResult(EngineException("Update statement missing target table",
@@ -271,7 +271,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_delete(const DeleteStatement& stmt)
+    SemanticAnalyzer::analyze_delete(const DeleteStmt& stmt)
     {
         if (stmt.table.table_name.value.empty())
             return AnalysisResult(EngineException("Delete statement missing target table",
@@ -295,7 +295,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_create_table(const CreateTableStatement& stmt) const
+    SemanticAnalyzer::analyze_create_table(const CreateTableStmt& stmt) const
     {
         if (db_.exists_table(stmt.table))
             return AnalysisResult(EngineException(
@@ -368,7 +368,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_alter_table(const AlterTableStatement& stmt) const
+    SemanticAnalyzer::analyze_alter_table(const AlterTableStmt& stmt) const
     {
         if (!db_.exists_table(stmt.table))
             return AnalysisResult(EngineException(
@@ -433,7 +433,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_create_index(const CreateIndexStatement& stmt) const
+    SemanticAnalyzer::analyze_create_index(const CreateIndexStmt& stmt) const
     {
         if (!db_.exists_table(stmt.table))
             return AnalysisResult(EngineException(
@@ -457,7 +457,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_drop_index(const DropIndexStatement& stmt) const
+    SemanticAnalyzer::analyze_drop_index(const DropIndexStmt& stmt) const
     {
         if (!db_.exists_table(stmt.table))
             return AnalysisResult(EngineException(
@@ -474,7 +474,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_drop_table(const DropTableStatement& stmt) const
+    SemanticAnalyzer::analyze_drop_table(const DropTableStmt& stmt) const
     {
         if (!db_.exists_table(stmt.table))
             return AnalysisResult(EngineException(
@@ -535,7 +535,7 @@ namespace exq
     }
 
     AnalysisResult
-    SemanticAnalyzer::analyze_create_db(const CreateDbStatement& stmt) const
+    SemanticAnalyzer::analyze_create_db(const CreateDatabaseStmt& stmt) const
     {
         if (generic_validator_.exists_db(stmt.name.value))
             return AnalysisResult(EngineException(

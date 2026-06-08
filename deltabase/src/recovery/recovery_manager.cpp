@@ -11,7 +11,6 @@
 namespace recovery
 {
     using namespace types;
-    using namespace txn;
 
     RecoveryManager::RecoveryManager(Config& cfg, wal::IWALManager& wal, storage::IIOManager& io)
         : cfg_(cfg), wal_(wal), io_(io)

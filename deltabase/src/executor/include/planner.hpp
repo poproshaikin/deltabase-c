@@ -5,6 +5,7 @@
 #ifndef DELTABASE_PLANNER_HPP
 #define DELTABASE_PLANNER_HPP
 #include "../../types/include/query_plan.hpp"
+#include "../../types/include/execution_context.hpp"
 
 namespace exq
 {

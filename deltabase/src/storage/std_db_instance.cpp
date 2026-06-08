@@ -37,9 +37,9 @@ namespace storage
         wal_manager_ = wal_factory.make(cfg);
         buffer_pool_ = std::make_unique<BufferPool>(*io_manager_);
         catalog_ = std::make_unique<CatalogCache>(*io_manager_);
-        txn_manager_ = std::make_unique<txn::TransactionManager>(*wal_manager_, *buffer_pool_);
         recovery_manager_ =
             std::make_unique<recovery::RecoveryManager>(cfg_, *wal_manager_, *io_manager_);
+        txn_manager_ = std::make_unique<txn::TransactionManager>(*wal_manager_, *buffer_pool_, *catalog_, *recovery_manager_);
 
         init();
     }
@@ -371,7 +371,7 @@ namespace storage
         std::optional<std::vector<std::string>>& cols,
         std::vector<DataToken>& row,
         txn::Transaction& txn
-    )
+    ) const
     {
         for (size_t i = 0; i < mt.columns.size(); ++i)
         {
@@ -506,7 +506,7 @@ namespace storage
             if (tail_page)
             {
                 tail_page->next = page->id;
-                buffer_pool_->dirty_dp(tail_page->id);
+                buffer_pool_->dirty_dp(tail_page->id, txn.get_id());
             }
         }
 
@@ -526,7 +526,7 @@ namespace storage
         for (const auto& index_id : touched_indexes)
             buffer_pool_->set_if_lsn(index_id, page_lsn);
 
-        buffer_pool_->dirty_dp(page->id);
+        buffer_pool_->dirty_dp(page->id, txn.get_id());
     }
 
     std::vector<IndexId>
@@ -660,7 +660,7 @@ namespace storage
             if (updated)
             {
                 page->last_lsn = page_lsn;
-                buffer_pool_->dirty_dp(page->id);
+                buffer_pool_->dirty_dp(page->id, txn.get_id());
             }
         }
     }
@@ -712,7 +712,7 @@ namespace storage
             if (deleted)
             {
                 page->last_lsn = page_lsn;
-                buffer_pool_->dirty_dp(page->id);
+                buffer_pool_->dirty_dp(page->id, txn.get_id());
             }
         }
     }
@@ -798,13 +798,13 @@ namespace storage
                 UpdateRecord update_record(mt->id, reading_page->id, old_row, row);
                 txn.append_log(update_record);
                 reading_page->last_lsn = txn.get_last_lsn();
-                buffer_pool_->dirty_dp(reading_page->id);
+                buffer_pool_->dirty_dp(reading_page->id, txn.get_id());
 
                 if (destination != reading_page && linked_pages.insert(destination->id).second)
                 {
                     destination->next = reading_page->next;
                     reading_page->next = destination->id;
-                    buffer_pool_->dirty_dp(reading_page->id);
+                    buffer_pool_->dirty_dp(reading_page->id, txn.get_id());
                 }
 
                 destination->rows.push_back(new_row);
@@ -819,7 +819,7 @@ namespace storage
                 InsertRecord insert_record(mt->id, destination->id, new_row);
                 txn.append_log(insert_record);
                 destination->last_lsn = txn.get_last_lsn();
-                buffer_pool_->dirty_dp(destination->id);
+                buffer_pool_->dirty_dp(destination->id, txn.get_id());
             }
         }
 
@@ -923,7 +923,7 @@ namespace storage
         CreateTableRecord record(mt);
         txn.append_log(record);
 
-        auto* saved_mt = catalog_->save_table(std::move(mt));
+        auto* saved_mt = catalog_->save_table(std::move(mt), txn.get_id());
 
         for (const auto& col_name : pk_column_names)
             create_index(
@@ -948,7 +948,7 @@ namespace storage
         CreateSchemaRecord record(ms);
         txn.append_log(record);
 
-        catalog_->save_schema(ms);
+        catalog_->save_schema(ms, txn.get_id());
     }
 
     bool
@@ -1150,7 +1150,7 @@ namespace storage
         const auto table_unchanged = *table;
 
         io_manager_->delete_mt(table_unchanged);
-        catalog_->delete_table(table_unchanged.id);
+        catalog_->delete_table(table_unchanged.id, txn.get_id());
 
         DeleteTableRecord record(table_unchanged);
         txn.append_log(record);
@@ -1172,7 +1172,7 @@ namespace storage
         sequence.schema_name = ms->name;
         sequence.current_value = 0;
 
-        catalog_->put(sequence);
+        catalog_->put(sequence, txn.get_id());
         CreateSequenceRecord record(sequence);
         txn.append_log(record);
 

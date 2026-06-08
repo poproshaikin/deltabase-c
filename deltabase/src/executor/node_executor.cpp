@@ -300,10 +300,11 @@ namespace exq
         const std::string& schema_name,
         storage::IDbInstance& storage,
         const std::optional<std::vector<std::string>>& col_names,
+        ExecutionContext& ctx,
         std::unique_ptr<INodeExecutor> child
     )
         : table_name_(table_name), schema_name_(schema_name), db_(storage),
-          col_names_(col_names), child_(std::move(child))
+          col_names_(col_names), ctx_(ctx), child_(std::move(child))
     {
     }
 
@@ -321,20 +322,16 @@ namespace exq
 
         int inserted_count = 0;
 
-        auto txn = db_.make_txn();
-        txn.begin();
-
         while (true)
         {
             DataRow row;
             if (!child_->next(row))
                 break;
 
-            db_.insert_row(table_name_, schema_name_, col_names_, row.tokens, txn);
+            db_.insert_row(table_name_, schema_name_, col_names_, row.tokens, *ctx_.txn);
             inserted_count++;
         }
 
-        txn.commit();
         executed_ = true;
 
         DataToken affected_rows_count(misc::convert(inserted_count), DataType::INTEGER);
@@ -389,10 +386,11 @@ namespace exq
         const std::string& schema_name,
         storage::IDbInstance& db,
         const std::vector<Assignment>& asg,
+        ExecutionContext& ctx,
         std::unique_ptr<INodeExecutor> child
     )
         : table_name_(table_name), schema_name_(schema_name), db_(db), assignments_(asg),
-          child_(std::move(child)), executed_(false)
+          ctx_(ctx), child_(std::move(child)), executed_(false)
     {
     }
 
@@ -411,9 +409,6 @@ namespace exq
         int updated_count = 0;
         std::vector<DataRow> rows;
 
-        auto txn = db_.make_txn();
-        txn.begin();
-
         while (true)
         {
             DataRow row;
@@ -424,10 +419,8 @@ namespace exq
             updated_count++;
         }
 
-        db_.update_row(table_name_, schema_name_, assignments_, rows, txn);
+        db_.update_row(table_name_, schema_name_, assignments_, rows, *ctx_.txn);
         executed_ = true;
-
-        txn.commit();
 
         DataToken affected_rows_count(misc::convert(updated_count), DataType::INTEGER);
         out.tokens = {affected_rows_count};
@@ -450,10 +443,11 @@ namespace exq
         const std::string& table_name,
         const std::string& schema_name,
         storage::IDbInstance& db,
+        ExecutionContext& ctx,
         std::unique_ptr<INodeExecutor> child
     )
-        : table_name_(table_name), schema_name_(schema_name), db_(db), child_(std::move(child)),
-          executed_(false)
+        : table_name_(table_name), schema_name_(schema_name), db_(db), ctx_(ctx),
+          child_(std::move(child)), executed_(false)
     {
     }
 
@@ -472,9 +466,6 @@ namespace exq
         int deleted_count = 0;
         std::vector<DataRow> rows;
 
-        auto txn = db_.make_txn();
-        txn.begin();
-
         while (true)
         {
             DataRow row;
@@ -485,10 +476,8 @@ namespace exq
             deleted_count++;
         }
 
-        db_.delete_rows(table_name_, schema_name_, rows, txn);
+        db_.delete_rows(table_name_, schema_name_, rows, *ctx_.txn);
         executed_ = true;
-
-        txn.commit();
 
         DataToken affected_rows_count(misc::convert(deleted_count), DataType::INTEGER);
         out.tokens = {affected_rows_count};
@@ -511,9 +500,10 @@ namespace exq
         const std::string& table_name,
         const MetaSchema& schema,
         const std::vector<ColumnDefinition>& columns,
+        ExecutionContext& ctx,
         storage::IDbInstance& db
     )
-        : table_name_(table_name), schema_(schema), columns_(columns), db_(db)
+        : table_name_(table_name), schema_(schema), columns_(columns), ctx_(ctx), db_(db)
     {
     }
 
@@ -525,10 +515,7 @@ namespace exq
     bool
     CreateTableNodeExecutor::next(DataRow& out)
     {
-        auto txn = db_.make_txn();
-        txn.begin();
-        db_.create_table(table_name_, schema_.name, columns_, txn);
-        txn.commit();
+        db_.create_table(table_name_, schema_.name, columns_, *ctx_.txn);
         return false;
     }
 
@@ -547,9 +534,11 @@ namespace exq
         const std::string& table_name,
         const MetaSchema& schema,
         const std::vector<AlterTableOperation>& columns,
-        storage::IDbInstance& db) : table_name_(table_name),
-                                    schema_(schema), operations_(columns),
-                                    db_(db)
+        ExecutionContext& ctx,
+        storage::IDbInstance& db
+    ) : table_name_(table_name),
+        schema_(schema), operations_(columns),
+        db_(db), ctx_(ctx)
     {
     }
 
@@ -564,19 +553,14 @@ namespace exq
         if (executed_)
             return false;
 
-        auto txn = db_.make_txn();
-        txn.begin();
-
         for (const auto& operation : this->operations_)
         {
             if (auto* add_col = std::get_if<AddColumnOperation>(&operation))
             {
-                db_.add_column(table_name_, schema_.name, add_col->column, txn);
+                db_.add_column(table_name_, schema_.name, add_col->column, *ctx_.txn);
                 executed_ = true;
             }
         }
-
-        txn.commit();
 
         return false;
     }
@@ -627,10 +611,12 @@ namespace exq
         const std::string& schema_name,
         bool is_unique,
         bool is_primary,
-        storage::IDbInstance& db
+        storage::IDbInstance& db,
+        ExecutionContext& ctx
     )
         : index_name_(index_name), column_name_(column_name), table_name_(table_name),
-          schema_name_(schema_name), is_unique_(is_unique), is_primary_(is_primary), db_(db)
+          schema_name_(schema_name), is_unique_(is_unique), is_primary_(is_primary), db_(db),
+          ctx_(ctx)
     {
     }
 
@@ -642,10 +628,14 @@ namespace exq
     bool
     CreateIndexNodeExecutor::next(DataRow& out)
     {
-        auto txn = db_.make_txn();
-        txn.begin();
-        db_.create_index(index_name_, table_name_, column_name_, schema_name_, is_unique_, is_primary_, txn);
-        txn.commit();
+        db_.create_index(
+            index_name_,
+            table_name_,
+            column_name_,
+            schema_name_,
+            is_unique_,
+            is_primary_,
+            *ctx_.txn);
         return false;
     }
 
@@ -664,9 +654,11 @@ namespace exq
         const std::string& index_name,
         const std::string& table_name,
         const std::string& schema_name,
-        storage::IDbInstance& db
+        storage::IDbInstance& db,
+        ExecutionContext& ctx
     )
-        : index_name_(index_name), table_name_(table_name), schema_name_(schema_name), db_(db)
+        : index_name_(index_name), table_name_(table_name), schema_name_(schema_name), db_(db),
+          ctx_(ctx)
     {
     }
 
@@ -678,10 +670,7 @@ namespace exq
     bool
     DropIndexNodeExecutor::next(DataRow& out)
     {
-        auto txn = db_.make_txn();
-        txn.begin();
-        db_.drop_index(index_name_, table_name_, schema_name_, txn);
-        txn.commit();
+        db_.drop_index(index_name_, table_name_, schema_name_, *ctx_.txn);
         return false;
     }
 
@@ -699,9 +688,10 @@ namespace exq
     DropTableNodeExecutor::DropTableNodeExecutor(
         const std::string& table_name,
         const std::string& schema_name,
-        storage::IDbInstance& db
+        storage::IDbInstance& db,
+        ExecutionContext& ctx
     )
-        : table_name_(table_name), schema_name_(schema_name), db_(db)
+        : table_name_(table_name), schema_name_(schema_name), db_(db), ctx_(ctx)
     {
     }
 
@@ -713,10 +703,7 @@ namespace exq
     bool
     DropTableNodeExecutor::next(DataRow& out)
     {
-        auto txn = db_.make_txn();
-        txn.begin();
-        db_.drop_table(table_name_, schema_name_, txn);
-        txn.commit();
+        db_.drop_table(table_name_, schema_name_, *ctx_.txn);
         return false;
     }
 
@@ -732,7 +719,9 @@ namespace exq
     }
 
     std::unique_ptr<INodeExecutor>
-    NodeExecutorFactory::from_plan(std::unique_ptr<IPlanNode>&& node, storage::IDbInstance& db)
+    NodeExecutorFactory::from_plan(std::unique_ptr<IPlanNode>&& node,
+                                   storage::IDbInstance& db,
+                                   ExecutionContext& ctx)
     {
         switch (node->type())
         {
@@ -767,7 +756,7 @@ namespace exq
             FilterNodeExecutor executor(
                 filter_node.table,
                 std::move(filter_node.where),
-                from_plan(std::move(filter_node.child), db));
+                from_plan(std::move(filter_node.child), db, ctx));
 
             return std::make_unique<FilterNodeExecutor>(std::move(executor));
         }
@@ -777,7 +766,7 @@ namespace exq
             ProjectionNodeExecutor executor(
                 project_node.table,
                 project_node.columns,
-                from_plan(std::move(project_node.child), db));
+                from_plan(std::move(project_node.child), db, ctx));
 
             return std::make_unique<ProjectionNodeExecutor>(std::move(executor));
         }
@@ -786,7 +775,7 @@ namespace exq
             auto& limit_node = static_cast<LimitPlanNode&>(*node);
             LimitNodeExecutor executor(
                 limit_node.limit,
-                from_plan(std::move(limit_node.child), db));
+                from_plan(std::move(limit_node.child), db, ctx));
 
             return std::make_unique<LimitNodeExecutor>(std::move(executor));
         }
@@ -798,7 +787,8 @@ namespace exq
                 insert_node.schema_name,
                 db,
                 insert_node.column_names,
-                from_plan(std::move(insert_node.child), db));
+                ctx,
+                from_plan(std::move(insert_node.child), db, ctx));
 
             return std::make_unique<InsertNodeExecutor>(std::move(executor));
         }
@@ -816,7 +806,8 @@ namespace exq
                 update_node.schema_name,
                 db,
                 update_node.assignments,
-                from_plan(std::move(update_node.child), db));
+                ctx,
+                from_plan(std::move(update_node.child), db, ctx));
 
             return std::make_unique<UpdateNodeExecutor>(std::move(executor));
         }
@@ -827,7 +818,8 @@ namespace exq
                 delete_node.table_name,
                 delete_node.schema_name,
                 db,
-                from_plan(std::move(delete_node.child), db));
+                ctx,
+                from_plan(std::move(delete_node.child), db, ctx));
 
             return std::make_unique<DeleteNodeExecutor>(std::move(executor));
         }
@@ -838,6 +830,7 @@ namespace exq
                 create_table_node.table_name,
                 create_table_node.schema,
                 create_table_node.columns,
+                ctx,
                 db);
 
             return std::make_unique<CreateTableNodeExecutor>(std::move(executor));
@@ -849,6 +842,7 @@ namespace exq
                 alter_table_node.table_name,
                 alter_table_node.schema,
                 alter_table_node.operations,
+                ctx,
                 db);
 
             return std::make_unique<AlterTableNodeExecutor>(std::move(executor));
@@ -869,7 +863,8 @@ namespace exq
                 create_index_node.schema_name,
                 create_index_node.is_unique,
                 create_index_node.is_primary,
-                db);
+                db,
+                ctx);
 
             return std::make_unique<CreateIndexNodeExecutor>(std::move(executor));
         }
@@ -880,7 +875,8 @@ namespace exq
                 drop_index_node.index_name,
                 drop_index_node.table_name,
                 drop_index_node.schema_name,
-                db);
+                db,
+                ctx);
 
             return std::make_unique<DropIndexNodeExecutor>(std::move(executor));
         }
@@ -890,7 +886,8 @@ namespace exq
             DropTableNodeExecutor executor(
                 drop_table_node.table_name,
                 drop_table_node.schema_name,
-                db);
+                db,
+                ctx);
 
             return std::make_unique<DropTableNodeExecutor>(std::move(executor));
         }

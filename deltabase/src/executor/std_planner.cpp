@@ -4,8 +4,6 @@
 
 #include "include/std_planner.hpp"
 
-#include "meta_schema.hpp"
-
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -84,43 +82,43 @@ namespace exq
     {
         if (ast.type == AstNodeType::SELECT)
         {
-            return plan(std::get<SelectStatement>(ast.value));
+            return plan(std::get<SelectStmt>(ast.value));
         }
         if (ast.type == AstNodeType::INSERT)
         {
-            return plan(std::get<InsertStatement>(ast.value));
+            return plan(std::get<InsertStmt>(ast.value));
         }
         if (ast.type == AstNodeType::UPDATE)
         {
-            return plan(std::get<UpdateStatement>(ast.value));
+            return plan(std::get<UpdateStmt>(ast.value));
         }
         if (ast.type == AstNodeType::DELETE)
         {
-            return plan(std::get<DeleteStatement>(ast.value));
+            return plan(std::get<DeleteStmt>(ast.value));
         }
         if (ast.type == AstNodeType::CREATE_DATABASE)
         {
-            return plan(std::get<CreateDbStatement>(ast.value));
+            return plan(std::get<CreateDatabaseStmt>(ast.value));
         }
         if (ast.type == AstNodeType::CREATE_TABLE)
         {
-            return plan(std::get<CreateTableStatement>(ast.value));
+            return plan(std::get<CreateTableStmt>(ast.value));
         }
         if (ast.type == AstNodeType::CREATE_INDEX)
         {
-            return plan(std::get<CreateIndexStatement>(ast.value));
+            return plan(std::get<CreateIndexStmt>(ast.value));
         }
         if (ast.type == AstNodeType::DROP_INDEX)
         {
-            return plan(std::get<DropIndexStatement>(ast.value));
+            return plan(std::get<DropIndexStmt>(ast.value));
         }
         if (ast.type == AstNodeType::DROP_TABLE)
         {
-            return plan(std::get<DropTableStatement>(ast.value));
+            return plan(std::get<DropTableStmt>(ast.value));
         }
         if (ast.type == AstNodeType::ALTER_TABLE)
         {
-            return plan(std::get<AlterTableStatement>(ast.value));
+            return plan(std::get<AlterTableStmt>(ast.value));
         }
 
         throw std::runtime_error(
@@ -229,7 +227,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(SelectStatement& stmt) const
+    StdPlanner::plan(SelectStmt& stmt) const
     {
         std::unique_ptr<IPlanNode> node;
         bool index = false;
@@ -320,7 +318,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(InsertStatement& stmt) const
+    StdPlanner::plan(InsertStmt& stmt) const
     {
         std::vector<DataRow> rows;
         for (auto& [vals] : stmt.values)
@@ -356,7 +354,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(UpdateStatement& stmt) const
+    StdPlanner::plan(UpdateStmt& stmt) const
     {
         const auto* table = db_.get_table(stmt.table);
 
@@ -415,7 +413,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(DeleteStatement& stmt) const
+    StdPlanner::plan(DeleteStmt& stmt) const
     {
         std::string schema_name = stmt.table.schema_name.has_value()
                                       ? stmt.table.schema_name.value().value
@@ -446,7 +444,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(CreateDbStatement& stmt) const
+    StdPlanner::plan(CreateDatabaseStmt& stmt) const
     {
         std::unique_ptr<IPlanNode> root = std::make_unique<CreateDbPlanNode>(stmt.name);
 
@@ -459,7 +457,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(const CreateTableStatement& table) const
+    StdPlanner::plan(const CreateTableStmt& table) const
     {
         auto name = table.table.schema_name.has_value()
                         ? table.table.schema_name.value().value
@@ -481,7 +479,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(const AlterTableStatement& stmt) const
+    StdPlanner::plan(const AlterTableStmt& stmt) const
     {
 
         auto schema_name = stmt.table.schema_name.has_value()
@@ -504,7 +502,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(const CreateIndexStatement& stmt) const
+    StdPlanner::plan(const CreateIndexStmt& stmt) const
     {
         auto schema_name = stmt.table.schema_name.has_value()
                                ? stmt.table.schema_name.value().value
@@ -530,7 +528,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(const DropIndexStatement& stmt) const
+    StdPlanner::plan(const DropIndexStmt& stmt) const
     {
 
         auto schema_name = stmt.table.schema_name.has_value()
@@ -551,7 +549,7 @@ namespace exq
     }
 
     QueryPlan
-    StdPlanner::plan(const DropTableStatement& stmt) const
+    StdPlanner::plan(const DropTableStmt& stmt) const
     {
         auto schema_name = stmt.table.schema_name.has_value()
                                ? stmt.table.schema_name.value().value

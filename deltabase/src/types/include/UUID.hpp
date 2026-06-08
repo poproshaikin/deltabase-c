@@ -100,6 +100,8 @@ namespace types
             return &value_;
         }
     };
+
+    using TxnId = UUID;
 } // namespace types
 
 namespace std
