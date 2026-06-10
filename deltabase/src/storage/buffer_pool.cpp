@@ -80,23 +80,48 @@ namespace storage
     }
 
     DataPage*
-    BufferPool::prepare_dp(size_t size, const MetaTable& mt)
+    BufferPool::prepare_dp(size_t size, const MetaTable& mt, const TxnId& txn_id)
     {
         auto table_pages_it = data_pages_per_table_.find(mt.id);
-        if (table_pages_it == data_pages_per_table_.end())
-            return create_dp(mt);
-
-        for (const auto& page_id : table_pages_it->second)
+        if (table_pages_it != data_pages_per_table_.end())
         {
-            auto* page = get_dp(page_id);
-            if (!page)
-                continue;
+            for (const auto& page_id : table_pages_it->second)
+            {
+                auto* page = get_dp(page_id);
+                if (!page)
+                    continue;
 
-            if (page->size + size <= DataPage::MAX_SIZE)
-                return page;
+                if (page->size + size <= DataPage::MAX_SIZE)
+                    return page;
+            }
         }
 
-        return create_dp(mt);
+        auto* new_page = create_dp(mt);
+
+        DataPage* tail_page = nullptr;
+        if (table_pages_it != data_pages_per_table_.end())
+        {
+            for (const auto& page_id : table_pages_it->second)
+            {
+                auto* existing_page = get_dp(page_id);
+                if (!existing_page)
+                    continue;
+
+                if (existing_page->next != DataPageId::null())
+                    continue;
+
+                if (!tail_page || existing_page->max_rid > tail_page->max_rid)
+                    tail_page = existing_page;
+            }
+        }
+
+        if (tail_page)
+        {
+            tail_page->next = new_page->id;
+            dirty_dp(tail_page->id, txn_id);
+        }
+
+        return new_page;
     }
 
     std::vector<DataPage*>

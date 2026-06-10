@@ -46,6 +46,10 @@ namespace storage
             txn::Transaction& txn
         ) const;
 
+        void
+        validate_fk(const types::MetaTable& referencing_table, const std::vector<std::string>& cols, const std::vector<types::DataToken>&
+                    row);
+
     public:
         explicit StdDbInstance(const types::Config& cfg);
 

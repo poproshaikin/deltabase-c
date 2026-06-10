@@ -39,7 +39,11 @@ namespace storage
         catalog_ = std::make_unique<CatalogCache>(*io_manager_);
         recovery_manager_ =
             std::make_unique<recovery::RecoveryManager>(cfg_, *wal_manager_, *io_manager_);
-        txn_manager_ = std::make_unique<txn::TransactionManager>(*wal_manager_, *buffer_pool_, *catalog_, *recovery_manager_);
+        txn_manager_ = std::make_unique<txn::TransactionManager>(
+            *wal_manager_,
+            *buffer_pool_,
+            *catalog_,
+            *recovery_manager_);
 
         init();
     }
@@ -384,7 +388,11 @@ namespace storage
             if (cols.has_value())
             {
                 for (const auto& col_name : *cols)
-                    if (col_name == column.name) { caller_provided = true; break; }
+                    if (col_name == column.name)
+                    {
+                        caller_provided = true;
+                        break;
+                    }
             }
             else
             {
@@ -393,31 +401,30 @@ namespace storage
 
             if (caller_provided)
             {
-                if (cols.has_value())
+                if (!cols.has_value())
+                    continue;
+
+                auto it = std::ranges::find(*cols, column.name);
+                if (it != cols->end())
                 {
-                    auto it = std::ranges::find(*cols, column.name);
-                    if (it != cols->end())
+                    const size_t idx = static_cast<size_t>(std::distance(cols->begin(), it));
+                    if (idx < row.size() && row[idx].type == DataType::INTEGER)
                     {
-                        const size_t idx = static_cast<size_t>(std::distance(cols->begin(), it));
-                        if (idx < row.size() && row[idx].type == DataType::INTEGER)
+                        int32_t provided_val = 0;
+                        std::memcpy(&provided_val, row[idx].bytes.data(), sizeof(int32_t));
+
+                        auto* seq = catalog_->get_sequence(ai->sequence_id);
+                        if (seq && provided_val >= seq->current_value)
                         {
-                            int32_t provided_val = 0;
-                            std::memcpy(&provided_val, row[idx].bytes.data(), sizeof(int32_t));
+                            const MetaSequence before = *seq;
+                            seq->current_value = provided_val;
 
-                            auto* seq = catalog_->get_sequence(ai->sequence_id);
-                            if (seq && provided_val >= seq->current_value)
-                            {
-                                const MetaSequence before = *seq;
-                                seq->current_value = provided_val;
-
-                                UpdateSequenceRecord seq_record(before, *seq);
-                                txn.append_log(seq_record);
-                                io_manager_->write_seq(*seq);
-                            }
+                            UpdateSequenceRecord seq_record(before, *seq);
+                            txn.append_log(seq_record);
+                            io_manager_->write_seq(*seq);
                         }
                     }
                 }
-                continue;
             }
 
             auto* seq = catalog_->get_sequence(ai->sequence_id);
@@ -450,6 +457,31 @@ namespace storage
     }
 
     void
+    StdDbInstance::validate_fk(
+        const MetaTable& referencing_table,
+        const std::vector<std::string>& cols,
+        const std::vector<DataToken>& row)
+    {
+        if (cols.size() != row.size())
+            throw std::runtime_error("StdDbInstance::validate_fk: 1");
+
+        for (int i = 0; i < cols.size(); ++i)
+        {
+            auto& col_name = cols[i];
+            if (!referencing_table.is_foreign_key(col_name))
+                continue;
+
+            auto& mc = referencing_table.get_column(col_name);
+            auto* fk = mc.get_constraint<MetaForeignKeyConstraint>();
+
+            if (!fk)
+                throw std::runtime_error("StdDbInstance::validate_fk: 2");
+
+
+        }
+    }
+
+    void
     StdDbInstance::insert_row(
         const std::string& table_name,
         const std::string& schema_name,
@@ -463,52 +495,16 @@ namespace storage
         auto* mt = catalog_->get_table(table_name, ms->id);
         const auto mt_unchanged = *mt;
 
-        std::optional<std::vector<std::string>> effective_cols = cols;
-        std::vector<DataToken> effective_row = row;
+        auto effective_cols = cols;
+        auto effective_row = row;
         fill_autoincrement_columns(*mt, effective_cols, effective_row, txn);
+
+        // TODO: validate_fk(...);
 
         auto new_row = mt->make_row(effective_cols, effective_row);
         size_t row_size = io_manager_->estimate_size(new_row);
 
-        const auto pages_before = buffer_pool_->get_table_data(mt->id);
-
-        auto* page = buffer_pool_->prepare_dp(row_size, *mt);
-
-        bool is_new_page = true;
-        for (const auto* existing_page : pages_before)
-        {
-            if (!existing_page)
-                continue;
-
-            if (existing_page->id == page->id)
-            {
-                is_new_page = false;
-                break;
-            }
-        }
-
-        if (is_new_page)
-        {
-            DataPage* tail_page = nullptr;
-
-            for (auto* existing_page : pages_before)
-            {
-                if (!existing_page)
-                    continue;
-
-                if (existing_page->next != DataPageId::null())
-                    continue;
-
-                if (!tail_page || existing_page->max_rid > tail_page->max_rid)
-                    tail_page = existing_page;
-            }
-
-            if (tail_page)
-            {
-                tail_page->next = page->id;
-                buffer_pool_->dirty_dp(tail_page->id, txn.get_id());
-            }
-        }
+        auto* page = buffer_pool_->prepare_dp(row_size, *mt, txn.get_id());
 
         std::vector<IndexId> touched_indexes;
         if (mt->indexes.size() > 0)
@@ -566,7 +562,8 @@ namespace storage
             {
                 auto existing = tree.find(key);
                 if (existing.has_value() && !is_row_obsolete(existing.value()))
-                    throw EngineException("Unique constraint violation: " + mi.name, EngineException::Code::UNIQUE_VIOLATION);
+                    throw EngineException("Unique constraint violation: " + mi.name,
+                                          EngineException::Code::UNIQUE_VIOLATION);
             }
 
             tree.insert(key, row_ptr);
@@ -792,7 +789,7 @@ namespace storage
                 DataPage* destination =
                     reading_page->size + size <= DataPage::MAX_SIZE
                         ? reading_page
-                        : buffer_pool_->prepare_dp(size, *mt);
+                        : buffer_pool_->prepare_dp(size, *mt, txn.get_id());
 
                 row.flags |= DataRowFlags::OBSOLETE;
                 UpdateRecord update_record(mt->id, reading_page->id, old_row, row);
@@ -811,7 +808,9 @@ namespace storage
                 destination->rows_count = destination->rows.size();
                 destination->size += size;
                 destination->min_rid =
-                    destination->rows_count == 1 ? new_row.id : std::min(destination->min_rid, new_row.id);
+                    destination->rows_count == 1
+                        ? new_row.id
+                        : std::min(destination->min_rid, new_row.id);
                 destination->max_rid = std::max(destination->max_rid, new_row.id);
 
                 mt->total_rows++;
@@ -894,11 +893,17 @@ namespace storage
 
             bool is_pk = false;
             bool is_ai = false;
+            std::optional<ForeignKeyConstraint> fk;
+
             for (const auto& c : col_def.constraints)
                 if (std::holds_alternative<PrimaryKeyConstraint>(c))
                     is_pk = true;
                 else if (std::holds_alternative<AutoIncrementConstraint>(c))
                     is_ai = true;
+                else if (std::holds_alternative<ForeignKeyConstraint>(c))
+                    fk.emplace(std::get<ForeignKeyConstraint>(c));
+
+            bool is_fk = fk.has_value();
 
             if (is_pk)
             {
@@ -913,8 +918,29 @@ namespace storage
                     schema->name,
                     txn);
 
-                auto constraint = MetaAutoIncrementConstraint{.column_id = column.id, .table_id = mt.id, .sequence_id = seq_id};
+                auto constraint = MetaAutoIncrementConstraint{
+                    .column_id = column.id, .table_id = mt.id, .sequence_id = seq_id};
                 column.constraints.push_back(constraint);
+            }
+
+            if (is_fk)
+            {
+                auto referenced_schema = catalog_->get_schema(
+                    fk->referenced_table.schema_name.value_or(
+                        SqlToken(cfg_.default_schema)).value);
+
+                auto referenced_table = catalog_->get_table(
+                    fk->referenced_table.table_name,
+                    referenced_schema->id);
+
+                auto referenced_column = referenced_table->get_column(fk->referenced_column.value);
+
+                auto meta_constraint = MetaForeignKeyConstraint{
+                    .referenced_table_id = referenced_table->id,
+                    .referenced_column_id = referenced_column.id,
+                    .action = fk->action};
+
+                column.constraints.push_back(meta_constraint);
             }
 
             mt.columns.emplace_back(std::move(column));
@@ -1145,7 +1171,8 @@ namespace storage
         InstanceGuard guard(mtx_);
         auto* table = get_table(table_name, schema_name);
         if (!table)
-            throw EngineException("Table " + table_name + " does not exist", EngineException::Code::TABLE_NOT_EXISTS);
+            throw EngineException("Table " + table_name + " does not exist",
+                                  EngineException::Code::TABLE_NOT_EXISTS);
 
         const auto table_unchanged = *table;
 

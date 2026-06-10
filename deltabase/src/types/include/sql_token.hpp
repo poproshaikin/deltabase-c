@@ -60,7 +60,12 @@ namespace types
         DEFAULT,
         BEGIN,
         COMMIT,
-        ROLLBACK
+        ROLLBACK,
+        FOREIGN,
+        REFERENCES,
+        CASCADE,
+        RESTRICT,
+
     };
 
     enum class SqlSymbol
@@ -122,6 +127,10 @@ namespace types
         SqlTokenDetail detail;
 
         SqlToken() = default;
+
+        SqlToken(std::string value) : value(value)
+        {
+        }
 
         SqlToken(
             SqlTokenType type,

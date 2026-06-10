@@ -47,6 +47,15 @@ namespace types
         const MetaColumn&
         get_column(const ColumnId& col_id) const;
 
+        bool
+        is_unique(const std::string& col_name) const;
+
+        bool
+        is_primary_key(const std::string& col_name) const;
+
+        bool
+        is_foreign_key(const std::string& col_name) const;
+
         // -1 if not found
         int64_t
         get_column_idx(const std::string& col_name) const;

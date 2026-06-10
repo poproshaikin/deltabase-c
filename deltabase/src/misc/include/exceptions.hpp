@@ -43,7 +43,12 @@ public:
         MULTIPLE_PK,
         INVALID_AUTOINCREMENT_TYPE,
         MULTIPLE_BEGIN,
-        NO_ACTIVE_TXN
+        NO_ACTIVE_TXN,
+        REF_TABLE_NOT_EXISTS,
+        REF_COLUMN_NOT_EXISTS,
+        REF_COLUMN_TYPE_MISMATCH,
+        REF_COLUMN_NOT_UNIQUE,
+        REF_COLUMN_NOT_NULL
     };
 
     explicit EngineException(const std::string& msg, Code code)

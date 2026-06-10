@@ -53,7 +53,11 @@ namespace sql
             {"where", SqlKeyword::WHERE},
             {"begin", SqlKeyword::BEGIN},
             {"commit", SqlKeyword::COMMIT},
-            {"rollback", SqlKeyword::ROLLBACK}
+            {"rollback", SqlKeyword::ROLLBACK},
+            {"foreign", SqlKeyword::FOREIGN},
+            {"references", SqlKeyword::REFERENCES},
+            {"cascade", SqlKeyword::CASCADE},
+            {"restrict", SqlKeyword::RESTRICT}
         };
 
         return dictionary;
@@ -121,6 +125,7 @@ namespace sql
             {"not", SqlKeyword::NOT},
             {"null", SqlKeyword::_NULL},
             {"primary", SqlKeyword::PRIMARY},
+            {"foreign", SqlKeyword::FOREIGN},
             {"key", SqlKeyword::KEY},
             {"autoincrement", SqlKeyword::AUTOINCREMENT},
             {"unique", SqlKeyword::UNIQUE},

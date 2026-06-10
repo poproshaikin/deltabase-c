@@ -153,6 +153,20 @@ namespace types
     {
     };
 
+    enum class OnDeleteFkAction
+    {
+        RESTRICT,
+        CASCADE,
+        SET_NULL
+    };
+
+    struct ForeignKeyConstraint
+    {
+        TableIdentifier referenced_table;
+        SqlToken referenced_column;
+        OnDeleteFkAction action;
+    };
+
     struct AutoIncrementConstraint
     {
     };
@@ -171,6 +185,7 @@ namespace types
     using Constraint = std::variant<
         NotNullConstraint,
         PrimaryKeyConstraint,
+        ForeignKeyConstraint,
         AutoIncrementConstraint,
         DefaultConstraint
     >;

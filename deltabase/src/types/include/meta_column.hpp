@@ -36,9 +36,9 @@ namespace types
 
     struct MetaForeignKeyConstraint
     {
-        UUID referenced_table_id;
+        TableId referenced_table_id;
         ColumnId referenced_column_id;
-        // if referenced ids are not known at parse time, they can be left null/zero
+        OnDeleteFkAction action;
     };
 
     using ColumnConstraint = std::variant<

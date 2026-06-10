@@ -145,6 +145,44 @@ namespace types
         throw std::runtime_error("MetaTable::get_column: column '" + col_id.to_string() + "' not found");
     }
 
+    bool
+    MetaTable::is_unique(const std::string& col_name) const
+    {
+        for (const auto& index : indexes)
+        {
+            auto column = get_column(index.column_id);
+            if (column.name == col_name && index.is_unique)
+                return true;
+        }
+
+        return false;
+    }
+
+    bool
+    MetaTable::is_primary_key(const std::string& col_name) const
+    {
+        for (const auto& index : indexes)
+        {
+            auto column = get_column(index.column_id);
+            if (column.name == col_name && index.is_primary)
+                return true;
+        }
+
+        return false;
+    }
+
+    bool
+    MetaTable::is_foreign_key(const std::string& col_name) const
+    {
+        for (const auto& col : columns)
+        {
+            if (col.name == col_name && col.has_constraint<MetaForeignKeyConstraint>())
+                return true;
+        }
+
+        return false;
+    }
+
     int64_t
     MetaTable::get_column_idx(const std::string& col_name) const
     {

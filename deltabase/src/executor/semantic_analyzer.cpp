@@ -322,14 +322,57 @@ namespace exq
                             "Auto incremented column can only be of a numerical type",
                             EngineException::Code::INVALID_AUTOINCREMENT_TYPE));
                 }
+                else if (auto* fk = std::get_if<ForeignKeyConstraint>(&c))
+                {
+                    auto referenced_table = db_.get_table(fk->referenced_table);
+                    if (!referenced_table)
+                        return AnalysisResult(EngineException(
+                            "Referenced table " + fk->referenced_table.table_name.value +
+                            " not found",
+                            EngineException::Code::REF_TABLE_NOT_EXISTS));
+
+                    if (!referenced_table->has_column(fk->referenced_column.value))
+                        return AnalysisResult(EngineException(
+                            "Referenced column " + fk->referenced_column.value + " on table " +
+                            referenced_table->name + " does not exist",
+                            EngineException::Code::REF_COLUMN_NOT_EXISTS));
+
+                    auto referenced_column = referenced_table->get_column(
+                        fk->referenced_column.value);
+                    DataType referencing_dt = misc::convert_to_dt(col_def.type);
+
+                    if (referencing_dt != referenced_column.type)
+                        return AnalysisResult(EngineException(
+                            "Referenced column should have the same type as the referencing column",
+                            EngineException::Code::REF_COLUMN_TYPE_MISMATCH));
+
+                    if (!referenced_table->is_unique(referenced_column.name))
+                        return AnalysisResult(EngineException(
+                            "Referenced column '" + referenced_column.name + " must be unique",
+                            EngineException::Code::REF_COLUMN_NOT_UNIQUE));
+
+                    bool referencing_column_is_not_null = false;
+                    for (const auto& referencing_c : col_def.constraints)
+                        if (std::holds_alternative<NotNullConstraint>(referencing_c))
+                            referencing_column_is_not_null = true;
+
+                    if (fk->action == OnDeleteFkAction::SET_NULL &&
+                        referencing_column_is_not_null)
+                        return AnalysisResult(EngineException(
+                            "Referencing column has NOT NULL constraint",
+                            EngineException::Code::REF_COLUMN_NOT_NULL));
+                }
 
         if (pk_col)
             for (const auto& c : pk_col->constraints)
                 if (const auto* dc = std::get_if<DefaultConstraint>(&c))
+                {
                     if (dc->value.get_detail<SqlLiteral>() == SqlLiteral::_NULL)
                         return AnalysisResult(EngineException(
                             "Primary key column cannot have DEFAULT NULL",
                             EngineException::Code::NULLABLE_PK));
+                    break;
+                }
 
         return AnalysisResult(true);
     }
