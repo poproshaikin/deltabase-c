@@ -12,12 +12,17 @@ namespace storage
 {
     class DDLService
     {
-        std::string db_name_;
+        types::Config& cfg_;
         CatalogCache& catalog_;
+        BufferPool& buffer_pool_;
         wal::IWALManager& wal_manager_;
 
     public:
-        explicit DDLService(const std::string& db_name, CatalogCache& catalog, wal::IWALManager& wal_manager);
+        explicit
+        DDLService(types::Config& cfg,
+                   BufferPool& buffer_pool,
+                   CatalogCache& catalog,
+                   wal::IWALManager& wal_manager);
 
         types::MetaSchema*
         create_schema(const std::string& schema_name, txn::Transaction& txn);
@@ -25,7 +30,10 @@ namespace storage
         bool
         exists_schema(const std::string& schema_name);
 
-        void
+        types::MetaSchema*
+        get_schema(const std::string& name);
+
+        types::MetaTable*
         create_table(
             const std::string& table_name,
             const std::string& schema_name,
@@ -38,11 +46,68 @@ namespace storage
         bool
         exists_table(const types::TableIdentifier& identifier);
 
+        types::MetaTable*
+        get_table(const std::string& table_name, const std::string& schema_name);
+
+        types::MetaTable*
+        get_table(const types::TableIdentifier& identifier);
+
         void
         drop_table(
             const std::string& table_name,
             const std::string& schema_name,
             txn::Transaction& txn);
+
+        types::UUID
+        create_sequence(
+            const std::string& sequence_name,
+            const std::string& schema_name,
+            txn::Transaction& txn);
+
+        void
+        create_index(
+            const std::string& string,
+            const std::string& table_name,
+            const std::string& column_name,
+            const std::string& schema_name,
+            bool is_unique,
+            bool is_primary,
+            txn::Transaction& txn);
+
+        bool
+        exists_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name);
+
+        bool
+        exists_index(
+            const std::string& index_name,
+            const types::TableIdentifier& table_identifier);
+
+        types::MetaIndex*
+        get_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name);
+
+        types::MetaIndex*
+        get_index(
+            const std::string& index_name,
+            const types::TableIdentifier& table_identifier);
+
+        void
+        drop_index(
+            const std::string& index_name,
+            const std::string& table_name,
+            const std::string& schema_name,
+            txn::Transaction& txn);
+
+        std::vector<types::MetaTable*>
+        get_all_tables() const;
+
+        std::vector<types::MetaSchema*>
+        get_all_schemas() const;
     };
 }
 

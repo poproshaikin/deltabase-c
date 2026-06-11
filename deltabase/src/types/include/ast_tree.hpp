@@ -110,6 +110,12 @@ namespace types
             : table_name(std::move(table_name)), schema_name(std::move(schema_name))
         {
         }
+
+        std::string
+        require_schema(const Config& cfg) const
+        {
+            return schema_name.has_value() ? schema_name.value().value : cfg.default_schema;
+        }
     };
 
     struct SelectStmt

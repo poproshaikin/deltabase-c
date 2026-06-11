@@ -6,15 +6,23 @@
 
 #include "wal_manager.hpp"
 
+#include "../misc/include/exceptions.hpp"
+#include "../misc/include/utils.hpp"
+#include "index_bplus_tree.hpp"
+#include "BP_index_pager.hpp"
+
 namespace storage
 {
     using namespace types;
 
     DDLService::DDLService(
-        const std::string& db_name,
+        Config& cfg,
+        BufferPool& buffer_pool,
         CatalogCache& catalog,
         wal::IWALManager& wal
-    ) : db_name_(db_name), catalog_(catalog),
+    ) : cfg_(cfg),
+        buffer_pool_(buffer_pool),
+        catalog_(catalog),
         wal_manager_(wal)
     {
     }
@@ -25,7 +33,7 @@ namespace storage
         MetaSchema ms;
         ms.id = UUID::make();
         ms.name = schema_name;
-        ms.db_name = db_name_;
+        ms.db_name = cfg_.db_name.value();
 
         CreateSchemaRecord record(ms);
         txn.append_log(record);
@@ -39,14 +47,347 @@ namespace storage
         return catalog_.exists_schema(schema_name);
     }
 
-    void
-    DDLService::create_table(const std::string& table_name,
-        const std::string& schema_name,
-        const std::vector<types::ColumnDefinition>& columns,
-        txn::Transaction& txn)
+    MetaSchema*
+    DDLService::get_schema(const std::string& name)
     {
-
+        return catalog_.get_schema(name);
     }
 
+    MetaTable
+    *
+    DDLService::create_table(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const std::vector<ColumnDefinition>& columns,
+        txn::Transaction& txn)
+    {
+        auto* schema = catalog_.get_schema(schema_name);
 
+        MetaTable mt;
+        mt.id = UUID::make();
+        mt.name = table_name;
+        mt.schema_id = schema->id;
+        mt.last_rid = 0;
+        mt.columns.reserve(columns.size());
+
+        std::vector<std::string> pk_column_names;
+
+        for (const auto& col_def : columns)
+        {
+            MetaColumn column(col_def);
+            column.id = UUID::make();
+            column.table_id = mt.id;
+
+            bool is_pk = false;
+            bool is_ai = false;
+            std::optional<ForeignKeyConstraint> fk;
+
+            for (const auto& c : col_def.constraints)
+                if (std::holds_alternative<PrimaryKeyConstraint>(c))
+                    is_pk = true;
+                else if (std::holds_alternative<AutoIncrementConstraint>(c))
+                    is_ai = true;
+                else if (std::holds_alternative<ForeignKeyConstraint>(c))
+                    fk.emplace(std::get<ForeignKeyConstraint>(c));
+
+            bool is_fk = fk.has_value();
+
+            if (is_pk)
+            {
+                column.constraints.emplace_back(MetaNotNullConstraint());
+                pk_column_names.push_back(column.name);
+            }
+
+            if (is_ai)
+            {
+                auto seq_id = create_sequence(
+                    mt.name + "_" + column.name + "_seq",
+                    schema->name,
+                    txn);
+
+                auto constraint = MetaAutoIncrementConstraint{
+                    .column_id = column.id, .table_id = mt.id, .sequence_id = seq_id};
+                column.constraints.push_back(constraint);
+            }
+
+            if (is_fk)
+            {
+                auto referenced_schema = catalog_.get_schema(
+                    fk->referenced_table.schema_name.value_or(
+                        SqlToken(cfg_.default_schema)).value);
+
+                auto referenced_table = catalog_.get_table(
+                    fk->referenced_table.table_name,
+                    referenced_schema->id);
+
+                auto referenced_column = referenced_table->get_column(fk->referenced_column.value);
+
+                auto meta_constraint = MetaForeignKeyConstraint{
+                    .referenced_table_id = referenced_table->id,
+                    .referenced_column_id = referenced_column.id,
+                    .action = fk->action};
+
+                column.constraints.push_back(meta_constraint);
+            }
+
+            mt.columns.emplace_back(std::move(column));
+        }
+
+        CreateTableRecord record(mt);
+        txn.append_log(record);
+
+        return catalog_.save_table(std::move(mt), txn.get_id());
+    }
+
+    bool
+    DDLService::exists_table(const std::string& table_name, const std::string& schema_name)
+    {
+        return get_table(table_name, schema_name) != nullptr;
+    }
+
+    bool
+    DDLService::exists_table(const TableIdentifier& identifier)
+    {
+        std::string schema_name = identifier.require_schema(cfg_);
+        return exists_table(identifier.table_name.value, schema_name);
+    }
+
+    MetaTable*
+    DDLService::get_table(const std::string& table_name, const std::string& schema_name)
+    {
+        auto* ms = get_schema(schema_name);
+        if (!ms)
+            return nullptr;
+        return catalog_.get_table(table_name, ms->id);
+    }
+
+    MetaTable*
+    DDLService::get_table(const TableIdentifier& identifier)
+    {
+        return get_table(
+            identifier.table_name.value,
+            identifier.schema_name.has_value()
+                ? identifier.schema_name.value().value
+                : cfg_.default_schema
+        );
+    }
+
+    void
+    DDLService::drop_table(const std::string& table_name,
+                           const std::string& schema_name,
+                           txn::Transaction& txn)
+    {
+        auto* table = get_table(table_name, schema_name);
+        if (!table)
+            throw EngineException("Table " + table_name + " does not exist",
+                                  EngineException::Code::TABLE_NOT_EXISTS);
+
+        const auto table_unchanged = *table;
+
+        catalog_.delete_table(table_unchanged.id, txn.get_id());
+
+        DeleteTableRecord record(table_unchanged);
+        txn.append_log(record);
+    }
+
+    UUID
+    DDLService::create_sequence(const std::string& sequence_name,
+                                const std::string& schema_name,
+                                txn::Transaction& txn)
+    {
+        auto* ms = catalog_.get_schema(schema_name);
+
+        MetaSequence sequence{};
+        sequence.id = UUID::make();
+        sequence.name = sequence_name;
+        sequence.schema_id = ms->id;
+        sequence.schema_name = ms->name;
+        sequence.current_value = 0;
+
+        catalog_.put(sequence, txn.get_id());
+        CreateSequenceRecord record(sequence);
+        txn.append_log(record);
+
+        return sequence.id;
+    }
+
+    void
+    DDLService::create_index(
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& column_name,
+        const std::string& schema_name,
+        bool is_unique,
+        bool is_primary,
+        txn::Transaction& txn
+    )
+    {
+        const auto* schema = catalog_.get_schema(schema_name);
+        auto* table = catalog_.get_table(table_name, schema->id);
+        const auto& column = table->get_column(column_name);
+
+        MetaIndex mi;
+        mi.id = UUID::make();
+        mi.name = index_name;
+        mi.column_id = column.id;
+        mi.key_type = column.type;
+        mi.is_unique = is_unique;
+        mi.is_primary = is_primary;
+        mi.table_id = table->id;
+
+        CreateIndexRecord record(mi);
+        txn.append_log(record);
+
+        buffer_pool_.create_table_index(schema_name, *table, mi, txn.get_last_lsn());
+
+        const auto col_idx = table->get_column_idx(column.id);
+        if (col_idx < 0)
+            throw std::runtime_error("Index column not found in table schema");
+
+        // Pre-validate unique constraint on existing data before creating index file
+        if (is_primary || is_unique)
+        {
+            auto pages = buffer_pool_.get_table_data(table->id);
+            std::unordered_set<std::string> seen_values;
+
+            for (const auto& page : pages)
+            {
+                for (const auto& row : page->rows)
+                {
+                    if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                        continue;
+
+                    const auto& key = row.tokens[static_cast<size_t>(col_idx)];
+
+                    // NULL values are not indexed and don't violate uniqueness
+                    if (key.type == DataType::_NULL)
+                        continue;
+
+                    std::string key_str(key.bytes.begin(), key.bytes.end());
+
+                    if (seen_values.contains(key_str))
+                    {
+                        throw EngineException(
+                            "Cannot create unique index '" + index_name + "' on column '" +
+                            column_name + "': table '" + table_name + "' contains duplicate values",
+                            EngineException::Code::UNIQUE_VIOLATION
+                        );
+                    }
+
+                    seen_values.insert(key_str);
+                }
+            }
+        }
+
+        BPIndexPager pager(buffer_pool_, table->id, mi.id);
+        IndexBPlusTree tree(pager);
+
+        auto pages = buffer_pool_.get_table_data(table->id);
+
+        for (const auto& page : pages)
+        {
+            for (const auto& row : page->rows)
+            {
+                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    continue;
+
+                const auto& key = row.tokens[static_cast<size_t>(col_idx)];
+
+                // NULL values are not indexed
+                if (key.type == DataType::_NULL)
+                    continue;
+
+                const RowPtr row_ptr{page->id, row.id};
+
+                tree.insert(key, row_ptr);
+            }
+        }
+
+        buffer_pool_.set_if_lsn(mi.id, txn.get_last_lsn());
+
+        table->indexes.push_back(std::move(mi));
+    }
+
+    bool
+    DDLService::exists_index(
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& schema_name
+    )
+    {
+        return get_index(index_name, table_name, schema_name) != nullptr;
+    }
+
+    bool
+    DDLService::exists_index(
+        const std::string& index_name,
+        const TableIdentifier& table_identifier
+    )
+    {
+        return get_index(index_name, table_identifier) != nullptr;
+    }
+
+    MetaIndex*
+    DDLService::get_index(
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& schema_name
+    )
+    {
+        const auto* schema = catalog_.get_schema(schema_name);
+        auto* table = catalog_.get_table(table_name, schema->id);
+
+        for (auto& index : table->indexes)
+            if (index.name == index_name)
+                return &index;
+
+        return nullptr;
+    }
+
+    MetaIndex*
+    DDLService::get_index(
+        const std::string& index_name,
+        const TableIdentifier& identifier
+    )
+    {
+        std::string schema_name = identifier.require_schema(cfg_);
+        return get_index(index_name, identifier.table_name.value, schema_name);
+    }
+
+    void
+    DDLService::drop_index(
+        const std::string& index_name,
+        const std::string& table_name,
+        const std::string& schema_name,
+        txn::Transaction& txn
+    )
+    {
+        auto* table = get_table(table_name, schema_name);
+        auto* index = get_index(index_name, table_name, schema_name);
+        if (!index)
+            throw std::runtime_error("StdDbInstance::drop_index");
+
+        const auto index_unchanged = *index;
+
+        std::erase_if(table->indexes,
+                      [&index](MetaIndex& index_entry)
+                      {
+                          return index_entry.id == index->id;
+                      });
+
+        DropIndexRecord record(index_unchanged);
+        txn.append_log(record);
+    }
+
+    std::vector<MetaTable*>
+    DDLService::get_all_tables() const
+    {
+        return catalog_.get_all_tables();
+    }
+
+    std::vector<MetaSchema*>
+    DDLService::get_all_schemas() const
+    {
+        return catalog_.get_all_schemas();
+    }
 }
