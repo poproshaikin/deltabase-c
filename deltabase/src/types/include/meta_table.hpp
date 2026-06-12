@@ -32,8 +32,11 @@ namespace types
 
         DataRow
         make_row(
-            const std::optional<std::vector<std::string>>& cols, const std::vector<DataToken>& row
-        );
+            const std::optional<std::vector<std::string>>& cols,
+            const std::vector<DataToken>& row);
+
+        DataRow
+        make_row(const std::vector<DataToken>& normalized_row);
 
         bool
         has_column(const std::string& col_name) const;

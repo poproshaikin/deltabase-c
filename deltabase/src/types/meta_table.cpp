@@ -103,6 +103,12 @@ namespace types
         return data_row;
     }
 
+    DataRow
+    MetaTable::make_row(const std::vector<DataToken>& normalized_row)
+    {
+        return make_row(std::nullopt, normalized_row);
+    }
+
     bool
     MetaTable::has_column(const std::string& col_name) const
     {

@@ -16,26 +16,29 @@ namespace storage
 {
     class DMLService
     {
-        DDLService ddl_service;
-        BufferPool& buffer_pool;
-
-
+        DDLService& ddl_service_;
+        BufferPool& buffer_pool_;
+        IIOManager& io_manager_;
 
         std::vector<types::IndexId>
         insert_row_into_indexes(
             const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id);
 
     public:
+        explicit DMLService(
+            DDLService& ddl_service,
+            BufferPool& buffer_pool,
+            IIOManager& io_manager);
+
         void
         insert_row(
             const std::string& table_name,
             const std::string& schema_name,
-            const std::optional<std::vector<std::string>>& cols,
-            std::vector<types::DataToken> row,
+            std::vector<types::DataToken> normalized_row,
             txn::Transaction& txn);
 
         void
-        update_sequentially(
+        update_selected(
             const std::string& table_name,
             const std::string& schema_name,
             types::RowUpdate update,
@@ -43,7 +46,7 @@ namespace storage
             txn::Transaction& txn);
 
         void
-        delete_sequentially(
+        delete_selected(
             const std::string& table_name,
             const std::string& schema_name,
             const std::vector<types::DataRow>& rows,
