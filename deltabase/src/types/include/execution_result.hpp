@@ -6,7 +6,7 @@
 #define DELTABASE_EXECUTION_RESULT_HPP
 #include "data_row.hpp"
 #include "data_table.hpp"
-#include "../../executor/include/node_executor.hpp"
+#include "i_node_executor.hpp"
 
 namespace types
 {

@@ -19,8 +19,8 @@ namespace exq
         constexpr double k_seq_scan_stream_threshold_rows = 2048.0;
     }
 
-    StdPlanner::StdPlanner(const Config& db_config, storage::IDbInstance& db)
-        : db_(db), db_config_(db_config), info_schema_provider_(db_)
+    StdPlanner::StdPlanner(const Config& db_config, storage::StorageServiceProvider& ssp)
+        : ssp_(ssp), db_config_(db_config), info_schema_provider_(ssp_)
     {
     }
 
@@ -250,7 +250,7 @@ namespace exq
         else
         {
             // Real table: full planning with index optimization
-            table = db_.get_table(stmt.table);
+            table = ssp_.ddl().get_table(stmt.table);
             const auto* condition_ptr = stmt.where ? &(*stmt.where) : nullptr;
 
             const MetaIndex* chosen_index = nullptr;
@@ -356,7 +356,7 @@ namespace exq
     QueryPlan
     StdPlanner::plan(UpdateStmt& stmt) const
     {
-        const auto* table = db_.get_table(stmt.table);
+        const auto* table = ssp_.ddl().get_table(stmt.table);
 
         const std::string schema_name = stmt.table.schema_name.has_value()
                                             ? stmt.table.schema_name.value().value
@@ -390,7 +390,7 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                *db_.get_table(stmt.table),
+                *ssp_.ddl().get_table(stmt.table),
                 std::move(*stmt.where),
                 std::move(root)
             );
@@ -425,7 +425,7 @@ namespace exq
         if (stmt.where)
         {
             root = std::make_unique<FilterPlanNode>(
-                *db_.get_table(stmt.table),
+                *ssp_.ddl().get_table(stmt.table),
                 std::move(*stmt.where),
                 std::move(root)
             );
@@ -463,7 +463,7 @@ namespace exq
                         ? table.table.schema_name.value().value
                         : db_config_.default_schema;
 
-        const auto* schema = db_.get_schema(name);
+        const auto* schema = ssp_.ddl().get_schema(name);
 
         std::unique_ptr<IPlanNode> root = std::make_unique<CreateTablePlanNode>(
             table.table.table_name.value,
@@ -486,7 +486,7 @@ namespace exq
                                ? stmt.table.schema_name.value().value
                                : db_config_.default_schema;
 
-        const auto* schema = db_.get_schema(schema_name);
+        const auto* schema = ssp_.ddl().get_schema(schema_name);
 
         std::unique_ptr<IPlanNode> root = std::make_unique<AlterTablePlanNode>(
             stmt.table.table_name.value,

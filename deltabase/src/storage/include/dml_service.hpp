@@ -24,6 +24,9 @@ namespace storage
         insert_row_into_indexes(
             const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id);
 
+        bool
+        is_row_obsolete(const types::RowPtr& row_ptr) const;
+
     public:
         explicit DMLService(
             DDLService& ddl_service,
@@ -32,23 +35,20 @@ namespace storage
 
         void
         insert_row(
-            const std::string& table_name,
-            const std::string& schema_name,
+            types::MetaTable& mt,
             std::vector<types::DataToken> normalized_row,
             txn::Transaction& txn);
 
         void
         update_selected(
-            const std::string& table_name,
-            const std::string& schema_name,
+            types::MetaTable& mt,
             types::RowUpdate update,
             const std::vector<types::DataRow>& rows,
             txn::Transaction& txn);
 
         void
         delete_selected(
-            const std::string& table_name,
-            const std::string& schema_name,
+            types::MetaTable& mt,
             const std::vector<types::DataRow>& rows,
             txn::Transaction& txn);
 

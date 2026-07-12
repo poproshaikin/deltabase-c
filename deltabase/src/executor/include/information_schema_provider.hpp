@@ -7,16 +7,18 @@
 
 #include "ast_tree.hpp"
 #include "data_table.hpp"
-#include "../../storage/include/db_instance.hpp"
+#include "meta_table.hpp"
+
+namespace storage { class StorageServiceProvider; }
 
 namespace exq
 {
     class InformationSchemaProvider
     {
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& ssp_;
 
     public:
-        InformationSchemaProvider(storage::IDbInstance& db);
+        InformationSchemaProvider(storage::StorageServiceProvider& ssp);
 
         bool
         is_virtual(const types::TableIdentifier& table) const;

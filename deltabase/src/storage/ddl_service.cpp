@@ -8,22 +8,27 @@
 
 #include "../misc/include/exceptions.hpp"
 #include "../misc/include/utils.hpp"
+#include "../misc/include/convert.hpp"
 #include "index_bplus_tree.hpp"
 #include "BP_index_pager.hpp"
+
+#include <assert.h>
 
 namespace storage
 {
     using namespace types;
 
     DDLService::DDLService(
-        Config& cfg,
-        BufferPool& buffer_pool,
-        CatalogCache& catalog,
-        wal::IWALManager& wal
+        Config & cfg,
+        BufferPool & buffer_pool,
+        CatalogCache & catalog,
+        wal::IWALManager & wal_manager,
+        IIOManager & io_manager
     ) : cfg_(cfg),
         buffer_pool_(buffer_pool),
         catalog_(catalog),
-        wal_manager_(wal)
+        wal_manager_(wal_manager),
+        io_manager_(io_manager)
     {
     }
 
@@ -184,16 +189,107 @@ namespace storage
 
         const auto table_unchanged = *table;
 
+        io_manager_.delete_mt(table_unchanged);
         catalog_.delete_table(table_unchanged.id, txn.get_id());
 
         DeleteTableRecord record(table_unchanged);
         txn.append_log(record);
     }
 
+    void
+    DDLService::add_column(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const ColumnDefinition& column,
+        txn::Transaction& txn)
+    {
+        auto* mt = get_table(table_name, schema_name);
+        const auto unchanged_mt = *mt;
+        auto data = buffer_pool_.get_table_data(mt->id);
+        std::unordered_set<DataPageId> linked_pages;
+
+        MetaColumn new_column = misc::convert(column);
+
+        mt->columns.push_back(new_column);
+
+        if (mt->live_rows == 0)
+        {
+            UpdateTableRecord update_table_record(unchanged_mt, *mt);
+            txn.append_log(update_table_record);
+            return;
+        }
+
+        for (auto* reading_page : data)
+        {
+            for (auto& row : reading_page->rows)
+            {
+                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    continue;
+
+                auto old_row = row;
+                auto old_values = old_row.tokens;
+                if (new_column.has_constraint<MetaNotNullConstraint>())
+                {
+                    auto* default_constraint = new_column.get_constraint<MetaDefaultConstraint>();
+                    assert(default_constraint &&
+                        "Semantic analyzer invariant violated: NOT NULL column without default");
+
+                    old_values.push_back(default_constraint->value);
+                }
+                else
+                {
+                    old_values.push_back(DataToken({}, DataType::_NULL));
+                }
+
+                DataRow new_row = old_row;
+                new_row.tokens = std::move(old_values);
+                auto size = io_manager_.estimate_size(new_row);
+
+                DataPage* destination =
+                    reading_page->size + size <= DataPage::MAX_SIZE
+                        ? reading_page
+                        : buffer_pool_.prepare_dp(size, *mt, txn.get_id());
+
+                row.flags |= DataRowFlags::OBSOLETE;
+                UpdateRecord update_record(mt->id, reading_page->id, old_row, row);
+                txn.append_log(update_record);
+                reading_page->last_lsn = txn.get_last_lsn();
+                buffer_pool_.dirty_dp(reading_page->id, txn.get_id());
+
+                if (destination != reading_page && linked_pages.insert(destination->id).second)
+                {
+                    destination->next = reading_page->next;
+                    reading_page->next = destination->id;
+                    buffer_pool_.dirty_dp(reading_page->id, txn.get_id());
+                }
+
+                destination->rows.push_back(new_row);
+                destination->rows_count = destination->rows.size();
+                destination->size += size;
+                destination->min_rid =
+                    destination->rows_count == 1
+                        ? new_row.id
+                        : std::min(destination->min_rid, new_row.id);
+                destination->max_rid = std::max(destination->max_rid, new_row.id);
+
+                mt->total_rows++;
+
+                InsertRecord insert_record(mt->id, destination->id, new_row);
+                txn.append_log(insert_record);
+                destination->last_lsn = txn.get_last_lsn();
+                buffer_pool_.dirty_dp(destination->id, txn.get_id());
+            }
+        }
+
+        UpdateTableRecord update_table_record(unchanged_mt, *mt);
+        txn.append_log(update_table_record);
+    }
+
     UUID
-    DDLService::create_sequence(const std::string& sequence_name,
-                                const std::string& schema_name,
-                                txn::Transaction& txn)
+    DDLService::create_sequence(
+        const std::string& sequence_name,
+        const std::string& schema_name,
+        txn::Transaction& txn)
     {
         auto* ms = catalog_.get_schema(schema_name);
 

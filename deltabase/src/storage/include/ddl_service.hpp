@@ -16,13 +16,16 @@ namespace storage
         CatalogCache& catalog_;
         BufferPool& buffer_pool_;
         wal::IWALManager& wal_manager_;
+        IIOManager& io_manager_;
 
     public:
         explicit
-        DDLService(types::Config& cfg,
-                   BufferPool& buffer_pool,
-                   CatalogCache& catalog,
-                   wal::IWALManager& wal_manager);
+        DDLService(
+            types::Config& cfg,
+            BufferPool& buffer_pool,
+            CatalogCache& catalog,
+            wal::IWALManager& wal_manager,
+            IIOManager& io_manager);
 
         types::MetaSchema*
         create_schema(const std::string& schema_name, txn::Transaction& txn);
@@ -56,6 +59,13 @@ namespace storage
         drop_table(
             const std::string& table_name,
             const std::string& schema_name,
+            txn::Transaction& txn);
+
+        void
+        add_column(
+            const std::string& table_name,
+            const std::string& schema_name,
+            const types::ColumnDefinition& column,
             txn::Transaction& txn);
 
         types::UUID

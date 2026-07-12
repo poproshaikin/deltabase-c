@@ -56,7 +56,7 @@ function(add_cpp_module module_name)
     endif()
 
     if (${module_name} STREQUAL "executor")
-        target_link_libraries(${module_name} PUBLIC types)
+        target_link_libraries(${module_name} PUBLIC types storage)
     endif()
 
     if (${module_name} STREQUAL "sql")

@@ -5,6 +5,7 @@
 #ifndef DELTABASE_AST_TREE_HPP
 #define DELTABASE_AST_TREE_HPP
 #include "sql_token.hpp"
+#include "config.hpp"
 
 #include <memory>
 #include <optional>

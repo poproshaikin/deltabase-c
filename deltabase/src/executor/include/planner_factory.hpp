@@ -6,7 +6,7 @@
 #define DELTABASE_PLANNER_FACTORY_HPP
 #include "planner.hpp"
 #include "../../types/include/config.hpp"
-#include "../../storage/include/db_instance.hpp"
+#include "../../storage/include/storage_service_provider.hpp"
 
 #include <memory>
 
@@ -16,7 +16,7 @@ namespace exq
     {
     public:
         std::unique_ptr<IPlanner>
-        make_planner(const types::Config& config, storage::IDbInstance& db);
+        make_planner(const types::Config& config, storage::StorageServiceProvider& ssp);
     };
 }
 
