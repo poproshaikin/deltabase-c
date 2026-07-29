@@ -23,6 +23,9 @@ namespace storage
         virtual void
         init() = 0;
 
+        virtual void
+        init_wal() = 0;
+
         virtual std::vector<types::MetaTable>
         read_tables_meta() = 0;
 

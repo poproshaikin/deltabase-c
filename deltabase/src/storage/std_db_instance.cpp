@@ -680,7 +680,7 @@ namespace storage
         for (const auto& row : rows)
             ids.insert(row.id);
 
-        for (auto& page : pages)
+        for (auto page : pages)
         {
             bool deleted = false;
             LSN page_lsn = page->last_lsn;

@@ -7,13 +7,13 @@
 #include "information_schema_provider.hpp"
 #include "planner.hpp"
 #include "../../types/include/config.hpp"
-#include "../../storage/include/db_instance.hpp"
+#include "../../storage/include/storage_service_provider.hpp"
 
 namespace exq
 {
     class StdPlanner final : public IPlanner
     {
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& ssp_;
         types::Config db_config_;
         InformationSchemaProvider info_schema_provider_;
 
@@ -55,7 +55,7 @@ namespace exq
 
     public:
         explicit
-        StdPlanner(const types::Config& db_config, storage::IDbInstance& db);
+        StdPlanner(const types::Config& db_config, storage::StorageServiceProvider& ssp);
 
         types::QueryPlan
         plan(types::AstNode&& ast) override;

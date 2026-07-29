@@ -4,7 +4,6 @@
 
 #include "engine.hpp"
 
-#include "detached_db_instance.hpp"
 #include "lexer.hpp"
 #include "logger.hpp"
 #include "static_storage.hpp"
@@ -12,7 +11,6 @@
 #include "../misc/include/memory_stream.hpp"
 #include "../storage/include/file_utils.hpp"
 #include "../storage/include/path.hpp"
-#include "../storage/include/std_db_instance.hpp"
 #include "../storage/include/std_storage_serializer.hpp"
 
 namespace engine
@@ -43,33 +41,24 @@ namespace engine
 
     Engine::Engine() : parser_()
     {
-        auto cfg = Config::detached();
-        auto db = std::make_unique<DetachedDbInstance>(cfg);
-        set_db_instance(std::move(db));
+        reset_storage(Config::detached());
     }
 
     void
-    Engine::set_db_instance(std::unique_ptr<IDbInstance> db)
+    Engine::reset_storage(const Config& config)
     {
-        db_ = std::move(db);
-
-        if (!db_)
-        {
-            auto config = Config::detached();
-            db_ = std::make_unique<DetachedDbInstance>(config);
-        }
-
-        auto config = db_->get_config();
+        storage_service_provider_ = std::make_unique<StorageServiceProvider>(config);
 
         parser_.reset();
-        planner_ = planner_factory_.make_planner(config, *db_);
-        analyzer_ = std::make_unique<exq::SemanticAnalyzer>(config, *db_);
+        planner_ = planner_factory_.make_planner(config, *storage_service_provider_);
+        analyzer_ = std::make_unique<exq::SemanticAnalyzer>(config, *storage_service_provider_);
 
-        if (config.db_name.has_value() && !db_->exists_schema(config.default_schema))
+        if (config.db_name.has_value() &&
+            !storage_service_provider_->ddl().exists_schema(config.default_schema))
         {
-            auto txn = db_->make_txn();
+            auto txn = storage_service_provider_->make_txn();
             txn.begin();
-            db_->create_schema(config.default_schema, txn);
+            storage_service_provider_->ddl().create_schema(config.default_schema, txn);
             txn.commit();
         }
     }
@@ -78,23 +67,21 @@ namespace engine
     Engine::attach_db(const std::string& db_name)
     {
         auto cfg = load_config(db_name, StaticStorage::get_executable_path());
-        auto db = std::make_unique<StdDbInstance>(cfg);
-        set_db_instance(std::move(db));
+        reset_storage(cfg);
     }
 
     void
     Engine::create_db(const Config& config)
     {
-        auto db = std::make_unique<StdDbInstance>(config);
-        set_db_instance(std::move(db));
+        reset_storage(config);
     }
 
     void
     Engine::detach_db()
     {
         planner_.reset();
-        db_.reset();
         analyzer_.reset();
+        reset_storage(Config::detached());
     }
 
     std::unique_ptr<IExecutionResult>
@@ -115,10 +102,11 @@ namespace engine
         if (ast.type == AstNodeType::BEGIN)
         {
             if (active_txn_.has_value())
-                throw EngineException("Another transaction is being in progress",
-                                      EngineException::Code::MULTIPLE_BEGIN);
+                throw EngineException(
+                    "Another transaction is being in progress",
+                    EngineException::Code::MULTIPLE_BEGIN);
 
-            active_txn_.emplace(db_->make_txn());
+            active_txn_.emplace(storage_service_provider_->make_txn());
             active_txn_->begin();
             return make_ok_result("BEGIN");
         }
@@ -142,14 +130,10 @@ namespace engine
             return make_ok_result("ROLLBACK");
         }
 
-        bool implicit_txn = !active_txn_.has_value();
-        if (implicit_txn)
-        {
-            active_txn_.emplace(db_->make_txn());
-            active_txn_->begin();
-        }
-
-        ctx_.txn = &*active_txn_;
+        if (ast.type != AstNodeType::CREATE_DATABASE &&
+            !storage_service_provider_->config().db_name.has_value())
+            throw EngineException("No database attached",
+                                  EngineException::Code::DB_NOT_ATTACHED);
 
         auto analysis = analyzer_->analyze(ast);
         if (!analysis.is_valid)
@@ -157,34 +141,20 @@ namespace engine
 
         auto plan = planner_->plan(std::move(ast));
 
-        auto executor = executor_factory_.from_plan(std::move(plan.root), *db_, ctx_);
+        std::function<void()> on_done;
+        bool implicit_txn = !active_txn_.has_value() && plan.needs_txn;
+        if (implicit_txn)
+        {
+            active_txn_.emplace(storage_service_provider_->make_txn());
+            active_txn_->begin();
+            on_done = [this] { commit_active_txn(); };
+        }
+
+        ctx_.txn = active_txn_.has_value() ? &*active_txn_ : nullptr;
 
         try
         {
-            std::unique_ptr<IExecutionResult> result;
-
-            if (!plan.needs_stream)
-            {
-                DataTable result_table;
-                DataRow row;
-
-                executor->open();
-                while (executor->next(row))
-                    result_table.rows.push_back(row);
-                executor->close();
-                result_table.output_schema = executor->output_schema();
-                result = std::make_unique<MaterializedResult>(std::move(result_table));
-
-                if (implicit_txn)
-                {
-                    active_txn_->commit();
-                    active_txn_.reset();
-                }
-            }
-            else
-                result = std::make_unique<StreamedResult>(std::move(executor));
-
-            return result;
+            return execute(plan.needs_stream, *plan.root, std::move(on_done));
         }
         catch (...)
         {
@@ -195,5 +165,40 @@ namespace engine
             }
             throw;
         }
+    }
+
+    void
+    Engine::commit_active_txn()
+    {
+        active_txn_->commit();
+        active_txn_.reset();
+    }
+
+    std::unique_ptr<IExecutionResult>
+    Engine::execute(bool needs_stream, IPlanNode& root, std::function<void()> on_done)
+    {
+        auto exec = executor_factory_.from_plan(
+            root,
+            *storage_service_provider_,
+            ctx_);
+
+        if (!needs_stream)
+        {
+            DataTable result_table;
+            DataRow row;
+
+            exec->open();
+            while (exec->next(row))
+                result_table.rows.push_back(row);
+            exec->close();
+            result_table.output_schema = exec->output_schema();
+
+            if (on_done)
+                on_done();
+
+            return std::make_unique<MaterializedResult>(std::move(result_table));
+        }
+
+        return std::make_unique<StreamedResult>(std::move(exec), std::move(on_done));
     }
 } // namespace engine

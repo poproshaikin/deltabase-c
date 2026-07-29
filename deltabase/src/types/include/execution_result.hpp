@@ -6,7 +6,8 @@
 #define DELTABASE_EXECUTION_RESULT_HPP
 #include "data_row.hpp"
 #include "data_table.hpp"
-#include "../../executor/include/node_executor.hpp"
+#include "i_node_executor.hpp"
+#include <functional>
 
 namespace types
 {
@@ -41,9 +42,11 @@ namespace types
     class StreamedResult final : public IExecutionResult
     {
         std::unique_ptr<exq::INodeExecutor> executor_;
+        std::function<void()> on_exhausted_;
 
     public:
         StreamedResult(std::unique_ptr<exq::INodeExecutor>&& executor);
+        StreamedResult(std::unique_ptr<exq::INodeExecutor>&& executor, std::function<void()> on_exhausted);
 
         bool
         next(DataRow& out) override;

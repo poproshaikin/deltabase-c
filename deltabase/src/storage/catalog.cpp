@@ -231,7 +231,9 @@ namespace storage
     {
         return get_schema(name) != nullptr;
     }
-    void
+
+    types::MetaSchema
+    *
     CatalogCache::save_schema(const types::MetaSchema& ms, const types::UUID& txn_id)
     {
         auto it = schemas_.find(ms.id);
@@ -239,6 +241,7 @@ namespace storage
             txn_deltas_[txn_id].added_schemas.push_back(ms.id);
 
         schemas_[ms.id] = ms;
+        return &schemas_[ms.id];
     }
 
     std::vector<types::MetaTable*>

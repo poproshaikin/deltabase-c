@@ -27,14 +27,28 @@ namespace types
         return schema_;
     }
 
-    StreamedResult::StreamedResult(std::unique_ptr<exq::INodeExecutor>&& executor) : executor_(std::move(executor))
+    StreamedResult::StreamedResult(std::unique_ptr<exq::INodeExecutor>&& executor)
+        : executor_(std::move(executor))
+    {
+    }
+
+    StreamedResult::StreamedResult(std::unique_ptr<exq::INodeExecutor>&& executor, std::function<void()> on_exhausted)
+        : executor_(std::move(executor)), on_exhausted_(std::move(on_exhausted))
     {
     }
 
     bool
     StreamedResult::next(DataRow& out)
     {
-        return executor_->next(out);
+        if (executor_->next(out))
+            return true;
+
+        if (on_exhausted_)
+        {
+            on_exhausted_();
+            on_exhausted_ = nullptr;
+        }
+        return false;
     }
 
     OutputSchema

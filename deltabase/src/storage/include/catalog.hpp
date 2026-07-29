@@ -77,7 +77,8 @@ namespace storage
         get_schema(const types::UUID& id);
         types::MetaSchema*
         get_schema(const std::string& name);
-        void
+        types::MetaSchema
+        *
         save_schema(const types::MetaSchema& ms, const types::UUID& txn_id);
         void
         delete_schema(const types::UUID& schema_id, const types::UUID& txn_id);

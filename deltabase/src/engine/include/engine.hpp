@@ -6,14 +6,17 @@
 #define DELTABASE_ENGINE_HPP
 
 #include "execution_context.hpp"
+#include <functional>
 #include "planner_factory.hpp"
 #include "semantic_analyzer.hpp"
+#include "storage_service_provider.hpp"
 #include "../../sql/include/parser.hpp"
 #include "../../types/include/execution_result.hpp"
 #include "../../storage/include/db_instance.hpp"
 #include "../../types/include/config.hpp"
 #include "../../executor/include/node_executor.hpp"
 #include "../../executor/include/planner.hpp"
+#include "../../types/include/query_plan.hpp"
 
 namespace engine
 {
@@ -22,7 +25,7 @@ namespace engine
         sql::SqlParser parser_;
         std::unique_ptr<exq::SemanticAnalyzer> analyzer_;
         std::unique_ptr<exq::IPlanner> planner_;
-        std::unique_ptr<storage::IDbInstance> db_;
+        std::unique_ptr<storage::StorageServiceProvider> storage_service_provider_;
         exq::NodeExecutorFactory executor_factory_;
         exq::PlannerFactory planner_factory_;
 
@@ -33,10 +36,16 @@ namespace engine
         load_config(const std::string& name, const std::filesystem::path& executable_path) const;
 
         void
-        set_db_instance(std::unique_ptr<storage::IDbInstance> db = nullptr);
+        reset_storage(const types::Config& config);
 
         std::unique_ptr<types::IExecutionResult>
         make_ok_result(const std::string& tag);
+
+        void
+        commit_active_txn();
+
+        std::unique_ptr<types::IExecutionResult>
+        execute(bool needs_stream, types::IPlanNode& root, std::function<void()> on_done);
 
     public:
         Engine();

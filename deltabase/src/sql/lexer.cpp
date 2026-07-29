@@ -251,6 +251,13 @@ namespace sql
                 i++;
                 pos++;
             }
+            else
+            {
+                throw std::runtime_error(
+                    std::string("Unexpected character '") + c + "' at line " +
+                    std::to_string(line) + ", pos " + std::to_string(pos)
+                );
+            }
         }
 
         return result;

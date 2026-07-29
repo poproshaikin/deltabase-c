@@ -47,6 +47,7 @@ namespace types
     {
         bool needs_stream;
         bool db_specific;
+        bool needs_txn;
 
         enum class Type
         {

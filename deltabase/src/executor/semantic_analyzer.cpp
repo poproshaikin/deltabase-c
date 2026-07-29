@@ -16,8 +16,8 @@ namespace exq
 {
     using namespace types;
 
-    SemanticAnalyzer::SemanticAnalyzer(const Config& config, storage::IDbInstance& db)
-        : db_(db), config_(config), generic_validator_(config), info_schema_provider_(db)
+    SemanticAnalyzer::SemanticAnalyzer(const Config& config, storage::StorageServiceProvider& ssp)
+        : ssp_(ssp), config_(config), generic_validator_(config), info_schema_provider_(ssp)
     {
     }
 
@@ -80,11 +80,11 @@ namespace exq
         }
         else
         {
-            if (!db_.exists_table(stmt.table))
+            if (!ssp_.ddl().exists_table(stmt.table))
                 return AnalysisResult(EngineException(
                     "Table '" + stmt.table.table_name.value + "' doesn't exist",
                     EngineException::Code::TABLE_NOT_EXISTS));
-            table = db_.get_table(stmt.table);
+            table = ssp_.ddl().get_table(stmt.table);
         }
 
         for (const SqlToken& col : stmt.columns)
@@ -109,12 +109,12 @@ namespace exq
             return AnalysisResult(EngineException("Insert statement missing target table",
                                                   EngineException::Code::SYNTAX_ERROR));
 
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* table = db_.get_table(stmt.table);
+        const auto* table = ssp_.ddl().get_table(stmt.table);
 
         for (const SqlToken& col : stmt.columns)
             if (!table->has_column(col.value))
@@ -246,12 +246,12 @@ namespace exq
             return AnalysisResult(EngineException("Update statement missing assignments",
                                                   EngineException::Code::SYNTAX_ERROR));
 
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* table = db_.get_table(stmt.table);
+        const auto* table = ssp_.ddl().get_table(stmt.table);
 
         for (const auto& assignment : stmt.assignments)
         {
@@ -277,12 +277,12 @@ namespace exq
             return AnalysisResult(EngineException("Delete statement missing target table",
                                                   EngineException::Code::SYNTAX_ERROR));
 
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* table = db_.get_table(stmt.table);
+        const auto* table = ssp_.ddl().get_table(stmt.table);
 
         if (stmt.where.has_value())
         {
@@ -297,7 +297,7 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_create_table(const CreateTableStmt& stmt) const
     {
-        if (db_.exists_table(stmt.table))
+        if (ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' already exists",
                 EngineException::Code::TABLE_EXISTS));
@@ -324,7 +324,7 @@ namespace exq
                 }
                 else if (auto* fk = std::get_if<ForeignKeyConstraint>(&c))
                 {
-                    auto referenced_table = db_.get_table(fk->referenced_table);
+                    auto referenced_table = ssp_.ddl().get_table(fk->referenced_table);
                     if (!referenced_table)
                         return AnalysisResult(EngineException(
                             "Referenced table " + fk->referenced_table.table_name.value +
@@ -413,12 +413,12 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_alter_table(const AlterTableStmt& stmt) const
     {
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* mt = db_.get_table(stmt.table);
+        const auto* mt = ssp_.ddl().get_table(stmt.table);
 
         for (const auto& operation : stmt.operations)
         {
@@ -478,12 +478,12 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_create_index(const CreateIndexStmt& stmt) const
     {
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* table = db_.get_table(stmt.table);
+        const auto* table = ssp_.ddl().get_table(stmt.table);
 
         for (const auto& index : table->indexes)
             if (index.name == stmt.index_name.value)
@@ -502,12 +502,12 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_drop_index(const DropIndexStmt& stmt) const
     {
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        if (!db_.exists_index(stmt.index_name.value, stmt.table))
+        if (!ssp_.ddl().exists_index(stmt.index_name.value, stmt.table))
             return AnalysisResult(EngineException(
                 "Index '" + stmt.index_name.value + "' does not exist on table " + stmt.table.
                 table_name.value,
@@ -519,7 +519,7 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_drop_table(const DropTableStmt& stmt) const
     {
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
