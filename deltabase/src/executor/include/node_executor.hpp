@@ -490,7 +490,7 @@ namespace exq
     {
     public:
         std::unique_ptr<INodeExecutor>
-        from_plan(std::unique_ptr<types::IPlanNode>&& node, storage::StorageServiceProvider& ssp, types::ExecutionContext& ctx);
+        from_plan(const types::IPlanNode& node, storage::StorageServiceProvider& ssp, types::ExecutionContext& ctx);
     };
 } // namespace exq
 

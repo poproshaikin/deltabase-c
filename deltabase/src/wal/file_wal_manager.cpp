@@ -47,14 +47,8 @@ namespace wal
         serializer_ = factory.make(serializer_type);
         db_mutex_ = io_lock_service_->mutex_for(db_path_, db_name_);
 
-        // Create WAL directory if it doesn't exist
-        auto wal_dir = storage::path_db_wal(db_path_, db_name_);
-        if (!fs::exists(wal_dir))
-        {
-            fs::create_directories(wal_dir);
-        }
-
         // Ensure a first WAL file exists for an empty WAL directory.
+        auto wal_dir = storage::path_db_wal(db_path_, db_name_);
         if (fs::is_empty(wal_dir))
         {
             auto first_file_path =

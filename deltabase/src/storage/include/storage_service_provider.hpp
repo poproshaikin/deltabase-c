@@ -43,17 +43,30 @@ namespace storage
         std::unique_ptr<ConstraintEnforcer> constraint_enforcer_;
 
     public:
-        explicit StorageServiceProvider(const types::Config& cfg);
+        explicit
+        StorageServiceProvider(const types::Config& cfg);
 
-        const types::Config& config() const { return cfg_; }
+        ~StorageServiceProvider();
 
-        txn::Transaction make_txn();
+        const types::Config&
+        config() const
+        {
+            return cfg_;
+        }
 
-        DDLService& ddl();
-        DMLService& dml();
-        DqlService& dql();
-        RowPreprocessor& preprocessor();
-        ConstraintEnforcer& enforcer();
+        txn::Transaction
+        make_txn();
+
+        DDLService&
+        ddl();
+        DMLService&
+        dml();
+        DqlService&
+        dql();
+        RowPreprocessor&
+        preprocessor();
+        ConstraintEnforcer&
+        enforcer();
     };
 }
 

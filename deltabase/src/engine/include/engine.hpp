@@ -6,6 +6,7 @@
 #define DELTABASE_ENGINE_HPP
 
 #include "execution_context.hpp"
+#include <functional>
 #include "planner_factory.hpp"
 #include "semantic_analyzer.hpp"
 #include "storage_service_provider.hpp"
@@ -15,6 +16,7 @@
 #include "../../types/include/config.hpp"
 #include "../../executor/include/node_executor.hpp"
 #include "../../executor/include/planner.hpp"
+#include "../../types/include/query_plan.hpp"
 
 namespace engine
 {
@@ -38,6 +40,12 @@ namespace engine
 
         std::unique_ptr<types::IExecutionResult>
         make_ok_result(const std::string& tag);
+
+        void
+        commit_active_txn();
+
+        std::unique_ptr<types::IExecutionResult>
+        execute(bool needs_stream, types::IPlanNode& root, std::function<void()> on_done);
 
     public:
         Engine();

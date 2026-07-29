@@ -714,108 +714,108 @@ namespace exq
 
     std::unique_ptr<INodeExecutor>
     NodeExecutorFactory::from_plan(
-        std::unique_ptr<IPlanNode>&& node,
+        const IPlanNode& node,
         storage::StorageServiceProvider& ssp,
         ExecutionContext& ctx)
     {
-        switch (node->type())
+        switch (node.type())
         {
         case IPlanNode::Type::SEQ_SCAN:
         {
-            const auto& n = static_cast<const SeqScanPlanNode&>(*node);
+            const auto& n = static_cast<const SeqScanPlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<SeqScanNodeExecutor>(ssp, mt);
         }
         case IPlanNode::Type::INDEX_SCAN:
         {
-            auto& n = static_cast<IndexScanPlanNode&>(*node);
+            auto& n = static_cast<IndexScanPlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<IndexScanNodeExecutor>(mt, n.index_id, std::move(n.condition), ssp);
         }
         case IPlanNode::Type::VIRTUAL_TABLE:
         {
-            const auto& n = static_cast<const VirtualTablePlanNode&>(*node);
+            const auto& n = static_cast<const VirtualTablePlanNode&>(node);
             return std::make_unique<VirtualTableNodeExecutor>(n.table_name, n.schema_name, ssp);
         }
         case IPlanNode::Type::FILTER:
         {
-            auto& n = static_cast<FilterPlanNode&>(*node);
+            auto& n = static_cast<FilterPlanNode&>(node);
             return std::make_unique<FilterNodeExecutor>(
-                n.table, std::move(n.where), from_plan(std::move(n.child), ssp, ctx));
+                n.table, std::move(n.where), from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::PROJECT:
         {
-            auto& n = static_cast<ProjectPlanNode&>(*node);
+            auto& n = static_cast<ProjectPlanNode&>(node);
             return std::make_unique<ProjectionNodeExecutor>(
-                n.table, n.columns, from_plan(std::move(n.child), ssp, ctx));
+                n.table, n.columns, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::LIMIT:
         {
-            auto& n = static_cast<LimitPlanNode&>(*node);
-            return std::make_unique<LimitNodeExecutor>(n.limit, from_plan(std::move(n.child), ssp, ctx));
+            auto& n = static_cast<LimitPlanNode&>(node);
+            return std::make_unique<LimitNodeExecutor>(n.limit, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::INSERT:
         {
-            auto& n = static_cast<InsertPlanNode&>(*node);
+            auto& n = static_cast<InsertPlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<InsertNodeExecutor>(
-                mt, ssp, n.column_names, ctx, from_plan(std::move(n.child), ssp, ctx));
+                mt, ssp, n.column_names, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::VALUES:
         {
-            auto& n = static_cast<ValuesPlanNode&>(*node);
+            auto& n = static_cast<ValuesPlanNode&>(node);
             return std::make_unique<ValuesNodeExecutor>(n.values);
         }
         case IPlanNode::Type::UPDATE:
         {
-            auto& n = static_cast<UpdatePlanNode&>(*node);
+            auto& n = static_cast<UpdatePlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<UpdateNodeExecutor>(
-                mt, ssp, n.assignments, ctx, from_plan(std::move(n.child), ssp, ctx));
+                mt, ssp, n.assignments, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::DELETE:
         {
-            auto& n = static_cast<DeletePlanNode&>(*node);
+            auto& n = static_cast<DeletePlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<DeleteNodeExecutor>(
-                mt, ssp, ctx, from_plan(std::move(n.child), ssp, ctx));
+                mt, ssp, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::CREATE_TABLE:
         {
-            auto& n = static_cast<CreateTablePlanNode&>(*node);
+            auto& n = static_cast<CreateTablePlanNode&>(node);
             return std::make_unique<CreateTableNodeExecutor>(n.table_name, n.schema, n.columns, ssp, ctx);
         }
         case IPlanNode::Type::ALTER_TABLE:
         {
-            auto& n = static_cast<AlterTablePlanNode&>(*node);
+            auto& n = static_cast<AlterTablePlanNode&>(node);
             return std::make_unique<AlterTableNodeExecutor>(n.table_name, n.schema, n.operations, ssp, ctx);
         }
         case IPlanNode::Type::CREATE_DB:
         {
-            auto& n = static_cast<CreateDbPlanNode&>(*node);
+            auto& n = static_cast<CreateDbPlanNode&>(node);
             return std::make_unique<CreateDbNodeExecutor>(n.db_name);
         }
         case IPlanNode::Type::CREATE_INDEX:
         {
-            auto& n = static_cast<CreateIndexPlanNode&>(*node);
+            auto& n = static_cast<CreateIndexPlanNode&>(node);
             return std::make_unique<CreateIndexNodeExecutor>(
                 n.index_name, n.table_name, n.column_name, n.schema_name, n.is_unique, n.is_primary, ssp, ctx);
         }
         case IPlanNode::Type::DROP_INDEX:
         {
-            auto& n = static_cast<DropIndexPlanNode&>(*node);
+            auto& n = static_cast<DropIndexPlanNode&>(node);
             return std::make_unique<DropIndexNodeExecutor>(n.index_name, n.table_name, n.schema_name, ssp, ctx);
         }
         case IPlanNode::Type::DROP_TABLE:
         {
-            auto& n = static_cast<DropTablePlanNode&>(*node);
+            auto& n = static_cast<DropTablePlanNode&>(node);
             return std::make_unique<DropTableNodeExecutor>(n.table_name, n.schema_name, ssp, ctx);
         }
         default:
             throw std::runtime_error(
                 "NodeExecutorFactory::from_plan: failed to create executor tree for plan node of "
                 "type " +
-                std::to_string(static_cast<int>(node->type())));
+                std::to_string(static_cast<int>(node.type())));
         }
     }
 

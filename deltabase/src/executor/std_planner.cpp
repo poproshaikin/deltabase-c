@@ -314,6 +314,7 @@ namespace exq
 
         plan.root = std::move(node);
         plan.db_specific = true;
+        plan.needs_txn = false;
         return plan;
     }
 
@@ -349,6 +350,7 @@ namespace exq
         plan.type = QueryPlan::Type::INSERT;
         plan.needs_stream = false;
         plan.db_specific = true;
+        plan.needs_txn = true;
 
         return plan;
     }
@@ -408,6 +410,7 @@ namespace exq
         plan.type = QueryPlan::Type::UPDATE;
         plan.needs_stream = false;
         plan.db_specific = true;
+        plan.needs_txn = true;
 
         return plan;
     }
@@ -439,6 +442,7 @@ namespace exq
         plan.type = QueryPlan::Type::DELETE;
         plan.needs_stream = false;
         plan.db_specific = true;
+        plan.needs_txn = true;
 
         return plan;
     }
@@ -453,6 +457,7 @@ namespace exq
         plan.type = QueryPlan::Type::CREATE_DB;
         plan.needs_stream = false;
         plan.db_specific = false;
+        plan.needs_txn = false;
         return plan;
     }
 
@@ -475,6 +480,7 @@ namespace exq
         plan.type = QueryPlan::Type::CREATE_TABLE;
         plan.needs_stream = false;
         plan.db_specific = true;
+        plan.needs_txn = true;
         return plan;
     }
 
@@ -498,6 +504,7 @@ namespace exq
         plan.type = QueryPlan::Type::ALTER_TABLE;
         plan.needs_stream = false;
         plan.db_specific = true;
+        plan.needs_txn = true;
         return plan;
     }
 
@@ -524,6 +531,7 @@ namespace exq
         plan.type = QueryPlan::Type::CREATE_INDEX;
         plan.needs_stream = false;
         plan.db_specific = true;
+        plan.needs_txn = true;
         return plan;
     }
 
@@ -545,6 +553,7 @@ namespace exq
         plan.type = QueryPlan::Type::DROP_INDEX;
         plan.needs_stream = false;
         plan.db_specific = true;
+        plan.needs_txn = true;
         return plan;
     }
 
@@ -564,6 +573,7 @@ namespace exq
         plan.type = QueryPlan::Type::DROP_TABLE;
         plan.needs_stream = false;
         plan.db_specific = true;
+        plan.needs_txn = true;
         return plan;
     }
 } // namespace exq

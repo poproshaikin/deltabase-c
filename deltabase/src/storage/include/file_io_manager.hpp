@@ -49,6 +49,9 @@ namespace storage
         void
         init() override;
 
+        void
+        init_wal() override;
+
         std::vector<types::MetaTable>
         read_tables_meta() override;
 
