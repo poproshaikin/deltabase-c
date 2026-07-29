@@ -151,9 +151,12 @@ namespace exq
             const std::string mt_schema = it != schema_names.end() ? it->second : "";
 
             const MetaColumn* pkey = nullptr;
-            for (const auto& idx : mt->indexes)
-                if (idx.is_primary)
-                    pkey = &mt->get_column(idx.column_id);
+            for (const auto& col : mt->columns)
+                if (col.has_constraint<MetaPrimaryKeyConstraint>())
+                {
+                    pkey = &col;
+                    break;
+                }
 
             DataRow row;
             row.tokens = {

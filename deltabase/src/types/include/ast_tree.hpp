@@ -89,8 +89,10 @@ namespace types
 
         BinaryExpr() = default;
         BinaryExpr(BinaryExpr&&) = default;
-        BinaryExpr&
-        operator=(BinaryExpr&&) = default;
+        BinaryExpr& operator=(BinaryExpr&&) = default;
+
+        BinaryExpr(const BinaryExpr&);
+        BinaryExpr& operator=(const BinaryExpr&);
 
         std::string
         to_string() const;
@@ -236,7 +238,6 @@ namespace types
         SqlToken index_name;
         SqlToken column_name;
         bool is_unique;
-        bool is_primary;
     };
 
     struct DropIndexStmt

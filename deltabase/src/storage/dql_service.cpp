@@ -17,13 +17,13 @@ namespace storage
     using namespace types;
     using namespace misc;
 
-    DqlService::DqlService(BufferPool & buffer_pool)
+    DqlService::DqlService(BufferPool& buffer_pool)
         : buffer_pool_(buffer_pool)
     {
     }
 
     DataTable
-    DqlService::seq_scan(const MetaTable & mt)
+    DqlService::seq_scan(const MetaTable& mt)
     {
         DataTable dt;
         dt.output_schema = convert(mt);
@@ -38,7 +38,7 @@ namespace storage
     }
 
     ScanCursor
-    DqlService::seq_scan_begin(const MetaTable & mt)
+    DqlService::seq_scan_begin(const MetaTable& mt)
     {
         const auto pages = buffer_pool_.get_table_data(mt.id);
 
@@ -88,7 +88,7 @@ namespace storage
     }
 
     bool
-    DqlService::seq_scan_next(ScanCursor & cursor, DataRow & out)
+    DqlService::seq_scan_next(ScanCursor& cursor, DataRow& out)
     {
         if (!cursor.initialized)
             return false;
@@ -121,9 +121,9 @@ namespace storage
 
     DataTable
     DqlService::index_scan(
-        const MetaTable & mt,
-        const IndexId & index_id,
-        const BinaryExpr & condition)
+        const MetaTable& mt,
+        const IndexId& index_id,
+        const BinaryExpr& condition)
     {
         const MetaIndex* meta_index = nullptr;
         for (const auto& index : mt.indexes)
@@ -166,12 +166,18 @@ namespace storage
 
             switch (condition.op)
             {
-            case AstOperator::EQ:  return left == right;
-            case AstOperator::NEQ: return left != right;
-            case AstOperator::LT:  return left < right;
-            case AstOperator::LTE: return left <= right;
-            case AstOperator::GR:  return left > right;
-            case AstOperator::GRE: return left >= right;
+            case AstOperator::EQ:
+                return left == right;
+            case AstOperator::NEQ:
+                return left != right;
+            case AstOperator::LT:
+                return left < right;
+            case AstOperator::LTE:
+                return left <= right;
+            case AstOperator::GR:
+                return left > right;
+            case AstOperator::GRE:
+                return left >= right;
             default:
                 throw std::runtime_error("DqlService::index_scan: unsupported condition op");
             }
@@ -267,5 +273,32 @@ namespace storage
         }
 
         return dt;
+    }
+
+    bool
+    DqlService::value_exists(
+        const MetaTable& mt,
+        const std::string& column_name,
+        const DataToken& value)
+    {
+        // Try via index scan
+        auto indexes = mt.get_indexes(column_name);
+        if (!indexes.empty())
+        {
+            BPIndexPager pager(buffer_pool_, mt.id, indexes[0]->id);
+            IndexBPlusTree tree(pager);
+            return tree.find(value).has_value();
+        }
+
+        // Fallback to seq scan
+
+        int64_t col_idx = mt.get_column_idx(column_name);
+        auto cursor = seq_scan_begin(mt);
+        DataRow row;
+        while (seq_scan_next(cursor, row))
+            if (row.tokens[col_idx] == value)
+                return true;
+
+        return false;
     }
 }

@@ -19,11 +19,11 @@ namespace storage
     using namespace types;
 
     DDLService::DDLService(
-        Config & cfg,
-        BufferPool & buffer_pool,
-        CatalogCache & catalog,
-        wal::IWALManager & wal_manager,
-        IIOManager & io_manager
+        Config& cfg,
+        BufferPool& buffer_pool,
+        CatalogCache& catalog,
+        wal::IWALManager& wal_manager,
+        IIOManager& io_manager
     ) : cfg_(cfg),
         buffer_pool_(buffer_pool),
         catalog_(catalog),
@@ -58,8 +58,64 @@ namespace storage
         return catalog_.get_schema(name);
     }
 
-    MetaTable
-    *
+    MetaColumn
+    DDLService::resolve_column(const ColumnDefinition& column_def, const MetaTable& mt)
+    {
+        MetaColumn column = misc::convert(column_def);
+        column.id = UUID::make();
+        column.table_id = mt.id;
+
+        bool is_pk = false;
+        bool is_ai = false;
+        std::optional<ForeignKeyConstraint> fk;
+
+        for (const auto& c : column_def.constraints)
+            if (std::holds_alternative<PrimaryKeyConstraint>(c))
+                is_pk = true;
+            else if (std::holds_alternative<AutoIncrementConstraint>(c))
+                is_ai = true;
+            else if (std::holds_alternative<ForeignKeyConstraint>(c))
+                fk.emplace(std::get<ForeignKeyConstraint>(c));
+
+        bool is_fk = fk.has_value();
+
+        if (is_pk)
+        {
+            column.constraints.emplace_back(MetaNotNullConstraint());
+            column.constraints.emplace_back(MetaPrimaryKeyConstraint{});
+        }
+
+        if (is_ai)
+        {
+            auto constraint = MetaAutoIncrementConstraint{
+                .column_id = column.id, .table_id = mt.id, .sequence_id = UUID::null()};
+            column.constraints.push_back(constraint);
+        }
+
+        if (is_fk)
+        {
+            auto referenced_schema = catalog_.get_schema(
+                fk->referenced_table.schema_name.value_or(
+                    SqlToken(cfg_.default_schema)).value);
+
+            auto referenced_table = catalog_.get_table(
+                fk->referenced_table.table_name,
+                referenced_schema->id);
+
+            auto referenced_column = referenced_table->get_column(fk->referenced_column.value);
+
+            auto meta_constraint = MetaForeignKeyConstraint{
+                .referenced_table_id = referenced_table->id,
+                .referenced_column_id = referenced_column.id,
+                .action = fk->action};
+
+            column.constraints.push_back(meta_constraint);
+        }
+
+        return column;
+    }
+
+    MetaTable*
     DDLService::create_table(
         const std::string& table_name,
         const std::string& schema_name,
@@ -75,73 +131,37 @@ namespace storage
         mt.last_rid = 0;
         mt.columns.reserve(columns.size());
 
-        std::vector<std::string> pk_column_names;
-
         for (const auto& col_def : columns)
-        {
-            MetaColumn column(col_def);
-            column.id = UUID::make();
-            column.table_id = mt.id;
-
-            bool is_pk = false;
-            bool is_ai = false;
-            std::optional<ForeignKeyConstraint> fk;
-
-            for (const auto& c : col_def.constraints)
-                if (std::holds_alternative<PrimaryKeyConstraint>(c))
-                    is_pk = true;
-                else if (std::holds_alternative<AutoIncrementConstraint>(c))
-                    is_ai = true;
-                else if (std::holds_alternative<ForeignKeyConstraint>(c))
-                    fk.emplace(std::get<ForeignKeyConstraint>(c));
-
-            bool is_fk = fk.has_value();
-
-            if (is_pk)
-            {
-                column.constraints.emplace_back(MetaNotNullConstraint());
-                pk_column_names.push_back(column.name);
-            }
-
-            if (is_ai)
-            {
-                auto seq_id = create_sequence(
-                    mt.name + "_" + column.name + "_seq",
-                    schema->name,
-                    txn);
-
-                auto constraint = MetaAutoIncrementConstraint{
-                    .column_id = column.id, .table_id = mt.id, .sequence_id = seq_id};
-                column.constraints.push_back(constraint);
-            }
-
-            if (is_fk)
-            {
-                auto referenced_schema = catalog_.get_schema(
-                    fk->referenced_table.schema_name.value_or(
-                        SqlToken(cfg_.default_schema)).value);
-
-                auto referenced_table = catalog_.get_table(
-                    fk->referenced_table.table_name,
-                    referenced_schema->id);
-
-                auto referenced_column = referenced_table->get_column(fk->referenced_column.value);
-
-                auto meta_constraint = MetaForeignKeyConstraint{
-                    .referenced_table_id = referenced_table->id,
-                    .referenced_column_id = referenced_column.id,
-                    .action = fk->action};
-
-                column.constraints.push_back(meta_constraint);
-            }
-
-            mt.columns.emplace_back(std::move(column));
-        }
+            mt.columns.push_back(resolve_column(col_def, mt));
 
         CreateTableRecord record(mt);
         txn.append_log(record);
 
-        return catalog_.save_table(std::move(mt), txn.get_id());
+        auto* saved = catalog_.save_table(std::move(mt), txn.get_id());
+
+        for (auto& col : saved->columns)
+        {
+            if (col.has_constraint<MetaAutoIncrementConstraint>())
+            {
+                auto seq_id = create_sequence(
+                    mt.name + "_" + col.name + "_seq",
+                    schema->name,
+                    txn);
+                col.get_constraint<MetaAutoIncrementConstraint>()->sequence_id = seq_id;
+            }
+            else if (col.has_constraint<MetaPrimaryKeyConstraint>())
+            {
+                create_index(
+                    table_name + "_" + col.name + "_pkey",
+                    table_name,
+                    col.name,
+                    schema_name,
+                    true,
+                    txn);
+            }
+        }
+
+        return saved;
     }
 
     bool
@@ -196,6 +216,29 @@ namespace storage
         txn.append_log(record);
     }
 
+    DataRow
+    DDLService::extend_row(const DataRow& old_row, const MetaColumn& new_column)
+    {
+        auto old_values = old_row.tokens;
+        if (new_column.has_constraint<MetaNotNullConstraint>())
+        {
+            auto* default_constraint = new_column.get_constraint<MetaDefaultConstraint>();
+            if (!default_constraint)
+                throw std::logic_error(
+                    "Semantic analyzer invariant violated: NOT NULL column without default");
+
+            old_values.push_back(default_constraint->value);
+        }
+        else
+        {
+            old_values.push_back(DataToken({}, DataType::_NULL));
+        }
+
+        DataRow new_row = old_row;
+        new_row.tokens = std::move(old_values);
+        return new_row;
+    }
+
     void
     DDLService::add_column(
         const std::string& table_name,
@@ -226,23 +269,7 @@ namespace storage
                 if (has_flag(row.flags, DataRowFlags::OBSOLETE))
                     continue;
 
-                auto old_row = row;
-                auto old_values = old_row.tokens;
-                if (new_column.has_constraint<MetaNotNullConstraint>())
-                {
-                    auto* default_constraint = new_column.get_constraint<MetaDefaultConstraint>();
-                    assert(default_constraint &&
-                        "Semantic analyzer invariant violated: NOT NULL column without default");
-
-                    old_values.push_back(default_constraint->value);
-                }
-                else
-                {
-                    old_values.push_back(DataToken({}, DataType::_NULL));
-                }
-
-                DataRow new_row = old_row;
-                new_row.tokens = std::move(old_values);
+                DataRow new_row = extend_row(row, new_column);
                 auto size = io_manager_.estimate_size(new_row);
 
                 DataPage* destination =
@@ -250,6 +277,7 @@ namespace storage
                         ? reading_page
                         : buffer_pool_.prepare_dp(size, *mt, txn.get_id());
 
+                const DataRow old_row = row;
                 row.flags |= DataRowFlags::OBSOLETE;
                 UpdateRecord update_record(mt->id, reading_page->id, old_row, row);
                 txn.append_log(update_record);
@@ -263,21 +291,9 @@ namespace storage
                     buffer_pool_.dirty_dp(reading_page->id, txn.get_id());
                 }
 
-                destination->rows.push_back(new_row);
-                destination->rows_count = destination->rows.size();
-                destination->size += size;
-                destination->min_rid =
-                    destination->rows_count == 1
-                        ? new_row.id
-                        : std::min(destination->min_rid, new_row.id);
-                destination->max_rid = std::max(destination->max_rid, new_row.id);
-
-                mt->total_rows++;
-
                 InsertRecord insert_record(mt->id, destination->id, new_row);
                 txn.append_log(insert_record);
-                destination->last_lsn = txn.get_last_lsn();
-                buffer_pool_.dirty_dp(destination->id, txn.get_id());
+                buffer_pool_.append_row(destination, *mt, new_row, txn.get_last_lsn(), txn.get_id());
             }
         }
 
@@ -314,7 +330,6 @@ namespace storage
         const std::string& column_name,
         const std::string& schema_name,
         bool is_unique,
-        bool is_primary,
         txn::Transaction& txn
     )
     {
@@ -328,7 +343,6 @@ namespace storage
         mi.column_id = column.id;
         mi.key_type = column.type;
         mi.is_unique = is_unique;
-        mi.is_primary = is_primary;
         mi.table_id = table->id;
 
         CreateIndexRecord record(mi);
@@ -341,7 +355,7 @@ namespace storage
             throw std::runtime_error("Index column not found in table schema");
 
         // Pre-validate unique constraint on existing data before creating index file
-        if (is_primary || is_unique)
+        if (is_unique)
         {
             auto pages = buffer_pool_.get_table_data(table->id);
             std::unordered_set<std::string> seen_values;

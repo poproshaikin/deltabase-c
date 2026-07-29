@@ -18,6 +18,12 @@ namespace storage
         wal::IWALManager& wal_manager_;
         IIOManager& io_manager_;
 
+        types::MetaColumn
+        resolve_column(const types::ColumnDefinition& column_def, const types::MetaTable& mt);
+
+        types::DataRow
+        extend_row(const types::DataRow& old_row, const types::MetaColumn& new_column);
+
     public:
         explicit
         DDLService(
@@ -76,12 +82,11 @@ namespace storage
 
         void
         create_index(
-            const std::string& string,
+            const std::string& index_name,
             const std::string& table_name,
             const std::string& column_name,
             const std::string& schema_name,
             bool is_unique,
-            bool is_primary,
             txn::Transaction& txn);
 
         bool

@@ -68,6 +68,14 @@ namespace storage
         types::DataPage*
         prepare_dp(size_t size, const types::MetaTable& mt, const types::TxnId& txn_id);
 
+        void
+        append_row(
+            types::DataPage* destination,
+            types::MetaTable& mt,
+            const types::DataRow& new_row,
+            types::LSN lsn,
+            types::UUID txn_id);
+
         std::vector<types::DataPage*>
         get_table_data(const types::UUID& table_id);
 

@@ -31,11 +31,6 @@ namespace types
         MetaTable();
 
         DataRow
-        make_row(
-            const std::optional<std::vector<std::string>>& cols,
-            const std::vector<DataToken>& row);
-
-        DataRow
         make_row(const std::vector<DataToken>& normalized_row);
 
         bool
@@ -53,11 +48,11 @@ namespace types
         bool
         is_unique(const std::string& col_name) const;
 
-        bool
-        is_primary_key(const std::string& col_name) const;
+        std::vector<MetaIndex*>
+        get_indexes(const std::string& col_name, bool only_unique = false);
 
-        bool
-        is_foreign_key(const std::string& col_name) const;
+        std::vector<const MetaIndex*>
+        get_indexes(const std::string& col_name, bool only_unique = false) const;
 
         // -1 if not found
         int64_t

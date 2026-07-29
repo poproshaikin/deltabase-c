@@ -41,11 +41,14 @@ namespace types
         OnDeleteFkAction action;
     };
 
+    struct MetaPrimaryKeyConstraint {};
+
     using ColumnConstraint = std::variant<
         MetaNotNullConstraint,
         MetaDefaultConstraint,
         MetaAutoIncrementConstraint,
-        MetaForeignKeyConstraint
+        MetaForeignKeyConstraint,
+        MetaPrimaryKeyConstraint
     >;
 
     struct MetaColumn
@@ -58,9 +61,6 @@ namespace types
 
         explicit
         MetaColumn() = default;
-
-        explicit
-        MetaColumn(const ColumnDefinition& def);
 
         explicit
         MetaColumn(const std::string& name, DataType type, const std::vector<ColumnConstraint>& constraints);

@@ -65,6 +65,8 @@ namespace storage
 
         types::MetaTable*
         get_table(const types::UUID& id);
+        const types::MetaTable*
+        get_table(const types::UUID& id) const;
         types::MetaTable*
         get_table(const std::string& name, const types::UUID& schema_id);
 

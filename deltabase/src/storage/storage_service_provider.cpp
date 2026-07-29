@@ -60,7 +60,15 @@ namespace storage
         dql_ = std::make_unique<DqlService>(*buffer_pool_);
         dml_ = std::make_unique<DMLService>(*ddl_, *buffer_pool_, *io_manager_);
         row_preprocessor_ = std::make_unique<RowPreprocessor>(*catalog_, *io_manager_);
-        constraint_enforcer_ = std::make_unique<ConstraintEnforcer>(*dql_);
+        constraint_enforcer_ = std::make_unique<ConstraintEnforcer>(*dql_, *catalog_);
+
+        if (!ddl_->exists_schema(cfg_.default_schema))
+        {
+            auto txn = txn_manager_->make_transaction();
+            txn.begin();
+            ddl_->create_schema(cfg_.default_schema, txn);
+            txn.commit();
+        }
     }
 
     StorageServiceProvider::~StorageServiceProvider()

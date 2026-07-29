@@ -62,7 +62,8 @@ namespace storage
 
             if (key.type == DataType::_NULL)
             {
-                if (mi.is_primary)
+                const auto& indexed_col = mt.get_column(mi.column_id);
+                if (indexed_col.has_constraint<MetaPrimaryKeyConstraint>())
                     throw EngineException(
                         "PRIMARY KEY column cannot be NULL",
                         EngineException::Code::NOT_NULL_VIOLATION);
@@ -106,19 +107,16 @@ namespace storage
         if (mt.indexes.size() > 0)
             touched_indexes = insert_row_into_indexes(mt, new_row, page->id);
 
-        page->rows.push_back(new_row);
-
         InsertRecord insert_record(mt.id, page->id, new_row);
         UpdateTableRecord update_table_record(mt_unchanged, mt);
         txn.append_log(insert_record);
         txn.append_log(update_table_record);
         const LSN page_lsn = txn.get_last_lsn();
 
-        page->last_lsn = page_lsn;
+        buffer_pool_.append_row(page, mt, new_row, page_lsn, txn.get_id());
+
         for (const auto& index_id : touched_indexes)
             buffer_pool_.set_if_lsn(index_id, page_lsn);
-
-        buffer_pool_.dirty_dp(page->id, txn.get_id());
     }
 
     void

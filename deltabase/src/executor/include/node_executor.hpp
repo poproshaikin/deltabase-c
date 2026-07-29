@@ -60,7 +60,7 @@ namespace exq
         IndexScanNodeExecutor(
             const types::MetaTable& mt,
             const types::IndexId& index_id,
-            types::BinaryExpr condition,
+            const types::BinaryExpr& condition,
             storage::StorageServiceProvider& service_provider
         );
 
@@ -119,7 +119,7 @@ namespace exq
         explicit
         FilterNodeExecutor(
             const types::MetaTable& table,
-            types::BinaryExpr&& condition,
+            const types::BinaryExpr& condition,
             std::unique_ptr<INodeExecutor> child
         );
 
@@ -395,7 +395,6 @@ namespace exq
         std::string table_name_;
         std::string schema_name_;
         bool is_unique_;
-        bool is_primary_;
 
         storage::StorageServiceProvider& service_provider_;
         types::ExecutionContext& ctx_;
@@ -408,7 +407,6 @@ namespace exq
             const std::string& column_name,
             const std::string& schema_name,
             bool is_unique,
-            bool is_primary,
             storage::StorageServiceProvider& service_provider,
             types::ExecutionContext& ctx
         );

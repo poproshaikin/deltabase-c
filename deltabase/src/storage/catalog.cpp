@@ -127,6 +127,13 @@ namespace storage
         return it == tables_.end() ? nullptr : &it->second;
     }
 
+    const types::MetaTable*
+    CatalogCache::get_table(const types::UUID& id) const
+    {
+        auto it = tables_.find(id);
+        return it == tables_.end() ? nullptr : &it->second;
+    }
+
     types::MetaTable*
     CatalogCache::get_table(const std::string& name, const types::UUID& schema_id)
     {

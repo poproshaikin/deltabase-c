@@ -49,10 +49,10 @@ namespace exq
 
     FilterNodeExecutor::FilterNodeExecutor(
         const MetaTable& table,
-        BinaryExpr&& condition,
+        const BinaryExpr& condition,
         std::unique_ptr<INodeExecutor> child
     )
-        : condition_(std::move(condition)), evaluator_(table), table_(table),
+        : condition_(condition), evaluator_(table), table_(table),
           child_(std::move(child))
     {
     }
@@ -108,10 +108,10 @@ namespace exq
     IndexScanNodeExecutor::IndexScanNodeExecutor(
         const MetaTable& mt,
         const IndexId& index_id,
-        BinaryExpr condition,
+        const BinaryExpr& condition,
         storage::StorageServiceProvider& service_provider
     )
-        : index_id_(index_id), condition_(std::move(condition)),
+        : index_id_(index_id), condition_(condition),
           service_provider_(service_provider), mt_(mt)
     {
     }
@@ -307,6 +307,7 @@ namespace exq
 
         auto& dml = service_provider_.dml();
         auto& row_preprocessor = service_provider_.preprocessor();
+        auto& constraint_enforcer = service_provider_.enforcer();
 
         int inserted_count = 0;
 
@@ -318,6 +319,8 @@ namespace exq
 
             auto normalized_row = row.tokens;
             row_preprocessor.prepare_row(mt_, col_names_, normalized_row, *ctx_.txn);
+
+            constraint_enforcer.validate_or_throw(mt_, normalized_row);
 
             dml.insert_row(mt_, normalized_row, *ctx_.txn);
             inserted_count++;
@@ -603,12 +606,11 @@ namespace exq
         const std::string& column_name,
         const std::string& schema_name,
         bool is_unique,
-        bool is_primary,
         storage::StorageServiceProvider& service_provider,
         ExecutionContext& ctx
     )
         : index_name_(index_name), column_name_(column_name), table_name_(table_name),
-          schema_name_(schema_name), is_unique_(is_unique), is_primary_(is_primary),
+          schema_name_(schema_name), is_unique_(is_unique),
           service_provider_(service_provider), ctx_(ctx)
     {
     }
@@ -627,7 +629,6 @@ namespace exq
             column_name_,
             schema_name_,
             is_unique_,
-            is_primary_,
             *ctx_.txn);
         return false;
     }
@@ -728,9 +729,9 @@ namespace exq
         }
         case IPlanNode::Type::INDEX_SCAN:
         {
-            auto& n = static_cast<IndexScanPlanNode&>(node);
+            const auto& n = static_cast<const IndexScanPlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
-            return std::make_unique<IndexScanNodeExecutor>(mt, n.index_id, std::move(n.condition), ssp);
+            return std::make_unique<IndexScanNodeExecutor>(mt, n.index_id, n.condition, ssp);
         }
         case IPlanNode::Type::VIRTUAL_TABLE:
         {
@@ -739,76 +740,76 @@ namespace exq
         }
         case IPlanNode::Type::FILTER:
         {
-            auto& n = static_cast<FilterPlanNode&>(node);
+            const auto& n = static_cast<const FilterPlanNode&>(node);
             return std::make_unique<FilterNodeExecutor>(
-                n.table, std::move(n.where), from_plan(*n.child, ssp, ctx));
+                n.table, n.where, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::PROJECT:
         {
-            auto& n = static_cast<ProjectPlanNode&>(node);
+            const auto& n = static_cast<const ProjectPlanNode&>(node);
             return std::make_unique<ProjectionNodeExecutor>(
                 n.table, n.columns, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::LIMIT:
         {
-            auto& n = static_cast<LimitPlanNode&>(node);
+            const auto& n = static_cast<const LimitPlanNode&>(node);
             return std::make_unique<LimitNodeExecutor>(n.limit, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::INSERT:
         {
-            auto& n = static_cast<InsertPlanNode&>(node);
+            const auto& n = static_cast<const InsertPlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<InsertNodeExecutor>(
                 mt, ssp, n.column_names, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::VALUES:
         {
-            auto& n = static_cast<ValuesPlanNode&>(node);
+            const auto& n = static_cast<const ValuesPlanNode&>(node);
             return std::make_unique<ValuesNodeExecutor>(n.values);
         }
         case IPlanNode::Type::UPDATE:
         {
-            auto& n = static_cast<UpdatePlanNode&>(node);
+            const auto& n = static_cast<const UpdatePlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<UpdateNodeExecutor>(
                 mt, ssp, n.assignments, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::DELETE:
         {
-            auto& n = static_cast<DeletePlanNode&>(node);
+            const auto& n = static_cast<const DeletePlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<DeleteNodeExecutor>(
                 mt, ssp, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::CREATE_TABLE:
         {
-            auto& n = static_cast<CreateTablePlanNode&>(node);
+            const auto& n = static_cast<const CreateTablePlanNode&>(node);
             return std::make_unique<CreateTableNodeExecutor>(n.table_name, n.schema, n.columns, ssp, ctx);
         }
         case IPlanNode::Type::ALTER_TABLE:
         {
-            auto& n = static_cast<AlterTablePlanNode&>(node);
+            const auto& n = static_cast<const AlterTablePlanNode&>(node);
             return std::make_unique<AlterTableNodeExecutor>(n.table_name, n.schema, n.operations, ssp, ctx);
         }
         case IPlanNode::Type::CREATE_DB:
         {
-            auto& n = static_cast<CreateDbPlanNode&>(node);
+            const auto& n = static_cast<const CreateDbPlanNode&>(node);
             return std::make_unique<CreateDbNodeExecutor>(n.db_name);
         }
         case IPlanNode::Type::CREATE_INDEX:
         {
-            auto& n = static_cast<CreateIndexPlanNode&>(node);
+            const auto& n = static_cast<const CreateIndexPlanNode&>(node);
             return std::make_unique<CreateIndexNodeExecutor>(
-                n.index_name, n.table_name, n.column_name, n.schema_name, n.is_unique, n.is_primary, ssp, ctx);
+                n.index_name, n.table_name, n.column_name, n.schema_name, n.is_unique, ssp, ctx);
         }
         case IPlanNode::Type::DROP_INDEX:
         {
-            auto& n = static_cast<DropIndexPlanNode&>(node);
+            const auto& n = static_cast<const DropIndexPlanNode&>(node);
             return std::make_unique<DropIndexNodeExecutor>(n.index_name, n.table_name, n.schema_name, ssp, ctx);
         }
         case IPlanNode::Type::DROP_TABLE:
         {
-            auto& n = static_cast<DropTablePlanNode&>(node);
+            const auto& n = static_cast<const DropTablePlanNode&>(node);
             return std::make_unique<DropTableNodeExecutor>(n.table_name, n.schema_name, ssp, ctx);
         }
         default:

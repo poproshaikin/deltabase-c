@@ -122,7 +122,6 @@ namespace storage
         stream.write(&constraints_count, sizeof(uint64_t));
         for (const auto& c : column.constraints)
         {
-            // write a tag and payload depending on variant
             if (std::holds_alternative<MetaNotNullConstraint>(c))
             {
                 uint8_t tag = 0;
@@ -143,9 +142,18 @@ namespace storage
                 const auto& ai = std::get<MetaAutoIncrementConstraint>(c);
                 stream.write_uuid(ai.sequence_id);
             }
-            else
+            else if (std::holds_alternative<MetaForeignKeyConstraint>(c))
             {
-                uint8_t tag = 255;
+                uint8_t tag = 3;
+                stream.write(&tag, sizeof(uint8_t));
+                const auto& fk = std::get<MetaForeignKeyConstraint>(c);
+                stream.write_uuid(fk.referenced_table_id);
+                stream.write_uuid(fk.referenced_column_id);
+                stream.write(&fk.action, sizeof(fk.action));
+            }
+            else if (std::holds_alternative<MetaPrimaryKeyConstraint>(c))
+            {
+                uint8_t tag = 4;
                 stream.write(&tag, sizeof(uint8_t));
             }
         }
@@ -163,7 +171,6 @@ namespace storage
         stream.write(index.root_page_id.raw(), sizeof(uuid_t));
         write_str(index.name, stream);
         stream.write(&index.is_unique, sizeof(bool));
-        stream.write(&index.is_primary, sizeof(bool));
         stream.write(&index.key_type, sizeof(index.key_type));
 
         stream.seek(0);
@@ -448,8 +455,24 @@ namespace storage
                 out.constraints.push_back(std::move(constraint));
                 break;
             }
+            case 3:
+            {
+                MetaForeignKeyConstraint constraint;
+                if (!stream.read_uuid(constraint.referenced_table_id))
+                    return false;
+                if (!stream.read_uuid(constraint.referenced_column_id))
+                    return false;
+                int32_t action_raw;
+                if (!stream.read_i32(action_raw, false))
+                    return false;
+                constraint.action = static_cast<OnDeleteFkAction>(action_raw);
+                out.constraints.push_back(std::move(constraint));
+                break;
+            }
+            case 4:
+                out.constraints.emplace_back(MetaPrimaryKeyConstraint{});
+                break;
             default:
-                // unknown tag; fail
                 return false;
             }
         }
@@ -460,15 +483,6 @@ namespace storage
     bool
     StdStorageSerializer::deserialize_mi(ReadOnlyMemoryStream& stream, MetaIndex& out) const
     {
-        // stream.write(index.id.raw(), sizeof(uuid_t));
-        // stream.write(index.table_id.raw(), sizeof(uuid_t));
-        // stream.write(index.column_id.raw(), sizeof(uuid_t));
-        // stream.write(index.root_page_id.raw(), sizeof(uuid_t));
-        // write_str(index.name, stream);
-        // stream.write(&index.is_unique, sizeof(bool));
-        // stream.write(&index.is_primary, sizeof(bool));
-        // stream.write(&index.key_type, sizeof(index.key_type));
-
         if (stream.read(out.id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
             return false;
 
@@ -485,9 +499,6 @@ namespace storage
             return false;
 
         if (stream.read(&out.is_unique, sizeof(out.is_unique)) != sizeof(out.is_unique))
-            return false;
-
-        if (stream.read(&out.is_primary, sizeof(out.is_primary)) != sizeof(out.is_primary))
             return false;
 
         if (stream.read(&out.key_type, sizeof(out.key_type)) != sizeof(out.key_type))

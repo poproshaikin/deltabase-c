@@ -24,6 +24,41 @@ namespace storage
         std::vector<DataToken> & row,
         txn::Transaction & txn)
     {
+        const DataToken null_token(Bytes{}, DataType::_NULL);
+
+        // Step 1: map named columns to positional, fill gaps with NULL
+        std::vector<DataToken> normalized(mt.columns.size(), null_token);
+
+        if (!cols.has_value())
+        {
+            for (size_t i = 0; i < row.size() && i < mt.columns.size(); ++i)
+                normalized[i] = row[i];
+        }
+        else
+        {
+            for (size_t i = 0; i < cols->size(); ++i)
+            {
+                int64_t col_idx = mt.get_column_idx((*cols)[i]);
+                if (col_idx != -1 && i < row.size())
+                    normalized[static_cast<size_t>(col_idx)] = row[i];
+            }
+        }
+
+        // Step 2: apply DEFAULT for missing (NULL) positions
+        for (size_t i = 0; i < mt.columns.size(); ++i)
+        {
+            if (normalized[i].type == DataType::_NULL)
+            {
+                const auto* dc = mt.columns[i].get_constraint<MetaDefaultConstraint>();
+                if (dc)
+                    normalized[i] = dc->value;
+            }
+        }
+
+        row = std::move(normalized);
+        cols = std::nullopt;
+
+        // Step 3: AUTOINCREMENT — generate or sync sequence
         for (size_t i = 0; i < mt.columns.size(); ++i)
         {
             const auto& column = mt.columns[i];
@@ -31,71 +66,33 @@ namespace storage
             if (!ai)
                 continue;
 
-            bool caller_provided = false;
-            if (cols.has_value())
-            {
-                for (const auto& col_name : *cols)
-                    if (col_name == column.name)
-                    {
-                        caller_provided = true;
-                        break;
-                    }
-            }
-            else
-            {
-                caller_provided = (i < row.size() && row[i].type != DataType::_NULL);
-            }
-
-            if (caller_provided)
-            {
-                if (!cols.has_value())
-                    continue;
-
-                auto it = std::ranges::find(*cols, column.name);
-                if (it != cols->end())
-                {
-                    const size_t idx = static_cast<size_t>(std::distance(cols->begin(), it));
-                    if (idx < row.size() && row[idx].type == DataType::INTEGER)
-                    {
-                        int32_t provided_val = 0;
-                        std::memcpy(&provided_val, row[idx].bytes.data(), sizeof(int32_t));
-
-                        auto* seq = catalog_.get_sequence(ai->sequence_id);
-                        if (seq && provided_val >= seq->current_value)
-                        {
-                            const MetaSequence before = *seq;
-                            seq->current_value = provided_val;
-
-                            UpdateSequenceRecord seq_record(before, *seq);
-                            txn.append_log(seq_record);
-                            io_manager_.write_seq(*seq);
-                        }
-                    }
-                }
-            }
-
             auto* seq = catalog_.get_sequence(ai->sequence_id);
             if (!seq)
                 throw std::runtime_error("Sequence for autoincrement column not found");
+
+            if (row[i].type != DataType::_NULL)
+            {
+                // Caller provided an explicit value — sync sequence if needed
+                int32_t provided_val = 0;
+                std::memcpy(&provided_val, row[i].bytes.data(), sizeof(int32_t));
+
+                if (provided_val >= seq->current_value)
+                {
+                    const MetaSequence before = *seq;
+                    seq->current_value = provided_val;
+                    UpdateSequenceRecord seq_record(before, *seq);
+                    txn.append_log(seq_record);
+                    io_manager_.write_seq(*seq);
+                }
+                continue;
+            }
 
             const MetaSequence before = *seq;
             const int new_val = ++seq->current_value;
 
             Bytes val_bytes(sizeof(int));
             std::memcpy(val_bytes.data(), &new_val, sizeof(int));
-            DataToken token(val_bytes, DataType::INTEGER);
-
-            if (cols.has_value())
-            {
-                cols->push_back(column.name);
-                row.push_back(token);
-            }
-            else
-            {
-                if (row.size() <= i)
-                    row.resize(i + 1, DataToken(Bytes{}, DataType::_NULL));
-                row[i] = token;
-            }
+            row[i] = DataToken(val_bytes, DataType::INTEGER);
 
             UpdateSequenceRecord seq_record(before, *seq);
             txn.append_log(seq_record);

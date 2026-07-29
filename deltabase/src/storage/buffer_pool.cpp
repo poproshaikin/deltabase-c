@@ -47,7 +47,7 @@ namespace storage
 
         auto it = data_pages_per_table_.find(mt.id);
         if (it == data_pages_per_table_.end())
-            data_pages_per_table_[mt.id] = { id };
+            data_pages_per_table_[mt.id] = {id};
         else
             data_pages_per_table_.at(mt.id).push_back(id);
 
@@ -122,6 +122,22 @@ namespace storage
         }
 
         return new_page;
+    }
+
+    void
+    BufferPool::append_row(DataPage* destination, MetaTable& mt, const DataRow& new_row, LSN lsn, UUID txn_id)
+    {
+        destination->rows.push_back(new_row);
+        destination->rows_count = destination->rows.size();
+        destination->size += io_.estimate_size(new_row);
+        destination->min_rid =
+            destination->rows_count == 1
+                ? new_row.id
+                : std::min(destination->min_rid, new_row.id);
+        destination->max_rid = std::max(destination->max_rid, new_row.id);
+        mt.total_rows++;
+        destination->last_lsn = lsn;
+        dirty_dp(destination->id, txn_id);
     }
 
     std::vector<DataPage*>

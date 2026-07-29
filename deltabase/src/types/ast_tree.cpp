@@ -22,4 +22,22 @@ namespace types
         : type(type), value(std::move(value))
     {
     }
+
+    BinaryExpr::BinaryExpr(const BinaryExpr& other)
+        : op(other.op),
+          left(other.left ? std::make_unique<AstNode>(*other.left) : nullptr),
+          right(other.right ? std::make_unique<AstNode>(*other.right) : nullptr)
+    {
+    }
+
+    BinaryExpr& BinaryExpr::operator=(const BinaryExpr& other)
+    {
+        if (this != &other)
+        {
+            op = other.op;
+            left = other.left ? std::make_unique<AstNode>(*other.left) : nullptr;
+            right = other.right ? std::make_unique<AstNode>(*other.right) : nullptr;
+        }
+        return *this;
+    }
 }

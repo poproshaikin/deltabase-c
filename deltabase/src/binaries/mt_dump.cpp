@@ -78,8 +78,14 @@ namespace
                 const auto& ai = std::get<MetaAutoIncrementConstraint>(c);
                 parts.emplace_back("AUTOINCREMENT(seq=" + ai.sequence_id.to_string() + ")");
             }
-            else
-                parts.emplace_back("UNKNOWN");
+            else if (std::holds_alternative<MetaForeignKeyConstraint>(c))
+            {
+                const auto& fk = std::get<MetaForeignKeyConstraint>(c);
+                parts.emplace_back("FK(table=" + fk.referenced_table_id.to_string() +
+                                   " col=" + fk.referenced_column_id.to_string() + ")");
+            }
+            else if (std::holds_alternative<MetaPrimaryKeyConstraint>(c))
+                parts.emplace_back("PK");
         }
 
         std::ostringstream out;

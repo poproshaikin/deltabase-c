@@ -28,6 +28,7 @@ public:
         UNIQUE_VIOLATION,
         NOT_NULL_VIOLATION,
         CHECK_VIOLATION,
+        FOREIGN_KEY_VIOLATION,
 
         // SQL syntax / parsing
         SYNTAX_ERROR,

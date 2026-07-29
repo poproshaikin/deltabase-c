@@ -523,8 +523,7 @@ namespace exq
             table_name,
             schema_name,
             column_name,
-            stmt.is_unique,
-            stmt.is_primary);
+            stmt.is_unique);
 
         QueryPlan plan;
         plan.root = std::move(root);

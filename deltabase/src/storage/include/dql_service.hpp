@@ -35,6 +35,12 @@ namespace storage
             const types::MetaTable& mt,
             const types::IndexId& index_id,
             const types::BinaryExpr& condition);
+
+        bool
+        value_exists(
+            const types::MetaTable& mt,
+            const std::string& column_name,
+            const types::DataToken& value);
     };
 }
 
