@@ -4,7 +4,6 @@
 
 #include "detached_file_io_manager.hpp"
 
-#include "detached_db_instance.hpp"
 #include "path.hpp"
 #include "../../misc/include/exceptions.hpp"
 

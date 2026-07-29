@@ -461,7 +461,7 @@ namespace storage
         auto* table = get_table(table_name, schema_name);
         auto* index = get_index(index_name, table_name, schema_name);
         if (!index)
-            throw std::runtime_error("StdDbInstance::drop_index");
+            throw std::runtime_error("DDLService::drop_index: index not found");
 
         const auto index_unchanged = *index;
 

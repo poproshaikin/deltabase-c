@@ -12,7 +12,6 @@
 #include "storage_service_provider.hpp"
 #include "../../sql/include/parser.hpp"
 #include "../../types/include/execution_result.hpp"
-#include "../../storage/include/db_instance.hpp"
 #include "../../types/include/config.hpp"
 #include "../../executor/include/node_executor.hpp"
 #include "../../executor/include/planner.hpp"

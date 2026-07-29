@@ -33,7 +33,7 @@ namespace engine
         Config cfg;
         if (StdStorageSerializer serializer; !serializer.deserialize_cfg(stream, cfg))
             throw std::runtime_error(
-                "StdDbInstance::load_config: failed to load config at path " + cfg_path.string()
+                "Engine::load_config: failed to load config at path " + cfg_path.string()
             );
 
         return cfg;
