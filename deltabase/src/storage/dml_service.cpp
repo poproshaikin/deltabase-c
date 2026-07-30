@@ -119,6 +119,29 @@ namespace storage
             buffer_pool_.set_if_lsn(index_id, page_lsn);
     }
 
+    DataRow
+    DMLService::apply_row_update(
+        const MetaTable& mt,
+        const DataRow& old_row,
+        const RowUpdate& update)
+    {
+        DataRow new_row = old_row;
+        for (const auto& assignment : update)
+        {
+            int64_t col_idx = mt.get_column_idx(
+                std::visit([](auto& a) { return a.first; }, assignment));
+
+            if (const auto* lit = std::get_if<AssignLiteral>(&assignment))
+                new_row.tokens[col_idx] = lit->second;
+            else
+            {
+                const auto* col = std::get_if<AssignColumn>(&assignment);
+                new_row.tokens[col_idx] = old_row.tokens[mt.get_column_idx(col->second)];
+            }
+        }
+        return new_row;
+    }
+
     void
     DMLService::update_selected(
         types::MetaTable& mt,

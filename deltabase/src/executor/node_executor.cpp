@@ -413,8 +413,8 @@ namespace exq
             if (!child_->next(row))
                 break;
 
-            row_preprocessor.prepare_row(mt_, std::nullopt, row.tokens, *ctx_.txn);
-            constraint_enforcer.validate_or_throw(mt_, row.tokens);
+            DataRow new_row = dml.apply_row_update(mt_, row, assignments_);
+            constraint_enforcer.validate_or_throw(mt_, new_row.tokens);
 
             rows.push_back(std::move(row));
             updated_count++;

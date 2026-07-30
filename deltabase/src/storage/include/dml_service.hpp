@@ -39,6 +39,12 @@ namespace storage
             std::vector<types::DataToken> normalized_row,
             txn::Transaction& txn);
 
+        types::DataRow
+        apply_row_update(
+            const types::MetaTable& mt,
+            const types::DataRow& old_row,
+            const types::RowUpdate& update);
+
         void
         update_selected(
             types::MetaTable& mt,
