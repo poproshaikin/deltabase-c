@@ -60,7 +60,7 @@ namespace storage
         dql_ = std::make_unique<DQLService>(*buffer_pool_);
         dml_ = std::make_unique<DMLService>(*ddl_, *buffer_pool_, *io_manager_);
         row_preprocessor_ = std::make_unique<RowPreprocessor>(*catalog_, *io_manager_);
-        constraint_enforcer_ = std::make_unique<ConstraintEnforcer>(*dql_, *catalog_);
+        constraint_enforcer_ = std::make_unique<ConstraintEnforcer>(*dql_, *dml_, *catalog_);
 
         if (!ddl_->exists_schema(cfg_.default_schema))
         {

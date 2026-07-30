@@ -56,7 +56,6 @@ namespace storage
         }
 
         row = std::move(normalized);
-        cols = std::nullopt;
 
         // Step 3: AUTOINCREMENT — generate or sync sequence
         for (size_t i = 0; i < mt.columns.size(); ++i)
