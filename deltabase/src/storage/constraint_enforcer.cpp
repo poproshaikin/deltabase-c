@@ -77,19 +77,23 @@ namespace storage
             break;
         case OnDeleteFkAction::CASCADE:
         {
+            if (!txn)
+                throw std::logic_error("on_delete: transaction required for CASCADE");
             auto rows = dql_.get_rows_with_value(current_table, col.name, token);
             for (const auto& child_row : rows)
                 on_delete(current_table, child_row, txn);
-            dml_.delete_selected(current_table, rows, txn);
+            dml_.delete_selected(current_table, rows, *txn);
             break;
         }
         case OnDeleteFkAction::SET_NULL:
         {
+            if (!txn)
+                throw std::logic_error("on_delete: transaction required for SET_NULL");
             auto rows = dql_.get_rows_with_value(current_table, col.name, token);
             RowUpdate update = {
                 AssignLiteral{col.id, DataToken({}, DataType::_NULL)}
             };
-            dml_.update_selected(current_table, update, rows, txn);
+            dml_.update_selected(current_table, update, rows, *txn);
             break;
         }
         case OnDeleteFkAction::NO_ACTION:
