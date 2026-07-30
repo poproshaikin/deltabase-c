@@ -14,12 +14,12 @@
 
 namespace storage
 {
-    class DqlService
+    class DQLService
     {
         BufferPool& buffer_pool_;
 
     public:
-        explicit DqlService(BufferPool& buffer_pool);
+        explicit DQLService(BufferPool& buffer_pool);
 
         types::DataTable
         seq_scan(const types::MetaTable& mt);
@@ -41,6 +41,12 @@ namespace storage
             const types::MetaTable& mt,
             const std::string& column_name,
             const types::DataToken& value);
+
+        std::vector<types::DataRow>
+        get_rows_with_value(
+            const types::MetaTable& mt,
+            const std::string& col_name,
+            const types::DataToken& token);
     };
 }
 

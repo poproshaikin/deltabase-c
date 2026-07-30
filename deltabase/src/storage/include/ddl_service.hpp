@@ -123,6 +123,9 @@ namespace storage
 
         std::vector<types::MetaSchema*>
         get_all_schemas() const;
+
+        void
+        throw_if_referenced(const types::TableId& table_id) const;
     };
 }
 

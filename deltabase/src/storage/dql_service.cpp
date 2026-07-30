@@ -17,13 +17,13 @@ namespace storage
     using namespace types;
     using namespace misc;
 
-    DqlService::DqlService(BufferPool& buffer_pool)
+    DQLService::DQLService(BufferPool& buffer_pool)
         : buffer_pool_(buffer_pool)
     {
     }
 
     DataTable
-    DqlService::seq_scan(const MetaTable& mt)
+    DQLService::seq_scan(const MetaTable& mt)
     {
         DataTable dt;
         dt.output_schema = convert(mt);
@@ -38,7 +38,7 @@ namespace storage
     }
 
     ScanCursor
-    DqlService::seq_scan_begin(const MetaTable& mt)
+    DQLService::seq_scan_begin(const MetaTable& mt)
     {
         const auto pages = buffer_pool_.get_table_data(mt.id);
 
@@ -88,7 +88,7 @@ namespace storage
     }
 
     bool
-    DqlService::seq_scan_next(ScanCursor& cursor, DataRow& out)
+    DQLService::seq_scan_next(ScanCursor& cursor, DataRow& out)
     {
         if (!cursor.initialized)
             return false;
@@ -120,7 +120,7 @@ namespace storage
     }
 
     DataTable
-    DqlService::index_scan(
+    DQLService::index_scan(
         const MetaTable& mt,
         const IndexId& index_id,
         const BinaryExpr& condition)
@@ -276,7 +276,7 @@ namespace storage
     }
 
     bool
-    DqlService::value_exists(
+    DQLService::value_exists(
         const MetaTable& mt,
         const std::string& column_name,
         const DataToken& value)
@@ -300,5 +300,23 @@ namespace storage
                 return true;
 
         return false;
+    }
+
+    std::vector<DataRow>
+    DQLService::get_rows_with_value(
+        const MetaTable& mt,
+        const std::string& col_name,
+        const DataToken& token)
+    {
+        std::vector<DataRow> rows;
+        int64_t col_idx = mt.get_column_idx(col_name);
+        auto cursor = seq_scan_begin(mt);
+
+        DataRow row;
+        while (seq_scan_next(cursor, row))
+            if (row.tokens[col_idx] == token)
+                rows.push_back(row);
+
+        return rows;
     }
 }

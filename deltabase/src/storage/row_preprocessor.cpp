@@ -20,7 +20,7 @@ namespace storage
     void
     RowPreprocessor::prepare_row(
         const MetaTable & mt,
-        std::optional<std::vector<std::string>> & cols,
+        const std::optional<std::vector<std::string>>& cols,
         std::vector<DataToken> & row,
         txn::Transaction & txn)
     {

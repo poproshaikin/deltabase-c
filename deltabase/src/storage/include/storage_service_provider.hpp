@@ -38,7 +38,7 @@ namespace storage
         // services (depend on infrastructure above)
         std::unique_ptr<DDLService> ddl_;
         std::unique_ptr<DMLService> dml_;
-        std::unique_ptr<DqlService> dql_;
+        std::unique_ptr<DQLService> dql_;
         std::unique_ptr<RowPreprocessor> row_preprocessor_;
         std::unique_ptr<ConstraintEnforcer> constraint_enforcer_;
 
@@ -61,7 +61,7 @@ namespace storage
         ddl();
         DMLService&
         dml();
-        DqlService&
+        DQLService&
         dql();
         RowPreprocessor&
         preprocessor();

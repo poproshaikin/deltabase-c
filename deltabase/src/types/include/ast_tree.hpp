@@ -164,6 +164,7 @@ namespace types
 
     enum class OnDeleteFkAction
     {
+        NO_ACTION = 0,
         RESTRICT,
         CASCADE,
         SET_NULL

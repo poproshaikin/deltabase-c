@@ -57,7 +57,7 @@ namespace storage
             *wal_manager_,
             *io_manager_);
 
-        dql_ = std::make_unique<DqlService>(*buffer_pool_);
+        dql_ = std::make_unique<DQLService>(*buffer_pool_);
         dml_ = std::make_unique<DMLService>(*ddl_, *buffer_pool_, *io_manager_);
         row_preprocessor_ = std::make_unique<RowPreprocessor>(*catalog_, *io_manager_);
         constraint_enforcer_ = std::make_unique<ConstraintEnforcer>(*dql_, *catalog_);
@@ -95,7 +95,7 @@ namespace storage
         return *dml_;
     }
 
-    DqlService&
+    DQLService&
     StorageServiceProvider::dql()
     {
         return *dql_;

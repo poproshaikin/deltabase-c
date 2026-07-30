@@ -96,6 +96,9 @@ namespace storage
         std::vector<types::MetaTable*>
         get_all_tables();
 
+        std::vector<types::MetaTable*>
+        get_all_tables(const types::SchemaId& schema_id);
+
         std::vector<types::MetaSchema*>
         get_all_schemas();
     };

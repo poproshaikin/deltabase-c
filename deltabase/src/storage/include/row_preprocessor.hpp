@@ -28,7 +28,7 @@ namespace storage
         void
         prepare_row(
             const types::MetaTable& mt,
-            std::optional<std::vector<std::string>>& cols,
+            const std::optional<std::vector<std::string>>& cols,
             std::vector<types::DataToken>& row,
             txn::Transaction& txn);
     };

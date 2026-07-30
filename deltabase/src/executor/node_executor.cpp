@@ -4,6 +4,8 @@
 
 #include "node_executor.hpp"
 
+#include "exceptions.hpp"
+
 #include <cassert>
 
 #include "../misc/include/convert.hpp"
@@ -319,7 +321,6 @@ namespace exq
 
             auto normalized_row = row.tokens;
             row_preprocessor.prepare_row(mt_, col_names_, normalized_row, *ctx_.txn);
-
             constraint_enforcer.validate_or_throw(mt_, normalized_row);
 
             dml.insert_row(mt_, normalized_row, *ctx_.txn);
@@ -400,6 +401,8 @@ namespace exq
             return false;
 
         auto& dml = service_provider_.dml();
+        auto& row_preprocessor = service_provider_.preprocessor();
+        auto& constraint_enforcer = service_provider_.enforcer();
 
         int updated_count = 0;
         std::vector<DataRow> rows;
@@ -409,6 +412,9 @@ namespace exq
             DataRow row;
             if (!child_->next(row))
                 break;
+
+            row_preprocessor.prepare_row(mt_, std::nullopt, row.tokens, *ctx_.txn);
+            constraint_enforcer.validate_or_throw(mt_, row.tokens);
 
             rows.push_back(std::move(row));
             updated_count++;
@@ -457,10 +463,14 @@ namespace exq
         if (executed_)
             return false;
 
+        auto& ddl = service_provider_.ddl();
         auto& dml = service_provider_.dml();
+        auto& enforcer = service_provider_.enforcer();
 
         int deleted_count = 0;
         std::vector<DataRow> rows;
+
+        ddl.throw_if_referenced(mt_.id);
 
         while (true)
         {
@@ -468,6 +478,7 @@ namespace exq
             if (!child_->next(row))
                 break;
 
+            enforcer.on_delete(mt_, row, ctx_.txn);
             rows.push_back(std::move(row));
             deleted_count++;
         }

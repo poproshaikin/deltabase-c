@@ -500,4 +500,23 @@ namespace storage
     {
         return catalog_.get_all_schemas();
     }
+
+    void
+    DDLService::throw_if_referenced(const TableId& table_id) const
+    {
+        const auto* mt = catalog_.get_table(table_id);
+
+        for (const auto* other : catalog_.get_all_tables())
+        {
+            if (other->id == table_id)
+                continue;
+
+            for (const auto& col : other->columns)
+                if (const auto* fk = col.get_constraint<MetaForeignKeyConstraint>())
+                    if (fk->referenced_table_id == table_id)
+                        throw EngineException(
+                            "cannot drop table '" + mt->name + "': referenced by column '" +
+                            col.name + "' in table '" + other->name + "'",
+                            EngineException::Code::FOREIGN_KEY_VIOLATION);
+    }
 }

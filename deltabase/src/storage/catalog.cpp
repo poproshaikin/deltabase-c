@@ -263,6 +263,19 @@ namespace storage
         return tables;
     }
 
+    std::vector<types::MetaTable*>
+    CatalogCache::get_all_tables(const types::SchemaId& schema_id)
+    {
+        std::vector<types::MetaTable*> tables;
+        tables.reserve(tables_.size());
+
+        for (auto& table : tables_ | std::views::values)
+            if (table.schema_id == schema_id)
+                tables.push_back(&table);
+
+        return tables;
+    }
+
     std::vector<types::MetaSchema*>
     CatalogCache::get_all_schemas()
     {
