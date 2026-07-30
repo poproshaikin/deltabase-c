@@ -518,5 +518,6 @@ namespace storage
                             "cannot drop table '" + mt->name + "': referenced by column '" +
                             col.name + "' in table '" + other->name + "'",
                             EngineException::Code::FOREIGN_KEY_VIOLATION);
+        }
     }
 }
