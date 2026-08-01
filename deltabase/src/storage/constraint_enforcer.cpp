@@ -98,6 +98,11 @@ namespace storage
         }
         case OnDeleteFkAction::NO_ACTION:
         default:
+            if (dql_.value_exists(current_table, col.name, token))
+                throw EngineException(
+                    "FOREIGN KEY violation: cannot delete from '" + deleted_from_table.name +
+                    "': value is referenced by '" + current_table.name + "." + col.name + "'",
+                    EngineException::Code::FOREIGN_KEY_VIOLATION);
             break;
         }
     }

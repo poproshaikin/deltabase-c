@@ -463,14 +463,11 @@ namespace exq
         if (executed_)
             return false;
 
-        auto& ddl = service_provider_.ddl();
         auto& dml = service_provider_.dml();
         auto& enforcer = service_provider_.enforcer();
 
         int deleted_count = 0;
         std::vector<DataRow> rows;
-
-        ddl.throw_if_referenced(mt_.id);
 
         while (true)
         {

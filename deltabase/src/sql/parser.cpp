@@ -188,7 +188,10 @@ namespace sql
                 stmt.columns.push_back(*current());
 
                 if (!advance() || !match(SqlSymbol::COMMA))
+                {
+                    current_--;
                     break;
+                }
             }
         }
         else
@@ -520,12 +523,18 @@ namespace sql
                 {
                     advance_or_throw();
                     match_or_throw(SqlKeyword::_NULL);
-
+                    advance();
                     action = OnDeleteFkAction::SET_NULL;
                 }
                 else if (match(SqlKeyword::CASCADE))
                 {
+                    advance();
                     action = OnDeleteFkAction::CASCADE;
+                }
+                else if (match(SqlKeyword::RESTRICT))
+                {
+                    advance();
+                    action = OnDeleteFkAction::RESTRICT;
                 }
             }
 

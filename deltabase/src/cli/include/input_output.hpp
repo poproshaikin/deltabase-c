@@ -19,7 +19,7 @@ namespace cli
         InputOutput(CliContext& ctx);
 
         std::string
-        get_command() const;
+        get_command();
 
         void
         write(const std::string& str) const;

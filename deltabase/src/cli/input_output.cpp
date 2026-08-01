@@ -6,6 +6,7 @@
 
 #include <ostream>
 #include <istream>
+#include <unistd.h>
 extern "C"
 {
 #include "../../third_party/linenoise-ng/linenoise.h"
@@ -18,13 +19,24 @@ namespace cli
     }
 
     std::string
-    InputOutput::get_command() const
+    InputOutput::get_command()
     {
+        if (!isatty(STDIN_FILENO))
+        {
+            std::string line;
+            if (!std::getline(ctx_.in, line))
+                ctx_.running = false;
+            return line;
+        }
+
         std::string prompt = (!ctx_.attached_db.empty() ? ctx_.attached_db : "db") + "> ";
 
         char* line = linenoise(prompt.c_str());
         if (!line)
-            return {}; // EOF (Ctrl+D)
+        {
+            ctx_.running = false;
+            return {};
+        }
 
         std::string command(line);
         free(line);

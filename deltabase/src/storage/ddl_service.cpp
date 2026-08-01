@@ -293,7 +293,11 @@ namespace storage
 
                 InsertRecord insert_record(mt->id, destination->id, new_row);
                 txn.append_log(insert_record);
-                buffer_pool_.append_row(destination, *mt, new_row, txn.get_last_lsn(), txn.get_id());
+                buffer_pool_.append_row(destination,
+                                        *mt,
+                                        new_row,
+                                        txn.get_last_lsn(),
+                                        txn.get_id());
             }
         }
 
@@ -479,11 +483,12 @@ namespace storage
 
         const auto index_unchanged = *index;
 
-        std::erase_if(table->indexes,
-                      [&index](MetaIndex& index_entry)
-                      {
-                          return index_entry.id == index->id;
-                      });
+        std::erase_if(
+            table->indexes,
+            [&index](MetaIndex& index_entry)
+            {
+                return index_entry.id == index->id;
+            });
 
         DropIndexRecord record(index_unchanged);
         txn.append_log(record);
