@@ -5,6 +5,7 @@
 #ifndef DELTABASE_AST_TREE_HPP
 #define DELTABASE_AST_TREE_HPP
 #include "sql_token.hpp"
+#include "config.hpp"
 
 #include <memory>
 #include <optional>
@@ -88,8 +89,10 @@ namespace types
 
         BinaryExpr() = default;
         BinaryExpr(BinaryExpr&&) = default;
-        BinaryExpr&
-        operator=(BinaryExpr&&) = default;
+        BinaryExpr& operator=(BinaryExpr&&) = default;
+
+        BinaryExpr(const BinaryExpr&);
+        BinaryExpr& operator=(const BinaryExpr&);
 
         std::string
         to_string() const;
@@ -109,6 +112,12 @@ namespace types
         )
             : table_name(std::move(table_name)), schema_name(std::move(schema_name))
         {
+        }
+
+        std::string
+        require_schema(const Config& cfg) const
+        {
+            return schema_name.has_value() ? schema_name.value().value : cfg.default_schema;
         }
     };
 
@@ -153,6 +162,21 @@ namespace types
     {
     };
 
+    enum class OnDeleteFkAction
+    {
+        NO_ACTION = 0,
+        RESTRICT,
+        CASCADE,
+        SET_NULL
+    };
+
+    struct ForeignKeyConstraint
+    {
+        TableIdentifier referenced_table;
+        SqlToken referenced_column;
+        OnDeleteFkAction action;
+    };
+
     struct AutoIncrementConstraint
     {
     };
@@ -171,6 +195,7 @@ namespace types
     using Constraint = std::variant<
         NotNullConstraint,
         PrimaryKeyConstraint,
+        ForeignKeyConstraint,
         AutoIncrementConstraint,
         DefaultConstraint
     >;
@@ -214,7 +239,6 @@ namespace types
         SqlToken index_name;
         SqlToken column_name;
         bool is_unique;
-        bool is_primary;
     };
 
     struct DropIndexStmt

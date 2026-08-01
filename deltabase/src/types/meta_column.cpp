@@ -13,9 +13,4 @@ namespace types
     {
     }
 
-    MetaColumn::MetaColumn(const ColumnDefinition& def)
-    {
-        *this = misc::convert(def);
-    }
-
 }

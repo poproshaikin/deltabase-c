@@ -65,6 +65,8 @@ namespace storage
 
         types::MetaTable*
         get_table(const types::UUID& id);
+        const types::MetaTable*
+        get_table(const types::UUID& id) const;
         types::MetaTable*
         get_table(const std::string& name, const types::UUID& schema_id);
 
@@ -77,7 +79,8 @@ namespace storage
         get_schema(const types::UUID& id);
         types::MetaSchema*
         get_schema(const std::string& name);
-        void
+        types::MetaSchema
+        *
         save_schema(const types::MetaSchema& ms, const types::UUID& txn_id);
         void
         delete_schema(const types::UUID& schema_id, const types::UUID& txn_id);
@@ -92,6 +95,9 @@ namespace storage
 
         std::vector<types::MetaTable*>
         get_all_tables();
+
+        std::vector<types::MetaTable*>
+        get_all_tables(const types::SchemaId& schema_id);
 
         std::vector<types::MetaSchema*>
         get_all_schemas();

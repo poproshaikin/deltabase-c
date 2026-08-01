@@ -32,6 +32,9 @@ namespace storage
         void
         init() override;
 
+        void
+        init_wal() override {}
+
         bool
         exists_db(const std::string& name) override;
 

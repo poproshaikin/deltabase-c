@@ -16,8 +16,8 @@ namespace exq
 {
     using namespace types;
 
-    SemanticAnalyzer::SemanticAnalyzer(const Config& config, storage::IDbInstance& db)
-        : db_(db), config_(config), generic_validator_(config), info_schema_provider_(db)
+    SemanticAnalyzer::SemanticAnalyzer(const Config& config, storage::StorageServiceProvider& ssp)
+        : ssp_(ssp), config_(config), generic_validator_(config), info_schema_provider_(ssp)
     {
     }
 
@@ -80,11 +80,11 @@ namespace exq
         }
         else
         {
-            if (!db_.exists_table(stmt.table))
+            if (!ssp_.ddl().exists_table(stmt.table))
                 return AnalysisResult(EngineException(
                     "Table '" + stmt.table.table_name.value + "' doesn't exist",
                     EngineException::Code::TABLE_NOT_EXISTS));
-            table = db_.get_table(stmt.table);
+            table = ssp_.ddl().get_table(stmt.table);
         }
 
         for (const SqlToken& col : stmt.columns)
@@ -109,12 +109,12 @@ namespace exq
             return AnalysisResult(EngineException("Insert statement missing target table",
                                                   EngineException::Code::SYNTAX_ERROR));
 
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* table = db_.get_table(stmt.table);
+        const auto* table = ssp_.ddl().get_table(stmt.table);
 
         for (const SqlToken& col : stmt.columns)
             if (!table->has_column(col.value))
@@ -246,12 +246,12 @@ namespace exq
             return AnalysisResult(EngineException("Update statement missing assignments",
                                                   EngineException::Code::SYNTAX_ERROR));
 
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* table = db_.get_table(stmt.table);
+        const auto* table = ssp_.ddl().get_table(stmt.table);
 
         for (const auto& assignment : stmt.assignments)
         {
@@ -277,12 +277,12 @@ namespace exq
             return AnalysisResult(EngineException("Delete statement missing target table",
                                                   EngineException::Code::SYNTAX_ERROR));
 
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* table = db_.get_table(stmt.table);
+        const auto* table = ssp_.ddl().get_table(stmt.table);
 
         if (stmt.where.has_value())
         {
@@ -297,7 +297,7 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_create_table(const CreateTableStmt& stmt) const
     {
-        if (db_.exists_table(stmt.table))
+        if (ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' already exists",
                 EngineException::Code::TABLE_EXISTS));
@@ -322,14 +322,57 @@ namespace exq
                             "Auto incremented column can only be of a numerical type",
                             EngineException::Code::INVALID_AUTOINCREMENT_TYPE));
                 }
+                else if (auto* fk = std::get_if<ForeignKeyConstraint>(&c))
+                {
+                    auto referenced_table = ssp_.ddl().get_table(fk->referenced_table);
+                    if (!referenced_table)
+                        return AnalysisResult(EngineException(
+                            "Referenced table " + fk->referenced_table.table_name.value +
+                            " not found",
+                            EngineException::Code::REF_TABLE_NOT_EXISTS));
+
+                    if (!referenced_table->has_column(fk->referenced_column.value))
+                        return AnalysisResult(EngineException(
+                            "Referenced column " + fk->referenced_column.value + " on table " +
+                            referenced_table->name + " does not exist",
+                            EngineException::Code::REF_COLUMN_NOT_EXISTS));
+
+                    auto referenced_column = referenced_table->get_column(
+                        fk->referenced_column.value);
+                    DataType referencing_dt = misc::convert_to_dt(col_def.type);
+
+                    if (referencing_dt != referenced_column.type)
+                        return AnalysisResult(EngineException(
+                            "Referenced column should have the same type as the referencing column",
+                            EngineException::Code::REF_COLUMN_TYPE_MISMATCH));
+
+                    if (!referenced_table->is_unique(referenced_column.name))
+                        return AnalysisResult(EngineException(
+                            "Referenced column '" + referenced_column.name + " must be unique",
+                            EngineException::Code::REF_COLUMN_NOT_UNIQUE));
+
+                    bool referencing_column_is_not_null = false;
+                    for (const auto& referencing_c : col_def.constraints)
+                        if (std::holds_alternative<NotNullConstraint>(referencing_c))
+                            referencing_column_is_not_null = true;
+
+                    if (fk->action == OnDeleteFkAction::SET_NULL &&
+                        referencing_column_is_not_null)
+                        return AnalysisResult(EngineException(
+                            "Referencing column has NOT NULL constraint",
+                            EngineException::Code::REF_COLUMN_NOT_NULL));
+                }
 
         if (pk_col)
             for (const auto& c : pk_col->constraints)
                 if (const auto* dc = std::get_if<DefaultConstraint>(&c))
+                {
                     if (dc->value.get_detail<SqlLiteral>() == SqlLiteral::_NULL)
                         return AnalysisResult(EngineException(
                             "Primary key column cannot have DEFAULT NULL",
                             EngineException::Code::NULLABLE_PK));
+                    break;
+                }
 
         return AnalysisResult(true);
     }
@@ -370,12 +413,12 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_alter_table(const AlterTableStmt& stmt) const
     {
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* mt = db_.get_table(stmt.table);
+        const auto* mt = ssp_.ddl().get_table(stmt.table);
 
         for (const auto& operation : stmt.operations)
         {
@@ -435,12 +478,12 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_create_index(const CreateIndexStmt& stmt) const
     {
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        const auto* table = db_.get_table(stmt.table);
+        const auto* table = ssp_.ddl().get_table(stmt.table);
 
         for (const auto& index : table->indexes)
             if (index.name == stmt.index_name.value)
@@ -459,12 +502,12 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_drop_index(const DropIndexStmt& stmt) const
     {
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
 
-        if (!db_.exists_index(stmt.index_name.value, stmt.table))
+        if (!ssp_.ddl().exists_index(stmt.index_name.value, stmt.table))
             return AnalysisResult(EngineException(
                 "Index '" + stmt.index_name.value + "' does not exist on table " + stmt.table.
                 table_name.value,
@@ -476,7 +519,7 @@ namespace exq
     AnalysisResult
     SemanticAnalyzer::analyze_drop_table(const DropTableStmt& stmt) const
     {
-        if (!db_.exists_table(stmt.table))
+        if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));

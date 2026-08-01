@@ -1,4 +1,5 @@
 #include "include/information_schema_provider.hpp"
+#include "../storage/include/storage_service_provider.hpp"
 
 #include "meta_column.hpp"
 #include "meta_table.hpp"
@@ -56,8 +57,8 @@ namespace exq
         }
     } // namespace
 
-    InformationSchemaProvider::InformationSchemaProvider(storage::IDbInstance& db)
-        : db_(db)
+    InformationSchemaProvider::InformationSchemaProvider(storage::StorageServiceProvider& ssp)
+        : ssp_(ssp)
     {
     }
 
@@ -84,7 +85,7 @@ namespace exq
     MetaTable
     InformationSchemaProvider::get_virtual_table(const TableIdentifier& table) const
     {
-        auto config = db_.get_config();
+        const auto& config = ssp_.config();
         return get_virtual_table(
             table.schema_name.has_value() ? table.schema_name.value().value : config.default_schema,
             table.table_name.value);
@@ -104,7 +105,7 @@ namespace exq
     DataTable
     InformationSchemaProvider::get_virtual_data(const TableIdentifier& table) const
     {
-        auto config = db_.get_config();
+        const auto& config = ssp_.config();
         auto schema_name = table.schema_name.has_value()
             ? table.schema_name.value().value
             : config.default_schema;
@@ -120,9 +121,9 @@ namespace exq
         if (!is_virtual(schema_name, table_name))
             return DataTable{};
 
-        auto config = db_.get_config();
+        const auto& config = ssp_.config();
 
-        auto all_schemas = db_.get_all_schemas();
+        auto all_schemas = ssp_.ddl().get_all_schemas();
         std::unordered_map<UUID, std::string> schema_names;
         schema_names.reserve(all_schemas.size());
         for (const auto* s : all_schemas)
@@ -144,15 +145,18 @@ namespace exq
 
         const std::string db_name = config.db_name.value_or("");
 
-        for (const auto* mt : db_.get_all_tables())
+        for (const auto* mt : ssp_.ddl().get_all_tables())
         {
             auto it = schema_names.find(mt->schema_id);
             const std::string mt_schema = it != schema_names.end() ? it->second : "";
 
             const MetaColumn* pkey = nullptr;
-            for (const auto& idx : mt->indexes)
-                if (idx.is_primary)
-                    pkey = &mt->get_column(idx.column_id);
+            for (const auto& col : mt->columns)
+                if (col.has_constraint<MetaPrimaryKeyConstraint>())
+                {
+                    pkey = &col;
+                    break;
+                }
 
             DataRow row;
             row.tokens = {

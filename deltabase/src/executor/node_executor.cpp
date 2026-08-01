@@ -4,38 +4,34 @@
 
 #include "node_executor.hpp"
 
+#include "exceptions.hpp"
+
 #include <cassert>
 
 #include "../misc/include/convert.hpp"
-#include "../storage/include/std_db_instance.hpp"
+#include "../storage/include/storage_service_provider.hpp"
 #include "include/information_schema_provider.hpp"
 
 #include <algorithm>
+#include <complex>
 #include <ranges>
 
 namespace exq
 {
     using namespace types;
 
-    SeqScanNodeExecutor::SeqScanNodeExecutor(
-        storage::IDbInstance& storage,
-        const std::string& table_name,
-        const std::string& schema_name
-    )
-        : table_name_(table_name), schema_name_(schema_name), db_(storage), cursor_{}
-    {
-    }
-
     void
     SeqScanNodeExecutor::open()
     {
-        cursor_ = db_.seq_scan_begin(table_name_, schema_name_);
+        auto& dql = service_provider_.dql();
+        cursor_ = dql.seq_scan_begin(mt_);
     }
 
     bool
     SeqScanNodeExecutor::next(DataRow& out)
     {
-        return db_.seq_scan_next(cursor_, out);
+        auto& dql = service_provider_.dql();
+        return dql.seq_scan_next(cursor_, out);
     }
 
     void
@@ -46,51 +42,35 @@ namespace exq
     OutputSchema
     SeqScanNodeExecutor::output_schema()
     {
-        const auto* mt = db_.get_table(table_name_, schema_name_);
-
         OutputSchema output_schema;
-        output_schema.reserve(mt->columns.size());
-
-        for (const auto& column : mt->columns)
+        output_schema.reserve(mt_.columns.size());
+        for (const auto& column : mt_.columns)
             output_schema.push_back({.name = column.name, .type = column.type});
-
         return output_schema;
     }
 
     FilterNodeExecutor::FilterNodeExecutor(
         const MetaTable& table,
-        BinaryExpr&& condition,
+        const BinaryExpr& condition,
         std::unique_ptr<INodeExecutor> child
     )
-        : condition_(std::move(condition)), evaluator_(table), table_(table),
+        : condition_(condition), evaluator_(table), table_(table),
           child_(std::move(child))
-    {
-    }
-
-    IndexScanNodeExecutor::IndexScanNodeExecutor(
-        const std::string& table_name,
-        const std::string& schema_name,
-        const IndexId& index_id,
-        BinaryExpr condition,
-        storage::IDbInstance& db
-    )
-        : schema_name_(schema_name), index_id_(index_id), condition_(std::move(condition)),
-          db_(db), table_name_(table_name)
     {
     }
 
     VirtualTableNodeExecutor::VirtualTableNodeExecutor(
         const std::string& table_name,
         const std::string& schema_name,
-        storage::IDbInstance& db
-    ) : table_name_(table_name), schema_name_(schema_name), db_(db), index_(0)
+        storage::StorageServiceProvider& service_provider
+    ) : table_name_(table_name), schema_name_(schema_name), service_provider_(service_provider), index_(0)
     {
     }
 
     void
     VirtualTableNodeExecutor::open()
     {
-        InformationSchemaProvider prov(db_);
+        InformationSchemaProvider prov(service_provider_);
         TableIdentifier tid(
             SqlToken(SqlTokenType::IDENTIFIER, table_name_, 0, 0),
             SqlToken(SqlTokenType::IDENTIFIER, schema_name_, 0, 0)
@@ -127,10 +107,22 @@ namespace exq
         return schema;
     }
 
+    IndexScanNodeExecutor::IndexScanNodeExecutor(
+        const MetaTable& mt,
+        const IndexId& index_id,
+        const BinaryExpr& condition,
+        storage::StorageServiceProvider& service_provider
+    )
+        : index_id_(index_id), condition_(condition),
+          service_provider_(service_provider), mt_(mt)
+    {
+    }
+
     void
     IndexScanNodeExecutor::open()
     {
-        data_ = db_.index_scan(table_name_, schema_name_, index_id_, condition_);
+        auto& dql = service_provider_.dql();
+        data_ = dql.index_scan(mt_, index_id_, condition_);
     }
 
     bool
@@ -151,14 +143,10 @@ namespace exq
     OutputSchema
     IndexScanNodeExecutor::output_schema()
     {
-        const auto* mt = db_.get_table(table_name_, schema_name_);
-
         OutputSchema output_schema;
-        output_schema.reserve(mt->columns.size());
-
-        for (const auto& column : mt->columns)
+        output_schema.reserve(mt_.columns.size());
+        for (const auto& column : mt_.columns)
             output_schema.push_back({.name = column.name, .type = column.type});
-
         return output_schema;
     }
 
@@ -296,15 +284,14 @@ namespace exq
     }
 
     InsertNodeExecutor::InsertNodeExecutor(
-        const std::string& table_name,
-        const std::string& schema_name,
-        storage::IDbInstance& storage,
-        const std::optional<std::vector<std::string>>& col_names,
+        const MetaTable& mt,
+        storage::StorageServiceProvider& service_provider,
+        const std::optional<std::vector<std::string> >& col_names,
         ExecutionContext& ctx,
         std::unique_ptr<INodeExecutor> child
     )
-        : table_name_(table_name), schema_name_(schema_name), db_(storage),
-          col_names_(col_names), ctx_(ctx), child_(std::move(child))
+        : mt_(mt), service_provider_(service_provider),
+          col_names_(col_names), child_(std::move(child)), ctx_(ctx)
     {
     }
 
@@ -320,6 +307,10 @@ namespace exq
         if (executed_)
             return false;
 
+        auto& dml = service_provider_.dml();
+        auto& row_preprocessor = service_provider_.preprocessor();
+        auto& constraint_enforcer = service_provider_.enforcer();
+
         int inserted_count = 0;
 
         while (true)
@@ -328,7 +319,11 @@ namespace exq
             if (!child_->next(row))
                 break;
 
-            db_.insert_row(table_name_, schema_name_, col_names_, row.tokens, *ctx_.txn);
+            auto normalized_row = row.tokens;
+            row_preprocessor.prepare_row(mt_, col_names_, normalized_row, *ctx_.txn);
+            constraint_enforcer.validate_or_throw(mt_, normalized_row);
+
+            dml.insert_row(mt_, normalized_row, *ctx_.txn);
             inserted_count++;
         }
 
@@ -382,14 +377,13 @@ namespace exq
     }
 
     UpdateNodeExecutor::UpdateNodeExecutor(
-        const std::string& table_name,
-        const std::string& schema_name,
-        storage::IDbInstance& db,
+        const MetaTable& mt,
+        storage::StorageServiceProvider& service_provider,
         const std::vector<Assignment>& asg,
         ExecutionContext& ctx,
         std::unique_ptr<INodeExecutor> child
     )
-        : table_name_(table_name), schema_name_(schema_name), db_(db), assignments_(asg),
+        : mt_(mt), service_provider_(service_provider), assignments_(asg),
           ctx_(ctx), child_(std::move(child)), executed_(false)
     {
     }
@@ -406,6 +400,10 @@ namespace exq
         if (executed_)
             return false;
 
+        auto& dml = service_provider_.dml();
+        auto& row_preprocessor = service_provider_.preprocessor();
+        auto& constraint_enforcer = service_provider_.enforcer();
+
         int updated_count = 0;
         std::vector<DataRow> rows;
 
@@ -415,11 +413,14 @@ namespace exq
             if (!child_->next(row))
                 break;
 
+            DataRow new_row = dml.apply_row_update(mt_, row, assignments_);
+            constraint_enforcer.validate_or_throw(mt_, new_row.tokens);
+
             rows.push_back(std::move(row));
             updated_count++;
         }
 
-        db_.update_row(table_name_, schema_name_, assignments_, rows, *ctx_.txn);
+        dml.update_selected(mt_, assignments_, rows, *ctx_.txn);
         executed_ = true;
 
         DataToken affected_rows_count(misc::convert(updated_count), DataType::INTEGER);
@@ -440,13 +441,12 @@ namespace exq
     }
 
     DeleteNodeExecutor::DeleteNodeExecutor(
-        const std::string& table_name,
-        const std::string& schema_name,
-        storage::IDbInstance& db,
+        const MetaTable& mt,
+        storage::StorageServiceProvider& service_provider,
         ExecutionContext& ctx,
         std::unique_ptr<INodeExecutor> child
     )
-        : table_name_(table_name), schema_name_(schema_name), db_(db), ctx_(ctx),
+        : mt_(mt), service_provider_(service_provider), ctx_(ctx),
           child_(std::move(child)), executed_(false)
     {
     }
@@ -463,6 +463,9 @@ namespace exq
         if (executed_)
             return false;
 
+        auto& dml = service_provider_.dml();
+        auto& enforcer = service_provider_.enforcer();
+
         int deleted_count = 0;
         std::vector<DataRow> rows;
 
@@ -472,11 +475,12 @@ namespace exq
             if (!child_->next(row))
                 break;
 
+            enforcer.on_delete(mt_, row, ctx_.txn);
             rows.push_back(std::move(row));
             deleted_count++;
         }
 
-        db_.delete_rows(table_name_, schema_name_, rows, *ctx_.txn);
+        dml.delete_selected(mt_, rows, *ctx_.txn);
         executed_ = true;
 
         DataToken affected_rows_count(misc::convert(deleted_count), DataType::INTEGER);
@@ -500,10 +504,11 @@ namespace exq
         const std::string& table_name,
         const MetaSchema& schema,
         const std::vector<ColumnDefinition>& columns,
-        ExecutionContext& ctx,
-        storage::IDbInstance& db
+        storage::StorageServiceProvider& service_provider,
+        ExecutionContext& ctx
     )
-        : table_name_(table_name), schema_(schema), columns_(columns), ctx_(ctx), db_(db)
+        : table_name_(table_name), schema_(schema), columns_(columns),
+          service_provider_(service_provider), ctx_(ctx)
     {
     }
 
@@ -515,7 +520,7 @@ namespace exq
     bool
     CreateTableNodeExecutor::next(DataRow& out)
     {
-        db_.create_table(table_name_, schema_.name, columns_, *ctx_.txn);
+        service_provider_.ddl().create_table(table_name_, schema_.name, columns_, *ctx_.txn);
         return false;
     }
 
@@ -533,12 +538,11 @@ namespace exq
     AlterTableNodeExecutor::AlterTableNodeExecutor(
         const std::string& table_name,
         const MetaSchema& schema,
-        const std::vector<AlterTableOperation>& columns,
-        ExecutionContext& ctx,
-        storage::IDbInstance& db
-    ) : table_name_(table_name),
-        schema_(schema), operations_(columns),
-        db_(db), ctx_(ctx)
+        const std::vector<AlterTableOperation>& operations,
+        storage::StorageServiceProvider& service_provider,
+        ExecutionContext& ctx
+    ) : table_name_(table_name), schema_(schema), operations_(operations),
+        service_provider_(service_provider), ctx_(ctx)
     {
     }
 
@@ -553,11 +557,11 @@ namespace exq
         if (executed_)
             return false;
 
-        for (const auto& operation : this->operations_)
+        for (const auto& operation : operations_)
         {
             if (auto* add_col = std::get_if<AddColumnOperation>(&operation))
             {
-                db_.add_column(table_name_, schema_.name, add_col->column, *ctx_.txn);
+                service_provider_.ddl().add_column(table_name_, schema_.name, add_col->column, *ctx_.txn);
                 executed_ = true;
             }
         }
@@ -589,7 +593,7 @@ namespace exq
     CreateDbNodeExecutor::next(DataRow& out)
     {
         auto config = Config::std(db_name_);
-        auto db = storage::StdDbInstance(config);
+        storage::StorageServiceProvider ssp(config);
         return false;
     }
 
@@ -610,13 +614,12 @@ namespace exq
         const std::string& column_name,
         const std::string& schema_name,
         bool is_unique,
-        bool is_primary,
-        storage::IDbInstance& db,
+        storage::StorageServiceProvider& service_provider,
         ExecutionContext& ctx
     )
         : index_name_(index_name), column_name_(column_name), table_name_(table_name),
-          schema_name_(schema_name), is_unique_(is_unique), is_primary_(is_primary), db_(db),
-          ctx_(ctx)
+          schema_name_(schema_name), is_unique_(is_unique),
+          service_provider_(service_provider), ctx_(ctx)
     {
     }
 
@@ -628,13 +631,12 @@ namespace exq
     bool
     CreateIndexNodeExecutor::next(DataRow& out)
     {
-        db_.create_index(
+        service_provider_.ddl().create_index(
             index_name_,
             table_name_,
             column_name_,
             schema_name_,
             is_unique_,
-            is_primary_,
             *ctx_.txn);
         return false;
     }
@@ -654,11 +656,11 @@ namespace exq
         const std::string& index_name,
         const std::string& table_name,
         const std::string& schema_name,
-        storage::IDbInstance& db,
+        storage::StorageServiceProvider& service_provider,
         ExecutionContext& ctx
     )
-        : index_name_(index_name), table_name_(table_name), schema_name_(schema_name), db_(db),
-          ctx_(ctx)
+        : index_name_(index_name), table_name_(table_name), schema_name_(schema_name),
+          service_provider_(service_provider), ctx_(ctx)
     {
     }
 
@@ -670,7 +672,7 @@ namespace exq
     bool
     DropIndexNodeExecutor::next(DataRow& out)
     {
-        db_.drop_index(index_name_, table_name_, schema_name_, *ctx_.txn);
+        service_provider_.ddl().drop_index(index_name_, table_name_, schema_name_, *ctx_.txn);
         return false;
     }
 
@@ -688,10 +690,11 @@ namespace exq
     DropTableNodeExecutor::DropTableNodeExecutor(
         const std::string& table_name,
         const std::string& schema_name,
-        storage::IDbInstance& db,
+        storage::StorageServiceProvider& service_provider,
         ExecutionContext& ctx
     )
-        : table_name_(table_name), schema_name_(schema_name), db_(db), ctx_(ctx)
+        : table_name_(table_name), schema_name_(schema_name),
+          service_provider_(service_provider), ctx_(ctx)
     {
     }
 
@@ -703,7 +706,7 @@ namespace exq
     bool
     DropTableNodeExecutor::next(DataRow& out)
     {
-        db_.drop_table(table_name_, schema_name_, *ctx_.txn);
+        service_provider_.ddl().drop_table(table_name_, schema_name_, *ctx_.txn);
         return false;
     }
 
@@ -719,183 +722,109 @@ namespace exq
     }
 
     std::unique_ptr<INodeExecutor>
-    NodeExecutorFactory::from_plan(std::unique_ptr<IPlanNode>&& node,
-                                   storage::IDbInstance& db,
-                                   ExecutionContext& ctx)
+    NodeExecutorFactory::from_plan(
+        const IPlanNode& node,
+        storage::StorageServiceProvider& ssp,
+        ExecutionContext& ctx)
     {
-        switch (node->type())
+        switch (node.type())
         {
         case IPlanNode::Type::SEQ_SCAN:
         {
-            const auto& seq_scan_node = static_cast<const SeqScanPlanNode&>(*node);
-            SeqScanNodeExecutor executor(db, seq_scan_node.table_name, seq_scan_node.schema_name);
-
-            return std::make_unique<SeqScanNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const SeqScanPlanNode&>(node);
+            const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
+            return std::make_unique<SeqScanNodeExecutor>(ssp, mt);
         }
         case IPlanNode::Type::INDEX_SCAN:
         {
-            auto& index_scan_node = static_cast<IndexScanPlanNode&>(*node);
-            IndexScanNodeExecutor executor(
-                index_scan_node.table_name,
-                index_scan_node.schema_name,
-                index_scan_node.index_id,
-                std::move(index_scan_node.condition),
-                db);
-
-            return std::make_unique<IndexScanNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const IndexScanPlanNode&>(node);
+            const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
+            return std::make_unique<IndexScanNodeExecutor>(mt, n.index_id, n.condition, ssp);
         }
         case IPlanNode::Type::VIRTUAL_TABLE:
         {
-            const auto& v_node = static_cast<const VirtualTablePlanNode&>(*node);
-            VirtualTableNodeExecutor executor(v_node.table_name, v_node.schema_name, db);
-            return std::make_unique<VirtualTableNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const VirtualTablePlanNode&>(node);
+            return std::make_unique<VirtualTableNodeExecutor>(n.table_name, n.schema_name, ssp);
         }
         case IPlanNode::Type::FILTER:
         {
-            auto& filter_node = static_cast<FilterPlanNode&>(*node);
-            FilterNodeExecutor executor(
-                filter_node.table,
-                std::move(filter_node.where),
-                from_plan(std::move(filter_node.child), db, ctx));
-
-            return std::make_unique<FilterNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const FilterPlanNode&>(node);
+            return std::make_unique<FilterNodeExecutor>(
+                n.table, n.where, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::PROJECT:
         {
-            auto& project_node = static_cast<ProjectPlanNode&>(*node);
-            ProjectionNodeExecutor executor(
-                project_node.table,
-                project_node.columns,
-                from_plan(std::move(project_node.child), db, ctx));
-
-            return std::make_unique<ProjectionNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const ProjectPlanNode&>(node);
+            return std::make_unique<ProjectionNodeExecutor>(
+                n.table, n.columns, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::LIMIT:
         {
-            auto& limit_node = static_cast<LimitPlanNode&>(*node);
-            LimitNodeExecutor executor(
-                limit_node.limit,
-                from_plan(std::move(limit_node.child), db, ctx));
-
-            return std::make_unique<LimitNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const LimitPlanNode&>(node);
+            return std::make_unique<LimitNodeExecutor>(n.limit, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::INSERT:
         {
-            auto& insert_node = static_cast<InsertPlanNode&>(*node);
-            InsertNodeExecutor executor(
-                insert_node.table_name,
-                insert_node.schema_name,
-                db,
-                insert_node.column_names,
-                ctx,
-                from_plan(std::move(insert_node.child), db, ctx));
-
-            return std::make_unique<InsertNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const InsertPlanNode&>(node);
+            const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
+            return std::make_unique<InsertNodeExecutor>(
+                mt, ssp, n.column_names, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::VALUES:
         {
-            auto& values_node = static_cast<ValuesPlanNode&>(*node);
-            ValuesNodeExecutor executor(values_node.values);
-            return std::make_unique<ValuesNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const ValuesPlanNode&>(node);
+            return std::make_unique<ValuesNodeExecutor>(n.values);
         }
         case IPlanNode::Type::UPDATE:
         {
-            auto& update_node = static_cast<UpdatePlanNode&>(*node);
-            UpdateNodeExecutor executor(
-                update_node.table_name,
-                update_node.schema_name,
-                db,
-                update_node.assignments,
-                ctx,
-                from_plan(std::move(update_node.child), db, ctx));
-
-            return std::make_unique<UpdateNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const UpdatePlanNode&>(node);
+            const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
+            return std::make_unique<UpdateNodeExecutor>(
+                mt, ssp, n.assignments, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::DELETE:
         {
-            auto& delete_node = static_cast<DeletePlanNode&>(*node);
-            DeleteNodeExecutor executor(
-                delete_node.table_name,
-                delete_node.schema_name,
-                db,
-                ctx,
-                from_plan(std::move(delete_node.child), db, ctx));
-
-            return std::make_unique<DeleteNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const DeletePlanNode&>(node);
+            const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
+            return std::make_unique<DeleteNodeExecutor>(
+                mt, ssp, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::CREATE_TABLE:
         {
-            auto& create_table_node = static_cast<CreateTablePlanNode&>(*node);
-            CreateTableNodeExecutor executor(
-                create_table_node.table_name,
-                create_table_node.schema,
-                create_table_node.columns,
-                ctx,
-                db);
-
-            return std::make_unique<CreateTableNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const CreateTablePlanNode&>(node);
+            return std::make_unique<CreateTableNodeExecutor>(n.table_name, n.schema, n.columns, ssp, ctx);
         }
         case IPlanNode::Type::ALTER_TABLE:
         {
-            auto& alter_table_node = static_cast<AlterTablePlanNode&>(*node);
-            AlterTableNodeExecutor executor(
-                alter_table_node.table_name,
-                alter_table_node.schema,
-                alter_table_node.operations,
-                ctx,
-                db);
-
-            return std::make_unique<AlterTableNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const AlterTablePlanNode&>(node);
+            return std::make_unique<AlterTableNodeExecutor>(n.table_name, n.schema, n.operations, ssp, ctx);
         }
         case IPlanNode::Type::CREATE_DB:
         {
-            auto& create_db_node = static_cast<CreateDbPlanNode&>(*node);
-            CreateDbNodeExecutor executor(create_db_node.db_name);
-            return std::make_unique<CreateDbNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const CreateDbPlanNode&>(node);
+            return std::make_unique<CreateDbNodeExecutor>(n.db_name);
         }
         case IPlanNode::Type::CREATE_INDEX:
         {
-            auto& create_index_node = static_cast<CreateIndexPlanNode&>(*node);
-            CreateIndexNodeExecutor executor(
-                create_index_node.index_name,
-                create_index_node.table_name,
-                create_index_node.column_name,
-                create_index_node.schema_name,
-                create_index_node.is_unique,
-                create_index_node.is_primary,
-                db,
-                ctx);
-
-            return std::make_unique<CreateIndexNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const CreateIndexPlanNode&>(node);
+            return std::make_unique<CreateIndexNodeExecutor>(
+                n.index_name, n.table_name, n.column_name, n.schema_name, n.is_unique, ssp, ctx);
         }
         case IPlanNode::Type::DROP_INDEX:
         {
-            auto& drop_index_node = static_cast<DropIndexPlanNode&>(*node);
-            DropIndexNodeExecutor executor(
-                drop_index_node.index_name,
-                drop_index_node.table_name,
-                drop_index_node.schema_name,
-                db,
-                ctx);
-
-            return std::make_unique<DropIndexNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const DropIndexPlanNode&>(node);
+            return std::make_unique<DropIndexNodeExecutor>(n.index_name, n.table_name, n.schema_name, ssp, ctx);
         }
         case IPlanNode::Type::DROP_TABLE:
         {
-            auto& drop_table_node = static_cast<DropTablePlanNode&>(*node);
-            DropTableNodeExecutor executor(
-                drop_table_node.table_name,
-                drop_table_node.schema_name,
-                db,
-                ctx);
-
-            return std::make_unique<DropTableNodeExecutor>(std::move(executor));
+            const auto& n = static_cast<const DropTablePlanNode&>(node);
+            return std::make_unique<DropTableNodeExecutor>(n.table_name, n.schema_name, ssp, ctx);
         }
         default:
             throw std::runtime_error(
                 "NodeExecutorFactory::from_plan: failed to create executor tree for plan node of "
                 "type " +
-                std::to_string(static_cast<int>(node->type())));
+                std::to_string(static_cast<int>(node.type())));
         }
     }
 

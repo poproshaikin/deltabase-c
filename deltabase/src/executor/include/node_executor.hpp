@@ -4,48 +4,33 @@
 
 #ifndef DELTABASE_NODE_EXECUTOR_HPP
 #define DELTABASE_NODE_EXECUTOR_HPP
-#include "../../storage/include/db_instance.hpp"
 #include "../../types/include/data_row.hpp"
 #include "../../types/include/data_table.hpp"
 #include "../../types/include/query_plan.hpp"
 #include "../../types/include/execution_context.hpp"
+#include "../../types/include/i_node_executor.hpp"
+#include "../../types/include/scan_cursor.hpp"
 #include "evaluator.hpp"
+
+namespace storage { class StorageServiceProvider; }
 
 namespace exq
 {
-    class INodeExecutor
-    {
-    public:
-        virtual ~INodeExecutor() = default;
-
-        virtual void
-        open() = 0;
-
-        virtual bool
-        next(types::DataRow& out) = 0;
-
-        virtual void
-        close() = 0;
-
-        virtual types::OutputSchema
-        output_schema() = 0;
-    };
-
     class SeqScanNodeExecutor final : public INodeExecutor
     {
-        std::string table_name_;
-        std::string schema_name_;
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& service_provider_;
+        const types::MetaTable& mt_;
 
         types::ScanCursor cursor_;
 
     public:
         explicit
         SeqScanNodeExecutor(
-            storage::IDbInstance& storage,
-            const std::string& table_name,
-            const std::string& schema_name
-        );
+            storage::StorageServiceProvider& service_provider,
+            const types::MetaTable& mt
+        ) : service_provider_(service_provider), mt_(mt)
+        {
+        }
 
         void
         open() override;
@@ -62,24 +47,21 @@ namespace exq
 
     class IndexScanNodeExecutor final : public INodeExecutor
     {
-        std::string table_name_;
-        std::string schema_name_;
         types::IndexId index_id_;
         types::BinaryExpr condition_;
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& service_provider_;
 
-        types::MetaTable* mt_ = nullptr;
+        types::MetaTable mt_;
         types::DataTable data_;
         uint64_t index_ = 0;
 
     public:
         explicit
         IndexScanNodeExecutor(
-            const std::string& table_name,
-            const std::string& schema_name,
+            const types::MetaTable& mt,
             const types::IndexId& index_id,
-            types::BinaryExpr condition,
-            storage::IDbInstance& db
+            const types::BinaryExpr& condition,
+            storage::StorageServiceProvider& service_provider
         );
 
         void
@@ -99,7 +81,7 @@ namespace exq
     {
         std::string table_name_;
         std::string schema_name_;
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& service_provider_;
 
         types::MetaTable mt_;
         types::DataTable data_;
@@ -110,7 +92,7 @@ namespace exq
         VirtualTableNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
-            storage::IDbInstance& db
+            storage::StorageServiceProvider& service_provider
         );
 
         void
@@ -137,7 +119,7 @@ namespace exq
         explicit
         FilterNodeExecutor(
             const types::MetaTable& table,
-            types::BinaryExpr&& condition,
+            const types::BinaryExpr& condition,
             std::unique_ptr<INodeExecutor> child
         );
 
@@ -207,9 +189,9 @@ namespace exq
 
     class InsertNodeExecutor final : public INodeExecutor
     {
-        std::string table_name_;
-        std::string schema_name_;
-        storage::IDbInstance& db_;
+        types::MetaTable mt_;
+        storage::StorageServiceProvider& service_provider_;
+
         std::optional<std::vector<std::string>> col_names_;
         std::unique_ptr<INodeExecutor> child_;
         types::ExecutionContext& ctx_;
@@ -218,9 +200,8 @@ namespace exq
     public:
         explicit
         InsertNodeExecutor(
-            const std::string& table_name,
-            const std::string& schema_name,
-            storage::IDbInstance& storage,
+            const types::MetaTable& mt,
+            storage::StorageServiceProvider& service_provider,
             const std::optional<std::vector<std::string>>& col_names,
             types::ExecutionContext& ctx,
             std::unique_ptr<INodeExecutor> child
@@ -263,9 +244,9 @@ namespace exq
 
     class UpdateNodeExecutor final : public INodeExecutor
     {
-        std::string table_name_;
-        std::string schema_name_;
-        storage::IDbInstance& db_;
+        types::MetaTable mt_;
+        storage::StorageServiceProvider& service_provider_;
+
         std::vector<types::Assignment> assignments_;
         std::unique_ptr<INodeExecutor> child_;
         types::ExecutionContext& ctx_;
@@ -274,9 +255,8 @@ namespace exq
     public:
         explicit
         UpdateNodeExecutor(
-            const std::string& table_name,
-            const std::string& schema_name,
-            storage::IDbInstance& db,
+            const types::MetaTable& mt,
+            storage::StorageServiceProvider& service_provider,
             const std::vector<types::Assignment>& asg,
             types::ExecutionContext& ctx,
             std::unique_ptr<INodeExecutor> child
@@ -297,9 +277,9 @@ namespace exq
 
     class DeleteNodeExecutor final : public INodeExecutor
     {
-        std::string table_name_;
-        std::string schema_name_;
-        storage::IDbInstance& db_;
+        types::MetaTable mt_;
+        storage::StorageServiceProvider& service_provider_;
+
         std::unique_ptr<INodeExecutor> child_;
         types::ExecutionContext& ctx_;
         bool executed_;
@@ -307,9 +287,8 @@ namespace exq
     public:
         explicit
         DeleteNodeExecutor(
-            const std::string& table_name,
-            const std::string& schema_name,
-            storage::IDbInstance& db,
+            const types::MetaTable& mt,
+            storage::StorageServiceProvider& service_provider,
             types::ExecutionContext& ctx,
             std::unique_ptr<INodeExecutor> child
         );
@@ -332,8 +311,8 @@ namespace exq
         std::string table_name_;
         types::MetaSchema schema_;
         std::vector<types::ColumnDefinition> columns_;
+        storage::StorageServiceProvider& service_provider_;
         types::ExecutionContext& ctx_;
-        storage::IDbInstance& db_;
 
     public:
         explicit
@@ -341,8 +320,8 @@ namespace exq
             const std::string& table_name,
             const types::MetaSchema& schema,
             const std::vector<types::ColumnDefinition>& columns,
-            types::ExecutionContext& ctx,
-            storage::IDbInstance& db);
+            storage::StorageServiceProvider& service_provider,
+            types::ExecutionContext& ctx);
 
         void
         open() override;
@@ -362,7 +341,7 @@ namespace exq
         std::string table_name_;
         types::MetaSchema schema_;
         std::vector<types::AlterTableOperation> operations_;
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& service_provider_;
         types::ExecutionContext& ctx_;
         bool executed_ = false;
 
@@ -371,9 +350,9 @@ namespace exq
         AlterTableNodeExecutor(
             const std::string& table_name,
             const types::MetaSchema& schema,
-            const std::vector<types::AlterTableOperation>& columns,
-            types::ExecutionContext& ctx,
-            storage::IDbInstance& db);
+            const std::vector<types::AlterTableOperation>& operations,
+            storage::StorageServiceProvider& service_provider,
+            types::ExecutionContext& ctx);
 
         void
         open() override;
@@ -416,9 +395,8 @@ namespace exq
         std::string table_name_;
         std::string schema_name_;
         bool is_unique_;
-        bool is_primary_;
 
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& service_provider_;
         types::ExecutionContext& ctx_;
 
     public:
@@ -429,8 +407,7 @@ namespace exq
             const std::string& column_name,
             const std::string& schema_name,
             bool is_unique,
-            bool is_primary,
-            storage::IDbInstance& db,
+            storage::StorageServiceProvider& service_provider,
             types::ExecutionContext& ctx
         );
 
@@ -452,7 +429,7 @@ namespace exq
         std::string index_name_;
         std::string table_name_;
         std::string schema_name_;
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& service_provider_;
         types::ExecutionContext& ctx_;
 
     public:
@@ -461,7 +438,7 @@ namespace exq
             const std::string& index_name,
             const std::string& table_name,
             const std::string& schema_name,
-            storage::IDbInstance& db,
+            storage::StorageServiceProvider& service_provider,
             types::ExecutionContext& ctx
         );
 
@@ -482,7 +459,7 @@ namespace exq
     {
         std::string table_name_;
         std::string schema_name_;
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& service_provider_;
         types::ExecutionContext& ctx_;
 
     public:
@@ -490,7 +467,7 @@ namespace exq
         DropTableNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
-            storage::IDbInstance& db,
+            storage::StorageServiceProvider& service_provider,
             types::ExecutionContext& ctx
         );
 
@@ -511,7 +488,7 @@ namespace exq
     {
     public:
         std::unique_ptr<INodeExecutor>
-        from_plan(std::unique_ptr<types::IPlanNode>&& node, storage::IDbInstance& db, types::ExecutionContext& ctx);
+        from_plan(const types::IPlanNode& node, storage::StorageServiceProvider& ssp, types::ExecutionContext& ctx);
     };
 } // namespace exq
 

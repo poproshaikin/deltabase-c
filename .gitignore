@@ -1,3 +1,5 @@
 .idea
 .vscode
-tests
+.claude
+tests/ClientTests
+tests/integration/__pycache__

@@ -33,7 +33,7 @@ namespace storage
                 return std::make_unique<DetachedFileIOManager>(cfg.db_path, std::move(io_lock_service));
             default:
                 throw std::runtime_error(
-                    "StdDbInstance::StdDbInstance: unknown IO type " +
+                    "IOManagerFactory::make: unknown IO type " +
                     std::to_string(static_cast<int>(cfg.io_type))
                 );
             }

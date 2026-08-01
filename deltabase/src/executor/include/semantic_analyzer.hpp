@@ -7,13 +7,13 @@
 #include "generic_query_validator.hpp"
 #include "information_schema_provider.hpp"
 #include "../../types/include/analysis_result.hpp"
-#include "../../storage/include/db_instance.hpp"
+#include "../../storage/include/storage_service_provider.hpp"
 
 namespace exq
 {
     class SemanticAnalyzer
     {
-        storage::IDbInstance& db_;
+        storage::StorageServiceProvider& ssp_;
         GenericQueryValidator generic_validator_;
         InformationSchemaProvider info_schema_provider_;
         types::Config config_;
@@ -112,7 +112,7 @@ namespace exq
 
     public:
         explicit
-        SemanticAnalyzer(const types::Config& config, storage::IDbInstance& db);
+        SemanticAnalyzer(const types::Config& config, storage::StorageServiceProvider& ssp);
 
         types::AnalysisResult
         analyze(const types::AstNode& node);

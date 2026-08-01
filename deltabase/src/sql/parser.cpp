@@ -188,7 +188,10 @@ namespace sql
                 stmt.columns.push_back(*current());
 
                 if (!advance() || !match(SqlSymbol::COMMA))
+                {
+                    current_--;
                     break;
+                }
             }
         }
         else
@@ -491,6 +494,51 @@ namespace sql
             advance();
 
             return PrimaryKeyConstraint();
+        }
+        if (kw == SqlKeyword::REFERENCES)
+        {
+            advance_or_throw("Expected table identifier after REFERENCES");
+            match_or_throw(SqlTokenType::IDENTIFIER, "Expected table identifier after REFERENCES");
+
+            auto table = parse_table_identifier();
+            match_or_throw(SqlSymbol::LPAREN, "Expected ( after table identifier");
+            advance_or_throw("Expected foreign key identifier after (");
+
+            match_or_throw(SqlTokenType::IDENTIFIER, "Expected foreign key identifier");
+            auto column = *current();
+            advance_or_throw();
+
+            match_or_throw(SqlSymbol::RPAREN, "Expected ) after column identifier");
+            advance();
+
+            auto action = OnDeleteFkAction::RESTRICT;
+
+            if (match(SqlKeyword::ON))
+            {
+                advance_or_throw();
+                match_or_throw(SqlKeyword::DELETE);
+                advance_or_throw();
+
+                if (match(SqlKeyword::SET))
+                {
+                    advance_or_throw();
+                    match_or_throw(SqlKeyword::_NULL);
+                    advance();
+                    action = OnDeleteFkAction::SET_NULL;
+                }
+                else if (match(SqlKeyword::CASCADE))
+                {
+                    advance();
+                    action = OnDeleteFkAction::CASCADE;
+                }
+                else if (match(SqlKeyword::RESTRICT))
+                {
+                    advance();
+                    action = OnDeleteFkAction::RESTRICT;
+                }
+            }
+
+            return ForeignKeyConstraint{.referenced_table = std::move(table), .referenced_column = std::move(column), .action = action};
         }
         if (kw == SqlKeyword::DEFAULT)
         {

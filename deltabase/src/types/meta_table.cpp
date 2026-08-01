@@ -41,65 +41,13 @@ namespace types
     }
 
     DataRow
-    MetaTable::make_row(
-        const std::optional<std::vector<std::string>>& cols, const std::vector<DataToken>& row
-    )
+    MetaTable::make_row(const std::vector<DataToken>& normalized_row)
     {
-        const DataToken null_token(Bytes{}, DataType::_NULL);
-
         DataRow data_row;
         data_row.id = last_rid++;
-
         total_rows++;
         live_rows++;
-
-        // Always reorder tokens according to schema and fill missing values with NULL tokens.
-        // Missing values can then be materialized from DEFAULT constraints.
-        std::vector reordered_tokens(columns.size(), null_token);
-        std::vector provided(columns.size(), false);
-
-        if (!cols.has_value())
-        {
-            // No column names provided - map row tokens directly by index
-            for (size_t i = 0; i < row.size() && i < columns.size(); ++i)
-            {
-                reordered_tokens[i] = row[i];
-                provided[i] = true;
-            }
-        }
-        else
-        {
-            // Column names provided - map tokens according to schema
-            for (size_t i = 0; i < cols->size(); ++i)
-            {
-                int64_t col_idx = get_column_idx((*cols)[i]);
-                if (col_idx != -1 && i < row.size())
-                {
-                    reordered_tokens[col_idx] = row[i];
-                    provided[static_cast<size_t>(col_idx)] = true;
-                }
-            }
-        }
-
-        for (size_t i = 0; i < columns.size(); ++i)
-        {
-            const auto& column = columns[i];
-
-            if (!provided[i])
-            {
-                if (const auto* default_constraint = get_default_constraint(column))
-                    reordered_tokens[i] = default_constraint->value;
-            }
-
-            if (has_not_null_constraint(column) && reordered_tokens[i].type == DataType::_NULL)
-            {
-                throw std::runtime_error(
-                    "MetaTable::make_row: NOT NULL column '" + column.name + "' has no value"
-                );
-            }
-        }
-
-        data_row.tokens = reordered_tokens;
+        data_row.tokens = normalized_row;
         return data_row;
     }
 
@@ -143,6 +91,45 @@ namespace types
                 return column;
         }
         throw std::runtime_error("MetaTable::get_column: column '" + col_id.to_string() + "' not found");
+    }
+
+    bool
+    MetaTable::is_unique(const std::string& col_name) const
+    {
+        for (const auto& index : indexes)
+        {
+            auto column = get_column(index.column_id);
+            if (column.name == col_name && index.is_unique)
+                return true;
+        }
+
+        return false;
+    }
+
+    std::vector<MetaIndex*>
+    MetaTable::get_indexes(const std::string& col_name, bool only_unique)
+    {
+        std::vector<MetaIndex*> result;
+        for (auto& index : indexes)
+        {
+            auto column = get_column(index.column_id);
+            if (column.name == col_name && (!only_unique || index.is_unique))
+                result.push_back(&index);
+        }
+        return result;
+    }
+
+    std::vector<const MetaIndex*>
+    MetaTable::get_indexes(const std::string& col_name, bool only_unique) const
+    {
+        std::vector<const MetaIndex*> result;
+        for (const auto& index : indexes)
+        {
+            auto column = get_column(index.column_id);
+            if (column.name == col_name && (!only_unique || index.is_unique))
+                result.push_back(&index);
+        }
+        return result;
     }
 
     int64_t

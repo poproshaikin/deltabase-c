@@ -127,6 +127,13 @@ namespace storage
         return it == tables_.end() ? nullptr : &it->second;
     }
 
+    const types::MetaTable*
+    CatalogCache::get_table(const types::UUID& id) const
+    {
+        auto it = tables_.find(id);
+        return it == tables_.end() ? nullptr : &it->second;
+    }
+
     types::MetaTable*
     CatalogCache::get_table(const std::string& name, const types::UUID& schema_id)
     {
@@ -231,7 +238,9 @@ namespace storage
     {
         return get_schema(name) != nullptr;
     }
-    void
+
+    types::MetaSchema
+    *
     CatalogCache::save_schema(const types::MetaSchema& ms, const types::UUID& txn_id)
     {
         auto it = schemas_.find(ms.id);
@@ -239,6 +248,7 @@ namespace storage
             txn_deltas_[txn_id].added_schemas.push_back(ms.id);
 
         schemas_[ms.id] = ms;
+        return &schemas_[ms.id];
     }
 
     std::vector<types::MetaTable*>
@@ -249,6 +259,19 @@ namespace storage
 
         for (auto& table : tables_ | std::views::values)
             tables.push_back(&table);
+
+        return tables;
+    }
+
+    std::vector<types::MetaTable*>
+    CatalogCache::get_all_tables(const types::SchemaId& schema_id)
+    {
+        std::vector<types::MetaTable*> tables;
+        tables.reserve(tables_.size());
+
+        for (auto& table : tables_ | std::views::values)
+            if (table.schema_id == schema_id)
+                tables.push_back(&table);
 
         return tables;
     }

@@ -1,181 +1,201 @@
 # DeltaBase
 
-DeltaBase is a modular relational database engine written in C++20.
-It includes SQL parsing, planning/execution, file-backed storage, transactions, write-ahead logging, and crash recovery.
+A relational database engine written from scratch in C++20.  
+DeltaBase implements the full classic DB stack: SQL parsing, semantic analysis, query planning, Volcano-model execution, file-backed page storage, an LRU buffer pool, B+ tree indexes, sequences, multi-statement transactions, Write-Ahead Logging, and ARIES-style crash recovery.
 
-## Highlights
+---
 
-- C++20 codebase split into focused modules
-- SQL pipeline: lexer -> parser -> semantic analysis -> plan execution
-- File-backed storage with table/page metadata
-- Transaction lifecycle and WAL integration
-- Recovery manager with REDO/UNDO flow and compensation records (CLR)
-- CLI REPL for interactive usage
+## Features
 
-## Architecture At A Glance
+- **SQL** — `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `CREATE/DROP TABLE`, `ALTER TABLE`, `CREATE/DROP INDEX`, `CREATE DATABASE`, `CREATE SCHEMA`
+- **Data types** — `INTEGER`, `REAL`, `CHAR`, `BOOL`, `TEXT`
+- **Constraints** — `NOT NULL`, `UNIQUE`, `DEFAULT`, `AUTOINCREMENT` (sequence-backed), `PRIMARY KEY` (auto-creates B+ tree index)
+- **Transactions** — explicit `BEGIN` / `COMMIT` / `ROLLBACK`; UUID-keyed transaction IDs
+- **WAL** — append-only log with before/after images for data and DDL operations
+- **Crash recovery** — ARIES REDO+UNDO with Compensation Log Records (CLR); no lost committed work, no partial writes
+- **B+ tree indexes** — disk-resident, paged, used automatically for primary key lookups
+- **Buffer pool** — LRU-evicting cache for data pages and index files; dirty-page tracking per transaction
+- **`information_schema`** — virtual `tables` view exposing catalog metadata
+- **TCP server** — remote connections with a session-per-UUID model and chunked result streaming
+- **Interactive CLI** — linenoise-powered REPL with meta-commands (e.g. `\connect`, `\list`)
+- **Diagnostic tools** — standalone dump utilities for WAL, data pages, table metadata, and index files
 
-```mermaid
-flowchart LR
-    U[User] --> CLI[CLI]
-    CLI --> ENG[Engine]
-    ENG --> SQL[SQL Lexer + Parser]
-    ENG --> ANA[Semantic Analyzer]
-    ENG --> PLAN[Planner]
-    ENG --> EXEC[Node Executors]
-    EXEC --> ST[Storage DB Instance]
-    ST --> TX[Transactions]
-    TX --> WAL[WAL Manager]
-    ST --> IO[IO Manager]
-    ST --> REC[Recovery Manager]
-    WAL --> REC
+---
+
+## Architecture
+
+```
+                    ┌──────────────────────────────────────────┐
+                    │                  Engine                   │
+                    │  parse → analyze → plan → execute         │
+                    └──────────────┬───────────────────────────┘
+                                   │
+          ┌────────────────────────┼────────────────────────┐
+          │                        │                        │
+     ┌────▼────┐            ┌──────▼──────┐         ┌──────▼──────┐
+     │   SQL   │            │  Executor   │         │   Storage   │
+     │ Lexer + │            │  Semantic   │         │   Service   │
+     │ Parser  │            │  Analyzer   │         │  Provider   │
+     └─────────┘            │  Planner    │         └──────┬──────┘
+                            │  Node       │                │
+                            │  Executors  │    ┌───────────┼───────────┐
+                            └─────────────┘    │           │           │
+                                          ┌────▼───┐ ┌─────▼───┐ ┌────▼────┐
+                                          │ Buffer │ │Catalog  │ │DDL/DML/ │
+                                          │  Pool  │ │ Cache   │ │  DQL    │
+                                          └────┬───┘ └─────────┘ └─────────┘
+                                               │
+                               ┌───────────────┼───────────────┐
+                               │               │               │
+                          ┌────▼────┐   ┌──────▼─────┐  ┌─────▼──────┐
+                          │   WAL   │   │  IO Manager│  │  Recovery  │
+                          │ Manager │   │  (files)   │  │  Manager   │
+                          └─────────┘   └────────────┘  └────────────┘
 ```
 
-## Modules
+### Module breakdown
 
-| Module | Responsibility | Key locations |
-|---|---|---|
-| `cli` | REPL loop, command parsing, formatting, meta commands | [src/cli/include/cli.hpp](src/cli/include/cli.hpp), [src/cli/cli.cpp](src/cli/cli.cpp), [src/cli/meta_executor.cpp](src/cli/meta_executor.cpp) |
-| `engine` | Orchestrates query execution and DB lifecycle | [src/engine/include/engine.hpp](src/engine/include/engine.hpp), [src/engine/engine.cpp](src/engine/engine.cpp) |
-| `sql` | SQL lexer and parser to AST | [src/sql/include/lexer.hpp](src/sql/include/lexer.hpp), [src/sql/include/parser.hpp](src/sql/include/parser.hpp) |
-| `executor` | Semantic analysis, planning, and plan execution | [src/executor/include/semantic_analyzer.hpp](src/executor/include/semantic_analyzer.hpp), [src/executor/include/std_plan_executor.hpp](src/executor/include/std_plan_executor.hpp), [src/executor/std_plan_executor.cpp](src/executor/std_plan_executor.cpp) |
-| `storage` | DB instance API, page/table/schema I/O, metadata persistence | [src/storage/include/std_db_instance.hpp](src/storage/include/std_db_instance.hpp), [src/storage/std_db_instance.cpp](src/storage/std_db_instance.cpp), [src/storage/include/io_manager.hpp](src/storage/include/io_manager.hpp) |
-| `transactions` | Transaction objects and manager | [src/transactions/include/transaction.hpp](src/transactions/include/transaction.hpp), [src/transactions/include/transaction_manager.hpp](src/transactions/include/transaction_manager.hpp) |
-| `wal` | WAL API, file WAL manager, serializer | [src/wal/include/wal_manager.hpp](src/wal/include/wal_manager.hpp), [src/wal/file_wal_manager.cpp](src/wal/file_wal_manager.cpp), [src/wal/std_wal_serializer.cpp](src/wal/std_wal_serializer.cpp) |
-| `recovery` | Crash recovery (REDO/UNDO) over WAL | [src/recovery/include/recovery_manager.hpp](src/recovery/include/recovery_manager.hpp), [src/recovery/recovery_manager.cpp](src/recovery/recovery_manager.cpp) |
-| `types` | Shared core types (AST, rows/tables, config, WAL records, UUID) | [src/types/include](src/types/include) |
-| `misc` | Utility layer: logging, streams, helpers, static paths | [src/misc/include](src/misc/include) |
+| Module         | Path              | Responsibility                                                   |
+|----------------|-------------------|------------------------------------------------------------------|
+| `types`        | `src/types/`      | Shared data structures: `DataPage`, `DataRow`, `DataToken`, `WALRecord`, AST nodes, `Config`, `MetaTable/Column/Index/Schema` |
+| `misc`         | `src/misc/`       | Utilities: LRU cache, `MemoryStream`, logger, exceptions, `convert` helpers |
+| `sql`          | `src/sql/`        | Hand-written lexer (`Lexer`) and recursive-descent parser (`SqlParser`) producing an AST |
+| `executor`     | `src/executor/`   | `SemanticAnalyzer`, `StdPlanner`, `NodeExecutor` (Volcano model: open / next / close), `Evaluator`, `InformationSchemaProvider` |
+| `storage`      | `src/storage/`    | `StorageServiceProvider` (DI container), `BufferPool`, `CatalogCache`, `DDLService`, `DMLService`, `DqlService`, `FileIOManager`, `IndexBPlusTree` / `BPIndexPager`, `RowPreprocessor`, `ConstraintEnforcer` |
+| `transactions` | `src/transactions/` | `Transaction` (begin/commit/rollback + WAL append), `TransactionManager` |
+| `wal`          | `src/wal/`        | `IWALManager`, `FileWALManager`, `StdWALSerializer`              |
+| `recovery`     | `src/recovery/`   | `RecoveryManager`: full REDO pass then UNDO pass with CLR generation |
+| `engine`       | `src/engine/`     | `Engine` — top-level façade coordinating all layers              |
+| `network`      | `src/network/`    | `NetServer`, `INetProtocol` / `StdProtocol`, `Session`, `SocketHandle` |
+| `cli`          | `src/cli/`        | REPL (`Cli`), `MetaExecutor` (meta-commands), `ResultFormatter`  |
+| `binaries`     | `src/binaries/`   | `main()` entry points for each executable                        |
 
-## Query Execution Flow
+---
 
-1. CLI receives command in [src/cli/cli.cpp](src/cli/cli.cpp).
-2. Meta commands are handled in [src/cli/meta_executor.cpp](src/cli/meta_executor.cpp).
-3. SQL commands go to `Engine::execute_query` in [src/engine/engine.cpp](src/engine/engine.cpp).
-4. SQL is tokenized and parsed (`sql::lex`, `SqlParser`).
-5. Semantic analysis validates query against catalog.
-6. Planner builds a query plan.
-7. Executor runs plan nodes and returns a materialized result.
-8. Storage applies data changes, emits WAL records, and persists pages.
-9. Recovery replays WAL on startup.
+## Storage layout
 
-## Build
+Data is stored relative to the executable's working directory:
 
-Requirements:
+```
+data/
+  <database>/
+    <database>.meta          — database metadata
+    <schema>/
+      common.meta            — schema metadata
+      tables/
+        <table>/
+          <table>.meta       — column and index definitions
+          data/              — data pages (UUID-named files, up to 32 kB each)
+          index/             — B+ tree index files
+      sequences/
+        <sequence>           — current sequence value
+    wal/
+      1_1000                 — WAL segment (LSN range encoded in filename)
+```
 
-- CMake >= 3.15
-- C++20 compiler
-- `pkg-config`
-- `libuuid` development package
+### Data page format
 
-Build commands:
+- **Max size:** 32 kB
+- **Header:** table UUID + page UUID + next-page UUID + min/max RowId + row count + last LSN
+- **Body:** variable-length serialized `DataRow` records
+
+---
+
+## WAL & Recovery
+
+Every data modification (INSERT/UPDATE/DELETE) and every DDL operation writes a WAL record **before** touching the page. Records carry:
+- `lsn` — monotonically increasing Log Sequence Number (`uint64_t`)
+- `prev_lsn` — previous LSN for the same transaction (chain)
+- `txn_id` — UUID of the owning transaction
+- Before/after images sufficient for REDO and UNDO
+
+On crash, `RecoveryManager::recover()` runs:
+1. **Analysis** — scan WAL; build sets of committed, rolled-back, and active (loser) transactions
+2. **REDO** — replay all committed records and existing CLR records in LSN order
+3. **UNDO** — walk losers' chains backward; for each undoable record, apply the inverse operation and write a CLR to the log
+
+---
+
+## Query execution pipeline
+
+```
+SQL string
+   │
+   ▼  SqlParser::parse()
+  AST
+   │
+   ▼  SemanticAnalyzer::analyze()
+  AnalysisResult  (validated + type-checked)
+   │
+   ▼  StdPlanner::plan()
+  QueryPlan  (tree of plan nodes)
+   │
+   ▼  NodeExecutor  (Volcano: open / next / close)
+  DataTable  (result rows)
+```
+
+---
+
+## Building
+
+**Requirements:**
+- GCC 12+ (C++20)
+- CMake 3.15+
+- Ninja
+- `libuuid` (`sudo dnf install libuuid-devel` / `sudo apt install uuid-dev`)
 
 ```bash
-cmake -S . -B build
-cmake --build build -j
+cd deltabase
+cmake -G Ninja -B build .
+cd build
+ninja
 ```
 
-Produced binaries:
+Executables appear in `build/build/bin/`.
 
-- `build/build/bin/main.exe`
-- `build/build/bin/test.exe`
+---
 
-Note: CMake in this project sets runtime output under `${CMAKE_BINARY_DIR}/build/bin`.
+## Executables
 
-## Run
+| Binary           | Description                                                  |
+|------------------|--------------------------------------------------------------|
+| `cli.exe`        | Interactive REPL — connect to a database and run SQL queries |
+| `server.exe`     | TCP server; accepts remote sessions over the custom protocol |
+| `test.exe`       | Test suite                                                   |
+| `wal_dump.exe`   | Print WAL log records for a database to stdout               |
+| `dp_dump.exe`    | Hex/row dump of a data page file                             |
+| `mt_dump.exe`    | Print table metadata (columns, indexes, constraints)         |
+| `index_dump.exe` | Print B+ tree index file contents                            |
 
-```bash
-./build/build/bin/main.exe
+---
+
+## Network protocol
+
+`server.exe` listens on a configurable TCP port. Each client gets an independent `Engine` instance keyed by a session UUID. The custom binary protocol supports:
+
+| Message type    | Purpose                                     |
+|----------------|---------------------------------------------|
+| `QueryMessage`  | Execute a SQL string; stream result chunks  |
+| `CreateDbMessage` | Create a new database                    |
+| `AttachDbMessage` | Attach (open) an existing database        |
+| `CloseMessage`  | Close the session                           |
+
+---
+
+## information_schema
+
+```sql
+SELECT * FROM information_schema.tables;
 ```
 
-CLI meta commands:
+Returns: `table_catalog`, `table_schema`, `table_name`, `table_type`, `column_count`, `index_count`, `total_rows`, `live_rows`.
 
-- `.c <db_name>`: connect/attach database
-- `.q`: quit
+---
 
-All other input is treated as SQL.
+## Design notes
 
-## SQL Support (Current)
-
-The parser and execution pipeline include support for common operations such as:
-
-- `SELECT`
-- `INSERT`
-- `UPDATE`
-- `DELETE`
-- `CREATE TABLE`
-- `ALTER TABLE ... ADD COLUMN`
-- `CREATE SCHEMA`
-- `CREATE DATABASE`
-- Column constraints: `DEFAULT`, `NOT NULL`
-
-See parser entry points in [src/sql/include/parser.hpp](src/sql/include/parser.hpp).
-
-### Constraints Behavior
-
-- `DEFAULT` values are materialized when a column is omitted in `INSERT`.
-- `NOT NULL` is enforced during semantic validation and during row materialization.
-- For `ALTER TABLE ... ADD COLUMN`, existing rows are extended with:
-    - the declared `DEFAULT` value when present;
-    - `NULL` when the column is nullable.
-    - non-nullable columns require a `DEFAULT` value.
-
-## Recovery and WAL
-
-WAL record types are defined in [src/types/include/wal_log.hpp](src/types/include/wal_log.hpp).
-
-Core WAL/recovery parts:
-
-- WAL manager interface: [src/wal/include/wal_manager.hpp](src/wal/include/wal_manager.hpp)
-- File WAL manager: [src/wal/file_wal_manager.cpp](src/wal/file_wal_manager.cpp)
-- Recovery manager: [src/recovery/recovery_manager.cpp](src/recovery/recovery_manager.cpp)
-
-Recovery manager currently performs:
-
-- REDO pass for committed/eligible records
-- UNDO pass for active transactions
-- CLR-aware continuation in UNDO path
-
-## Tests
-
-```bash
-./build/build/bin/test.exe
-```
-
-Test entrypoint: [tests/main.cpp](tests/main.cpp).
-
-## Project Documentation
-
-UML and use-case diagrams:
-
-- [doc/class.puml](doc/class.puml)
-- [doc/domain.puml](doc/domain.puml)
-- [doc/use_case.puml](doc/use_case.puml)
-- [doc/class.png](doc/class.png)
-- [doc/domain.png](doc/domain.png)
-- [doc/use_case.png](doc/use_case.png)
-
-## Repository Layout
-
-```text
-.
-├── CMakeLists.txt
-├── main.cpp
-├── src/
-│   ├── cli/
-│   ├── engine/
-│   ├── executor/
-│   ├── misc/
-│   ├── recovery/
-│   ├── sql/
-│   ├── storage/
-│   ├── transactions/
-│   ├── types/
-│   └── wal/
-├── tests/
-└── doc/
-```
-
-## Notes
-
-- SELECT results are currently materialized in memory in the standard plan executor.
-- Streaming execution and deeper optimization paths are still evolving.
-- WAL/recovery behavior is actively evolving with recent CLR integration.
+- **No third-party DB library is used.** Every layer (parser, planner, storage, WAL, recovery, B+ tree) is written from scratch.
+- **`StorageServiceProvider`** is the DI container for the storage layer; it owns infrastructure objects (IOManager, WALManager, BufferPool, CatalogCache, RecoveryManager, TransactionManager) and service objects (DDLService, DMLService, DqlService). Infrastructure is initialized first (declaration order matters).
+- **Volcano model:** every plan node implements `open() / next() / close()`. `next()` returns one row at a time; the caller drives iteration.
+- **LRU buffer pool** tracks dirty pages per transaction. On commit, dirty pages are flushed; on rollback, dirty pages are discarded from the pool.
+- **Sequences** back `AUTOINCREMENT` columns; sequence state is persisted to disk and WAL-logged.

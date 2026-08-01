@@ -31,9 +31,7 @@ namespace types
         MetaTable();
 
         DataRow
-        make_row(
-            const std::optional<std::vector<std::string>>& cols, const std::vector<DataToken>& row
-        );
+        make_row(const std::vector<DataToken>& normalized_row);
 
         bool
         has_column(const std::string& col_name) const;
@@ -46,6 +44,15 @@ namespace types
 
         const MetaColumn&
         get_column(const ColumnId& col_id) const;
+
+        bool
+        is_unique(const std::string& col_name) const;
+
+        std::vector<MetaIndex*>
+        get_indexes(const std::string& col_name, bool only_unique = false);
+
+        std::vector<const MetaIndex*>
+        get_indexes(const std::string& col_name, bool only_unique = false) const;
 
         // -1 if not found
         int64_t

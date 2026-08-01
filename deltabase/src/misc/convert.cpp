@@ -54,10 +54,9 @@ namespace misc
         if (const auto* default_constraint = std::get_if<DefaultConstraint>(&constraint))
             return MetaDefaultConstraint{ DataToken(default_constraint->value) };
 
-        if (std::holds_alternative<PrimaryKeyConstraint>(constraint))
-            return std::nullopt;
-
-        if (std::holds_alternative<AutoIncrementConstraint>(constraint))
+        if (std::holds_alternative<PrimaryKeyConstraint>(constraint) ||
+            std::holds_alternative<AutoIncrementConstraint>(constraint) ||
+            std::holds_alternative<ForeignKeyConstraint>(constraint))
             return std::nullopt;
 
         throw std::runtime_error("convert: unsupported column constraint");

@@ -56,6 +56,15 @@ namespace storage
             fs::create_directories(path);
     }
 
+    void
+    FileIOManager::init_wal()
+    {
+        DbGuard guard(*db_mutex_);
+        auto wal_dir = paths_.wal();
+        if (!fs::exists(wal_dir))
+            fs::create_directories(wal_dir);
+    }
+
     // --- iteration helpers ---------------------------------------------------
 
     void
