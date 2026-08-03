@@ -11,8 +11,7 @@
 #include "../../types/include/i_node_executor.hpp"
 #include "../../types/include/scan_cursor.hpp"
 #include "evaluator.hpp"
-
-namespace storage { class StorageServiceProvider; }
+#include "storage_service_provider.hpp"
 
 namespace exq
 {

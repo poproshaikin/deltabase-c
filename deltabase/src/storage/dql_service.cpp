@@ -279,7 +279,8 @@ namespace storage
     DQLService::value_exists(
         const MetaTable& mt,
         const std::string& column_name,
-        const DataToken& value)
+        const DataToken& value,
+        std::optional<RowId> exclude)
     {
         // Try via index scan
         auto indexes = mt.get_indexes(column_name);
@@ -287,7 +288,10 @@ namespace storage
         {
             BPIndexPager pager(buffer_pool_, mt.id, indexes[0]->id);
             IndexBPlusTree tree(pager);
-            return tree.find(value).has_value();
+            auto row = tree.find(value);
+            if (!row.has_value()) return false;
+            if (!exclude.has_value()) return true;
+            return exclude.value() != row.value().second;
         }
 
         // Fallback to seq scan
@@ -296,8 +300,12 @@ namespace storage
         auto cursor = seq_scan_begin(mt);
         DataRow row;
         while (seq_scan_next(cursor, row))
+        {
+            if (exclude.has_value() && row.id == exclude.value())
+                continue;
             if (row.tokens[col_idx] == value)
                 return true;
+        }
 
         return false;
     }

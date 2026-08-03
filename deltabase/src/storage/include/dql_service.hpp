@@ -40,7 +40,8 @@ namespace storage
         value_exists(
             const types::MetaTable& mt,
             const std::string& column_name,
-            const types::DataToken& value);
+            const types::DataToken& value,
+            std::optional<types::RowId> exclude = std::nullopt);
 
         std::vector<types::DataRow>
         get_rows_with_value(

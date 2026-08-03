@@ -401,7 +401,6 @@ namespace exq
             return false;
 
         auto& dml = service_provider_.dml();
-        auto& row_preprocessor = service_provider_.preprocessor();
         auto& constraint_enforcer = service_provider_.enforcer();
 
         int updated_count = 0;
@@ -414,7 +413,7 @@ namespace exq
                 break;
 
             DataRow new_row = dml.apply_row_update(mt_, row, assignments_);
-            constraint_enforcer.validate_or_throw(mt_, new_row.tokens);
+            constraint_enforcer.validate_or_throw(mt_, new_row.tokens, row.id);
 
             rows.push_back(std::move(row));
             updated_count++;

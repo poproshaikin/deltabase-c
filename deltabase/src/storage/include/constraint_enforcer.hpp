@@ -38,7 +38,8 @@ namespace storage
         void
         validate_or_throw(
             const types::MetaTable& mt,
-            const std::vector<types::DataToken>& row) const;
+            const std::vector<types::DataToken>& row,
+            std::optional<types::RowId> exclude = std::nullopt) const;
 
         void
         on_delete(const types::MetaTable& mt, const types::DataRow& deleting_row, txn::Transaction* txn);

@@ -18,7 +18,8 @@ namespace storage
     void
     ConstraintEnforcer::validate_or_throw(
         const MetaTable& mt,
-        const std::vector<DataToken>& row) const
+        const std::vector<DataToken>& row,
+        std::optional<RowId> exclude) const
     {
         for (size_t i = 0; i < mt.columns.size(); ++i)
         {
@@ -30,12 +31,11 @@ namespace storage
                     "NOT NULL constraint violated for column '" + col.name + "'",
                     EngineException::Code::NOT_NULL_VIOLATION);
 
-            if (mt.is_unique(col.name) && !is_null && dql_.value_exists(mt, col.name, row[i]))
+            if (mt.is_unique(col.name) && !is_null && dql_.value_exists(mt, col.name, row[i], exclude))
             {
                 throw EngineException(
                     "UNIQUE constraint violated for column '" + col.name + "'",
                     EngineException::Code::UNIQUE_VIOLATION);
-
             }
 
             if (col.has_constraint<MetaForeignKeyConstraint>())
@@ -45,7 +45,7 @@ namespace storage
                 const auto& referenced_col_name = referenced_mt->get_column(
                     fk->referenced_column_id).name;
 
-                if (!is_null && !dql_.value_exists(*referenced_mt, referenced_col_name, row[i]))
+                if (!is_null && !dql_.value_exists(*referenced_mt, referenced_col_name, row[i], std::nullopt))
                     throw EngineException(
                         "FOREIGN KEY constraint violated for column '" + col.name +
                         "': this value doesn't exist in table " + referenced_mt->name,
