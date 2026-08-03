@@ -222,10 +222,9 @@ namespace exq
         if (!child_->next(src_row))
             return false;
 
+        out.tokens.clear();
         for (auto idx : indices_)
-        {
             out.tokens.push_back(src_row.tokens[idx]);
-        }
 
         return true;
     }

@@ -290,6 +290,7 @@ namespace storage
             IndexBPlusTree tree(pager);
             auto row = tree.find(value);
             if (!row.has_value()) return false;
+            if (buffer_pool_.is_row_obsolete(row.value())) return false;
             if (!exclude.has_value()) return true;
             return exclude.value() != row.value().second;
         }

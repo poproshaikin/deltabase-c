@@ -56,6 +56,11 @@ namespace storage
         {
         }
 
+        ~BufferPool()
+        {
+            flush_dirty();
+        }
+
         void
         initialize();
 
@@ -98,6 +103,9 @@ namespace storage
 
         void
         set_if_lsn(const types::IndexId& index_id, types::LSN last_lsn);
+
+        bool
+        is_row_obsolete(const types::RowPtr& row_ptr);
 
         void
         flush_dirty();

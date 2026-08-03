@@ -561,6 +561,11 @@ namespace sql
             advance();
             return AutoIncrementConstraint();
         }
+        if (kw == SqlKeyword::UNIQUE)
+        {
+            advance();
+            return UniqueConstraint();
+        }
 
         throw EngineException("Unknown constraint", EngineException::Code::SYNTAX_ERROR);
     }

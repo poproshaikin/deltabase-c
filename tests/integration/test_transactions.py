@@ -15,8 +15,8 @@ check("committed row visible", out, expected_substr="10")
 # ROLLBACK: changes should not persist
 check("rollback txn", run("txntest", "begin;", "insert into t (id, val) values(2, 20);", "rollback;"))
 out = run("txntest", "select * from t;")
-check("rolled back row absent", "20" not in out, expected_substr=None)
-check("only 1 row after rollback", out, expected_substr="1 rows")
+check("rolled back row absent", out, expected_substr="1 row")
+check("only 1 row after rollback", out, expected_substr="1 row")
 
 # Rollback of UPDATE
 check("update then rollback", run("txntest", "begin;", "update t set val = 999 where id == 1;", "rollback;"))

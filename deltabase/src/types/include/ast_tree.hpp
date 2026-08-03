@@ -181,6 +181,10 @@ namespace types
     {
     };
 
+    struct UniqueConstraint
+    {
+    };
+
     struct DefaultConstraint
     {
         SqlToken value;
@@ -197,6 +201,7 @@ namespace types
         PrimaryKeyConstraint,
         ForeignKeyConstraint,
         AutoIncrementConstraint,
+        UniqueConstraint,
         DefaultConstraint
     >;
 

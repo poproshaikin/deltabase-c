@@ -4,6 +4,7 @@
 
 #include "include/buffer_pool.hpp"
 
+#include "../misc/include/utils.hpp"
 #include <algorithm>
 #include <ranges>
 
@@ -278,6 +279,20 @@ namespace storage
 
             flush(index);
         }
+    }
+
+    bool
+    BufferPool::is_row_obsolete(const RowPtr& row_ptr)
+    {
+        const auto* page = get_dp(row_ptr.first);
+        if (!page)
+            return false;
+
+        for (const auto& row : page->rows)
+            if (row.id == row_ptr.second)
+                return has_flag(row.flags, DataRowFlags::OBSOLETE);
+
+        return false;
     }
 
     void

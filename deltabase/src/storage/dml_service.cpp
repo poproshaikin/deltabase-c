@@ -29,18 +29,7 @@ namespace storage
     bool
     DMLService::is_row_obsolete(const RowPtr& row_ptr) const
     {
-        const auto* page = buffer_pool_.get_dp(row_ptr.first);
-        if (!page)
-            return false;
-
-        for (auto it = page->rows.rbegin(); it != page->rows.rend(); ++it)
-        {
-            const auto& row = *it;
-            if (row.id == row_ptr.second)
-                return has_flag(row.flags, DataRowFlags::OBSOLETE);
-        }
-
-        return false;
+        return buffer_pool_.is_row_obsolete(row_ptr);
     }
 
     std::vector<IndexId>

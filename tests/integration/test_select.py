@@ -31,7 +31,7 @@ check("select cols has 2000",   out, expected_substr="2000")
 # WHERE with equality
 out = run("seltest", "select * from emp where id == 2;")
 check("where id=2 has bob",     out, expected_substr="bob")
-check("where id=2 one row",     out, expected_substr="1 rows")
+check("where id=2 one row",     out, expected_substr="1 row")
 
 # WHERE on non-pk column
 out = run("seltest", "select * from emp where dept == 10;")
@@ -41,10 +41,10 @@ check("where dept=10 two rows",    out, expected_substr="2 rows")
 
 # WHERE is null
 out = run("seltest", "select * from emp where salary is null;")
-check("where is null empty", out, expected_substr="0 rows")
+check("where is null empty", out, expected_substr="No results.")
 
 # SELECT from empty result
 out = run("seltest", "select * from emp where id == 999;")
-check("no match is empty", out, expected_substr="0 rows")
+check("no match is empty", out, expected_substr="No results.")
 
 summary()

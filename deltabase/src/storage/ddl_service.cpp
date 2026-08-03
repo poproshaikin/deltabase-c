@@ -131,8 +131,14 @@ namespace storage
         mt.last_rid = 0;
         mt.columns.reserve(columns.size());
 
+        std::vector<std::string> unique_col_names;
         for (const auto& col_def : columns)
+        {
             mt.columns.push_back(resolve_column(col_def, mt));
+            for (const auto& c : col_def.constraints)
+                if (std::holds_alternative<UniqueConstraint>(c))
+                    unique_col_names.push_back(mt.columns.back().name);
+        }
 
         CreateTableRecord record(mt);
         txn.append_log(record);
@@ -160,6 +166,15 @@ namespace storage
                     txn);
             }
         }
+
+        for (const auto& col_name : unique_col_names)
+            create_index(
+                table_name + "_" + col_name + "_ukey",
+                table_name,
+                col_name,
+                schema_name,
+                true,
+                txn);
 
         return saved;
     }

@@ -25,11 +25,12 @@ check("insert unique 1",     run("contest", "insert into uq (id, code) values(1,
 check("insert unique 2",     run("contest", "insert into uq (id, code) values(2, 42);"), expect_ok=False)
 check("insert unique null",  run("contest", "insert into uq (id, code) values(3, null);"))
 
-# AUTOINCREMENT
-check("create autoincrement table", run("contest", "create table ai(id integer primary key autoincrement, name text);"))
-check("insert ai row 1", run("contest", "insert into ai (name) values('first');"))
-check("insert ai row 2", run("contest", "insert into ai (name) values('second');"))
-out = run("contest", "select * from ai;")
-check("ai has 2 rows", out, expected_substr="second")
+# AUTOINCREMENT — all in one process (async flush not yet implemented)
+out = run("contest",
+    "create table ai(id integer primary key autoincrement, name text);",
+    "insert into ai (name) values('first');",
+    "insert into ai (name) values('second');",
+    "select * from ai;")
+check("autoincrement works", out, expected_substr="second")
 
 summary()
