@@ -30,8 +30,11 @@ namespace wal
         virtual void
         sync() = 0;
 
+        virtual types::LSN
+        get_durable_lsn() const = 0;
+
         virtual void
-        wait_for_durable(types::LSN lsn) = 0;
+        ensure_durable(types::LSN lsn) = 0;
 
         virtual std::vector<types::WALRecord>
         read_all_logs() = 0;

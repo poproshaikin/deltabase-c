@@ -50,6 +50,12 @@ namespace storage
 
         catalog_->hydrate();
 
+        flush_coordinator_ = std::make_unique<FlushCoordinator>(
+            *buffer_pool_,
+            *catalog_,
+            *wal_manager_,
+            200);
+
         ddl_ = std::make_unique<DDLService>(
             cfg_,
             *buffer_pool_,
@@ -59,7 +65,7 @@ namespace storage
 
         dql_ = std::make_unique<DQLService>(*buffer_pool_);
         dml_ = std::make_unique<DMLService>(*ddl_, *buffer_pool_, *io_manager_);
-        row_preprocessor_ = std::make_unique<RowPreprocessor>(*catalog_, *io_manager_);
+        row_preprocessor_ = std::make_unique<RowPreprocessor>(*catalog_);
         constraint_enforcer_ = std::make_unique<ConstraintEnforcer>(*dql_, *dml_, *catalog_);
 
         if (!ddl_->exists_schema(cfg_.default_schema))

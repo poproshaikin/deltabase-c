@@ -11,7 +11,6 @@
 #include "../../types/include/index_file.hpp"
 #include "io_manager.hpp"
 #include "../../types/include/UUID.hpp"
-#include <unordered_set>
 
 namespace storage
 {
@@ -22,31 +21,6 @@ namespace storage
 
     class BufferPool
     {
-        DataPageBuffer data_pages_;
-        IndexFileBuffer index_files_;
-
-        IIOManager& io_;
-
-        std::unordered_map<types::TxnId, std::unordered_set<types::DataPageId>> txn_dirty_pages_;
-
-        std::unordered_map<types::TableId, std::vector<types::DataPageId>> data_pages_per_table_;
-        std::unordered_map<types::TableId, std::vector<types::IndexId>> index_files_per_table_;
-
-        void
-        flush(DataPageBuffer::CacheEntry& page_entry);
-        void
-        flush(IndexFileBuffer::CacheEntry& index_file_entry);
-
-        std::function<void(DataPageBuffer::CacheEntry&)> data_page_flusher_ =
-            [this](DataPageBuffer::CacheEntry& page_entry) { flush(page_entry); };
-        std::function<void(IndexFileBuffer::CacheEntry&)> index_file_flusher_ =
-            [this](IndexFileBuffer::CacheEntry& index_file_entry) { flush(index_file_entry); };
-
-        types::DataPage*
-        create_dp(const types::MetaTable& mt);
-
-        types::DataPage*
-        mark_dirty(const types::DataPageId& page_id);
 
     public:
         BufferPool(IIOManager& io)
@@ -71,21 +45,20 @@ namespace storage
         get_dp(const types::DataPageId& page_id);
 
         types::DataPage*
-        prepare_dp(size_t size, const types::MetaTable& mt, const types::TxnId& txn_id);
+        prepare_dp(size_t size, const types::MetaTable& mt);
 
         void
         append_row(
             types::DataPage* destination,
             types::MetaTable& mt,
             const types::DataRow& new_row,
-            types::LSN lsn,
-            types::UUID txn_id);
+            types::LSN lsn);
 
         std::vector<types::DataPage*>
         get_table_data(const types::UUID& table_id);
 
         types::DataPage*
-        dirty_dp(const types::DataPageId& page_id, const types::TxnId& txn);
+        dirty_dp(const types::DataPageId& page_id);
 
         types::IndexFile*
         get_table_index(const types::UUID& table_id, const types::IndexId& index_id);
@@ -112,10 +85,89 @@ namespace storage
         void
         flush_dirty(types::LSN max_lsn);
 
+    private:
+
+        DataPageBuffer data_pages_;
+        IndexFileBuffer index_files_;
+
+        IIOManager& io_;
+
+        std::mutex mutex_;
+
+        std::unordered_map<types::TableId, std::vector<types::DataPageId>> data_pages_per_table_;
+        std::unordered_map<types::TableId, std::vector<types::IndexId>> index_files_per_table_;
+
         void
-        rollback_txn(const types::TxnId& txn_id);
+        flush(DataPageBuffer::CacheEntry& page_entry);
         void
-        commit_txn(const types::TxnId& txn_id);
+        flush(IndexFileBuffer::CacheEntry& index_file_entry);
+
+        std::function<void(DataPageBuffer::CacheEntry&)> data_page_flusher_ =
+            [this](DataPageBuffer::CacheEntry& page_entry) { flush(page_entry); };
+        std::function<void(IndexFileBuffer::CacheEntry&)> index_file_flusher_ =
+            [this](IndexFileBuffer::CacheEntry& index_file_entry) { flush(index_file_entry); };
+
+        // All *_impl methods assume the caller already holds whatever lock guards
+        // data_pages_/index_files_/data_pages_per_table_/index_files_per_table_.
+        // They must only call other *_impl methods internally, never the public
+        // (locking) API below -- calling a locking public method from here would
+        // re-enter the same (non-recursive) lock on the same thread and deadlock.
+
+        void
+        initialize_impl();
+
+        void
+        put_dp_impl(const types::DataPageId& page_id, types::DataPage&& page);
+
+        types::DataPage*
+        get_dp_impl(const types::DataPageId& page_id);
+
+        types::DataPage*
+        prepare_dp_impl(size_t size, const types::MetaTable& mt);
+
+        void
+        append_row_impl(
+            types::DataPage* destination,
+            types::MetaTable& mt,
+            const types::DataRow& new_row,
+            types::LSN lsn);
+
+        std::vector<types::DataPage*>
+        get_table_data_impl(const types::UUID& table_id);
+
+        types::DataPage*
+        dirty_dp_impl(const types::DataPageId& page_id);
+
+        types::IndexFile*
+        get_table_index_impl(const types::UUID& table_id, const types::IndexId& index_id);
+
+        void
+        create_table_index_impl(
+            const std::string& schema_name,
+            const types::MetaTable& table,
+            const types::MetaIndex& index,
+            types::LSN last_lsn
+        );
+
+        types::IndexFile*
+        dirty_if_impl(const types::IndexId& index_id);
+
+        void
+        set_if_lsn_impl(const types::IndexId& index_id, types::LSN last_lsn);
+
+        bool
+        is_row_obsolete_impl(const types::RowPtr& row_ptr);
+
+        void
+        flush_dirty_impl();
+        void
+        flush_dirty_impl(types::LSN max_lsn);
+
+        types::DataPage*
+        create_dp_impl(const types::MetaTable& mt);
+
+        types::DataPage*
+        mark_dirty_impl(const types::DataPageId& page_id);
     };
 } // namespace storage
 

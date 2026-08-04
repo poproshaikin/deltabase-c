@@ -12,8 +12,8 @@ namespace storage
 {
     using namespace types;
 
-    RowPreprocessor::RowPreprocessor(CatalogCache & catalog, IIOManager & io_manager)
-        : catalog_(catalog), io_manager_(io_manager)
+    RowPreprocessor::RowPreprocessor(CatalogCache & catalog)
+        : catalog_(catalog)
     {
     }
 
@@ -81,7 +81,7 @@ namespace storage
                     seq->current_value = provided_val;
                     UpdateSequenceRecord seq_record(before, *seq);
                     txn.append_log(seq_record);
-                    io_manager_.write_seq(*seq);
+                    catalog_.mark_dirty(seq, txn.get_last_lsn());
                 }
                 continue;
             }
@@ -95,7 +95,7 @@ namespace storage
 
             UpdateSequenceRecord seq_record(before, *seq);
             txn.append_log(seq_record);
-            io_manager_.write_seq(*seq);
+            catalog_.mark_dirty(seq, txn.get_last_lsn());
         }
     }
 }

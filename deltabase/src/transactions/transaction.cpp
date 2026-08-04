@@ -70,9 +70,7 @@ namespace txn
         types::CommitTxnRecord commit_record(0, last_lsn_, id_);
 
         last_lsn_ = wal_manager_->append_log(commit_record);
-        wal_manager_->wait_for_durable(last_lsn_);
-        buffer_pool_->flush_dirty(last_lsn_);
-        catalog_->commit_txn(id_);
+        wal_manager_->ensure_durable(last_lsn_);
         state_ = TransactionState::COMMITTED;
     }
 
@@ -125,6 +123,76 @@ namespace txn
                     last_lsn_ = wal_manager_->append_log(clr);
                     current = r.prev_lsn;
                 }
+                else if constexpr (std::is_same_v<R, types::CreateSchemaRecord>)
+                {
+                    types::CLRCreateSchemaRecord clr(0, last_lsn_, id_, r.prev_lsn, r.schema);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
+                else if constexpr (std::is_same_v<R, types::UpdateSchemaRecord>)
+                {
+                    types::CLRUpdateSchemaRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before, r.after);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
+                else if constexpr (std::is_same_v<R, types::DeleteSchemaRecord>)
+                {
+                    types::CLRDeleteSchemaRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
+                else if constexpr (std::is_same_v<R, types::CreateTableRecord>)
+                {
+                    types::CLRCreateTableRecord clr(0, last_lsn_, id_, r.prev_lsn, r.after);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
+                else if constexpr (std::is_same_v<R, types::UpdateTableRecord>)
+                {
+                    types::CLRUpdateTableRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before, r.after);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
+                else if constexpr (std::is_same_v<R, types::DeleteTableRecord>)
+                {
+                    types::CLRDeleteTableRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
+                else if constexpr (std::is_same_v<R, types::CreateIndexRecord>)
+                {
+                    types::CLRCreateIndexRecord clr(0, last_lsn_, id_, r.prev_lsn, r.after);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
+                else if constexpr (std::is_same_v<R, types::DropIndexRecord>)
+                {
+                    types::CLRDropIndexRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
+                else if constexpr (std::is_same_v<R, types::CreateSequenceRecord>)
+                {
+                    types::CLRCreateSequenceRecord clr(0, last_lsn_, id_, r.prev_lsn, r.after);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
+                else if constexpr (std::is_same_v<R, types::UpdateSequenceRecord>)
+                {
+                    types::CLRUpdateSequenceRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before, r.after);
+                    last_lsn_ = wal_manager_->append_log(clr);
+                    recovery_manager_->undo_record(r, *catalog_, last_lsn_);
+                    current = r.prev_lsn;
+                }
                 else if constexpr (requires { r.undo_next_lsn; })
                 {
                     current = r.undo_next_lsn;
@@ -140,10 +208,8 @@ namespace txn
 
         types::RollbackTxnRecord rollback_record(0, last_lsn_, id_);
         last_lsn_ = wal_manager_->append_log(rollback_record);
-        wal_manager_->wait_for_durable(last_lsn_);
+        wal_manager_->ensure_durable(last_lsn_);
 
-        buffer_pool_->rollback_txn(id_);
-        catalog_->rollback_txn(id_);
         state_ = TransactionState::ABORTED;
     }
 } // namespace txn

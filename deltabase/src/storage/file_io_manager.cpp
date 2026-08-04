@@ -455,7 +455,7 @@ namespace storage
     // --- writes --------------------------------------------------------------
 
     void
-    FileIOManager::write_page(const DataPage& page, bool fsync)
+    FileIOManager::write(const DataPage& page, bool fsync)
     {
         DbGuard guard(*db_mutex_);
         auto serialized = serializer_->serialize_dp(page);
@@ -730,7 +730,7 @@ namespace storage
     }
 
     void
-    FileIOManager::write_index_file(const IndexFile& index_file, bool fsync)
+    FileIOManager::write(const IndexFile& index_file, bool fsync)
     {
         DbGuard guard(*db_mutex_);
         std::optional<fs::path> index_path;

@@ -94,7 +94,7 @@ namespace recovery
                 {
                     redo(r, *page);
                     page->last_lsn = r.lsn;
-                    io_.write_page(*page);
+                    io_.write(*page);
                 }
             },
             record
@@ -397,7 +397,7 @@ namespace recovery
 
                             undo_record(r, *page);
                             page->last_lsn = clr_lsn;
-                            io_.write_page(*page);
+                            io_.write(*page);
 
                             txn_prev_lsn = clr_lsn;
                         }
@@ -535,6 +535,77 @@ namespace recovery
     RecoveryManager::undo_record(const UpdateSequenceRecord& record)
     {
         io_.write_seq(with_schema_name(record.before, io_), true);
+    }
+
+    void
+    RecoveryManager::undo_record(const CreateSchemaRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        // undo a CREATE = the schema must disappear again, mirrors io_.delete_ms(record.schema)
+        // deletion needs no last_lsn: an erased entry is never flushed again
+        catalog.delete_schema(record.schema.id);
+    }
+
+    void
+    RecoveryManager::undo_record(const UpdateSchemaRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        catalog.save_schema(record.before, last_lsn);
+    }
+
+    void
+    RecoveryManager::undo_record(const DeleteSchemaRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        // undo a DELETE = bring the before-image back
+        catalog.save_schema(record.before, last_lsn);
+    }
+
+    void
+    RecoveryManager::undo_record(const CreateTableRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        catalog.delete_table(record.after.id);
+    }
+
+    void
+    RecoveryManager::undo_record(const UpdateTableRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        catalog.save_table(MetaTable(record.before), last_lsn);
+    }
+
+    void
+    RecoveryManager::undo_record(const DeleteTableRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        catalog.save_table(MetaTable(record.before), last_lsn);
+    }
+
+    void
+    RecoveryManager::undo_record(const CreateIndexRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        if (auto* table = catalog.get_table(record.after.table_id))
+        {
+            std::erase_if(table->indexes, [&](const MetaIndex& value) { return value.id == record.after.id; });
+            catalog.mark_dirty(table, last_lsn);
+        }
+    }
+
+    void
+    RecoveryManager::undo_record(const DropIndexRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        if (auto* table = catalog.get_table(record.before.table_id))
+        {
+            table->indexes.push_back(record.before);
+            catalog.mark_dirty(table, last_lsn);
+        }
+    }
+
+    void
+    RecoveryManager::undo_record(const CreateSequenceRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        catalog.delete_sequence(record.after.id);
+    }
+
+    void
+    RecoveryManager::undo_record(const UpdateSequenceRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    {
+        catalog.put(record.before, last_lsn);
     }
 
     WALRecord

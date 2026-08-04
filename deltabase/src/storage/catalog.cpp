@@ -4,6 +4,7 @@
 
 #include "include/catalog.hpp"
 
+#include <limits>
 #include <ranges>
 
 namespace storage
@@ -27,6 +28,13 @@ namespace storage
     void
     CatalogCache::hydrate()
     {
+        std::lock_guard lock(mutex_);
+        hydrate_impl();
+    }
+
+    void
+    CatalogCache::hydrate_impl()
+    {
         tables_.clear();
         schemas_.clear();
         sequences_.clear();
@@ -38,227 +46,383 @@ namespace storage
             schemas_.emplace(schema.id, std::move(schema));
 
         for (auto&& sequence : io_.read_sequences())
-            sequences_.emplace(sequence.id, sequence);
+            sequences_.emplace(sequence.id, std::move(sequence));
     }
 
     void
     CatalogCache::flush()
     {
-        for (const auto& [_, schema] : schemas_)
-            io_.write_ms(schema, true);
-
-        for (const auto& [_, table] : tables_)
-            io_.write_mt(table, true);
-
-        for (const auto& [_, sequence] : sequences_)
-            io_.write_seq(sequence, true);
+        flush_impl();
     }
 
     void
-    CatalogCache::put(types::MetaTable table)
+    CatalogCache::flush_impl()
     {
-        tables_[table.id] = std::move(table);
+        flush_impl(std::numeric_limits<types::LSN>::max());
     }
 
     void
-    CatalogCache::put(types::MetaSchema schema)
+    CatalogCache::flush(types::LSN max_lsn)
     {
-        schemas_[schema.id] = std::move(schema);
+        flush_impl(max_lsn);
     }
 
     void
-    CatalogCache::put(types::MetaSequence sequence)
+    CatalogCache::flush_impl(types::LSN max_lsn)
     {
-        sequences_[sequence.id] = std::move(sequence);
+        // Collects eligible entries under the lock, writes them to disk with the
+        // lock released (fsync can take milliseconds -- must never block other
+        // threads for that long), then briefly re-locks to clear the dirty flag
+        // only for entries that weren't mutated again in the meantime.
+        auto flush_container = [this, max_lsn]<typename TValue, typename Writer>(
+            std::unordered_map<types::UUID, CatalogEntry<TValue>>& container, Writer&& writer)
+        {
+            std::vector<std::pair<types::UUID, TValue>> to_write;
+            {
+                std::lock_guard lock(mutex_);
+                for (auto& [id, entry] : container)
+                {
+                    if (!entry.dirty || entry.last_lsn > max_lsn)
+                        continue;
+                    to_write.emplace_back(id, entry.value);
+                }
+            }
+
+            for (const auto& [id, value] : to_write)
+                writer(value);
+
+            {
+                std::lock_guard lock(mutex_);
+                for (const auto& [id, value] : to_write)
+                {
+                    auto it = container.find(id);
+                    if (it != container.end() && it->second.last_lsn <= max_lsn)
+                        it->second.dirty = false;
+                }
+            }
+        };
+
+        flush_container(schemas_, [this](const types::MetaSchema& s) { io_.write_ms(s, true); });
+        flush_container(tables_, [this](const types::MetaTable& t) { io_.write_mt(t, true); });
+        flush_container(sequences_, [this](const types::MetaSequence& s) { io_.write_seq(s, true); });
     }
 
     void
-    CatalogCache::put(types::MetaTable table, const types::UUID& txn_id)
+    CatalogCache::put(types::MetaTable table, types::LSN last_lsn)
     {
-        txn_deltas_[txn_id].added_tables.push_back(table.id);
-        put(std::move(table));
+        std::lock_guard lock(mutex_);
+        put_impl(std::move(table), last_lsn);
     }
 
     void
-    CatalogCache::put(types::MetaSchema schema, const types::UUID& txn_id)
+    CatalogCache::put_impl(types::MetaTable table, types::LSN last_lsn)
     {
-        txn_deltas_[txn_id].added_schemas.push_back(schema.id);
-        put(std::move(schema));
+        auto id = table.id;
+        auto it = tables_.find(id);
+        if (it == tables_.end())
+            it = tables_.emplace(id, std::move(table)).first;
+        else
+            it->second.value = std::move(table);
+        it->second.dirty = true;
+        it->second.last_lsn = last_lsn;
     }
 
     void
-    CatalogCache::put(types::MetaSequence sequence, const types::UUID& txn_id)
+    CatalogCache::put(types::MetaSchema schema, types::LSN last_lsn)
     {
-        txn_deltas_[txn_id].added_sequences.push_back(sequence.id);
-        put(std::move(sequence));
+        std::lock_guard lock(mutex_);
+        put_impl(std::move(schema), last_lsn);
     }
 
     void
-    CatalogCache::commit_txn(const types::UUID& txn_id)
+    CatalogCache::put_impl(types::MetaSchema schema, types::LSN last_lsn)
     {
-        txn_deltas_.erase(txn_id);
+        auto id = schema.id;
+        auto it = schemas_.find(id);
+        if (it == schemas_.end())
+            it = schemas_.emplace(id, std::move(schema)).first;
+        else
+            it->second.value = std::move(schema);
+        it->second.dirty = true;
+        it->second.last_lsn = last_lsn;
     }
 
     void
-    CatalogCache::rollback_txn(const types::UUID& txn_id)
+    CatalogCache::put(types::MetaSequence sequence, types::LSN last_lsn)
     {
-        auto it = txn_deltas_.find(txn_id);
-        if (it == txn_deltas_.end())
-            return;
+        std::lock_guard lock(mutex_);
+        put_impl(std::move(sequence), last_lsn);
+    }
 
-        auto& delta = it->second;
+    void
+    CatalogCache::put_impl(types::MetaSequence sequence, types::LSN last_lsn)
+    {
+        auto id = sequence.id;
+        auto it = sequences_.find(id);
+        if (it == sequences_.end())
+            it = sequences_.emplace(id, std::move(sequence)).first;
+        else
+            it->second.value = std::move(sequence);
+        it->second.dirty = true;
+        it->second.last_lsn = last_lsn;
+    }
 
-        for (const auto& id : delta.added_tables)    tables_.erase(id);
-        for (const auto& id : delta.added_schemas)   schemas_.erase(id);
-        for (const auto& id : delta.added_sequences) sequences_.erase(id);
+    void
+    CatalogCache::mark_dirty(const types::MetaTable* table, types::LSN last_lsn)
+    {
+        std::lock_guard lock(mutex_);
+        mark_dirty_impl(table, last_lsn);
+    }
 
-        for (auto& t : delta.removed_tables)         tables_[t.id]  = std::move(t);
-        for (auto& s : delta.removed_schemas)        schemas_[s.id] = std::move(s);
-        for (auto& s : delta.removed_sequences)      sequences_[s.id] = std::move(s);
-        for (auto& t : delta.updated_tables_before)  tables_[t.id]  = std::move(t);
+    void
+    CatalogCache::mark_dirty_impl(const types::MetaTable* table, types::LSN last_lsn)
+    {
+        auto it = tables_.find(table->id);
+        if (it != tables_.end())
+        {
+            it->second.dirty = true;
+            it->second.last_lsn = last_lsn;
+        }
+    }
 
-        txn_deltas_.erase(it);
+    void
+    CatalogCache::mark_dirty(const types::MetaSchema* schema, types::LSN last_lsn)
+    {
+        std::lock_guard lock(mutex_);
+        mark_dirty_impl(schema, last_lsn);
+    }
+
+    void
+    CatalogCache::mark_dirty_impl(const types::MetaSchema* schema, types::LSN last_lsn)
+    {
+        auto it = schemas_.find(schema->id);
+        if (it != schemas_.end())
+        {
+            it->second.dirty = true;
+            it->second.last_lsn = last_lsn;
+        }
+    }
+
+    void
+    CatalogCache::mark_dirty(const types::MetaSequence* sequence, types::LSN last_lsn)
+    {
+        std::lock_guard lock(mutex_);
+        mark_dirty_impl(sequence, last_lsn);
+    }
+
+    void
+    CatalogCache::mark_dirty_impl(const types::MetaSequence* sequence, types::LSN last_lsn)
+    {
+        auto it = sequences_.find(sequence->id);
+        if (it != sequences_.end())
+        {
+            it->second.dirty = true;
+            it->second.last_lsn = last_lsn;
+        }
     }
 
     types::MetaTable*
     CatalogCache::get_table(const types::UUID& id)
     {
+        std::lock_guard lock(mutex_);
+        return get_table_impl(id);
+    }
+
+    types::MetaTable*
+    CatalogCache::get_table_impl(const types::UUID& id)
+    {
         auto it = tables_.find(id);
-        return it == tables_.end() ? nullptr : &it->second;
+        return it == tables_.end() ? nullptr : &it->second.value;
     }
 
     const types::MetaTable*
     CatalogCache::get_table(const types::UUID& id) const
     {
+        std::lock_guard lock(mutex_);
+        return get_table_impl(id);
+    }
+
+    const types::MetaTable*
+    CatalogCache::get_table_impl(const types::UUID& id) const
+    {
         auto it = tables_.find(id);
-        return it == tables_.end() ? nullptr : &it->second;
+        return it == tables_.end() ? nullptr : &it->second.value;
     }
 
     types::MetaTable*
     CatalogCache::get_table(const std::string& name, const types::UUID& schema_id)
     {
+        std::lock_guard lock(mutex_);
+        return get_table_impl(name, schema_id);
+    }
+
+    types::MetaTable*
+    CatalogCache::get_table_impl(const std::string& name, const types::UUID& schema_id)
+    {
         for (auto& [_, table] : tables_)
         {
-            if (table.name == name && table.schema_id == schema_id)
-                return &table;
+            if (table.value.name == name && table.value.schema_id == schema_id)
+                return &table.value;
         }
 
         return nullptr;
     }
 
-    void
-    CatalogCache::put_or_update(types::MetaTable table, const types::UUID& txn_id)
+    types::MetaTable*
+    CatalogCache::save_table(types::MetaTable&& mt, types::LSN last_lsn)
     {
-        auto it = tables_.find(table.id);
-        if (it == tables_.end())
-        {
-            txn_deltas_[txn_id].added_tables.push_back(table.id);
-        }
-        else
-        {
-            txn_deltas_[txn_id].updated_tables_before.push_back(it->second);
-        }
-        tables_[table.id] = std::move(table);
+        std::lock_guard lock(mutex_);
+        return save_table_impl(std::move(mt), last_lsn);
     }
 
     types::MetaTable*
-    CatalogCache::save_table(types::MetaTable&& mt, const types::UUID& txn_id)
+    CatalogCache::save_table_impl(types::MetaTable&& mt, types::LSN last_lsn)
     {
-        put_or_update(mt, txn_id);
-        return &tables_[mt.id];
+        auto id = mt.id;
+        auto it = tables_.find(id);
+        if (it == tables_.end())
+            it = tables_.emplace(id, std::move(mt)).first;
+        else
+            it->second.value = std::move(mt);
+        it->second.dirty = true;
+        it->second.last_lsn = last_lsn;
+        return &it->second.value;
     }
 
     void
     CatalogCache::delete_table(const types::UUID& table_id)
     {
-        tables_.erase(table_id);
+        std::lock_guard lock(mutex_);
+        delete_table_impl(table_id);
     }
 
     void
-    CatalogCache::delete_table(const types::UUID& table_id, const types::UUID& txn_id)
+    CatalogCache::delete_table_impl(const types::UUID& table_id)
     {
-        auto it = tables_.find(table_id);
-        if (it == tables_.end())
-            return;
-
-        txn_deltas_[txn_id].removed_tables.push_back(it->second);
-        tables_.erase(it);
+        tables_.erase(table_id);
     }
 
     types::MetaSchema*
     CatalogCache::get_schema(const types::UUID& id)
     {
+        std::lock_guard lock(mutex_);
+        return get_schema_impl(id);
+    }
+
+    types::MetaSchema*
+    CatalogCache::get_schema_impl(const types::UUID& id)
+    {
         const auto it = schemas_.find(id);
-        return it == schemas_.end() ? nullptr : &it->second;
+        return it == schemas_.end() ? nullptr : &it->second.value;
     }
 
     types::MetaSchema*
     CatalogCache::get_schema(const std::string& name)
     {
+        std::lock_guard lock(mutex_);
+        return get_schema_impl(name);
+    }
+
+    types::MetaSchema*
+    CatalogCache::get_schema_impl(const std::string& name)
+    {
         for (auto& [_, schema] : schemas_)
         {
-            if (schema.name == name)
-                return &schema;
+            if (schema.value.name == name)
+                return &schema.value;
         }
 
         return nullptr;
     }
 
     void
-    CatalogCache::delete_schema(const types::UUID& schema_id, const types::UUID& txn_id)
+    CatalogCache::delete_schema(const types::UUID& schema_id)
     {
-        auto it = schemas_.find(schema_id);
-        if (it == schemas_.end())
-            return;
-
-        txn_deltas_[txn_id].removed_schemas.push_back(it->second);
-        schemas_.erase(it);
+        std::lock_guard lock(mutex_);
+        delete_schema_impl(schema_id);
     }
 
     void
-    CatalogCache::delete_sequence(const types::UUID& sequence_id, const types::UUID& txn_id)
+    CatalogCache::delete_schema_impl(const types::UUID& schema_id)
     {
-        auto it = sequences_.find(sequence_id);
-        if (it == sequences_.end())
-            return;
+        schemas_.erase(schema_id);
+    }
 
-        txn_deltas_[txn_id].removed_sequences.push_back(it->second);
-        sequences_.erase(it);
+    void
+    CatalogCache::delete_sequence(const types::UUID& sequence_id)
+    {
+        std::lock_guard lock(mutex_);
+        delete_sequence_impl(sequence_id);
+    }
+
+    void
+    CatalogCache::delete_sequence_impl(const types::UUID& sequence_id)
+    {
+        sequences_.erase(sequence_id);
     }
 
     types::MetaSequence*
     CatalogCache::get_sequence(const types::UUID& id)
     {
+        std::lock_guard lock(mutex_);
+        return get_sequence_impl(id);
+    }
+
+    types::MetaSequence*
+    CatalogCache::get_sequence_impl(const types::UUID& id)
+    {
         const auto it = sequences_.find(id);
-        return it == sequences_.end() ? nullptr : &it->second;
+        return it == sequences_.end() ? nullptr : &it->second.value;
     }
 
     bool
     CatalogCache::exists_schema(const std::string& name)
     {
-        return get_schema(name) != nullptr;
+        std::lock_guard lock(mutex_);
+        return exists_schema_impl(name);
     }
 
-    types::MetaSchema
-    *
-    CatalogCache::save_schema(const types::MetaSchema& ms, const types::UUID& txn_id)
+    bool
+    CatalogCache::exists_schema_impl(const std::string& name)
+    {
+        return get_schema_impl(name) != nullptr;
+    }
+
+    types::MetaSchema*
+    CatalogCache::save_schema(const types::MetaSchema& ms, types::LSN last_lsn)
+    {
+        std::lock_guard lock(mutex_);
+        return save_schema_impl(ms, last_lsn);
+    }
+
+    types::MetaSchema*
+    CatalogCache::save_schema_impl(const types::MetaSchema& ms, types::LSN last_lsn)
     {
         auto it = schemas_.find(ms.id);
         if (it == schemas_.end())
-            txn_deltas_[txn_id].added_schemas.push_back(ms.id);
-
-        schemas_[ms.id] = ms;
-        return &schemas_[ms.id];
+            it = schemas_.emplace(ms.id, types::MetaSchema(ms)).first;
+        else
+            it->second.value = ms;
+        it->second.dirty = true;
+        it->second.last_lsn = last_lsn;
+        return &it->second.value;
     }
 
     std::vector<types::MetaTable*>
     CatalogCache::get_all_tables()
     {
+        std::lock_guard lock(mutex_);
+        return get_all_tables_impl();
+    }
+
+    std::vector<types::MetaTable*>
+    CatalogCache::get_all_tables_impl()
+    {
         std::vector<types::MetaTable*> tables;
         tables.reserve(tables_.size());
 
         for (auto& table : tables_ | std::views::values)
-            tables.push_back(&table);
+            tables.push_back(&table.value);
 
         return tables;
     }
@@ -266,12 +430,19 @@ namespace storage
     std::vector<types::MetaTable*>
     CatalogCache::get_all_tables(const types::SchemaId& schema_id)
     {
+        std::lock_guard lock(mutex_);
+        return get_all_tables_impl(schema_id);
+    }
+
+    std::vector<types::MetaTable*>
+    CatalogCache::get_all_tables_impl(const types::SchemaId& schema_id)
+    {
         std::vector<types::MetaTable*> tables;
         tables.reserve(tables_.size());
 
         for (auto& table : tables_ | std::views::values)
-            if (table.schema_id == schema_id)
-                tables.push_back(&table);
+            if (table.value.schema_id == schema_id)
+                tables.push_back(&table.value);
 
         return tables;
     }
@@ -279,11 +450,18 @@ namespace storage
     std::vector<types::MetaSchema*>
     CatalogCache::get_all_schemas()
     {
+        std::lock_guard lock(mutex_);
+        return get_all_schemas_impl();
+    }
+
+    std::vector<types::MetaSchema*>
+    CatalogCache::get_all_schemas_impl()
+    {
         std::vector<types::MetaSchema*> schemas;
         schemas.reserve(schemas_.size());
 
         for (auto& schema : schemas_ | std::views::values)
-            schemas.push_back(&schema);
+            schemas.push_back(&schema.value);
 
         return schemas;
     }

@@ -83,7 +83,7 @@ namespace storage
         read_data_page(types::DataPageId id) override;
 
         void
-        write_page(const types::DataPage& page, bool fsync) override;
+        write(const types::DataPage& page, bool fsync) override;
 
         uint64_t
         estimate_size(const types::DataRow& row) override;
@@ -135,7 +135,7 @@ namespace storage
         read_index_file(const types::IndexId& index_id) override;
 
         void
-        write_index_file(const types::IndexFile& index_file, bool fsync) override;
+        write(const types::IndexFile& index_file, bool fsync) override;
 
         types::MetaSequence
         read_seq(const std::string& name, const std::string& schema_name) override;
