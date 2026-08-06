@@ -166,11 +166,11 @@ namespace recovery
         recover();
 
         void
-        undo_record(const types::InsertRecord& record, types::DataPage& page);
+        undo_record(const types::InsertRecord& record, types::DataPage& page, types::LSN last_lsn);
         void
-        undo_record(const types::UpdateRecord& record, types::DataPage& page);
+        undo_record(const types::UpdateRecord& record, types::DataPage& page, types::LSN last_lsn);
         void
-        undo_record(const types::DeleteRecord& record, types::DataPage& page);
+        undo_record(const types::DeleteRecord& record, types::DataPage& page, types::LSN last_lsn);
 
         void
         undo_record(const types::CreateSchemaRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);

@@ -4,18 +4,16 @@
 
 #ifndef DELTABASE_TRANSACTION_HPP
 #define DELTABASE_TRANSACTION_HPP
-#include "../../recovery/include/recovery_manager.hpp"
-#include "../../storage/include/buffer_pool.hpp"
-#include "../../storage/include/catalog.hpp"
 #include "../../types/include/UUID.hpp"
 #include "../../types/include/wal_log.hpp"
-#include "../../wal/include/wal_manager.hpp"
 
 #include <cstdint>
 
 namespace txn
 {
     using TxnId = types::UUID;
+
+    class TransactionManager;
 
     enum class TransactionState
     {
@@ -28,14 +26,11 @@ namespace txn
     class Transaction
     {
         TxnId id_;
-        wal::IWALManager* wal_manager_;
-        storage::BufferPool* buffer_pool_;
-        storage::CatalogCache* catalog_;
-        recovery::RecoveryManager* recovery_manager_;
+        TransactionManager* mgr_;
         TransactionState state_ = TransactionState::IDLE;
         types::LSN last_lsn_ = 0;
 
-        Transaction(const TxnId& id, wal::IWALManager& wal_manager, storage::BufferPool& buffer_pool, storage::CatalogCache& catalog, recovery::RecoveryManager& recovery_manager);
+        Transaction(const TxnId& id, TransactionManager& mgr);
 
         friend class TransactionManager;
 
@@ -57,6 +52,40 @@ namespace txn
 
         void
         rollback();
+
+    private:
+        types::LSN
+        undo_one(const types::BeginTxnRecord& record);
+        types::LSN
+        undo_one(const types::InsertRecord& record);
+        types::LSN
+        undo_one(const types::UpdateRecord& record);
+        types::LSN
+        undo_one(const types::DeleteRecord& record);
+        types::LSN
+        undo_one(const types::CreateSchemaRecord& record);
+        types::LSN
+        undo_one(const types::UpdateSchemaRecord& record);
+        types::LSN
+        undo_one(const types::DeleteSchemaRecord& record);
+        types::LSN
+        undo_one(const types::CreateTableRecord& record);
+        types::LSN
+        undo_one(const types::UpdateTableRecord& record);
+        types::LSN
+        undo_one(const types::DeleteTableRecord& record);
+        types::LSN
+        undo_one(const types::CreateIndexRecord& record);
+        types::LSN
+        undo_one(const types::DropIndexRecord& record);
+        types::LSN
+        undo_one(const types::CreateSequenceRecord& record);
+        types::LSN
+        undo_one(const types::UpdateSequenceRecord& record);
+
+        template <typename R>
+        types::LSN
+        undo_one(const R& record);
     };
 } // namespace txn
 

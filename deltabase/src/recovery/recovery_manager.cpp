@@ -395,8 +395,7 @@ namespace recovery
                             wal_.append_log(clr);
                             wal_.flush();
 
-                            undo_record(r, *page);
-                            page->last_lsn = clr_lsn;
+                            undo_record(r, *page, clr_lsn);
                             io_.write(*page);
 
                             txn_prev_lsn = clr_lsn;
@@ -436,7 +435,7 @@ namespace recovery
         }
     }
     void
-    RecoveryManager::undo_record(const InsertRecord& record, DataPage& page)
+    RecoveryManager::undo_record(const InsertRecord& record, DataPage& page, LSN last_lsn)
     {
         for (auto& row : page.rows)
         {
@@ -446,9 +445,11 @@ namespace recovery
             row.flags |= DataRowFlags::OBSOLETE;
             break;
         }
+
+        page.last_lsn = last_lsn;
     }
     void
-    RecoveryManager::undo_record(const UpdateRecord& record, DataPage& page)
+    RecoveryManager::undo_record(const UpdateRecord& record, DataPage& page, LSN last_lsn)
     {
         for (auto& row : page.rows)
         {
@@ -459,9 +460,11 @@ namespace recovery
             row.flags &= ~DataRowFlags::OBSOLETE;
             break;
         }
+
+        page.last_lsn = last_lsn;
     }
     void
-    RecoveryManager::undo_record(const DeleteRecord& record, DataPage& page)
+    RecoveryManager::undo_record(const DeleteRecord& record, DataPage& page, LSN last_lsn)
     {
         for (auto& row : page.rows)
         {
@@ -471,6 +474,8 @@ namespace recovery
             row.flags &= ~DataRowFlags::OBSOLETE;
             break;
         }
+
+        page.last_lsn = last_lsn;
     }
 
     void
