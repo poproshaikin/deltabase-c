@@ -90,7 +90,7 @@ namespace storage
 
         const auto mt_unchanged = mt;
 
-        auto* page = buffer_pool_.prepare_dp(row_size, mt, txn.get_id());
+        auto* page = buffer_pool_.prepare_dp(row_size, mt);
 
         std::vector<IndexId> touched_indexes;
         if (mt.indexes.size() > 0)
@@ -102,7 +102,7 @@ namespace storage
         txn.append_log(update_table_record);
         const LSN page_lsn = txn.get_last_lsn();
 
-        buffer_pool_.append_row(page, mt, new_row, page_lsn, txn.get_id());
+        buffer_pool_.append_row(page, mt, new_row, page_lsn);
 
         for (const auto& index_id : touched_indexes)
             buffer_pool_.set_if_lsn(index_id, page_lsn);
@@ -208,7 +208,7 @@ namespace storage
             if (updated)
             {
                 page->last_lsn = page_lsn;
-                buffer_pool_.dirty_dp(page->id, txn.get_id());
+                buffer_pool_.dirty_dp(page->id);
             }
         }
     }
@@ -255,7 +255,7 @@ namespace storage
             if (deleted)
             {
                 page->last_lsn = page_lsn;
-                buffer_pool_.dirty_dp(page->id, txn.get_id());
+                buffer_pool_.dirty_dp(page->id);
             }
         }
     }

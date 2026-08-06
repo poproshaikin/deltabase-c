@@ -17,8 +17,32 @@ namespace txn
     }
 
     Transaction
-    TransactionManager::make_transaction() const
+    TransactionManager::make_transaction()
     {
-        return Transaction(TxnId::make(), wal_manager_, buffer_pool_, catalog_, recovery_manager_);
+        return Transaction(TxnId::make(), *this);
+    }
+
+    wal::IWALManager&
+    TransactionManager::wal_manager() const
+    {
+        return wal_manager_;
+    }
+
+    storage::BufferPool&
+    TransactionManager::buffer_pool() const
+    {
+        return buffer_pool_;
+    }
+
+    storage::CatalogCache&
+    TransactionManager::catalog() const
+    {
+        return catalog_;
+    }
+
+    recovery::RecoveryManager&
+    TransactionManager::recovery_manager() const
+    {
+        return recovery_manager_;
     }
 } // namespace txn

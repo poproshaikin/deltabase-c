@@ -191,7 +191,7 @@ namespace wal
     }
 
     void
-    FileWalManager::wait_for_durable(LSN lsn)
+    FileWalManager::ensure_durable(LSN lsn)
     {
         DbGuard guard(*db_mutex_);
         std::unique_lock lk(mtx_);
@@ -228,7 +228,7 @@ namespace wal
     void
     FileWalManager::commit_wait(LSN lsn)
     {
-        wait_for_durable(lsn);
+        ensure_durable(lsn);
     }
 
     void
@@ -286,6 +286,12 @@ namespace wal
         DbGuard guard(*db_mutex_);
         std::lock_guard lk(mtx_);
         return next_lsn_;
+    }
+
+    LSN
+    FileWalManager::get_durable_lsn() const
+    {
+        return flushed_lsn_;
     }
 
     void

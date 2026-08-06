@@ -22,12 +22,12 @@ namespace misc
         using const_iterator = std::unordered_map<TKey, CacheEntry>::const_iterator;
 
     private:
-        std::size_t max_size_ = 100;
+        std::size_t max_size_;
         std::unordered_map<TKey, CacheEntry> map_;
         TPolicy policy_;
 
     public:
-        Cache(TPolicy policy) : policy_(policy)
+        Cache(TPolicy policy, std::size_t max_size = 10000) : max_size_(max_size), policy_(policy)
         {
         }
 

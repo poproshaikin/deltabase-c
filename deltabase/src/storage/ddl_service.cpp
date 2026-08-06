@@ -13,6 +13,7 @@
 #include "BP_index_pager.hpp"
 
 #include <assert.h>
+#include <unordered_set>
 
 namespace storage
 {
@@ -43,7 +44,7 @@ namespace storage
         CreateSchemaRecord record(ms);
         txn.append_log(record);
 
-        return catalog_.save_schema(ms, txn.get_id());
+        return catalog_.save_schema(ms, txn.get_last_lsn());
     }
 
     bool
@@ -143,7 +144,7 @@ namespace storage
         CreateTableRecord record(mt);
         txn.append_log(record);
 
-        auto* saved = catalog_.save_table(std::move(mt), txn.get_id());
+        auto* saved = catalog_.save_table(std::move(mt), txn.get_last_lsn());
 
         for (auto& col : saved->columns)
         {
@@ -224,8 +225,7 @@ namespace storage
 
         const auto table_unchanged = *table;
 
-        io_manager_.delete_mt(table_unchanged);
-        catalog_.delete_table(table_unchanged.id, txn.get_id());
+        catalog_.delete_table(table_unchanged.id);
 
         DeleteTableRecord record(table_unchanged);
         txn.append_log(record);
@@ -274,6 +274,7 @@ namespace storage
         {
             UpdateTableRecord update_table_record(unchanged_mt, *mt);
             txn.append_log(update_table_record);
+            catalog_.mark_dirty(mt, txn.get_last_lsn());
             return;
         }
 
@@ -290,20 +291,20 @@ namespace storage
                 DataPage* destination =
                     reading_page->size + size <= DataPage::MAX_SIZE
                         ? reading_page
-                        : buffer_pool_.prepare_dp(size, *mt, txn.get_id());
+                        : buffer_pool_.prepare_dp(size, *mt);
 
                 const DataRow old_row = row;
                 row.flags |= DataRowFlags::OBSOLETE;
                 UpdateRecord update_record(mt->id, reading_page->id, old_row, row);
                 txn.append_log(update_record);
                 reading_page->last_lsn = txn.get_last_lsn();
-                buffer_pool_.dirty_dp(reading_page->id, txn.get_id());
+                buffer_pool_.dirty_dp(reading_page->id);
 
                 if (destination != reading_page && linked_pages.insert(destination->id).second)
                 {
                     destination->next = reading_page->next;
                     reading_page->next = destination->id;
-                    buffer_pool_.dirty_dp(reading_page->id, txn.get_id());
+                    buffer_pool_.dirty_dp(reading_page->id);
                 }
 
                 InsertRecord insert_record(mt->id, destination->id, new_row);
@@ -311,13 +312,13 @@ namespace storage
                 buffer_pool_.append_row(destination,
                                         *mt,
                                         new_row,
-                                        txn.get_last_lsn(),
-                                        txn.get_id());
+                                        txn.get_last_lsn());
             }
         }
 
         UpdateTableRecord update_table_record(unchanged_mt, *mt);
         txn.append_log(update_table_record);
+        catalog_.mark_dirty(mt, txn.get_last_lsn());
     }
 
     UUID
@@ -335,9 +336,9 @@ namespace storage
         sequence.schema_name = ms->name;
         sequence.current_value = 0;
 
-        catalog_.put(sequence, txn.get_id());
         CreateSequenceRecord record(sequence);
         txn.append_log(record);
+        catalog_.put(sequence, txn.get_last_lsn());
 
         return sequence.id;
     }

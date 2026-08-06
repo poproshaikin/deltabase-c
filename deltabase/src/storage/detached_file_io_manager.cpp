@@ -79,7 +79,7 @@ namespace storage
     DetachedFileIOManager::estimate_size(const types::DataRow&) { unsupported(); }
 
     void
-    DetachedFileIOManager::write_page(const types::DataPage&, bool) { unsupported(); }
+    DetachedFileIOManager::write(const types::DataPage&, bool) { unsupported(); }
 
     void
     DetachedFileIOManager::write_mt(const types::MetaTable&, const std::string&, bool) { unsupported(); }
@@ -123,7 +123,7 @@ namespace storage
     DetachedFileIOManager::read_index_file(const types::IndexId&) { unsupported(); }
 
     void
-    DetachedFileIOManager::write_index_file(const types::IndexFile&, bool) { unsupported(); }
+    DetachedFileIOManager::write(const types::IndexFile&, bool) { unsupported(); }
 
     types::MetaSequence
     DetachedFileIOManager::read_seq(const std::string&, const std::string&) { unsupported(); }

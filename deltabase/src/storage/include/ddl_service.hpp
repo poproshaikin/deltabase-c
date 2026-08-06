@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_DDL_SERVICE_HPP
 #define DELTABASE_DDL_SERVICE_HPP
+#include "buffer_pool.hpp"
 #include "catalog.hpp"
 #include "../../transactions/include/transaction.hpp"
 #include "wal_manager.hpp"

@@ -19,10 +19,29 @@ namespace txn
         recovery::RecoveryManager& recovery_manager_;
 
     public:
-        TransactionManager(wal::IWALManager& wal_manager, storage::BufferPool& buffer_pool, storage::CatalogCache& catalog, recovery::RecoveryManager& recovery_manager);
+        TransactionManager(
+            wal::IWALManager& wal_manager,
+            storage::BufferPool& buffer_pool,
+            storage::CatalogCache& catalog,
+            recovery::RecoveryManager& recovery_manager);
 
         Transaction
-        make_transaction() const;
+        make_transaction();
+
+    private:
+        wal::IWALManager&
+        wal_manager() const;
+
+        storage::BufferPool&
+        buffer_pool() const;
+
+        storage::CatalogCache&
+        catalog() const;
+
+        recovery::RecoveryManager&
+        recovery_manager() const;
+
+        friend class Transaction;
     };
 }
 

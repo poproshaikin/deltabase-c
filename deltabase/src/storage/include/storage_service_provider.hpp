@@ -14,6 +14,7 @@
 #include "dql_service.hpp"
 #include "row_preprocessor.hpp"
 #include "constraint_enforcer.hpp"
+#include "flush_coordinator.hpp"
 #include "../../types/include/config.hpp"
 #include "../../recovery/include/recovery_manager.hpp"
 #include "../../transactions/include/transaction_manager.hpp"
@@ -41,6 +42,7 @@ namespace storage
         std::unique_ptr<DQLService> dql_;
         std::unique_ptr<RowPreprocessor> row_preprocessor_;
         std::unique_ptr<ConstraintEnforcer> constraint_enforcer_;
+        std::unique_ptr<FlushCoordinator> flush_coordinator_;
 
     public:
         explicit

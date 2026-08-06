@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_RECOVERY_MANAGER_HPP
 #define DELTABASE_RECOVERY_MANAGER_HPP
+#include "../../storage/include/catalog.hpp"
 #include "../../storage/include/io_manager.hpp"
 #include "../../wal/include/wal_manager.hpp"
 #include "../../types/include/UUID.hpp"
@@ -165,11 +166,32 @@ namespace recovery
         recover();
 
         void
-        undo_record(const types::InsertRecord& record, types::DataPage& page);
+        undo_record(const types::InsertRecord& record, types::DataPage& page, types::LSN last_lsn);
         void
-        undo_record(const types::UpdateRecord& record, types::DataPage& page);
+        undo_record(const types::UpdateRecord& record, types::DataPage& page, types::LSN last_lsn);
         void
-        undo_record(const types::DeleteRecord& record, types::DataPage& page);
+        undo_record(const types::DeleteRecord& record, types::DataPage& page, types::LSN last_lsn);
+
+        void
+        undo_record(const types::CreateSchemaRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::UpdateSchemaRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::DeleteSchemaRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::CreateTableRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::UpdateTableRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::DeleteTableRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::CreateIndexRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::DropIndexRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::CreateSequenceRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::UpdateSequenceRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
     };
 } // namespace recovery
 

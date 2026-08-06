@@ -76,7 +76,7 @@ namespace wal
         read_log(types::LSN lsn) override;
 
         void
-        wait_for_durable(types::LSN lsn) override;
+        ensure_durable(types::LSN lsn) override;
 
         void
         commit_wait(types::LSN lsn);
@@ -92,6 +92,9 @@ namespace wal
 
         types::LSN
         get_next_lsn() const override;
+
+        types::LSN
+        get_durable_lsn() const override;
     };
 } // namespace wal
 

@@ -60,7 +60,7 @@ namespace storage
         estimate_size(const types::DataRow& row) = 0;
 
         virtual void
-        write_page(const types::DataPage& page, bool fsync = false) = 0;
+        write(const types::DataPage& page, bool fsync = false) = 0;
 
         virtual void
         write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync = false) = 0;
@@ -107,7 +107,7 @@ namespace storage
         read_index_file(const types::IndexId& index_id) = 0;
 
         virtual void
-        write_index_file(const types::IndexFile& index_file, bool fsync = false) = 0;
+        write(const types::IndexFile& index_file, bool fsync = false) = 0;
 
         virtual types::MetaSequence
         read_seq(const std::string& name, const std::string& schema_name) = 0;
