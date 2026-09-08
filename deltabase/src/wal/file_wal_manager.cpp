@@ -19,6 +19,8 @@ namespace wal
     using namespace misc;
     using DbGuard = std::lock_guard<storage::DatabaseIoLockService::Mutex>;
 
+    using checksum_t = uint32_t;
+
     FileWalManager::FileWalManager(
         const fs::path& db_path,
         const std::string& db_name,
@@ -294,6 +296,19 @@ namespace wal
         return flushed_lsn_;
     }
 
+    checksum_t
+    crc32(const uint8_t* data, size_t len)
+    {
+        uint32_t crc = 0xFFFFFFFF;
+        for (size_t i = 0; i < len; i++)
+        {
+            crc ^= data[i];
+            for (int j = 0; j < 8; j++)
+                crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
+        }
+        return ~crc;
+    }
+
     void
     FileWalManager::write_logs(const std::vector<WALRecord>& logs)
     {
@@ -333,12 +348,16 @@ namespace wal
             auto serialized = serializer_->serialize(record);
 
             uint64_t record_size = serialized.size();
+            checksum_t checksum = crc32(serialized.data(), serialized.size());
 
             if (write(fd, &record_size, sizeof(record_size)) != sizeof(record_size))
                 throw std::runtime_error("Failed to write WAL record size");
 
             if (write(fd, serialized.data(), serialized.size()) != (ssize_t)serialized.size())
                 throw std::runtime_error("Failed to write WAL record");
+
+            if (write(fd, &checksum, sizeof(checksum)) != sizeof(checksum))
+                throw std::runtime_error("Failed to write WAL checksum");
         }
 
         if (fd >= 0)
@@ -358,7 +377,6 @@ namespace wal
         if (!file.is_open())
             return logs;
 
-        // Прочитать весь файл в буфер
         file.seekg(0, std::ios::end);
         size_t file_size = file.tellg();
         file.seekg(0, std::ios::beg);
@@ -367,7 +385,6 @@ namespace wal
         file.read(reinterpret_cast<char*>(buffer.data()), file_size);
         file.close();
 
-        // Десериализовать все записи из буфера
         ReadOnlyMemoryStream stream(buffer);
 
         while (stream.remaining() > 0)
@@ -376,20 +393,26 @@ namespace wal
             if (!stream.read(&record_size, sizeof(record_size)))
                 break;
 
-            if (stream.remaining() < record_size)
+            if (stream.remaining() < record_size + sizeof(uint32_t))
                 break;
 
+            Bytes payload(record_size);
+            stream.read(payload.data(), record_size);
+
+            checksum_t read_checksum = 0;
+            stream.read(&read_checksum, sizeof(read_checksum));
+
+            checksum_t computed = crc32(payload.data(), payload.size());
+            if (computed != read_checksum)
+                throw std::runtime_error("WAL corruption detected: checksum mismatch");
+
+            ReadOnlyMemoryStream record_stream(payload);
             WALRecord record;
-            if (serializer_->deserialize(stream, record))
-            {
+
+            if (serializer_->deserialize(record_stream, record))
                 logs.push_back(std::move(record));
-            }
             else
-            {
-                throw std::runtime_error(
-                    "FileWalManager::read_logs_from_file: failed to deserialize a record"
-                );
-            }
+                throw std::runtime_error("Failed to deserialize a record");
         }
 
         return logs;
