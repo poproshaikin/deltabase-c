@@ -143,7 +143,7 @@ new types (e.g. DECIMAL, DATE), and eliminate the repeated `memcpy` + cast overh
 
 **Fix:** Add a static `DataToken::compare(const DataToken& a, const DataToken& b) -> int`
 that dispatches on `a.type` and does a `memcmp`-style comparison on the raw `Bytes` buffer for
-fixed-size types (INTEGER, REAL, CHAR, BOOL) and `std::string` compare for TEXT.
+fixed-size types (INTEGER, REAL, BOOL) and `std::string` compare for TEXT.
 Then rewrite `Evaluator::lt/lte/gr/gre` to call `DataToken::compare` and compare the result
 to 0, eliminating all the primitive overloads.
 

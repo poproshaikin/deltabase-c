@@ -268,6 +268,12 @@ namespace sql
                 current()->detail = SqlLiteral::_NULL;
             }
 
+            if (match(SqlKeyword::TRUE) || match(SqlKeyword::FALSE))
+            {
+                current()->type = SqlTokenType::LITERAL;
+                current()->detail = SqlLiteral::BOOL;
+            }
+
             if (!match(SqlTokenType::LITERAL))
                 throw EngineException("Expected a literal in VALUES expression", EngineException::Code::SYNTAX_ERROR);
 
@@ -547,6 +553,13 @@ namespace sql
             advance_or_throw(err);
             match_or_throw(SqlSymbol::LPAREN, err);
             advance_or_throw(err);
+
+            if (match(SqlKeyword::TRUE) || match(SqlKeyword::FALSE))
+            {
+                current()->type = SqlTokenType::LITERAL;
+                current()->detail = SqlLiteral::BOOL;
+            }
+
             match_or_throw(SqlTokenType::LITERAL, err);
             const auto* default_value = current();
             advance_or_throw(err);
@@ -846,6 +859,17 @@ namespace sql
             SqlToken copy = *token;
             copy.type = SqlTokenType::LITERAL;
             copy.detail = SqlLiteral::_NULL;
+
+            return std::make_unique<AstNode>(AstNodeType::LITERAL, AstNodeValue(std::move(copy)));
+        }
+
+        if (match(SqlKeyword::TRUE) || match(SqlKeyword::FALSE))
+        {
+            advance();
+
+            SqlToken copy = *token;
+            copy.type = SqlTokenType::LITERAL;
+            copy.detail = SqlLiteral::BOOL;
 
             return std::make_unique<AstNode>(AstNodeType::LITERAL, AstNodeValue(std::move(copy)));
         }

@@ -30,9 +30,6 @@ namespace types
                 { DataType::TEXT, {
                     { DataType::TEXT,    DataType::TEXT    },
                 }},
-                { DataType::CHAR, {
-                    { DataType::CHAR,    DataType::CHAR    },
-                }},
                 { DataType::BOOL, {
                     { DataType::BOOL,    DataType::BOOL    },
                 }},
@@ -116,7 +113,6 @@ namespace types
                 return compare_ieee754_le(a.bytes.data(), b.bytes.data(), a.bytes.size());
             case DataType::TEXT:
                 return compare_bytes_lex(a.bytes, b.bytes);
-            case DataType::CHAR:
             case DataType::BOOL:
                 return static_cast<int>(a.bytes[0]) - static_cast<int>(b.bytes[0]);
             default:
@@ -161,13 +157,6 @@ namespace types
             bytes.resize(1);
             bytes[0] = (sql_token.value == "true" || sql_token.value == "1") ? 1 : 0;
             type = DataType::BOOL;
-            break;
-        }
-        case SqlLiteral::CHAR:
-        {
-            bytes.resize(1);
-            bytes[0] = static_cast<uint8_t>(sql_token.value[0]);
-            type = DataType::CHAR;
             break;
         }
         case SqlLiteral::_NULL:

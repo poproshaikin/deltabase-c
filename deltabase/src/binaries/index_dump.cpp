@@ -75,12 +75,6 @@ namespace
                 out << "real?" << to_hex(token.bytes);
             }
             break;
-        case DataType::CHAR:
-            if (!token.bytes.empty())
-                out << "'" << static_cast<char>(token.bytes[0]) << "'";
-            else
-                out << "char?";
-            break;
         case DataType::BOOL:
             if (!token.bytes.empty())
                 out << (token.bytes[0] == 0 ? "false" : "true");

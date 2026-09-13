@@ -41,8 +41,6 @@ namespace
             return "INTEGER";
         case DataType::REAL:
             return "REAL";
-        case DataType::CHAR:
-            return "CHAR";
         case DataType::BOOL:
             return "BOOL";
         case DataType::TEXT:

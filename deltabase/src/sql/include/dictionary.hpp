@@ -23,7 +23,8 @@ namespace sql
             {"alter", SqlKeyword::ALTER},
             {"autoincrement", SqlKeyword::AUTOINCREMENT},
             {"bool", SqlKeyword::BOOL},
-            {"char", SqlKeyword::CHAR},
+            {"true", SqlKeyword::TRUE},
+            {"false", SqlKeyword::FALSE},
             {"column", SqlKeyword::COLUMN},
             {"create", SqlKeyword::CREATE},
             {"database", SqlKeyword::DATABASE},
@@ -70,7 +71,6 @@ namespace sql
             {"text", SqlKeyword::TEXT},
             {"integer", SqlKeyword::INTEGER},
             {"real", SqlKeyword::REAL},
-            {"char", SqlKeyword::CHAR},
             {"bool", SqlKeyword::BOOL},
             {"null", SqlKeyword::_NULL}};
 
@@ -85,7 +85,6 @@ namespace sql
             {SqlKeyword::TEXT, DataType::TEXT},
             {SqlKeyword::REAL, DataType::REAL},
             {SqlKeyword::BOOL, DataType::BOOL},
-            {SqlKeyword::CHAR, DataType::CHAR},
             {SqlKeyword::_NULL, DataType::_NULL},
         };
 

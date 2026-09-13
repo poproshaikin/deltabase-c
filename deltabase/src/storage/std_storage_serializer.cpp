@@ -54,8 +54,6 @@ namespace storage
             return 8;
         case DataType::BOOL:
             return 1;
-        case DataType::CHAR:
-            return 1;
         default:
             throw std::runtime_error(
                 "StdBinarySerializer:get_data_type_size: failed to get size of type " +

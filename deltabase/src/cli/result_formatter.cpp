@@ -80,8 +80,6 @@ namespace cli
                 oss << std::fixed << std::setprecision(2) << token.as<double>();
                 return oss.str();
             }
-        case types::DataType::CHAR:
-            return std::string(1, token.as<char>());
         case types::DataType::BOOL:
             return token.as<bool>() ? "true" : "false";
         case types::DataType::TEXT:

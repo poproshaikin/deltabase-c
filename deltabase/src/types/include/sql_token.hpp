@@ -42,8 +42,9 @@ namespace types
         TEXT,
         INTEGER,
         REAL,
-        CHAR,
         BOOL,
+        TRUE,
+        FALSE,
         _NULL,
         PRIMARY,
         KEY,
@@ -108,7 +109,6 @@ namespace types
         INTEGER = 1,
         STRING,
         BOOL,
-        CHAR,
         REAL,
         _NULL,
 

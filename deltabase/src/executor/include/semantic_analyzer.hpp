@@ -73,10 +73,9 @@ namespace exq
                 {
                     { types::DataType::INTEGER, { types::DataType::INTEGER } },
                     { types::DataType::REAL, { types::DataType::REAL, types::DataType::INTEGER } },
-                    { types::DataType::TEXT, { types::DataType::TEXT, types::DataType::CHAR } },
-                    { types::DataType::CHAR, { types::DataType::CHAR } },
+                    { types::DataType::TEXT, { types::DataType::TEXT } },
                     { types::DataType::BOOL, { types::DataType::BOOL } },
-                    { types::DataType::_NULL, { types::DataType::_NULL, types::DataType::INTEGER, types::DataType::REAL, types::DataType::TEXT, types::DataType::CHAR, types::DataType::BOOL } }
+                    { types::DataType::_NULL, { types::DataType::_NULL, types::DataType::INTEGER, types::DataType::REAL, types::DataType::TEXT, types::DataType::BOOL } }
                 };
 
             return table;
@@ -89,7 +88,6 @@ namespace exq
             {
                 { types::SqlLiteral::INTEGER, types::DataType::INTEGER },
                 { types::SqlLiteral::STRING, types::DataType::TEXT },
-                { types::SqlLiteral::CHAR, types::DataType::CHAR },
                 { types::SqlLiteral::BOOL, types::DataType::BOOL },
                 { types::SqlLiteral::REAL, types::DataType::REAL },
                 { types::SqlLiteral::_NULL, types::DataType::_NULL },

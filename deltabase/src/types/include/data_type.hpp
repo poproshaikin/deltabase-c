@@ -15,7 +15,6 @@ namespace types
         _NULL = 1,
         INTEGER = 2,
         REAL,
-        CHAR,
         BOOL,
         TEXT
     };
