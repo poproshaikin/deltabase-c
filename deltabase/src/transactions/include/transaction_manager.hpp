@@ -18,6 +18,20 @@ namespace txn
         storage::CatalogCache& catalog_;
         recovery::RecoveryManager& recovery_manager_;
 
+        struct ActiveTxnEntry
+        {
+            TransactionState state;
+            types::LSN last_lsn;
+
+            explicit ActiveTxnEntry(TransactionState state, types::LSN last_lsn)
+                : state(state), last_lsn(last_lsn)
+            {
+            }
+        };
+
+        std::unordered_map<types::TxnId, ActiveTxnEntry> active_transactions_;
+        mutable std::mutex active_transactions_mutex_;
+
     public:
         TransactionManager(
             wal::IWALManager& wal_manager,
@@ -40,6 +54,15 @@ namespace txn
 
         recovery::RecoveryManager&
         recovery_manager() const;
+
+        void
+        assign_active_entry(const Transaction& txn);
+
+        void
+        remove_active_entry(const Transaction& txn);
+
+        std::unordered_map<types::TxnId, ActiveTxnEntry>
+        snapshot_att() const;
 
         friend class Transaction;
     };

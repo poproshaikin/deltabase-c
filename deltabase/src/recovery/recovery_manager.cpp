@@ -36,7 +36,8 @@ namespace recovery
 
     void
     RecoveryManager::redo(
-        const WALRecord& record, const std::unordered_map<TxnId, LSN>& commit_lsns
+        const WALRecord& record,
+        const std::unordered_map<TxnId, LSN>& commit_lsns
     )
     {
         LSN last_checkpoint = cfg_.last_checkpoint_lsn;
@@ -75,10 +76,13 @@ namespace recovery
                     redo_data(r);
                 else if constexpr (misc::is_in_variant_v<R, WALMetaRecord>)
                     redo_meta(r);
+                else if constexpr (misc::is_in_variant_v<R, WALIndexRecord>)
+                    redo_index(r);
             },
             record
         );
     }
+
     void
     RecoveryManager::redo_data(const WALDataRecord& record)
     {
@@ -100,6 +104,44 @@ namespace recovery
             record
         );
     }
+
+    static std::pair<MetaTable, MetaIndex>
+    find_index_owner(storage::IIOManager& io, const IndexId& index_id)
+    {
+        for (auto& table : io.read_tables_meta())
+            for (auto& mi : table.indexes)
+                if (mi.id == index_id)
+                    return {table, mi};
+
+        throw std::runtime_error("Recovery: index not found for id");
+    }
+
+    void
+    RecoveryManager::redo_index(const WALIndexRecord& record)
+    {
+        std::visit(
+            [&](const auto& r)
+            {
+                auto file = io_.read_index_file(r.index_id);
+                if (!file)
+                {
+                    auto owner = find_index_owner(io_, r.index_id);
+                    auto ms = io_.read_schema_meta(owner.first.schema_id);
+                    file = std::make_unique<IndexFile>(
+                        io_.create_index_file(ms.name, owner.first.name, owner.second));
+                }
+
+                if (file->last_lsn < r.lsn)
+                {
+                    redo(r, *file);
+                    file->last_lsn = r.lsn;
+                    io_.write(*file);
+                }
+
+            },
+            record);
+    }
+
     void
     RecoveryManager::redo_meta(const WALRecord& record)
     {
@@ -201,7 +243,11 @@ namespace recovery
     RecoveryManager::redo(const CLRCreateIndexRecord& record)
     {
         auto table = io_.read_table_meta(record.after.table_id);
-        std::erase_if(table.indexes, [&](const MetaIndex& value) { return value.id == record.after.id; });
+        std::erase_if(table.indexes,
+                      [&](const MetaIndex& value)
+                      {
+                          return value.id == record.after.id;
+                      });
         io_.write_mt(table);
     }
 
@@ -209,7 +255,11 @@ namespace recovery
     RecoveryManager::redo(const DropIndexRecord& record)
     {
         auto table = io_.read_table_meta(record.before.table_id);
-        std::erase_if(table.indexes, [&](const MetaIndex& value) { return value.id == record.before.id; });
+        std::erase_if(table.indexes,
+                      [&](const MetaIndex& value)
+                      {
+                          return value.id == record.before.id;
+                      });
         io_.write_mt(table);
     }
 
@@ -273,6 +323,7 @@ namespace recovery
     {
         page.rows.push_back(record.after);
     }
+
     void
     RecoveryManager::redo(const UpdateRecord& record, DataPage& page)
     {
@@ -287,6 +338,7 @@ namespace recovery
 
         page.rows.push_back(record.after);
     }
+
     void
     RecoveryManager::redo(const DeleteRecord& record, DataPage& page)
     {
@@ -298,6 +350,42 @@ namespace recovery
             row.flags |= DataRowFlags::OBSOLETE;
             break;
         }
+    }
+
+    void
+    RecoveryManager::redo(const LinkDataPageRecord& record, DataPage& page)
+    {
+        page.next = record.after;
+    }
+
+    void
+    RecoveryManager::redo(const WriteIndexPageRecord& record, IndexFile& file)
+    {
+        for (auto& page : file.pages)
+        {
+            if (page.id == record.index_page_id)
+            {
+                page.data = record.after;
+                page.parent = record.parent;
+                return;
+            }
+        }
+
+        IndexPage page;
+        page.id = record.index_page_id;
+        page.index_id = record.index_id;
+        page.parent = record.parent;
+        page.data = record.after;
+        page.is_leaf = record.is_leaf;
+
+        file.pages.push_back(page);
+        file.last_page = std::max(file.last_page, page.id);
+    }
+
+    void
+    RecoveryManager::redo(const SetIndexRootRecord& record, IndexFile& file)
+    {
+        file.root_page = record.after;
     }
 
     void
@@ -372,6 +460,14 @@ namespace recovery
                             current = r.undo_next_lsn;
                             return;
                         }
+                        else if constexpr (
+                            std::is_same_v<R, LinkDataPageRecord> ||
+                            misc::is_in_variant_v<R, WALIndexRecord>)
+                        {
+                            // redo-only: physical page linking is never undone
+                            current = r.prev_lsn;
+                            return;
+                        }
                         else if constexpr (misc::is_in_variant_v<R, WALDataRecord>)
                         {
                             auto page = io_.read_data_page(r.page_id);
@@ -434,6 +530,7 @@ namespace recovery
             }
         }
     }
+
     void
     RecoveryManager::undo_record(const InsertRecord& record, DataPage& page, LSN last_lsn)
     {
@@ -448,6 +545,7 @@ namespace recovery
 
         page.last_lsn = last_lsn;
     }
+
     void
     RecoveryManager::undo_record(const UpdateRecord& record, DataPage& page, LSN last_lsn)
     {
@@ -463,6 +561,7 @@ namespace recovery
 
         page.last_lsn = last_lsn;
     }
+
     void
     RecoveryManager::undo_record(const DeleteRecord& record, DataPage& page, LSN last_lsn)
     {
@@ -518,7 +617,11 @@ namespace recovery
     RecoveryManager::undo_record(const CreateIndexRecord& record)
     {
         MetaTable table = io_.read_table_meta(record.after.table_id);
-        std::erase_if(table.indexes, [&](MetaIndex& value) { return value.id == record.after.id; });
+        std::erase_if(table.indexes,
+                      [&](MetaIndex& value)
+                      {
+                          return value.id == record.after.id;
+                      });
         io_.write_mt(table);
     }
 
@@ -543,7 +646,9 @@ namespace recovery
     }
 
     void
-    RecoveryManager::undo_record(const CreateSchemaRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const CreateSchemaRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         // undo a CREATE = the schema must disappear again, mirrors io_.delete_ms(record.schema)
         // deletion needs no last_lsn: an erased entry is never flushed again
@@ -551,48 +656,66 @@ namespace recovery
     }
 
     void
-    RecoveryManager::undo_record(const UpdateSchemaRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const UpdateSchemaRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         catalog.save_schema(record.before, last_lsn);
     }
 
     void
-    RecoveryManager::undo_record(const DeleteSchemaRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const DeleteSchemaRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         // undo a DELETE = bring the before-image back
         catalog.save_schema(record.before, last_lsn);
     }
 
     void
-    RecoveryManager::undo_record(const CreateTableRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const CreateTableRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         catalog.delete_table(record.after.id);
     }
 
     void
-    RecoveryManager::undo_record(const UpdateTableRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const UpdateTableRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         catalog.save_table(MetaTable(record.before), last_lsn);
     }
 
     void
-    RecoveryManager::undo_record(const DeleteTableRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const DeleteTableRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         catalog.save_table(MetaTable(record.before), last_lsn);
     }
 
     void
-    RecoveryManager::undo_record(const CreateIndexRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const CreateIndexRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         if (auto* table = catalog.get_table(record.after.table_id))
         {
-            std::erase_if(table->indexes, [&](const MetaIndex& value) { return value.id == record.after.id; });
+            std::erase_if(table->indexes,
+                          [&](const MetaIndex& value)
+                          {
+                              return value.id == record.after.id;
+                          });
             catalog.mark_dirty(table, last_lsn);
         }
     }
 
     void
-    RecoveryManager::undo_record(const DropIndexRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const DropIndexRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         if (auto* table = catalog.get_table(record.before.table_id))
         {
@@ -602,13 +725,17 @@ namespace recovery
     }
 
     void
-    RecoveryManager::undo_record(const CreateSequenceRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const CreateSequenceRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         catalog.delete_sequence(record.after.id);
     }
 
     void
-    RecoveryManager::undo_record(const UpdateSequenceRecord& record, storage::CatalogCache& catalog, LSN last_lsn)
+    RecoveryManager::undo_record(const UpdateSequenceRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
     {
         catalog.put(record.before, last_lsn);
     }
@@ -666,7 +793,12 @@ namespace recovery
     RecoveryManager::make_clr(const UpdateSchemaRecord& record) const
     {
         return CLRUpdateSchemaRecord(
-            record.lsn, 0, record.txn_id, record.prev_lsn, record.before, record.after
+            record.lsn,
+            0,
+            record.txn_id,
+            record.prev_lsn,
+            record.before,
+            record.after
         );
     }
 
@@ -686,7 +818,12 @@ namespace recovery
     RecoveryManager::make_clr(const UpdateTableRecord& record) const
     {
         return CLRUpdateTableRecord(
-            record.lsn, 0, record.txn_id, record.prev_lsn, record.before, record.after
+            record.lsn,
+            0,
+            record.txn_id,
+            record.prev_lsn,
+            record.before,
+            record.after
         );
     }
 
@@ -718,7 +855,12 @@ namespace recovery
     RecoveryManager::make_clr(const UpdateSequenceRecord& record) const
     {
         return CLRUpdateSequenceRecord(
-            record.lsn, 0, record.txn_id, record.prev_lsn, record.before, record.after
+            record.lsn,
+            0,
+            record.txn_id,
+            record.prev_lsn,
+            record.before,
+            record.after
         );
     }
 
@@ -768,6 +910,7 @@ namespace recovery
 
         return rollback_lsns;
     }
+
     std::unordered_map<TxnId, LSN>
     RecoveryManager::get_last_lsns(const std::vector<WALRecord>& wal) const
     {
@@ -775,11 +918,16 @@ namespace recovery
 
         for (const auto& record : wal)
         {
-            std::visit([&](const auto& r) { last[r.txn_id] = r.lsn; }, record);
+            std::visit([&](const auto& r)
+                       {
+                           last[r.txn_id] = r.lsn;
+                       },
+                       record);
         }
 
         return last;
     }
+
     std::unordered_map<TxnId, LSN>
     RecoveryManager::get_active_txns(
         const std::unordered_map<TxnId, LSN>& last,

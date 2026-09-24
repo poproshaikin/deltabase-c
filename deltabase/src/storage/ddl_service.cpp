@@ -291,7 +291,7 @@ namespace storage
                 DataPage* destination =
                     reading_page->size + size <= DataPage::MAX_SIZE
                         ? reading_page
-                        : buffer_pool_.prepare_dp(size, *mt);
+                        : buffer_pool_.prepare_dp(size, *mt, txn);
 
                 const DataRow old_row = row;
                 row.flags |= DataRowFlags::OBSOLETE;
@@ -302,9 +302,12 @@ namespace storage
 
                 if (destination != reading_page && linked_pages.insert(destination->id).second)
                 {
-                    destination->next = reading_page->next;
-                    reading_page->next = destination->id;
-                    buffer_pool_.dirty_dp(reading_page->id);
+                    if (destination->next != DataPageId::null())
+                        throw std::runtime_error(
+                            "DDLService::add_column: destination page is not a chain tail");
+
+                    buffer_pool_.log_page_linking(destination, reading_page->next, *mt, txn);
+                    buffer_pool_.log_page_linking(reading_page, destination->id, *mt, txn);
                 }
 
                 InsertRecord insert_record(mt->id, destination->id, new_row);

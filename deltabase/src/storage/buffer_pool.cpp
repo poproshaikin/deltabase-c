@@ -82,14 +82,14 @@ namespace storage
     }
 
     DataPage*
-    BufferPool::prepare_dp(size_t size, const MetaTable& mt)
+    BufferPool::prepare_dp(size_t size, const MetaTable& mt, txn::Transaction& txn)
     {
         std::lock_guard lock(mutex_);
-        return prepare_dp_impl(size, mt);
+        return prepare_dp_impl(size, mt, txn);
     }
 
     DataPage*
-    BufferPool::prepare_dp_impl(size_t size, const MetaTable& mt)
+    BufferPool::prepare_dp_impl(size_t size, const MetaTable& mt, txn::Transaction& txn)
     {
         auto table_pages_it = data_pages_per_table_.find(mt.id);
         if (table_pages_it != data_pages_per_table_.end())
@@ -125,10 +125,7 @@ namespace storage
         }
 
         if (tail_page)
-        {
-            tail_page->next = new_page->id;
-            dirty_dp_impl(tail_page->id);
-        }
+            log_page_linking_impl(tail_page, new_page->id, mt, txn);
 
         return new_page;
     }
@@ -299,6 +296,26 @@ namespace storage
     BufferPool::dirty_dp_impl(const DataPageId& page_id)
     {
         return mark_dirty_impl(page_id);
+    }
+
+    void
+    BufferPool::log_page_linking(
+        DataPage* page, const DataPageId& next, const MetaTable& mt, txn::Transaction& txn)
+    {
+        std::lock_guard lock(mutex_);
+        log_page_linking_impl(page, next, mt, txn);
+    }
+
+    void
+    BufferPool::log_page_linking_impl(
+        DataPage* page, const DataPageId& next, const MetaTable& mt, txn::Transaction& txn)
+    {
+        DataPageId before = page->next;
+        page->next = next;
+
+        txn.append_log(LinkDataPageRecord(mt.id, page->id, before, next));
+
+        dirty_dp_impl(page->id);
     }
 
     void

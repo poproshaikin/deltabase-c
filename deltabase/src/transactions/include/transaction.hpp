@@ -54,6 +54,17 @@ namespace txn
         rollback();
 
     private:
+        void
+        advance_lsn(types::LSN lsn);
+
+        template <typename R, typename CLR>
+        types::LSN
+        undo_page_record(const R& record, CLR clr);
+
+        template <typename R, typename CLR>
+        types::LSN
+        undo_catalog_record(const R& record, CLR clr);
+
         types::LSN
         undo_one(const types::BeginTxnRecord& record);
         types::LSN

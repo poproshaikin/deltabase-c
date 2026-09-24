@@ -25,6 +25,8 @@ namespace recovery
         void
         redo_data(const types::WALDataRecord& record);
         void
+        redo_index(const types::WALIndexRecord& record);
+        void
         redo_meta(const types::WALRecord& record);
 
         void
@@ -39,6 +41,12 @@ namespace recovery
         redo(const types::CLRUpdateRecord& record, types::DataPage& page);
         void
         redo(const types::CLRDeleteRecord& record, types::DataPage& page);
+        void
+        redo(const types::LinkDataPageRecord& record, types::DataPage& page);
+        void
+        redo(const types::WriteIndexPageRecord& record, types::IndexFile& file);
+        void
+        redo(const types::SetIndexRootRecord& record, types::IndexFile& file);
 
         void
         redo(const types::CreateSchemaRecord& record);

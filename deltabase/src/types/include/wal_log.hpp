@@ -6,6 +6,7 @@
 #define DELTABASE_WAL_LOG_HPP
 #include "data_page.hpp"
 #include "data_row.hpp"
+#include "index_page.hpp"
 #include "meta_schema.hpp"
 #include "meta_sequence.hpp"
 #include "meta_table.hpp"
@@ -49,6 +50,11 @@ namespace types
         CLR_CREATE_SEQUENCE,
         UPDATE_SEQUENCE,
         CLR_UPDATE_SEQUENCE,
+        LINK_DATA_PAGE,
+        WRITE_INDEX_PAGE,
+        BEGIN_CKPT,
+        END_CKPT,
+        SET_INDEX_ROOT,
     };
 
     namespace detail
@@ -668,9 +674,11 @@ namespace types
         MetaSequence after;
 
         CreateSequenceRecord() = default;
+
         CreateSequenceRecord(const MetaSequence& after) : after(after)
         {
         }
+
         CreateSequenceRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, const MetaSequence& after) :
             lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), after(after)
         {
@@ -714,12 +722,17 @@ namespace types
         MetaSequence after;
 
         UpdateSequenceRecord() = default;
+
         UpdateSequenceRecord(const MetaSequence& before, const MetaSequence& after)
             : before(before), after(after)
         {
         }
-        UpdateSequenceRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id,
-                             const MetaSequence& before, const MetaSequence& after)
+
+        UpdateSequenceRecord(LSN lsn,
+                             LSN prev_lsn,
+                             const UUID& txn_id,
+                             const MetaSequence& before,
+                             const MetaSequence& after)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(before), after(after)
         {
         }
@@ -739,9 +752,13 @@ namespace types
         MetaSequence after;
 
         CLRUpdateSequenceRecord() = default;
-        CLRUpdateSequenceRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id,
+
+        CLRUpdateSequenceRecord(LSN lsn,
+                                LSN prev_lsn,
+                                const UUID& txn_id,
                                 LSN undo_next_lsn,
-                                const MetaSequence& before, const MetaSequence& after)
+                                const MetaSequence& before,
+                                const MetaSequence& after)
             : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id),
               undo_next_lsn(undo_next_lsn), before(before), after(after)
         {
@@ -796,6 +813,110 @@ namespace types
         }
     };
 
+    struct LinkDataPageRecord
+    {
+        static constexpr auto type = WALRecordType::LINK_DATA_PAGE;
+
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        UUID txn_id = UUID::null();
+
+        UUID table_id;
+        DataPageId page_id;
+        DataPageId before;
+        DataPageId after;
+
+        LinkDataPageRecord() = default;
+
+        LinkDataPageRecord(
+            const UUID& table_id,
+            const DataPageId& page_id,
+            const DataPageId& before,
+            const DataPageId& after
+        )
+            : table_id(table_id), page_id(page_id), before(before), after(after)
+        {
+        }
+
+        LinkDataPageRecord(
+            LSN lsn,
+            LSN prev_lsn,
+            const UUID& txn_id,
+            const UUID& table_id,
+            const DataPageId& page_id,
+            const DataPageId& before,
+            const DataPageId& after
+        )
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), table_id(table_id), page_id(page_id),
+              before(before), after(after)
+        {
+        }
+    };
+
+    struct WriteIndexPageRecord
+    {
+        static constexpr auto type = WALRecordType::WRITE_INDEX_PAGE;
+
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        UUID txn_id;
+
+        IndexId index_id;
+        IndexPageId index_page_id;
+        IndexPageId parent;
+        bool is_leaf;
+        std::variant<InternalIndexNode, LeafIndexNode> after;
+
+        WriteIndexPageRecord() = default;
+
+        WriteIndexPageRecord(
+            IndexId index_id,
+            IndexPageId index_page_id,
+            IndexPageId parent,
+            bool is_leaf,
+            std::variant<InternalIndexNode, LeafIndexNode> after)
+            : index_id(index_id), index_page_id(index_page_id), parent(parent), is_leaf(is_leaf),
+              after(after)
+        {
+        }
+    };
+
+    struct SetIndexRootRecord
+    {
+        static constexpr auto type = WALRecordType::SET_INDEX_ROOT;
+
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        UUID txn_id;
+
+        IndexId index_id;
+        IndexPageId before;
+        IndexPageId after;
+
+        SetIndexRootRecord() = default;
+
+        SetIndexRootRecord(IndexId index_id, IndexPageId before, IndexPageId after)
+            : index_id(index_id), before(before), after(after)
+        {
+        }
+    };
+
+    struct BeginCkptRecord
+    {
+        static constexpr auto type = WALRecordType::BEGIN_CKPT;
+
+        LSN lsn;
+        LSN prev_lsn;
+        UUID txn_id;
+
+        BeginCkptRecord() = default;
+
+        BeginCkptRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id)
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id)
+        {
+        }
+    };
+
     using WALRecord = detail::WALRecordVariant<
         InsertRecord,
         CLRInsertRecord,
@@ -805,6 +926,10 @@ namespace types
 
         DeleteRecord,
         CLRDeleteRecord,
+
+        LinkDataPageRecord,
+        WriteIndexPageRecord,
+        SetIndexRootRecord,
 
         CreateSchemaRecord,
         CLRCreateSchemaRecord,
@@ -840,13 +965,19 @@ namespace types
         CommitTxnRecord,
         RollbackTxnRecord>;
 
+    using WALIndexRecord = detail::WALRecordVariant<
+        WriteIndexPageRecord,
+        SetIndexRootRecord
+    >;
+
     using WALDataRecord = detail::WALRecordVariant<
         InsertRecord,
         UpdateRecord,
         DeleteRecord,
         CLRInsertRecord,
         CLRUpdateRecord,
-        CLRDeleteRecord>;
+        CLRDeleteRecord,
+        LinkDataPageRecord>;
 
     using WALMetaRecord = detail::WALRecordVariant<
         CreateSchemaRecord,

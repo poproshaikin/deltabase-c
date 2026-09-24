@@ -90,7 +90,7 @@ namespace storage
 
         const auto mt_unchanged = mt;
 
-        auto* page = buffer_pool_.prepare_dp(row_size, mt);
+        auto* page = buffer_pool_.prepare_dp(row_size, mt, txn);
 
         std::vector<IndexId> touched_indexes;
         if (mt.indexes.size() > 0)

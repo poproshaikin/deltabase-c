@@ -28,15 +28,23 @@ namespace txn
     }
 
     void
+    Transaction::advance_lsn(types::LSN lsn)
+    {
+        last_lsn_ = lsn;
+        mgr_->assign_active_entry(*this);
+    }
+
+    void
     Transaction::begin()
     {
         if (state_ != TransactionState::IDLE)
             throw std::runtime_error("Transaction::begin: transaction state not idle");
 
         types::BeginTxnRecord record(0, last_lsn_, id_);
+        types::LSN lsn = mgr_->wal_manager().append_log(record);
 
-        last_lsn_ = mgr_->wal_manager().append_log(record);
         state_ = TransactionState::ACTIVE;
+        advance_lsn(lsn);
     }
 
     void
@@ -55,7 +63,7 @@ namespace txn
             record
         );
 
-        last_lsn_ = mgr_->wal_manager().append_log(record_with_txn_id);
+        advance_lsn(mgr_->wal_manager().append_log(record_with_txn_id));
     }
 
     void
@@ -69,6 +77,8 @@ namespace txn
         last_lsn_ = mgr_->wal_manager().append_log(commit_record);
         mgr_->wal_manager().ensure_durable(last_lsn_);
         state_ = TransactionState::COMMITTED;
+
+        mgr_->remove_active_entry(*this);
     }
 
     void
@@ -90,6 +100,31 @@ namespace txn
         mgr_->wal_manager().ensure_durable(last_lsn_);
 
         state_ = TransactionState::ABORTED;
+
+        mgr_->remove_active_entry(*this);
+    }
+
+    template <typename R, typename CLR>
+    types::LSN
+    Transaction::undo_page_record(const R& r, CLR clr)
+    {
+        if (auto* page = mgr_->buffer_pool().get_dp(r.page_id))
+        {
+            advance_lsn(mgr_->wal_manager().append_log(clr));
+            mgr_->recovery_manager().undo_record(r, *page, last_lsn_);
+            mgr_->buffer_pool().dirty_dp(r.page_id);
+        }
+
+        return r.prev_lsn;
+    }
+
+    template <typename R, typename CLR>
+    types::LSN
+    Transaction::undo_catalog_record(const R& r, CLR clr)
+    {
+        advance_lsn(mgr_->wal_manager().append_log(clr));
+        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
+        return r.prev_lsn;
     }
 
     types::LSN
@@ -101,136 +136,92 @@ namespace txn
     types::LSN
     Transaction::undo_one(const types::InsertRecord& r)
     {
-        if (auto* page = mgr_->buffer_pool().get_dp(r.page_id))
-        {
-            types::CLRInsertRecord clr(0, last_lsn_, id_, r.table_id, r.page_id, r.prev_lsn, r.after);
-            last_lsn_ = mgr_->wal_manager().append_log(clr);
-
-            mgr_->recovery_manager().undo_record(r, *page, last_lsn_);
-            mgr_->buffer_pool().dirty_dp(r.page_id);
-        }
-
-        return r.prev_lsn;
+        return undo_page_record(
+            r, types::CLRInsertRecord(0, last_lsn_, id_, r.table_id, r.page_id, r.prev_lsn, r.after)
+        );
     }
 
     types::LSN
     Transaction::undo_one(const types::UpdateRecord& r)
     {
-        if (auto* page = mgr_->buffer_pool().get_dp(r.page_id))
-        {
-            types::CLRUpdateRecord clr(0, last_lsn_, id_, r.table_id, r.page_id, r.prev_lsn, r.before, r.after);
-            last_lsn_ = mgr_->wal_manager().append_log(clr);
-
-            mgr_->recovery_manager().undo_record(r, *page, last_lsn_);
-            mgr_->buffer_pool().dirty_dp(r.page_id);
-        }
-
-        return r.prev_lsn;
+        return undo_page_record(
+            r,
+            types::CLRUpdateRecord(0, last_lsn_, id_, r.table_id, r.page_id, r.prev_lsn, r.before, r.after)
+        );
     }
 
     types::LSN
     Transaction::undo_one(const types::DeleteRecord& r)
     {
-        if (auto* page = mgr_->buffer_pool().get_dp(r.page_id))
-        {
-            types::CLRDeleteRecord clr(0, last_lsn_, id_, r.table_id, r.page_id, r.prev_lsn, r.before);
-            last_lsn_ = mgr_->wal_manager().append_log(clr);
-
-            mgr_->recovery_manager().undo_record(r, *page, last_lsn_);
-            mgr_->buffer_pool().dirty_dp(r.page_id);
-        }
-
-        return r.prev_lsn;
+        return undo_page_record(
+            r, types::CLRDeleteRecord(0, last_lsn_, id_, r.table_id, r.page_id, r.prev_lsn, r.before)
+        );
     }
 
     types::LSN
     Transaction::undo_one(const types::CreateSchemaRecord& r)
     {
-        types::CLRCreateSchemaRecord clr(0, last_lsn_, id_, r.prev_lsn, r.schema);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(r, types::CLRCreateSchemaRecord(0, last_lsn_, id_, r.prev_lsn, r.schema));
     }
 
     types::LSN
     Transaction::undo_one(const types::UpdateSchemaRecord& r)
     {
-        types::CLRUpdateSchemaRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before, r.after);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(
+            r, types::CLRUpdateSchemaRecord(0, last_lsn_, id_, r.prev_lsn, r.before, r.after)
+        );
     }
 
     types::LSN
     Transaction::undo_one(const types::DeleteSchemaRecord& r)
     {
-        types::CLRDeleteSchemaRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(r, types::CLRDeleteSchemaRecord(0, last_lsn_, id_, r.prev_lsn, r.before));
     }
 
     types::LSN
     Transaction::undo_one(const types::CreateTableRecord& r)
     {
-        types::CLRCreateTableRecord clr(0, last_lsn_, id_, r.prev_lsn, r.after);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(r, types::CLRCreateTableRecord(0, last_lsn_, id_, r.prev_lsn, r.after));
     }
 
     types::LSN
     Transaction::undo_one(const types::UpdateTableRecord& r)
     {
-        types::CLRUpdateTableRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before, r.after);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(
+            r, types::CLRUpdateTableRecord(0, last_lsn_, id_, r.prev_lsn, r.before, r.after)
+        );
     }
 
     types::LSN
     Transaction::undo_one(const types::DeleteTableRecord& r)
     {
-        types::CLRDeleteTableRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(r, types::CLRDeleteTableRecord(0, last_lsn_, id_, r.prev_lsn, r.before));
     }
 
     types::LSN
     Transaction::undo_one(const types::CreateIndexRecord& r)
     {
-        types::CLRCreateIndexRecord clr(0, last_lsn_, id_, r.prev_lsn, r.after);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(r, types::CLRCreateIndexRecord(0, last_lsn_, id_, r.prev_lsn, r.after));
     }
 
     types::LSN
     Transaction::undo_one(const types::DropIndexRecord& r)
     {
-        types::CLRDropIndexRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(r, types::CLRDropIndexRecord(0, last_lsn_, id_, r.prev_lsn, r.before));
     }
 
     types::LSN
     Transaction::undo_one(const types::CreateSequenceRecord& r)
     {
-        types::CLRCreateSequenceRecord clr(0, last_lsn_, id_, r.prev_lsn, r.after);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(r, types::CLRCreateSequenceRecord(0, last_lsn_, id_, r.prev_lsn, r.after));
     }
 
     types::LSN
     Transaction::undo_one(const types::UpdateSequenceRecord& r)
     {
-        types::CLRUpdateSequenceRecord clr(0, last_lsn_, id_, r.prev_lsn, r.before, r.after);
-        last_lsn_ = mgr_->wal_manager().append_log(clr);
-        mgr_->recovery_manager().undo_record(r, mgr_->catalog(), last_lsn_);
-        return r.prev_lsn;
+        return undo_catalog_record(
+            r, types::CLRUpdateSequenceRecord(0, last_lsn_, id_, r.prev_lsn, r.before, r.after)
+        );
     }
 
     template <typename R>

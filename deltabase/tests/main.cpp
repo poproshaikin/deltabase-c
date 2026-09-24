@@ -63,7 +63,7 @@ namespace
         {
             engine::Engine bootstrap;
             bootstrap.create_db(types::Config::std(db_name));
-            bootstrap.execute_query("create table common.test_concurrent(id integer, payload string)");
+            bootstrap.execute_query("create table common.test_concurrent(id integer, payload text);");
         }
 
         int start_pipe_1[2] = {-1, -1};

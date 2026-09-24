@@ -100,7 +100,7 @@ namespace storage
 
         virtual types::IndexFile
         create_index_file(
-            const std::string& string, const std::string& table_name, const types::MetaIndex& mi
+            const std::string& schema_name, const std::string& table_name, const types::MetaIndex& mi
         ) = 0;
 
         virtual std::unique_ptr<types::IndexFile>
