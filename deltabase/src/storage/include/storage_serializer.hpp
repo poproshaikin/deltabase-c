@@ -6,6 +6,7 @@
 #define DELTABASE_BINARY_SERIALIZER_HPP
 #include "../../misc/include/memory_stream.hpp"
 #include "../../types/include/config.hpp"
+#include "../../types/include/control_file.hpp"
 #include "../../types/include/data_page.hpp"
 #include "../../types/include/meta_schema.hpp"
 #include "../../types/include/meta_table.hpp"
@@ -52,6 +53,9 @@ namespace storage
         virtual misc::MemoryStream
         serialize_seq(const types::MetaSequence& sequence) const = 0;
 
+        virtual misc::MemoryStream
+        serialize_ctrl(const types::ControlFile& file) const = 0;
+
         virtual bool
         deserialize_mt(misc::ReadOnlyMemoryStream& content, types::MetaTable &out) const = 0;
 
@@ -84,6 +88,9 @@ namespace storage
 
         virtual bool
         deserialize_seq(misc::ReadOnlyMemoryStream& content, types::MetaSequence& out) const = 0;
+
+        virtual bool
+        deserialize_ctrl(misc::ReadOnlyMemoryStream& content, types::ControlFile& out) const = 0;
 
         virtual uint64_t
         estimate_size(const types::DataRow& row) const = 0;

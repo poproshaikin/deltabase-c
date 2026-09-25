@@ -97,10 +97,11 @@ namespace storage
             touched_indexes = insert_row_into_indexes(mt, new_row, page->id);
 
         InsertRecord insert_record(mt.id, page->id, new_row);
-        UpdateTableRecord update_table_record(mt_unchanged, mt);
         txn.append_log(insert_record);
-        txn.append_log(update_table_record);
         const LSN page_lsn = txn.get_last_lsn();
+
+        UpdateTableRecord update_table_record(mt_unchanged, mt);
+        txn.append_log(update_table_record);
 
         buffer_pool_.append_row(page, mt, new_row, page_lsn);
 

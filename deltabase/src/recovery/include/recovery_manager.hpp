@@ -13,14 +13,14 @@ namespace recovery
 {
     class RecoveryManager
     {
-        types::Config& cfg_;
         wal::IWALManager& wal_;
         storage::IIOManager& io_;
 
         void
         redo(
             const types::WALRecord& record,
-            const std::unordered_map<types::TxnId, types::LSN>& commit_lsns
+            const std::unordered_map<types::TxnId, types::LSN>& commit_lsns,
+            types::LSN last_checkpoint
         );
         void
         redo_data(const types::WALDataRecord& record);
@@ -168,7 +168,7 @@ namespace recovery
 
     public:
         explicit
-        RecoveryManager(types::Config& cfg, wal::IWALManager& wal, storage::IIOManager& io);
+        RecoveryManager(wal::IWALManager& wal, storage::IIOManager& io);
 
         void
         recover();

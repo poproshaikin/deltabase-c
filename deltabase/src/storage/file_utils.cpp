@@ -123,6 +123,46 @@ namespace storage
 #endif
     }
 
+    void
+    append_file(const fs::path& path, const Bytes& content)
+    {
+        if (!fs::exists(path.parent_path()))
+            fs::create_directories(path.parent_path());
+
+#ifdef _WIN32
+        std::ofstream file(path, std::ios::binary | std::ios::app);
+        file.write(reinterpret_cast<const char*>(content.data()), content.size());
+        file.close();
+#else
+        const int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd < 0)
+            throw std::runtime_error("Cannot open file for appending: " + path.string());
+
+        if (flock(fd, LOCK_EX) < 0)
+        {
+            close(fd);
+            throw std::runtime_error("Cannot acquire exclusive lock for file: " + path.string());
+        }
+
+        size_t total = 0;
+        while (total < content.size())
+        {
+            const auto written = write(fd, content.data() + total, content.size() - total);
+            if (written < 0)
+            {
+                flock(fd, LOCK_UN);
+                close(fd);
+                throw std::runtime_error("Error appending to file: " + path.string());
+            }
+
+            total += static_cast<size_t>(written);
+        }
+
+        flock(fd, LOCK_UN);
+        close(fd);
+#endif
+    }
+
     bool
     exists_file(const fs::path& path)
     {
@@ -196,6 +236,58 @@ namespace storage
                 throw std::runtime_error("fsync_file: write failed");
             }
             total += written;
+        }
+
+        if (fsync(fd) < 0)
+        {
+            flock(fd, LOCK_UN);
+            close(fd);
+            throw std::runtime_error("fsync_file: fsync failed");
+        }
+
+        flock(fd, LOCK_UN);
+        close(fd);
+#endif
+    }
+
+    void
+    fsync_file(const fs::path& path)
+    {
+#ifdef _WIN32
+        // --- Windows ---
+        HANDLE file = CreateFileW(
+            path.wstring().c_str(),
+            GENERIC_WRITE,
+            0,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr
+        );
+
+        if (file == INVALID_HANDLE_VALUE)
+            throw std::runtime_error("fsync_file: CreateFile failed");
+
+        if (!FlushFileBuffers(file))
+        {
+            CloseHandle(file);
+            throw std::runtime_error("fsync_file: FlushFileBuffers failed");
+        }
+
+        CloseHandle(file);
+#else
+        // --- POSIX (Linux, macOS) ---
+        // Opens the file as-is (no O_CREAT/O_TRUNC) and flushes whatever the OS
+        // already has buffered for it — no content is (re)written here.
+
+        int fd = open(path.c_str(), O_WRONLY);
+        if (fd < 0)
+            throw std::runtime_error("fsync_file: open failed");
+
+        if (flock(fd, LOCK_EX) < 0)
+        {
+            close(fd);
+            throw std::runtime_error("fsync_file: flock failed");
         }
 
         if (fsync(fd) < 0)

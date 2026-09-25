@@ -64,7 +64,7 @@ namespace types
             PlannerType planner,
             SerializerType serializer
         )
-            : db_name(std::nullopt), db_path(db_path), io_type(io), planner_type(planner),
+            : db_path(db_path), io_type(io), planner_type(planner),
               serializer_type(serializer)
         {
         }
@@ -92,7 +92,7 @@ namespace types
         PlannerType planner_type;
         SerializerType serializer_type;
 
-        LSN last_checkpoint_lsn = 0;
+        uint32_t checkpoint_interval_ms = 30000;
 
         static Config
         detached()

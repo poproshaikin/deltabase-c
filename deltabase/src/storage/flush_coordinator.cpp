@@ -3,6 +3,7 @@
 //
 
 #include "flush_coordinator.hpp"
+#include "../misc/include/logger.hpp"
 
 namespace storage
 {
@@ -25,10 +26,12 @@ namespace storage
     FlushCoordinator::~FlushCoordinator()
     {
         stop_bg_thread_ = true;
-        flush();
+        cv_.notify_all();
 
         if (bg_thread_.joinable())
             bg_thread_.join();
+
+        flush();
     }
 
     void
@@ -36,16 +39,30 @@ namespace storage
     {
         LSN last_durable_lsn = wal_manager_.get_durable_lsn();
 
+        std::unique_lock lock(cv_mtx_);
         do
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms_));
+            if (cv_.wait_for(
+                    lock,
+                    std::chrono::milliseconds(interval_ms_),
+                    [this] { return stop_bg_thread_.load(); }))
+                break;
 
-            LSN new_durable_lsn = wal_manager_.get_durable_lsn();
-            if (last_durable_lsn != new_durable_lsn)
+            lock.unlock();
+            try
             {
-                flush(new_durable_lsn);
-                last_durable_lsn = new_durable_lsn;
+                LSN new_durable_lsn = wal_manager_.get_durable_lsn();
+                if (last_durable_lsn != new_durable_lsn)
+                {
+                    flush(new_durable_lsn);
+                    last_durable_lsn = new_durable_lsn;
+                }
             }
+            catch (const std::exception& e)
+            {
+                misc::Logger::error(std::string("FlushCoordinator: flush failed: ") + e.what());
+            }
+            lock.lock();
         } while (!stop_bg_thread_);
     }
 

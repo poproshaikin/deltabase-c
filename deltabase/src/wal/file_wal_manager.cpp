@@ -4,8 +4,10 @@
 
 #include "include/file_wal_manager.hpp"
 
+#include "file_utils.hpp"
 #include "include/wal_serializer_factory.hpp"
 #include "path.hpp"
+#include "../misc/include/crc32.hpp"
 
 #include <algorithm>
 #include <fcntl.h>
@@ -18,8 +20,6 @@ namespace wal
     using namespace types;
     using namespace misc;
     using DbGuard = std::lock_guard<storage::DatabaseIoLockService::Mutex>;
-
-    using checksum_t = uint32_t;
 
     FileWalManager::FileWalManager(
         const fs::path& db_path,
@@ -67,17 +67,15 @@ namespace wal
         hydrate_cache();
     }
 
-    void
-    FileWalManager::hydrate_cache()
+    std::vector<std::pair<LSN, fs::path>>
+    FileWalManager::list_logfiles()
     {
         auto dir = storage::path_db_wal(db_path_, db_name_);
 
-        // If directory is empty, nothing to hydrate
         if (!fs::exists(dir) || fs::is_empty(dir))
-            return;
+            return {};
 
-        // Collect all log files and sort by first_lsn
-        std::vector<std::pair<uint64_t, fs::path>> log_files;
+        std::vector<std::pair<LSN, fs::path>> log_files;
 
         for (const auto& entry : fs::directory_iterator(dir))
         {
@@ -93,6 +91,27 @@ namespace wal
             log_files.emplace_back(first_lsn, entry.path());
         }
 
+        return log_files;
+    }
+
+    void
+    FileWalManager::update_next_lsn(std::vector<WALRecord> logs)
+    {
+        for (const auto& record : logs)
+        {
+            auto record_lsn = std::visit([](const auto& rec) { return rec.lsn; }, record);
+            if (record_lsn >= next_lsn_)
+                next_lsn_ = record_lsn + 1;
+        }
+    }
+
+    void
+    FileWalManager::hydrate_cache()
+    {
+        auto log_files = list_logfiles();
+        if (log_files.empty())
+            return;
+
         // Sort by LSN to read in correct order
         std::sort(
             log_files.begin(),
@@ -106,13 +125,7 @@ namespace wal
             auto file_logs = read_logs_from_file(file_path);
             flushed_.insert(flushed_.end(), file_logs.begin(), file_logs.end());
 
-            // Update next_lsn to be after the last loaded record
-            for (const auto& record : file_logs)
-            {
-                auto record_lsn = std::visit([](const auto& rec) { return rec.lsn; }, record);
-                if (record_lsn >= next_lsn_)
-                    next_lsn_ = record_lsn + 1;
-            }
+            update_next_lsn(file_logs);
         }
 
         // Trust record payload LSNs over filenames to keep correct logical order.
@@ -282,6 +295,12 @@ namespace wal
         return all_logs;
     }
 
+    std::vector<WALRecord>
+    FileWalManager::read_logs(LSN begin_lsn)
+    {
+        throw std::runtime_error("not impelemntd");
+    }
+
     LSN
     FileWalManager::get_next_lsn() const
     {
@@ -296,74 +315,74 @@ namespace wal
         return flushed_lsn_;
     }
 
-    checksum_t
-    crc32(const uint8_t* data, size_t len)
+    void
+    FileWalManager::ensure_directory_exists()
     {
-        uint32_t crc = 0xFFFFFFFF;
-        for (size_t i = 0; i < len; i++)
+        auto dir = storage::path_db_wal(db_path_, db_name_);
+        if (!fs::exists(dir))
+            fs::create_directories(dir);
+    }
+
+    std::filesystem::path
+    FileWalManager::compute_segment(const WALRecord& record)
+    {
+        auto record_lsn = std::visit([](const auto& rec) { return rec.lsn; }, record);
+
+        uint64_t file_first_lsn = (record_lsn - 1) / MAX_RECORDS_PER_LOGFILE * MAX_RECORDS_PER_LOGFILE + 1;
+        uint64_t file_last_lsn = file_first_lsn + MAX_RECORDS_PER_LOGFILE - 1;
+
+        return storage::path_db_wal_logfile(db_path_, db_name_, file_first_lsn, file_last_lsn);
+    }
+
+    MemoryStream
+    FileWalManager::serialize_record(const WALRecord& record)
+    {
+        MemoryStream content;
+        auto serialized = serializer_->serialize(record);
+
+        content.write_u64(serialized.size(), false);
+        content.append(serialized, serialized.size());
+
+        auto checksum = crc32(serialized.data(), serialized.size());
+        content.write(&checksum, sizeof(checksum));
+        content.seek(0);
+
+        return content;
+    }
+
+    std::unordered_map<fs::path, MemoryStream>
+    FileWalManager::segment_buffers(const std::vector<WALRecord>& logs)
+    {
+        std::unordered_map<fs::path, MemoryStream> segment_buffers;
+
+        for (const auto& log : logs)
         {
-            crc ^= data[i];
-            for (int j = 0; j < 8; j++)
-                crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
+            auto path = compute_segment(log);
+            auto content = serialize_record(log);
+
+            auto it = segment_buffers.find(path)
+            if (it == segment_buffers.end())
+                segment_buffers[path] = content;
+            else
+                it->second.append(content, content.size());
         }
-        return ~crc;
+
+        return segment_buffers;
     }
 
     void
     FileWalManager::write_logs(const std::vector<WALRecord>& logs)
     {
         DbGuard guard(*db_mutex_);
-        auto dir = storage::path_db_wal(db_path_, db_name_);
-        if (!fs::exists(dir))
-            fs::create_directories(dir);
 
-        int fd = -1;
-        uint64_t opened_first_lsn = 0;
+        ensure_directory_exists();
 
-        for (const auto& record : logs)
+        auto segments = segment_buffers(logs);
+
+        for (const auto& [path, content] : segments)
         {
-            auto record_lsn = std::visit([](const auto& rec) { return rec.lsn; }, record);
-            uint64_t file_first_lsn =
-                ((record_lsn - 1) / MAX_RECORDS_PER_LOGFILE) * MAX_RECORDS_PER_LOGFILE + 1;
-            uint64_t file_last_lsn = file_first_lsn + MAX_RECORDS_PER_LOGFILE - 1;
-
-            if (fd < 0 || opened_first_lsn != file_first_lsn)
-            {
-                if (fd >= 0)
-                {
-                    fsync(fd);
-                    close(fd);
-                }
-
-                auto file_path =
-                    storage::path_db_wal_logfile(db_path_, db_name_, file_first_lsn, file_last_lsn);
-
-                fd = open(file_path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
-                if (fd < 0)
-                    throw std::runtime_error("Failed to open WAL log file");
-
-                opened_first_lsn = file_first_lsn;
-            }
-
-            auto serialized = serializer_->serialize(record);
-
-            uint64_t record_size = serialized.size();
-            checksum_t checksum = crc32(serialized.data(), serialized.size());
-
-            if (write(fd, &record_size, sizeof(record_size)) != sizeof(record_size))
-                throw std::runtime_error("Failed to write WAL record size");
-
-            if (write(fd, serialized.data(), serialized.size()) != (ssize_t)serialized.size())
-                throw std::runtime_error("Failed to write WAL record");
-
-            if (write(fd, &checksum, sizeof(checksum)) != sizeof(checksum))
-                throw std::runtime_error("Failed to write WAL checksum");
-        }
-
-        if (fd >= 0)
-        {
-            fsync(fd);
-            close(fd);
+            storage::append_file(path, content.to_vector());
+            storage::fsync_file(path);
         }
     }
 

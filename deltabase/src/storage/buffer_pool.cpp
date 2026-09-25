@@ -12,6 +12,7 @@
 namespace storage
 {
     using namespace types;
+
     void
     BufferPool::initialize()
     {
@@ -138,7 +139,11 @@ namespace storage
     }
 
     void
-    BufferPool::append_row_impl(DataPage* destination, MetaTable& mt, const DataRow& new_row, LSN lsn)
+    BufferPool::append_row_impl(
+        DataPage* destination,
+        MetaTable& mt,
+        const DataRow& new_row,
+        LSN lsn)
     {
         destination->rows.push_back(new_row);
         destination->rows_count = destination->rows.size();
@@ -236,7 +241,7 @@ namespace storage
         file.last_lsn = last_lsn;
 
         index_files_.put(index.id, std::move(file), index_file_flusher_);
-        index_files_.mark_dirty(file.index_id);
+        dirty_if_impl(file.index_id);
 
         auto it = index_files_per_table_.find(table.id);
         if (it == index_files_per_table_.end())
@@ -255,8 +260,15 @@ namespace storage
     IndexFile*
     BufferPool::dirty_if_impl(const IndexId& index_id)
     {
-        index_files_.mark_dirty(index_id);
         auto* entry = index_files_.get(index_id);
+        if (entry && !entry->dirty)
+        {
+            std::lock_guard lock(dpt_mutex_);
+            dpt_[index_id] = entry->value.last_lsn;
+        }
+
+        index_files_.mark_dirty(index_id);
+        entry = index_files_.get(index_id);
         return entry ? &entry->value : nullptr;
     }
 
@@ -280,8 +292,15 @@ namespace storage
     DataPage*
     BufferPool::mark_dirty_impl(const DataPageId& page_id)
     {
-        data_pages_.mark_dirty(page_id);
         auto* entry = data_pages_.get(page_id);
+        if (entry && !entry->dirty)
+        {
+            std::lock_guard lock(dpt_mutex_);
+            dpt_[page_id] = entry->value.last_lsn;
+        }
+
+        data_pages_.mark_dirty(page_id);
+        entry = data_pages_.get(page_id);
         return entry ? &entry->value : nullptr;
     }
 
@@ -300,7 +319,10 @@ namespace storage
 
     void
     BufferPool::log_page_linking(
-        DataPage* page, const DataPageId& next, const MetaTable& mt, txn::Transaction& txn)
+        DataPage* page,
+        const DataPageId& next,
+        const MetaTable& mt,
+        txn::Transaction& txn)
     {
         std::lock_guard lock(mutex_);
         log_page_linking_impl(page, next, mt, txn);
@@ -308,12 +330,16 @@ namespace storage
 
     void
     BufferPool::log_page_linking_impl(
-        DataPage* page, const DataPageId& next, const MetaTable& mt, txn::Transaction& txn)
+        DataPage* page,
+        const DataPageId& next,
+        const MetaTable& mt,
+        txn::Transaction& txn)
     {
         DataPageId before = page->next;
         page->next = next;
 
         txn.append_log(LinkDataPageRecord(mt.id, page->id, before, next));
+        page->last_lsn = txn.get_last_lsn();
 
         dirty_dp_impl(page->id);
     }
@@ -334,6 +360,19 @@ namespace storage
     BufferPool::flush_dirty(LSN max_lsn)
     {
         flush_dirty_impl(max_lsn);
+    }
+
+    std::vector<std::pair<UUID, LSN>>
+    BufferPool::snapshot_dpt()
+    {
+        std::vector<std::pair<UUID, LSN>> dpt;
+        {
+            std::lock_guard lock(dpt_mutex_);
+            dpt.reserve(dpt_.size());
+            for (const auto& [page_id, rec_lsn] : dpt_)
+                dpt.emplace_back(page_id, rec_lsn);
+        }
+        return dpt;
     }
 
     void
@@ -362,7 +401,11 @@ namespace storage
                 {
                     auto* entry = buffer.get(id);
                     if (entry && entry->value.last_lsn <= max_lsn)
+                    {
                         entry->dirty = false;
+                        std::lock_guard lock_dpt(dpt_mutex_);
+                        dpt_.erase(id);
+                    }
                 }
             }
         };

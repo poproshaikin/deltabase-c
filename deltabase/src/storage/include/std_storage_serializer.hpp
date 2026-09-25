@@ -56,7 +56,10 @@ namespace storage
         serialize_cfg(const types::Config& db) const override;
 
         misc::MemoryStream
-        serialize_seq(const types::MetaSequence& sequence) const;
+        serialize_seq(const types::MetaSequence& sequence) const override;
+
+        misc::MemoryStream
+        serialize_ctrl(const types::ControlFile& file) const override;
 
         bool
         deserialize_mt(misc::ReadOnlyMemoryStream &content, types::MetaTable &out) const override;
@@ -90,6 +93,9 @@ namespace storage
 
         bool
         deserialize_seq(misc::ReadOnlyMemoryStream& stream, types::MetaSequence& out) const override;
+
+        bool
+        deserialize_ctrl(misc::ReadOnlyMemoryStream& stream, types::ControlFile& out) const override;
 
         uint64_t
         estimate_size(const types::DataRow& row) const override;

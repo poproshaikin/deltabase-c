@@ -133,6 +133,59 @@ namespace wal
     }
 
     MemoryStream
+    StdWalSerializer::serialize(const LinkDataPageRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.table_id, sizeof(uuid_t));
+        stream.write(&record.page_id, sizeof(uuid_t));
+        stream.write(&record.before, sizeof(uuid_t));
+        stream.write(&record.after, sizeof(uuid_t));
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const WriteIndexPageRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+
+        IndexPage page;
+        page.id = record.index_page_id;
+        page.parent = record.parent;
+        page.index_id = record.index_id;
+        page.is_leaf = record.is_leaf;
+        page.data = record.after;
+
+        auto serialized_page = binary_serializer_.serialize_ip(page);
+        stream.append(serialized_page, serialized_page.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const SetIndexRootRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.index_id, sizeof(uuid_t));
+        stream.write(&record.before, sizeof(record.before));
+        stream.write(&record.after, sizeof(record.after));
+
+        return stream;
+    }
+
+    MemoryStream
     StdWalSerializer::serialize(const CLRCreateSchemaRecord& record) const
     {
         MemoryStream stream;
@@ -479,6 +532,68 @@ namespace wal
         stream.write(&record.lsn, sizeof(record.lsn));
         stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
         stream.write(&record.txn_id, sizeof(uuid_t));
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const BeginCkptRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        return stream;
+    }
+
+    static void
+    write_lsn_pairs(MemoryStream& stream, const std::vector<std::pair<UUID, LSN>>& pairs)
+    {
+        uint64_t count = pairs.size();
+        stream.write(&count, sizeof(count));
+        for (const auto& [id, lsn] : pairs)
+        {
+            stream.write(&id, sizeof(uuid_t));
+            stream.write(&lsn, sizeof(lsn));
+        }
+    }
+
+    static bool
+    read_lsn_pairs(ReadOnlyMemoryStream& stream, std::vector<std::pair<UUID, LSN>>& out)
+    {
+        uint64_t count = 0;
+        if (stream.read(&count, sizeof(count)) != sizeof(count))
+            return false;
+
+        out.clear();
+        out.reserve(count);
+        for (uint64_t i = 0; i < count; ++i)
+        {
+            UUID id;
+            LSN lsn;
+            if (stream.read(id.raw(), sizeof(uuid_t)) != sizeof(uuid_t))
+                return false;
+            if (stream.read(&lsn, sizeof(lsn)) != sizeof(lsn))
+                return false;
+            out.emplace_back(id, lsn);
+        }
+        return true;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const EndCkptRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.begin_ckpt_lsn, sizeof(record.begin_ckpt_lsn));
+        stream.write(&record.redo_lsn, sizeof(record.redo_lsn));
+
+        write_lsn_pairs(stream, record.att);
+        write_lsn_pairs(stream, record.dpt);
+
         return stream;
     }
 
@@ -893,6 +1008,91 @@ namespace wal
             return true;
         }
 
+        case WALRecordType::LINK_DATA_PAGE:
+        {
+            LSN lsn;
+            LSN prev_lsn;
+            UUID txn_id;
+            UUID table_id;
+            DataPageId page_id;
+            DataPageId before;
+            DataPageId after;
+
+            if (!stream.read(&lsn, sizeof(lsn)))
+                return false;
+            if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                return false;
+            if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(table_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(page_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(before.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(after.raw(), sizeof(uuid_t)))
+                return false;
+
+            out = LinkDataPageRecord(lsn, prev_lsn, txn_id, table_id, page_id, before, after);
+            return true;
+        }
+
+        case WALRecordType::WRITE_INDEX_PAGE:
+        {
+            WriteIndexPageRecord rec;
+
+            if (!stream.read(&rec.lsn, sizeof(rec.lsn)))
+                return false;
+            if (!stream.read(&rec.prev_lsn, sizeof(rec.prev_lsn)))
+                return false;
+            if (!stream.read(rec.txn_id.raw(), sizeof(uuid_t)))
+                return false;
+
+            IndexPage page;
+            if (!binary_serializer_.deserialize_ip(stream, page))
+                return false;
+
+            rec.index_id = page.index_id;
+            rec.index_page_id = page.id;
+            rec.parent = page.parent;
+            rec.is_leaf = page.is_leaf;
+            rec.after = page.data;
+
+            out = rec;
+            return true;
+        }
+
+        case WALRecordType::SET_INDEX_ROOT:
+        {
+            LSN lsn;
+            LSN prev_lsn;
+            UUID txn_id;
+            IndexId index_id;
+            IndexPageId before;
+            IndexPageId after;
+
+            if (!stream.read(&lsn, sizeof(lsn)))
+                return false;
+            if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                return false;
+            if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(index_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(&before, sizeof(before)))
+                return false;
+            if (!stream.read(&after, sizeof(after)))
+                return false;
+
+            SetIndexRootRecord rec(index_id, before, after);
+            rec.lsn = lsn;
+            rec.prev_lsn = prev_lsn;
+            rec.txn_id = txn_id;
+
+            out = rec;
+            return true;
+        }
+
         case WALRecordType::CLR_CREATE_SCHEMA:
         {
             LSN lsn;
@@ -1196,6 +1396,47 @@ namespace wal
                 return false;
 
             out = CLRUpdateSequenceRecord(lsn, prev_lsn, txn_id, undo_next_lsn, before, after);
+            return true;
+        }
+
+        case WALRecordType::BEGIN_CKPT:
+        {
+            LSN lsn;
+            LSN prev_lsn;
+            UUID txn_id;
+
+            if (!stream.read(&lsn, sizeof(lsn)))
+                return false;
+            if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                return false;
+            if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                return false;
+
+            out = BeginCkptRecord(lsn, prev_lsn, txn_id);
+            return true;
+        }
+
+        case WALRecordType::END_CKPT:
+        {
+            EndCkptRecord rec;
+
+            if (!stream.read(&rec.lsn, sizeof(rec.lsn)))
+                return false;
+            if (!stream.read(&rec.prev_lsn, sizeof(rec.prev_lsn)))
+                return false;
+            if (!stream.read(rec.txn_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(&rec.begin_ckpt_lsn, sizeof(rec.begin_ckpt_lsn)))
+                return false;
+            if (!stream.read(&rec.redo_lsn, sizeof(rec.redo_lsn)))
+                return false;
+
+            if (!read_lsn_pairs(stream, rec.att))
+                return false;
+            if (!read_lsn_pairs(stream, rec.dpt))
+                return false;
+
+            out = rec;
             return true;
         }
 

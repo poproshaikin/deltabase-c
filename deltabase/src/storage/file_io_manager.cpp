@@ -526,6 +526,33 @@ namespace storage
         write_file(paths_.db_meta(), serialized.to_vector());
     }
 
+    void
+    FileIOManager::write_control_file(const ControlFile& file)
+    {
+        DbGuard guard(*db_mutex_);
+        auto serialized = serializer_->serialize_ctrl(file);
+        write_file(paths_.control_file(), serialized.to_vector());
+    }
+
+    ControlFile
+    FileIOManager::read_control_file()
+    {
+        DbGuard guard(*db_mutex_);
+        const auto path = paths_.control_file();
+
+        if (!fs::exists(path))
+            return ControlFile{0, 0};
+
+        auto content = read_file(path);
+        ControlFile file;
+        misc::ReadOnlyMemoryStream stream(content);
+        if (!serializer_->deserialize_ctrl(stream, file))
+            throw std::runtime_error(
+                "FileIOManager::read_control_file: failed to deserialize control file"
+            );
+        return file;
+    }
+
     bool
     FileIOManager::exists_db(const std::string& name)
     {

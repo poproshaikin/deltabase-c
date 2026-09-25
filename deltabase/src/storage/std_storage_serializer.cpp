@@ -3,6 +3,7 @@
 //
 
 #include "std_storage_serializer.hpp"
+#include "../misc/include/crc32.hpp"
 
 namespace storage
 {
@@ -325,7 +326,7 @@ namespace storage
         stream.write(&db.io_type, sizeof(db.io_type));
         stream.write(&db.planner_type, sizeof(db.planner_type));
         stream.write(&db.serializer_type, sizeof(db.serializer_type));
-        stream.write(&db.last_checkpoint_lsn, sizeof(db.last_checkpoint_lsn));
+        stream.write(&db.checkpoint_interval_ms, sizeof(db.checkpoint_interval_ms));
         stream.seek(0);
         return stream;
     }
@@ -338,6 +339,22 @@ namespace storage
         stream.write_uuid(sequence.schema_id);
         stream.write_string(sequence.name, false);
         stream.write_i32(sequence.current_value, false);
+        return stream;
+    }
+
+    MemoryStream
+    StdStorageSerializer::serialize_ctrl(const ControlFile& file) const
+    {
+        MemoryStream stream;
+        stream.write(&file.last_checkpoint_lsn, sizeof(file.last_checkpoint_lsn));
+
+        auto checksum = crc32(
+            reinterpret_cast<const uint8_t*>(&file.last_checkpoint_lsn),
+            sizeof(file.last_checkpoint_lsn)
+        );
+        stream.write(&checksum, sizeof(checksum));
+
+        stream.seek(0);
         return stream;
     }
 
@@ -696,8 +713,8 @@ namespace storage
             sizeof(out.serializer_type))
             return false;
 
-        if (stream.read(&out.last_checkpoint_lsn, sizeof(out.last_checkpoint_lsn)) !=
-            sizeof(out.last_checkpoint_lsn))
+        if (stream.read(&out.checkpoint_interval_ms, sizeof(out.checkpoint_interval_ms)) !=
+            sizeof(out.checkpoint_interval_ms))
             return false;
 
         return true;
@@ -780,6 +797,27 @@ namespace storage
 
         if (!stream.read_i32(out.current_value, false))
             return false;
+
+        return true;
+    }
+
+    bool
+    StdStorageSerializer::deserialize_ctrl(ReadOnlyMemoryStream& stream, ControlFile& out) const
+    {
+        if (stream.read(&out.last_checkpoint_lsn, sizeof(out.last_checkpoint_lsn)) !=
+            sizeof(out.last_checkpoint_lsn))
+            return false;
+
+        if (stream.read(&out.crc32, sizeof(out.crc32)) != sizeof(out.crc32))
+            return false;
+
+        auto computed = crc32(
+            reinterpret_cast<const uint8_t*>(&out.last_checkpoint_lsn),
+            sizeof(out.last_checkpoint_lsn)
+        );
+
+        if (computed != out.crc32)
+            throw std::runtime_error("ControlFile corruption detected: checksum mismatch");
 
         return true;
     }

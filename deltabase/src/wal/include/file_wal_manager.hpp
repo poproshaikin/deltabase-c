@@ -42,7 +42,25 @@ namespace wal
 
         // Helper methods
         void
+        ensure_directory_exists();
+
+        std::filesystem::path
+        compute_segment(const types::WALRecord& record);
+
+        misc::MemoryStream
+        serialize_record(const types::WALRecord& record);
+
+        std::unordered_map<fs::path, misc::MemoryStream>
+        segment_buffers(const std::vector<types::WALRecord>& logs);
+
+        void
         write_logs(const std::vector<types::WALRecord>& logs);
+
+        std::vector<std::pair<types::LSN, fs::path>>
+        list_logfiles();
+
+        void
+        update_next_lsn(std::vector<types::WALRecord> logs);
 
         std::vector<types::WALRecord>
         read_logs_from_file(const fs::path& file_path);
@@ -89,6 +107,9 @@ namespace wal
 
         std::vector<types::WALRecord>
         read_all_logs() override;
+
+        std::vector<types::WALRecord>
+        read_logs(types::LSN begin_lsn) override;
 
         types::LSN
         get_next_lsn() const override;

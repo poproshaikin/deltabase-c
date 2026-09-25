@@ -54,6 +54,11 @@ namespace storage
             return db() / PATH_WAL;
         }
 
+        fs::path control_file() const
+        {
+            return db() / "control";
+        }
+
         fs::path schema(const std::string& schema_name) const
         {
             return db() / schema_name;

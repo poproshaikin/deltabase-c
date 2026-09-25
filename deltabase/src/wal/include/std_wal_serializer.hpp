@@ -44,6 +44,15 @@ namespace wal
         serialize(const types::CLRDeleteRecord& record) const;
 
         misc::MemoryStream
+        serialize(const types::LinkDataPageRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::WriteIndexPageRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::SetIndexRootRecord& record) const;
+
+        misc::MemoryStream
         serialize(const types::CLRCreateSchemaRecord& record) const;
 
         misc::MemoryStream
@@ -102,6 +111,12 @@ namespace wal
 
         misc::MemoryStream
         serialize(const types::CLRUpdateSequenceRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::BeginCkptRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::EndCkptRecord& record) const;
 
     public:
         misc::MemoryStream

@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_IO_MANAGER_HPP
 #define DELTABASE_IO_MANAGER_HPP
+#include "../../types/include/control_file.hpp"
 #include "../../types/include/meta_sequence.hpp"
 #include "../../types/include/config.hpp"
 #include "../../types/include/data_page.hpp"
@@ -120,6 +121,12 @@ namespace storage
 
         virtual std::vector<types::MetaSequence>
         read_sequences() = 0;
+
+        virtual void
+        write_control_file(const types::ControlFile& file) = 0;
+
+        virtual types::ControlFile
+        read_control_file() = 0;
     };
 } // namespace storage
 

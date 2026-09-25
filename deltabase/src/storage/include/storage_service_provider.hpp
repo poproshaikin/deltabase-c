@@ -7,6 +7,7 @@
 
 #include "buffer_pool.hpp"
 #include "catalog.hpp"
+#include "checkpoint_manager.hpp"
 #include "io_manager.hpp"
 #include "wal_manager.hpp"
 #include "ddl_service.hpp"
@@ -35,6 +36,7 @@ namespace storage
         std::unique_ptr<CatalogCache> catalog_;
         std::unique_ptr<recovery::RecoveryManager> recovery_manager_;
         std::unique_ptr<txn::TransactionManager> txn_manager_;
+        std::unique_ptr<recovery::CheckpointManager> checkpoint_manager_;
 
         // services (depend on infrastructure above)
         std::unique_ptr<DDLService> ddl_;

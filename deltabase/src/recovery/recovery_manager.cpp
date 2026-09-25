@@ -12,8 +12,8 @@ namespace recovery
 {
     using namespace types;
 
-    RecoveryManager::RecoveryManager(Config& cfg, wal::IWALManager& wal, storage::IIOManager& io)
-        : cfg_(cfg), wal_(wal), io_(io)
+    RecoveryManager::RecoveryManager(wal::IWALManager& wal, storage::IIOManager& io)
+        : wal_(wal), io_(io)
     {
     }
 
@@ -25,8 +25,10 @@ namespace recovery
         auto rollback_lsns = get_rollback_lsns(wal);
         auto last_lsn_per_txn = get_last_lsns(wal);
 
+        LSN last_checkpoint = io_.read_control_file().last_checkpoint_lsn;
+
         for (const auto& record : wal)
-            redo(record, commit_lsns);
+            redo(record, commit_lsns, last_checkpoint);
 
         auto active_txns = get_active_txns(last_lsn_per_txn, commit_lsns, rollback_lsns);
         undo(active_txns);
@@ -37,11 +39,10 @@ namespace recovery
     void
     RecoveryManager::redo(
         const WALRecord& record,
-        const std::unordered_map<TxnId, LSN>& commit_lsns
+        const std::unordered_map<TxnId, LSN>& commit_lsns,
+        LSN last_checkpoint
     )
     {
-        LSN last_checkpoint = cfg_.last_checkpoint_lsn;
-
         std::visit(
             [&]<typename TRecord>(const TRecord& r)
             {
