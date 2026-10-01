@@ -27,11 +27,12 @@ namespace txn
         return last_lsn_;
     }
 
-    void
+    int
     Transaction::advance_lsn(types::LSN lsn)
     {
         last_lsn_ = lsn;
         mgr_->assign_active_entry(*this);
+        return lsn;
     }
 
     void
@@ -47,7 +48,7 @@ namespace txn
         advance_lsn(lsn);
     }
 
-    void
+    int
     Transaction::append_log(const types::WALRecord& record)
     {
         if (state_ != TransactionState::ACTIVE)
@@ -63,7 +64,7 @@ namespace txn
             record
         );
 
-        advance_lsn(mgr_->wal_manager().append_log(record_with_txn_id));
+        return advance_lsn(mgr_->wal_manager().append_log(record_with_txn_id));
     }
 
     void

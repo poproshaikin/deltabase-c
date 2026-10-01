@@ -42,7 +42,7 @@ namespace storage
         {
             const auto key = make_key(db_path, db_name);
 
-            std::lock_guard<std::mutex> guard(registry_mutex_);
+            std::lock_guard guard(registry_mutex_);
             auto& mutex = locks_[key];
             if (!mutex)
                 mutex = std::make_shared<Mutex>();

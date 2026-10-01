@@ -36,6 +36,12 @@ namespace types
 
         DataPage() = default;
 
+        bool
+        has_space(size_t size) const
+        {
+            return this->size + size <= MAX_SIZE;
+        }
+
         static DataPage
         make(const fs::path& base_path, const UUID& table_id, const UUID& page_id)
         {

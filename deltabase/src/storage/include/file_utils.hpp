@@ -16,11 +16,17 @@ namespace storage
     void
     write_file(const fs::path& path, const types::Bytes& content);
 
+    void
+    append_file(const fs::path& path, const types::Bytes& content);
+
     bool
     exists_file(const fs::path& path);
 
     void
     fsync_file(const fs::path& path, const types::Bytes& content);
+
+    void
+    fsync_file(const fs::path& path);
 }
 
 #endif //DELTABASE_UTILS_HPP

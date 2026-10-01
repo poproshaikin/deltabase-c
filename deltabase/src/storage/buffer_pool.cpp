@@ -4,6 +4,7 @@
 
 #include "include/buffer_pool.hpp"
 
+#include "page_file_lock.hpp"
 #include "../misc/include/utils.hpp"
 #include <algorithm>
 #include <limits>
@@ -12,34 +13,12 @@
 namespace storage
 {
     using namespace types;
+
     void
     BufferPool::initialize()
     {
         std::lock_guard lock(mutex_);
         initialize_impl();
-    }
-
-    void
-    BufferPool::initialize_impl()
-    {
-        data_pages_per_table_ = io_.map_data_pages_for_table();
-        index_files_per_table_ = io_.map_index_files_for_table();
-    }
-
-    DataPage*
-    BufferPool::create_dp_impl(const MetaTable& mt)
-    {
-        DataPageId id = DataPageId::make();
-        DataPage new_page = io_.create_page(mt, id);
-        data_pages_.put(id, std::move(new_page), data_page_flusher_);
-
-        auto it = data_pages_per_table_.find(mt.id);
-        if (it == data_pages_per_table_.end())
-            data_pages_per_table_[mt.id] = {id};
-        else
-            data_pages_per_table_.at(mt.id).push_back(id);
-
-        return &data_pages_.get(id)->value;
     }
 
     void
@@ -49,17 +28,266 @@ namespace storage
         put_dp_impl(page_id, std::move(page));
     }
 
-    void
-    BufferPool::put_dp_impl(const DataPageId& page_id, DataPage&& page)
-    {
-        data_pages_.put(page_id, {std::move(page)}, data_page_flusher_);
-    }
-
     DataPage*
     BufferPool::get_dp(const DataPageId& page_id)
     {
         std::lock_guard lock(mutex_);
         return get_dp_impl(page_id);
+    }
+
+    DataPage*
+    BufferPool::prepare_dp(size_t size, const MetaTable& mt, txn::Transaction& txn)
+    {
+        std::lock_guard lock(mutex_);
+        return prepare_dp_impl(size, mt, txn);
+    }
+
+    DataPage*
+    BufferPool::find_row_owner(RowId row_id, const MetaTable& mt)
+    {
+        auto table_data = get_table_data(mt.id);
+
+        auto it = std::ranges::find_if(table_data, [&](DataPage* page)
+        {
+            if (row_id < page->min_rid || row_id > page->max_rid)
+                return false;
+            return std::ranges::find(page->rows, row_id, &DataRow::id) != page->rows.end();
+        });
+
+        if (it == table_data.end())
+            return nullptr;
+
+        return *it;
+    }
+
+    void
+    BufferPool::append_row(DataPage* destination, MetaTable& mt, const DataRow& new_row, LSN lsn)
+    {
+        std::lock_guard lock(mutex_);
+        append_row_impl(destination, mt, new_row, lsn);
+    }
+
+    std::vector<DataPage*>
+    BufferPool::get_table_data(const TableId& table_id)
+    {
+        std::lock_guard lock(mutex_);
+        return get_table_data_impl(table_id);
+    }
+
+    DataPage*
+    BufferPool::dirty_dp(const DataPageId& page_id)
+    {
+        std::lock_guard lock(mutex_);
+        return dirty_dp_impl(page_id);
+    }
+
+    void
+    BufferPool::log_page_linking(
+        DataPage* page, const DataPageId& next, const MetaTable& mt, txn::Transaction& txn)
+    {
+        std::lock_guard lock(mutex_);
+        log_page_linking_impl(page, next, mt, txn);
+    }
+
+    IndexFile*
+    BufferPool::get_table_index(const UUID& table_id, const IndexId& index_id)
+    {
+        std::lock_guard lock(mutex_);
+        return get_table_index_impl(table_id, index_id);
+    }
+
+    void
+    BufferPool::create_table_index(
+        const std::string& schema_name,
+        const MetaTable& table,
+        const MetaIndex& index,
+        LSN last_lsn
+    )
+    {
+        std::lock_guard lock(mutex_);
+        create_table_index_impl(schema_name, table, index, last_lsn);
+    }
+
+    IndexFile*
+    BufferPool::dirty_if(const IndexId& index_id)
+    {
+        std::lock_guard lock(mutex_);
+        return dirty_if_impl(index_id);
+    }
+
+    void
+    BufferPool::set_if_lsn(const IndexId& index_id, LSN last_lsn)
+    {
+        std::lock_guard lock(mutex_);
+        set_if_lsn_impl(index_id, last_lsn);
+    }
+
+    bool
+    BufferPool::is_row_obsolete(const RowPtr& row_ptr)
+    {
+        std::lock_guard lock(mutex_);
+        return is_row_obsolete_impl(row_ptr);
+    }
+
+    // not guarded by mutex_: therefore is not marked with _impl.
+    // this never touches data_pages_/index_files_/the per-table maps.
+    std::optional<LSN>
+    BufferPool::insert_row_locked(const DataPageId& page_id,
+        MetaTable& mt,
+        const DataRow& row,
+        txn::Transaction& txn)
+    {
+        size_t size = io_.estimate_size(row);
+        MetaTable mt_unchanged = mt;
+
+        auto page = io_.read_data_page(page_id);
+        PageFileLock page_lock(page->path);
+
+        // re-read while locked - to avoid races between first read and flock
+        page = io_.read_data_page(page_id);
+
+        if (!page->has_space(size))
+            return std::nullopt;
+
+        LSN lsn = txn.append_log(InsertRecord(mt.id, page->id, row));
+
+        page->rows.push_back(row);
+        page->rows_count = page->rows.size();
+        page->size += size;
+        page->min_rid = page->rows_count == 1 ? row.id : std::min(page->min_rid, row.id);
+        page->max_rid = std::max(page->max_rid, row.id);
+        page->last_lsn = lsn;
+        mt.total_rows++;
+        mt.live_rows++;
+
+        txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+
+        // must be durable before the PageFileLock below unlocks, otherwise the lock
+        // doesn't actually protect the on-disk state from a concurrent writer
+        io_.write(*page, true);
+
+        {
+            std::lock_guard lock(mutex_);
+            put_dp_impl(page_id, std::move(*page));
+        }
+
+        return lsn;
+    }
+
+    // not guarded by mutex_: see insert_row_locked above.
+    std::optional<LSN>
+    BufferPool::delete_row_locked(
+        const DataPageId& page_id,
+        RowId row_id,
+        MetaTable& mt,
+        txn::Transaction& txn)
+    {
+        MetaTable mt_unchanged = mt;
+
+        auto page = io_.read_data_page(page_id);
+        PageFileLock page_lock(page->path);
+
+        // re-read while locked - to avoid races between first read and flock
+        page = io_.read_data_page(page_id);
+
+        DataRow* target = nullptr;
+        for (auto& row : page->rows)
+        {
+            if (row.id == row_id)
+            {
+                target = &row;
+                break;
+            }
+        }
+
+        if (!target)
+            throw std::runtime_error("delete_row_locked: row not found on page");
+
+        if (has_flag(target->flags, DataRowFlags::OBSOLETE))
+            return std::nullopt;
+
+        DataRow before = *target;
+        target->flags |= DataRowFlags::OBSOLETE;
+        mt.live_rows--;
+
+        LSN lsn = txn.append_log(DeleteRecord(mt.id, page->id, before));
+        page->last_lsn = lsn;
+
+        txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+
+        io_.write(*page, true);
+
+        {
+            std::lock_guard lock(mutex_);
+            put_dp_impl(page_id, std::move(*page));
+        }
+
+        return lsn;
+    }
+
+    void
+    BufferPool::flush_dirty()
+    {
+        flush_dirty_impl();
+    }
+
+    void
+    BufferPool::flush_dirty(LSN max_lsn)
+    {
+        flush_dirty_impl(max_lsn);
+    }
+
+    void
+    BufferPool::flush(DataPageBuffer::CacheEntry& page_entry)
+    {
+        bool is_dirty;
+        {
+            std::lock_guard lock(mutex_);
+            is_dirty = page_entry.dirty;
+        }
+
+        if (is_dirty)
+        {
+            io_.write(page_entry.value, true);
+            std::lock_guard lock(mutex_);
+            page_entry.dirty = false;
+        }
+    }
+
+    void
+    BufferPool::flush(IndexFileBuffer::CacheEntry& index_file_entry)
+    {
+        bool is_dirty;
+        {
+            std::lock_guard lock(mutex_);
+            is_dirty = index_file_entry.dirty;
+        }
+
+        if (is_dirty)
+        {
+            io_.write(index_file_entry.value, true);
+            std::lock_guard lock(mutex_);
+            index_file_entry.dirty = false;
+        }
+    }
+
+    // All methods suffixed with impl assume the caller holds the appropriate
+    // locks on the data structures (data_pages/index_files_/data_pages_per_table_/index_files_per_table_).
+    // *_impl methods may call other *_impl methods.
+    // The locking public API (below) may not be called from any of these methods,
+    // as doing so would cause the public methods to acquire the same lock, which would cause deadlock.
+
+    void
+    BufferPool::initialize_impl()
+    {
+        data_pages_per_table_ = io_.map_data_pages_for_table();
+        index_files_per_table_ = io_.map_index_files_for_table();
+    }
+
+    void
+    BufferPool::put_dp_impl(const DataPageId& page_id, DataPage&& page)
+    {
+        data_pages_.put(page_id, {std::move(page)}, data_page_flusher_);
     }
 
     DataPage*
@@ -82,13 +310,6 @@ namespace storage
     }
 
     DataPage*
-    BufferPool::prepare_dp(size_t size, const MetaTable& mt, txn::Transaction& txn)
-    {
-        std::lock_guard lock(mutex_);
-        return prepare_dp_impl(size, mt, txn);
-    }
-
-    DataPage*
     BufferPool::prepare_dp_impl(size_t size, const MetaTable& mt, txn::Transaction& txn)
     {
         auto table_pages_it = data_pages_per_table_.find(mt.id);
@@ -100,7 +321,7 @@ namespace storage
                 if (!page)
                     continue;
 
-                if (page->size + size <= DataPage::MAX_SIZE)
+                if (page->has_space(size))
                     return page;
             }
         }
@@ -131,13 +352,6 @@ namespace storage
     }
 
     void
-    BufferPool::append_row(DataPage* destination, MetaTable& mt, const DataRow& new_row, LSN lsn)
-    {
-        std::lock_guard lock(mutex_);
-        append_row_impl(destination, mt, new_row, lsn);
-    }
-
-    void
     BufferPool::append_row_impl(DataPage* destination, MetaTable& mt, const DataRow& new_row, LSN lsn)
     {
         destination->rows.push_back(new_row);
@@ -151,13 +365,6 @@ namespace storage
         mt.total_rows++;
         destination->last_lsn = lsn;
         dirty_dp_impl(destination->id);
-    }
-
-    std::vector<DataPage*>
-    BufferPool::get_table_data(const TableId& table_id)
-    {
-        std::lock_guard lock(mutex_);
-        return get_table_data_impl(table_id);
     }
 
     std::vector<DataPage*>
@@ -175,11 +382,22 @@ namespace storage
         return pages;
     }
 
-    IndexFile*
-    BufferPool::get_table_index(const UUID& table_id, const IndexId& index_id)
+    DataPage*
+    BufferPool::dirty_dp_impl(const DataPageId& page_id)
     {
-        std::lock_guard lock(mutex_);
-        return get_table_index_impl(table_id, index_id);
+        return mark_dirty_impl(page_id);
+    }
+
+    void
+    BufferPool::log_page_linking_impl(
+        DataPage* page, const DataPageId& next, const MetaTable& mt, txn::Transaction& txn)
+    {
+        DataPageId before = page->next;
+        page->next = next;
+
+        txn.append_log(LinkDataPageRecord(mt.id, page->id, before, next));
+
+        dirty_dp_impl(page->id);
     }
 
     IndexFile*
@@ -213,18 +431,6 @@ namespace storage
     }
 
     void
-    BufferPool::create_table_index(
-        const std::string& schema_name,
-        const MetaTable& table,
-        const MetaIndex& index,
-        LSN last_lsn
-    )
-    {
-        std::lock_guard lock(mutex_);
-        create_table_index_impl(schema_name, table, index, last_lsn);
-    }
-
-    void
     BufferPool::create_table_index_impl(
         const std::string& schema_name,
         const MetaTable& table,
@@ -246,25 +452,11 @@ namespace storage
     }
 
     IndexFile*
-    BufferPool::dirty_if(const IndexId& index_id)
-    {
-        std::lock_guard lock(mutex_);
-        return dirty_if_impl(index_id);
-    }
-
-    IndexFile*
     BufferPool::dirty_if_impl(const IndexId& index_id)
     {
         index_files_.mark_dirty(index_id);
         auto* entry = index_files_.get(index_id);
         return entry ? &entry->value : nullptr;
-    }
-
-    void
-    BufferPool::set_if_lsn(const IndexId& index_id, LSN last_lsn)
-    {
-        std::lock_guard lock(mutex_);
-        set_if_lsn_impl(index_id, last_lsn);
     }
 
     void
@@ -277,63 +469,24 @@ namespace storage
         entry->value.last_lsn = std::max(entry->value.last_lsn, last_lsn);
     }
 
-    DataPage*
-    BufferPool::mark_dirty_impl(const DataPageId& page_id)
+    bool
+    BufferPool::is_row_obsolete_impl(const RowPtr& row_ptr)
     {
-        data_pages_.mark_dirty(page_id);
-        auto* entry = data_pages_.get(page_id);
-        return entry ? &entry->value : nullptr;
-    }
+        const auto* page = get_dp_impl(row_ptr.first);
+        if (!page)
+            return false;
 
-    DataPage*
-    BufferPool::dirty_dp(const DataPageId& page_id)
-    {
-        std::lock_guard lock(mutex_);
-        return dirty_dp_impl(page_id);
-    }
+        for (const auto& row : page->rows)
+            if (row.id == row_ptr.second)
+                return has_flag(row.flags, DataRowFlags::OBSOLETE);
 
-    DataPage*
-    BufferPool::dirty_dp_impl(const DataPageId& page_id)
-    {
-        return mark_dirty_impl(page_id);
-    }
-
-    void
-    BufferPool::log_page_linking(
-        DataPage* page, const DataPageId& next, const MetaTable& mt, txn::Transaction& txn)
-    {
-        std::lock_guard lock(mutex_);
-        log_page_linking_impl(page, next, mt, txn);
-    }
-
-    void
-    BufferPool::log_page_linking_impl(
-        DataPage* page, const DataPageId& next, const MetaTable& mt, txn::Transaction& txn)
-    {
-        DataPageId before = page->next;
-        page->next = next;
-
-        txn.append_log(LinkDataPageRecord(mt.id, page->id, before, next));
-
-        dirty_dp_impl(page->id);
-    }
-
-    void
-    BufferPool::flush_dirty()
-    {
-        flush_dirty_impl();
+        return false;
     }
 
     void
     BufferPool::flush_dirty_impl()
     {
         flush_dirty_impl(std::numeric_limits<LSN>::max());
-    }
-
-    void
-    BufferPool::flush_dirty(LSN max_lsn)
-    {
-        flush_dirty_impl(max_lsn);
     }
 
     void
@@ -371,60 +524,28 @@ namespace storage
         flush_buffer(index_files_);
     }
 
-    void
-    BufferPool::flush(DataPageBuffer::CacheEntry& page_entry)
+    DataPage*
+    BufferPool::create_dp_impl(const MetaTable& mt)
     {
-        bool is_dirty;
-        {
-            std::lock_guard lock(mutex_);
-            is_dirty = page_entry.dirty;
-        }
+        DataPageId id = DataPageId::make();
+        DataPage new_page = io_.create_page(mt, id);
+        data_pages_.put(id, std::move(new_page), data_page_flusher_);
 
-        if (is_dirty)
-        {
-            io_.write(page_entry.value, true);
-            std::lock_guard lock(mutex_);
-            page_entry.dirty = false;
-        }
+        auto it = data_pages_per_table_.find(mt.id);
+        if (it == data_pages_per_table_.end())
+            data_pages_per_table_[mt.id] = {id};
+        else
+            data_pages_per_table_.at(mt.id).push_back(id);
+
+        return &data_pages_.get(id)->value;
     }
 
-    void
-    BufferPool::flush(IndexFileBuffer::CacheEntry& index_file_entry)
+    DataPage*
+    BufferPool::mark_dirty_impl(const DataPageId& page_id)
     {
-        bool is_dirty;
-        {
-            std::lock_guard lock(mutex_);
-            is_dirty = index_file_entry.dirty;
-        }
-
-        if (is_dirty)
-        {
-            io_.write(index_file_entry.value, true);
-            std::lock_guard lock(mutex_);
-            index_file_entry.dirty = false;
-        }
-    }
-
-
-    bool
-    BufferPool::is_row_obsolete(const RowPtr& row_ptr)
-    {
-        std::lock_guard lock(mutex_);
-        return is_row_obsolete_impl(row_ptr);
-    }
-
-    bool
-    BufferPool::is_row_obsolete_impl(const RowPtr& row_ptr)
-    {
-        const auto* page = get_dp_impl(row_ptr.first);
-        if (!page)
-            return false;
-
-        for (const auto& row : page->rows)
-            if (row.id == row_ptr.second)
-                return has_flag(row.flags, DataRowFlags::OBSOLETE);
-
-        return false;
+        data_pages_.mark_dirty(page_id);
+        auto* entry = data_pages_.get(page_id);
+        return entry ? &entry->value : nullptr;
     }
 
 } // namespace storage

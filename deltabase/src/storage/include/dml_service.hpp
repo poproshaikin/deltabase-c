@@ -22,10 +22,13 @@ namespace storage
 
         std::vector<types::IndexId>
         insert_row_into_indexes(
-            const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id);
+            const types::MetaTable& mt, const types::DataRow& row, const types::DataPageId& page_id, txn::Transaction& txn);
 
         bool
         is_row_obsolete(const types::RowPtr& row_ptr) const;
+
+        void
+        check_row_constraints(const types::MetaTable& mt, const types::DataRow& row);
 
     public:
         explicit DMLService(
@@ -44,6 +47,12 @@ namespace storage
             const types::MetaTable& mt,
             const types::DataRow& old_row,
             const types::RowUpdate& update);
+        void
+        update_one_row(types::MetaTable& mt,
+                       const types::DataPageId& page_id,
+                       types::RowId row_id,
+                       const types::RowUpdate& update,
+                       txn::Transaction& txn);
 
         void
         update_selected(

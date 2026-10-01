@@ -40,6 +40,12 @@ namespace wal
 
         static constexpr uint64_t MAX_RECORDS_PER_LOGFILE = 1000;
 
+        std::filesystem::path
+        compute_segment(const types::WALRecord& record);
+        misc::MemoryStream
+        serialize_record(const types::WALRecord& record);
+        std::unordered_map<fs::path, misc::MemoryStream>
+        segment_buffers(const std::vector<types::WALRecord>& logs);
         // Helper methods
         void
         write_logs(const std::vector<types::WALRecord>& logs);
@@ -47,6 +53,8 @@ namespace wal
         std::vector<types::WALRecord>
         read_logs_from_file(const fs::path& file_path);
 
+        void
+        update_next_lsn(std::vector<types::WALRecord> logs);
         // Load all existing WAL records from disk into flushed_ cache
         void
         hydrate_cache();
@@ -64,6 +72,8 @@ namespace wal
             types::Config::SerializerType serializer_type,
             std::shared_ptr<storage::DatabaseIoLockService> io_lock_service
         );
+        std::vector<std::pair<types::LSN, fs::path>>
+        list_logfiles();
 
         // IWalManager interface
         types::LSN
@@ -89,12 +99,16 @@ namespace wal
 
         std::vector<types::WALRecord>
         read_all_logs() override;
+        std::vector<types::WALRecord>
+        read_logs(types::LSN begin_lsn);
 
         types::LSN
         get_next_lsn() const override;
 
         types::LSN
         get_durable_lsn() const override;
+        void
+        ensure_directory_exists();
     };
 } // namespace wal
 

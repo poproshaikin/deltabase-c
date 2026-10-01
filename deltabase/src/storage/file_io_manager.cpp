@@ -243,6 +243,7 @@ namespace storage
                             "FileIOManager::read_tables_meta: failed to deserialize " +
                             meta_path.string()
                         );
+                    mt.schema_name = schema_name;
                     tables.push_back(std::move(mt));
                 }
             }
@@ -263,6 +264,7 @@ namespace storage
             throw std::runtime_error(
                 "FileIOManager::read_table_meta: failed to deserialize " + path.string()
             );
+        table.schema_name = schema_name;
         return table;
     }
 
@@ -293,7 +295,11 @@ namespace storage
                     );
 
                 if (mt.id == table_id)
+                {
+                    // table_dir is {db}/{schema}/tables/{table}
+                    mt.schema_name = table_dir.path().parent_path().parent_path().filename().string();
                     result = std::make_unique<MetaTable>(std::move(mt));
+                }
             }
         );
 
@@ -487,8 +493,9 @@ namespace storage
     FileIOManager::write_mt(const MetaTable& table, bool fsync)
     {
         DbGuard guard(*db_mutex_);
-        auto schema = read_schema_meta(table.schema_id);
-        write_mt(table, schema.name, fsync);
+        const std::string schema_name =
+            table.schema_name.empty() ? read_schema_meta(table.schema_id).name : table.schema_name;
+        write_mt(table, schema_name, fsync);
     }
 
     void
@@ -507,8 +514,9 @@ namespace storage
     FileIOManager::delete_mt(const MetaTable& table)
     {
         DbGuard guard(*db_mutex_);
-        auto schema = read_schema_meta(table.schema_id);
-        fs::remove_all(paths_.table(schema.name, table.name));
+        const std::string schema_name =
+            table.schema_name.empty() ? read_schema_meta(table.schema_id).name : table.schema_name;
+        fs::remove_all(paths_.table(schema_name, table.name));
     }
 
     void
@@ -545,8 +553,9 @@ namespace storage
     FileIOManager::create_page(const MetaTable& mt, const DataPageId& page_id)
     {
         DbGuard guard(*db_mutex_);
-        auto ms = read_schema_meta(mt.schema_id);
-        const auto data_path = paths_.table_data_dir(ms.name, mt.name);
+        const std::string schema_name =
+            mt.schema_name.empty() ? read_schema_meta(mt.schema_id).name : mt.schema_name;
+        const auto data_path = paths_.table_data_dir(schema_name, mt.name);
         return DataPage::make(data_path, mt.id, page_id);
     }
 

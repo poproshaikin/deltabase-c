@@ -44,7 +44,7 @@ namespace txn
         void
         begin();
 
-        void
+        int
         append_log(const types::WALRecord& record);
 
         void
@@ -54,7 +54,7 @@ namespace txn
         rollback();
 
     private:
-        void
+        int
         advance_lsn(types::LSN lsn);
 
         template <typename R, typename CLR>

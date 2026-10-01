@@ -4,6 +4,7 @@
 
 #include "recovery_manager.hpp"
 
+#include "transaction.hpp"
 #include "type_traits.hpp"
 
 #include <algorithm>
@@ -12,8 +13,8 @@ namespace recovery
 {
     using namespace types;
 
-    RecoveryManager::RecoveryManager(Config& cfg, wal::IWALManager& wal, storage::IIOManager& io)
-        : cfg_(cfg), wal_(wal), io_(io)
+    RecoveryManager::RecoveryManager(wal::IWALManager& wal, storage::IIOManager& io)
+        : wal_(wal), io_(io)
     {
     }
 
@@ -23,10 +24,29 @@ namespace recovery
         auto wal = wal_.read_all_logs();
         auto commit_lsns = get_commit_lsns(wal);
         auto rollback_lsns = get_rollback_lsns(wal);
-        auto last_lsn_per_txn = get_last_lsns(wal);
+
+        LSN last_checkpoint_end = io_.read_control_file().last_checkpoint_end_lsn;
+        LSN redo_lsn = 0;
+        std::unordered_map<TxnId, LSN> last_lsn_per_txn;
+
+        if (last_checkpoint_end != 0)
+        {
+            WALRecord record = wal_.read_log(last_checkpoint_end);
+            auto* end_ckpt = std::get_if<EndCkptRecord>(&record);
+            if (!end_ckpt)
+                throw std::runtime_error("Invalid last end checkpoint LSN");
+
+            redo_lsn = end_ckpt->redo_lsn;
+
+            for (const auto& [txn_id, lsn] : end_ckpt->att)
+                last_lsn_per_txn[txn_id] = lsn;
+        }
+
+        for (const auto& [txn_id, lsn] : get_last_lsns(wal))
+            last_lsn_per_txn[txn_id] = lsn;
 
         for (const auto& record : wal)
-            redo(record, commit_lsns);
+            redo(record, commit_lsns, redo_lsn);
 
         auto active_txns = get_active_txns(last_lsn_per_txn, commit_lsns, rollback_lsns);
         undo(active_txns);
@@ -37,11 +57,10 @@ namespace recovery
     void
     RecoveryManager::redo(
         const WALRecord& record,
-        const std::unordered_map<TxnId, LSN>& commit_lsns
+        const std::unordered_map<TxnId, LSN>& commit_lsns,
+        LSN redo_lsn
     )
     {
-        LSN last_checkpoint = cfg_.last_checkpoint_lsn;
-
         std::visit(
             [&]<typename TRecord>(const TRecord& r)
             {
@@ -49,7 +68,7 @@ namespace recovery
 
                 if constexpr (misc::is_in_variant_v<R, WALCLRRecord>)
                 {
-                    if (r.lsn <= last_checkpoint)
+                    if (r.lsn <= redo_lsn)
                         return;
 
                     if constexpr (wal_log::has_page_id_v<R>)
@@ -65,7 +84,7 @@ namespace recovery
                     return;
 
                 // Skip records not needing redo by checkpoint boundary
-                if (r.lsn <= last_checkpoint)
+                if (r.lsn <= redo_lsn)
                     return;
 
                 // Safety: ignore records after commit marker (if malformed WAL)
@@ -918,11 +937,12 @@ namespace recovery
 
         for (const auto& record : wal)
         {
-            std::visit([&](const auto& r)
-                       {
-                           last[r.txn_id] = r.lsn;
-                       },
-                       record);
+            std::visit(
+                [&](const auto& r)
+                {
+                    last[r.txn_id] = r.lsn;
+                },
+                record);
         }
 
         return last;

@@ -129,6 +129,7 @@ namespace storage
         mt.id = UUID::make();
         mt.name = table_name;
         mt.schema_id = schema->id;
+        mt.schema_name = schema->name;
         mt.last_rid = 0;
         mt.columns.reserve(columns.size());
 
@@ -288,10 +289,9 @@ namespace storage
                 DataRow new_row = extend_row(row, new_column);
                 auto size = io_manager_.estimate_size(new_row);
 
-                DataPage* destination =
-                    reading_page->size + size <= DataPage::MAX_SIZE
-                        ? reading_page
-                        : buffer_pool_.prepare_dp(size, *mt, txn);
+                DataPage* destination = reading_page->has_space(size)
+                                             ? reading_page
+                                             : buffer_pool_.prepare_dp(size, *mt, txn);
 
                 const DataRow old_row = row;
                 row.flags |= DataRowFlags::OBSOLETE;
@@ -432,7 +432,7 @@ namespace storage
 
                 const RowPtr row_ptr{page->id, row.id};
 
-                tree.insert(key, row_ptr);
+                tree.insert(key, row_ptr, txn);
             }
         }
 

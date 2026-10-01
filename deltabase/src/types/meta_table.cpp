@@ -45,8 +45,6 @@ namespace types
     {
         DataRow data_row;
         data_row.id = last_rid++;
-        total_rows++;
-        live_rows++;
         data_row.tokens = normalized_row;
         return data_row;
     }

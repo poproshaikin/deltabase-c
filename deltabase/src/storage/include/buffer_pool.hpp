@@ -49,6 +49,9 @@ namespace storage
         types::DataPage*
         prepare_dp(size_t size, const types::MetaTable& mt, txn::Transaction& txn);
 
+        types::DataPage*
+        find_row_owner(types::RowId row_id, const types::MetaTable& mt);
+
         void
         append_row(
             types::DataPage* destination,
@@ -89,13 +92,26 @@ namespace storage
         bool
         is_row_obsolete(const types::RowPtr& row_ptr);
 
+        std::optional<types::LSN>
+        insert_row_locked(
+            const types::DataPageId& page_id,
+            types::MetaTable& mt,
+            const types::DataRow& row,
+            txn::Transaction& txn);
+
+        std::optional<types::LSN>
+        delete_row_locked(
+            const types::DataPageId& page_id,
+            types::RowId row_id,
+            types::MetaTable& mt,
+            txn::Transaction& txn);
+
         void
         flush_dirty();
         void
         flush_dirty(types::LSN max_lsn);
 
     private:
-
         DataPageBuffer data_pages_;
         IndexFileBuffer index_files_;
 
@@ -112,9 +128,15 @@ namespace storage
         flush(IndexFileBuffer::CacheEntry& index_file_entry);
 
         std::function<void(DataPageBuffer::CacheEntry&)> data_page_flusher_ =
-            [this](DataPageBuffer::CacheEntry& page_entry) { flush(page_entry); };
+            [this](DataPageBuffer::CacheEntry& page_entry)
+        {
+            flush(page_entry);
+        };
         std::function<void(IndexFileBuffer::CacheEntry&)> index_file_flusher_ =
-            [this](IndexFileBuffer::CacheEntry& index_file_entry) { flush(index_file_entry); };
+            [this](IndexFileBuffer::CacheEntry& index_file_entry)
+        {
+            flush(index_file_entry);
+        };
 
         // All methods suffixed with impl assume the caller holds the appropriate
         // locks on the data structures (data_pages/index_files_/data_pages_per_table_/index_files_per_table_).
@@ -184,8 +206,6 @@ namespace storage
 
         types::DataPage*
         mark_dirty_impl(const types::DataPageId& page_id);
-
-        
     };
 } // namespace storage
 

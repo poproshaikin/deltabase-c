@@ -5,6 +5,16 @@
 #include "index_bplus_tree.hpp"
 #include <optional>
 
+namespace
+{
+    void
+    log_page_write(const types::IndexPage& page, txn::Transaction& txn)
+    {
+        txn.append_log(types::WriteIndexPageRecord(
+            page.index_id, page.id, page.parent, page.is_leaf, page.data));
+    }
+}
+
 namespace storage
 {
     std::optional<types::RowPtr>
@@ -21,23 +31,29 @@ namespace storage
     }
 
     void
-    IndexBPlusTree::insert(const types::DataToken& key, const types::RowPtr& row_ptr)
+    IndexBPlusTree::insert(
+        const types::DataToken& key,
+        const types::RowPtr& row_ptr,
+        txn::Transaction& txn)
     {
         std::vector<types::IndexPageId> path;
         auto* leaf_page = find_leaf(key, &path);
         auto& leaf = std::get<types::LeafIndexNode>(leaf_page->data);
 
         insert_into_leaf(leaf, key, row_ptr);
+        log_page_write(*leaf_page, txn);
 
         if (leaf.keys.size() > max_leaf_keys_)
-            split_leaf_and_propagate(*leaf_page, path);
+            split_leaf_and_propagate(*leaf_page, path, txn);
 
         pager_.mark_dirty();
     }
 
     void
     IndexBPlusTree::split_leaf_and_propagate(
-        types::IndexPage& leaf_page, std::vector<types::IndexPageId>& path
+        types::IndexPage& leaf_page,
+        std::vector<types::IndexPageId>& path,
+        txn::Transaction& txn
     )
     {
         auto& leaf = std::get<types::LeafIndexNode>(leaf_page.data);
@@ -52,10 +68,12 @@ namespace storage
         leaf.rows.resize(mid);
 
         right_leaf.next_leaf = leaf.next_leaf;
+        log_page_write(*right_page, txn);
         leaf.next_leaf = right_page->id;
+        log_page_write(leaf_page, txn);
 
         const auto separator = right_leaf.keys.front();
-        insert_into_parent(path, leaf_page.id, separator, right_page->id);
+        insert_into_parent(path, leaf_page.id, separator, right_page->id, txn);
     }
 
     void
@@ -63,16 +81,19 @@ namespace storage
         std::vector<types::IndexPageId>& path,
         types::IndexPageId left_id,
         const types::DataToken& separator,
-        types::IndexPageId right_id
+        types::IndexPageId right_id,
+        txn::Transaction& txn
     )
     {
         if (path.size() == 1)
         {
             auto* new_root = pager_.create_page(false, 0);
+
             auto& r = std::get<types::InternalIndexNode>(new_root->data);
             r.keys.push_back(separator);
             r.children.push_back(left_id);
             r.children.push_back(right_id);
+            log_page_write(*new_root, txn);
 
             auto* left = pager_.get_page(left_id);
             auto* right = pager_.get_page(right_id);
@@ -80,8 +101,14 @@ namespace storage
                 throw std::runtime_error("IndexBpTree: new root link failed");
 
             left->parent = new_root->id;
+            log_page_write(*left, txn);
+
             right->parent = new_root->id;
+            log_page_write(*right, txn);
+
+            types::IndexPageId old_root = pager_.root_page_id();
             pager_.set_root_page_id(new_root->id);
+            txn.append_log(types::SetIndexRootRecord(pager_.index_id(), old_root, new_root->id));
             return;
         }
 
@@ -101,24 +128,29 @@ namespace storage
 
         parent.keys.insert(parent.keys.begin() + static_cast<long>(child_pos), separator);
         parent.children.insert(
-            parent.children.begin() + static_cast<long>(child_pos + 1), right_id
+            parent.children.begin() + static_cast<long>(child_pos + 1),
+            right_id
         );
+        log_page_write(*parent_page, txn);
 
         auto* right = pager_.get_page(right_id);
         if (!right)
             throw std::runtime_error("IndexBpTree: right child not found");
         right->parent = parent_id;
+        log_page_write(*right, txn);
 
         if (parent.keys.size() > max_internal_keys_)
         {
             path.pop_back();
-            split_internal_and_propagate(*parent_page, path);
+            split_internal_and_propagate(*parent_page, path, txn);
         }
     }
 
     void
     IndexBPlusTree::split_internal_and_propagate(
-        types::IndexPage& internal_page, std::vector<types::IndexPageId>& path
+        types::IndexPage& internal_page,
+        std::vector<types::IndexPageId>& path,
+        txn::Transaction& txn
     )
     {
         auto& node = std::get<types::InternalIndexNode>(internal_page.data);
@@ -130,11 +162,13 @@ namespace storage
 
         right_node.keys.assign(node.keys.begin() + static_cast<long>(mid + 1), node.keys.end());
         right_node.children.assign(
-            node.children.begin() + static_cast<long>(mid + 1), node.children.end()
-        );
+            node.children.begin() + static_cast<long>(mid + 1),
+            node.children.end());
+        log_page_write(*right_page, txn);
 
         node.keys.resize(mid);
         node.children.resize(mid + 1);
+        log_page_write(internal_page, txn);
 
         for (const auto child_id : right_node.children)
         {
@@ -142,14 +176,17 @@ namespace storage
             if (!child)
                 throw std::runtime_error("IndexBpTree: child missing during split");
             child->parent = right_page->id;
+            log_page_write(*child, txn);
         }
 
-        insert_into_parent(path, internal_page.id, up_key, right_page->id);
+        insert_into_parent(path, internal_page.id, up_key, right_page->id, txn);
     }
 
     void
     IndexBPlusTree::insert_into_leaf(
-        types::LeafIndexNode& leaf, const types::DataToken& key, const types::RowPtr& row_ptr
+        types::LeafIndexNode& leaf,
+        const types::DataToken& key,
+        const types::RowPtr& row_ptr
     )
     {
         size_t pos = 0;
