@@ -283,7 +283,7 @@ namespace exq
     }
 
     InsertNodeExecutor::InsertNodeExecutor(
-        const MetaTable& mt,
+        MetaTable& mt,
         storage::StorageServiceProvider& service_provider,
         const std::optional<std::vector<std::string> >& col_names,
         ExecutionContext& ctx,
@@ -376,7 +376,7 @@ namespace exq
     }
 
     UpdateNodeExecutor::UpdateNodeExecutor(
-        const MetaTable& mt,
+        MetaTable& mt,
         storage::StorageServiceProvider& service_provider,
         const std::vector<Assignment>& asg,
         ExecutionContext& ctx,
@@ -439,7 +439,7 @@ namespace exq
     }
 
     DeleteNodeExecutor::DeleteNodeExecutor(
-        const MetaTable& mt,
+        MetaTable& mt,
         storage::StorageServiceProvider& service_provider,
         ExecutionContext& ctx,
         std::unique_ptr<INodeExecutor> child
@@ -764,7 +764,7 @@ namespace exq
         case IPlanNode::Type::INSERT:
         {
             const auto& n = static_cast<const InsertPlanNode&>(node);
-            const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
+            MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<InsertNodeExecutor>(
                 mt, ssp, n.column_names, ctx, from_plan(*n.child, ssp, ctx));
         }
@@ -776,14 +776,14 @@ namespace exq
         case IPlanNode::Type::UPDATE:
         {
             const auto& n = static_cast<const UpdatePlanNode&>(node);
-            const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
+            MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<UpdateNodeExecutor>(
                 mt, ssp, n.assignments, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::DELETE:
         {
             const auto& n = static_cast<const DeletePlanNode&>(node);
-            const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
+            MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<DeleteNodeExecutor>(
                 mt, ssp, ctx, from_plan(*n.child, ssp, ctx));
         }

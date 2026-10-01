@@ -188,7 +188,7 @@ namespace exq
 
     class InsertNodeExecutor final : public INodeExecutor
     {
-        types::MetaTable mt_;
+        types::MetaTable& mt_;
         storage::StorageServiceProvider& service_provider_;
 
         std::optional<std::vector<std::string>> col_names_;
@@ -199,12 +199,11 @@ namespace exq
     public:
         explicit
         InsertNodeExecutor(
-            const types::MetaTable& mt,
+            types::MetaTable& mt,
             storage::StorageServiceProvider& service_provider,
             const std::optional<std::vector<std::string>>& col_names,
             types::ExecutionContext& ctx,
-            std::unique_ptr<INodeExecutor> child
-        );
+            std::unique_ptr<INodeExecutor> child);
 
         void
         open() override;
@@ -243,7 +242,7 @@ namespace exq
 
     class UpdateNodeExecutor final : public INodeExecutor
     {
-        types::MetaTable mt_;
+        types::MetaTable& mt_;
         storage::StorageServiceProvider& service_provider_;
 
         std::vector<types::Assignment> assignments_;
@@ -254,7 +253,7 @@ namespace exq
     public:
         explicit
         UpdateNodeExecutor(
-            const types::MetaTable& mt,
+            types::MetaTable& mt,
             storage::StorageServiceProvider& service_provider,
             const std::vector<types::Assignment>& asg,
             types::ExecutionContext& ctx,
@@ -276,7 +275,7 @@ namespace exq
 
     class DeleteNodeExecutor final : public INodeExecutor
     {
-        types::MetaTable mt_;
+        types::MetaTable& mt_;
         storage::StorageServiceProvider& service_provider_;
 
         std::unique_ptr<INodeExecutor> child_;
@@ -286,7 +285,7 @@ namespace exq
     public:
         explicit
         DeleteNodeExecutor(
-            const types::MetaTable& mt,
+            types::MetaTable& mt,
             storage::StorageServiceProvider& service_provider,
             types::ExecutionContext& ctx,
             std::unique_ptr<INodeExecutor> child
