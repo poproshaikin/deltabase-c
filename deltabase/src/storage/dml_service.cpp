@@ -32,15 +32,9 @@ namespace storage
         return buffer_pool_.is_row_obsolete(row_ptr);
     }
 
-    std::vector<IndexId>
-    DMLService::insert_row_into_indexes(
-        const MetaTable& mt,
-        const DataRow& row,
-        const DataPageId& page_id)
+    void
+    DMLService::check_row_constraints(const MetaTable& mt, const DataRow& row)
     {
-        std::vector<IndexId> touched_indexes;
-        touched_indexes.reserve(mt.indexes.size());
-
         for (auto& mi : mt.indexes)
         {
             const auto col_idx = mt.get_column_idx(mi.column_id);
@@ -59,20 +53,46 @@ namespace storage
                 continue;
             }
 
+            if (mi.is_unique)
+            {
+                BPIndexPager pager(buffer_pool_, mt.id, mi.id);
+                IndexBPlusTree tree(pager);
+
+                auto existing = tree.find(key);
+                if (existing.has_value() && !is_row_obsolete(existing.value()))
+                    throw EngineException(
+                        "Unique constraint violation: " + mi.name,
+                        EngineException::Code::UNIQUE_VIOLATION);
+            }
+        }
+    }
+
+    std::vector<IndexId>
+    DMLService::insert_row_into_indexes(
+        const MetaTable& mt,
+        const DataRow& row,
+        const DataPageId& page_id,
+        txn::Transaction& txn)
+    {
+        std::vector<IndexId> touched_indexes;
+        touched_indexes.reserve(mt.indexes.size());
+
+        for (auto& mi : mt.indexes)
+        {
+            const auto col_idx = mt.get_column_idx(mi.column_id);
+            if (col_idx < 0)
+                throw std::runtime_error("Index column not found in table schema");
+
+            const auto& key = row.tokens[static_cast<size_t>(col_idx)];
+            if (key.type == DataType::_NULL)
+                continue;
+
             const RowPtr row_ptr{page_id, row.id};
 
             BPIndexPager pager(buffer_pool_, mt.id, mi.id);
             IndexBPlusTree tree(pager);
 
-            if (mi.is_unique)
-            {
-                auto existing = tree.find(key);
-                if (existing.has_value() && !is_row_obsolete(existing.value()))
-                    throw EngineException("Unique constraint violation: " + mi.name,
-                                          EngineException::Code::UNIQUE_VIOLATION);
-            }
-
-            tree.insert(key, row_ptr);
+            tree.insert(key, row_ptr, txn);
             touched_indexes.push_back(mi.id);
         }
 
@@ -86,27 +106,32 @@ namespace storage
         txn::Transaction& txn)
     {
         auto new_row = mt.make_row(normalized_row);
+        check_row_constraints(mt, new_row);
+
         size_t row_size = io_manager_.estimate_size(new_row);
 
-        const auto mt_unchanged = mt;
+        while (true)
+        {
+            auto* page = buffer_pool_.prepare_dp(row_size, mt, txn);
 
-        auto* page = buffer_pool_.prepare_dp(row_size, mt, txn);
+            std::optional<LSN> result = buffer_pool_.insert_row_locked(
+                page->id,
+                mt,
+                new_row,
+                txn);
 
-        std::vector<IndexId> touched_indexes;
-        if (mt.indexes.size() > 0)
-            touched_indexes = insert_row_into_indexes(mt, new_row, page->id);
+            if (!result.has_value())
+                continue;
 
-        InsertRecord insert_record(mt.id, page->id, new_row);
-        txn.append_log(insert_record);
-        const LSN page_lsn = txn.get_last_lsn();
+            std::vector<IndexId> touched_indexes;
+            if (mt.indexes.size() > 0)
+                touched_indexes = insert_row_into_indexes(mt, new_row, page->id, txn);
 
-        UpdateTableRecord update_table_record(mt_unchanged, mt);
-        txn.append_log(update_table_record);
+            for (const auto& index_id : touched_indexes)
+                buffer_pool_.set_if_lsn(index_id, result.value());
 
-        buffer_pool_.append_row(page, mt, new_row, page_lsn);
-
-        for (const auto& index_id : touched_indexes)
-            buffer_pool_.set_if_lsn(index_id, page_lsn);
+            return;
+        }
     }
 
     DataRow
@@ -119,7 +144,11 @@ namespace storage
         for (const auto& assignment : update)
         {
             int64_t col_idx = mt.get_column_idx(
-                std::visit([](auto& a) { return a.first; }, assignment));
+                std::visit([](auto& a)
+                           {
+                               return a.first;
+                           },
+                           assignment));
 
             if (const auto* lit = std::get_if<AssignLiteral>(&assignment))
                 new_row.tokens[col_idx] = lit->second;
@@ -133,85 +162,66 @@ namespace storage
     }
 
     void
+    DMLService::update_one_row(
+        MetaTable& mt,
+        const DataPageId& page_id,
+        RowId row_id,
+        const RowUpdate& update,
+        txn::Transaction& txn)
+    {
+        auto owner_page = buffer_pool_.get_dp(page_id);
+        auto old_row_it = std::ranges::find(owner_page->rows, row_id, &DataRow::id);
+
+        if (old_row_it == owner_page->rows.end())
+            throw std::runtime_error("update_one_row: row wasn't found on given page");
+
+        DataRow old_row = *old_row_it;
+        DataRow new_row = apply_row_update(mt, old_row, update);
+        new_row.id = ++mt.last_rid;
+
+        check_row_constraints(mt, new_row);
+
+        auto deleted = buffer_pool_.delete_row_locked(page_id, row_id, mt, txn);
+        if (!deleted.has_value())
+            return;
+
+        DataPage *dest = nullptr;
+        std::optional<LSN> inserted;
+        while (!inserted.has_value())
+        {
+            dest = buffer_pool_.prepare_dp(io_manager_.estimate_size(new_row), mt, txn);
+            inserted = buffer_pool_.insert_row_locked(dest->id, mt, new_row, txn);
+        }
+
+        if (!mt.indexes.empty())
+        {
+            auto touched = insert_row_into_indexes(mt, new_row, dest->id, txn);
+            for (const auto& index_id : touched)
+                buffer_pool_.set_if_lsn(index_id, inserted.value());
+        }
+    }
+
+    void
     DMLService::update_selected(
-        types::MetaTable& mt,
+        MetaTable& mt,
         RowUpdate update,
         const std::vector<DataRow>& rows,
         txn::Transaction& txn)
     {
-        const auto unchanged_mt = mt;
-        auto pages = buffer_pool_.get_table_data(mt.id);
-
         std::unordered_set<RowId> ids;
         for (const auto& row : rows)
             ids.insert(row.id);
 
-        for (DataPage* page : pages)
-        {
-            bool updated = false;
-            LSN page_lsn = page->last_lsn;
+        // Phase 1: read-only, no locked-mutations
+        std::vector<std::pair<DataPageId, RowId>> candidates;
+        for (DataPage* page : buffer_pool_.get_table_data(mt.id))
+            for (const auto& row : page->rows)
+                if (ids.contains(row.id) && !has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    candidates.emplace_back(page->id, row.id);
 
-            for (auto& row : page->rows)
-            {
-                if (!ids.contains(row.id))
-                    continue;
-
-                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
-                    continue;
-
-                DataRow new_row = row;
-                new_row.id = ++mt.last_rid;
-
-                row.flags |= DataRowFlags::OBSOLETE;
-
-                for (const auto& assignment : update)
-                {
-                    ColumnId col_id = std::visit(
-                        [](auto& a) { return a.first; }, assignment);
-
-                    int64_t col_idx = mt.get_column_idx(col_id);
-                    MetaColumn cola = mt.get_column(col_idx);
-
-                    if (auto* lit = std::get_if<AssignLiteral>(&assignment))
-                    {
-                        new_row.tokens[col_idx] = lit->second;
-                    }
-                    else
-                    {
-                        auto* col = std::get_if<AssignColumn>(&assignment);
-                        int src_idx = mt.get_column_idx(col->second);
-                        new_row.tokens[col_idx] = row.tokens[src_idx];
-                    }
-                }
-
-                mt.total_rows++;
-
-                UpdateRecord update_record(mt.id, page->id, row, new_row);
-                txn.append_log(update_record);
-                page_lsn = std::max(page_lsn, txn.get_last_lsn());
-
-                UpdateTableRecord update_table_record(unchanged_mt, mt);
-                txn.append_log(update_table_record);
-
-                page->rows.push_back(new_row);
-                page->max_rid = std::max(page->max_rid, new_row.id);
-
-                if (mt.indexes.size() > 0)
-                {
-                    auto touched_indexes = insert_row_into_indexes(mt, new_row, page->id);
-                    for (const auto& index_id : touched_indexes)
-                        buffer_pool_.set_if_lsn(index_id, page_lsn);
-                }
-
-                updated = true;
-            }
-
-            if (updated)
-            {
-                page->last_lsn = page_lsn;
-                buffer_pool_.dirty_dp(page->id);
-            }
-        }
+        // Phase 2: mutation. DO NOT USE DataPage* - may become mutated by someone else.
+        for (const auto& [page_id, row_id] : candidates)
+            update_one_row(mt, page_id, row_id, update, txn);
     }
 
     void
@@ -220,45 +230,20 @@ namespace storage
         const std::vector<DataRow>& rows,
         txn::Transaction& txn)
     {
-        const auto unchanged_mt = mt;
-        auto pages = buffer_pool_.get_table_data(mt.id);
-
         std::unordered_set<RowId> ids;
         for (const auto& row : rows)
             ids.insert(row.id);
 
-        for (auto& page : pages)
-        {
-            bool deleted = false;
-            LSN page_lsn = page->last_lsn;
+        // Phase 1: read-only
+        std::vector<std::pair<DataPageId, RowId>> candidates;
+        for (DataPage* page : buffer_pool_.get_table_data(mt.id))
+            for (const auto& row : page->rows)
+                if (ids.contains(row.id) && !has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    candidates.emplace_back(page->id, row.id);
 
-            for (auto& row : page->rows)
-            {
-                if (!ids.contains(row.id))
-                    continue;
-
-                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
-                    continue;
-
-                deleted = true;
-
-                row.flags |= DataRowFlags::OBSOLETE;
-
-                mt.live_rows--;
-
-                DeleteRecord record(mt.id, page->id, row);
-                txn.append_log(record);
-                page_lsn = std::max(page_lsn, txn.get_last_lsn());
-                UpdateTableRecord update_table_record(unchanged_mt, mt);
-                txn.append_log(update_table_record);
-            }
-
-            if (deleted)
-            {
-                page->last_lsn = page_lsn;
-                buffer_pool_.dirty_dp(page->id);
-            }
-        }
+        // Phase 2
+        for (const auto& [page_id, row_id] : candidates)
+            buffer_pool_.delete_row_locked(page_id, row_id, mt, txn);
     }
 
 

@@ -22,6 +22,7 @@ namespace types
         TableId id;
         SchemaId schema_id;
         std::string name;
+        std::string schema_name; // runtime-only, not serialized
         std::vector<MetaColumn> columns;
         std::vector<MetaIndex> indexes;
         RowId last_rid = 0;

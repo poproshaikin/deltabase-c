@@ -5,6 +5,7 @@
 #ifndef DELTABASE_INDEX_BPLUS_TREE_HPP
 #define DELTABASE_INDEX_BPLUS_TREE_HPP
 #include "index_pager.hpp"
+#include "../../transactions/include/transaction.hpp"
 
 namespace storage
 {
@@ -27,18 +28,19 @@ namespace storage
         insert_into_leaf(types::LeafIndexNode& leaf, const types::DataToken& key, const types::RowPtr& row_ptr);
 
         void
-        split_leaf_and_propagate(types::IndexPage& leaf_page, std::vector<types::IndexPageId>& path);
+        split_leaf_and_propagate(types::IndexPage& leaf_page, std::vector<types::IndexPageId>& path, txn::Transaction& txn);
 
         void
         insert_into_parent(
             std::vector<types::IndexPageId>& path,
             types::IndexPageId left_id,
             const types::DataToken& separator,
-            types::IndexPageId right_id
+            types::IndexPageId right_id,
+            txn::Transaction& txn
         );
 
         void
-        split_internal_and_propagate(types::IndexPage& internal_page, std::vector<types::IndexPageId>& path);
+        split_internal_and_propagate(types::IndexPage& internal_page, std::vector<types::IndexPageId>& path, txn::Transaction& txn);
 
     public:
         IndexBPlusTree(IIndexPager& pager, size_t max_leaf_keys = 64, size_t max_internal_keys = 64)
@@ -50,7 +52,7 @@ namespace storage
         find(const types::DataToken& key);
 
         void
-        insert(const types::DataToken& key, const types::RowPtr& row_ptr);
+        insert(const types::DataToken& key, const types::RowPtr& row_ptr, txn::Transaction& txn);
     };
 }
 

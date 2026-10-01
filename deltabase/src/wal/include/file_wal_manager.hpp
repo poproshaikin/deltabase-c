@@ -40,10 +40,6 @@ namespace wal
 
         static constexpr uint64_t MAX_RECORDS_PER_LOGFILE = 1000;
 
-        // Helper methods
-        void
-        ensure_directory_exists();
-
         std::filesystem::path
         compute_segment(const types::WALRecord& record);
 
@@ -52,6 +48,10 @@ namespace wal
 
         std::unordered_map<fs::path, misc::MemoryStream>
         segment_buffers(const std::vector<types::WALRecord>& logs);
+
+        // Helper methods
+        void
+        ensure_directory_exists();
 
         void
         write_logs(const std::vector<types::WALRecord>& logs);

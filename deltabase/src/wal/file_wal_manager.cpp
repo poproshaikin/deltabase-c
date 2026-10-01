@@ -360,7 +360,7 @@ namespace wal
             auto path = compute_segment(log);
             auto content = serialize_record(log);
 
-            auto it = segment_buffers.find(path)
+            auto it = segment_buffers.find(path);
             if (it == segment_buffers.end())
                 segment_buffers[path] = content;
             else
