@@ -109,8 +109,8 @@ file(GLOB_RECURSE TESTS_SRC
     tests/*.cpp
 )
 
-add_executable(test.exe ${TESTS_SRC})
-target_link_libraries(test.exe 
+add_executable(test ${TESTS_SRC})
+target_link_libraries(test
     storage
     executor
     sql
@@ -123,8 +123,9 @@ target_link_libraries(test.exe
 )
 
 # --- cli ---
-add_executable(cli.exe src/binaries/cli.cpp)
-target_link_libraries(cli.exe
+add_executable(cli_bin src/binaries/cli.cpp)
+set_target_properties(cli_bin PROPERTIES OUTPUT_NAME cli)
+target_link_libraries(cli_bin
     storage
     executor
     sql
@@ -135,38 +136,38 @@ target_link_libraries(cli.exe
     recovery
 )
 
-add_executable(server.exe src/binaries/server.cpp)
-target_link_libraries(server.exe
+add_executable(server src/binaries/server.cpp)
+target_link_libraries(server
     network
     engine
     types
     misc
 )
 
-add_executable(wal_dump.exe src/binaries/wal_dump.cpp)
-target_link_libraries(wal_dump.exe
+add_executable(wal_dump src/binaries/wal_dump.cpp)
+target_link_libraries(wal_dump
     wal
     storage
     types
     misc
 )
 
-add_executable(dp_dump.exe src/binaries/dp_dump.cpp)
-target_link_libraries(dp_dump.exe
+add_executable(dp_dump src/binaries/dp_dump.cpp)
+target_link_libraries(dp_dump
     storage
     types
     misc
 )
 
-add_executable(mt_dump.exe src/binaries/mt_dump.cpp)
-target_link_libraries(mt_dump.exe
+add_executable(mt_dump src/binaries/mt_dump.cpp)
+target_link_libraries(mt_dump
     storage
     types
     misc
 )
 
-add_executable(index_dump.exe src/binaries/index_dump.cpp)
-target_link_libraries(index_dump.exe
+add_executable(index_dump src/binaries/index_dump.cpp)
+target_link_libraries(index_dump
     storage
     types
     misc

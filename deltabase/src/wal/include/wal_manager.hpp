@@ -39,6 +39,9 @@ namespace wal
         virtual std::vector<types::WALRecord>
         read_all_logs() = 0;
 
+        virtual std::vector<types::WALRecord>
+        read_logs(types::LSN begin_lsn) = 0;
+
         virtual types::LSN
         get_next_lsn() const = 0;
     };

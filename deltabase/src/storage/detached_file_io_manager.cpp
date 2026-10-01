@@ -137,4 +137,10 @@ namespace storage
     std::vector<types::MetaSequence>
     DetachedFileIOManager::read_sequences() { unsupported(); }
 
+    void
+    DetachedFileIOManager::write_control_file(const types::ControlFile&) { unsupported(); }
+
+    types::ControlFile
+    DetachedFileIOManager::read_control_file() { unsupported(); }
+
 } // namespace storage

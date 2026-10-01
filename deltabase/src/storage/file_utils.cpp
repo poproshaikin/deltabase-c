@@ -130,42 +130,18 @@ namespace storage
             fs::create_directories(path.parent_path());
 
 #ifdef _WIN32
-        HANDLE file = CreateFileW(
-            path.wstring().c_str(),
-            FILE_APPEND_DATA,
-            0,
-            nullptr,
-            OPEN_ALWAYS,
-            FILE_ATTRIBUTE_NORMAL,
-            nullptr
-        );
-
-        if (file == INVALID_HANDLE_VALUE)
-            throw std::runtime_error("append_file: CreateFile failed");
-
-        DWORD written = 0;
-        if (!WriteFile(file, content.data(), static_cast<DWORD>(content.size()), &written, nullptr))
-        {
-            CloseHandle(file);
-            throw std::runtime_error("append_file: WriteFile failed");
-        }
-
-        if (written != content.size())
-        {
-            CloseHandle(file);
-            throw std::runtime_error("append_file: partial write");
-        }
-
-        CloseHandle(file);
+        std::ofstream file(path, std::ios::binary | std::ios::app);
+        file.write(reinterpret_cast<const char*>(content.data()), content.size());
+        file.close();
 #else
         const int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
         if (fd < 0)
-            throw std::runtime_error("append_file: open failed: " + path.string());
+            throw std::runtime_error("Cannot open file for appending: " + path.string());
 
         if (flock(fd, LOCK_EX) < 0)
         {
             close(fd);
-            throw std::runtime_error("append_file: flock failed: " + path.string());
+            throw std::runtime_error("Cannot acquire exclusive lock for file: " + path.string());
         }
 
         size_t total = 0;
@@ -176,7 +152,7 @@ namespace storage
             {
                 flock(fd, LOCK_UN);
                 close(fd);
-                throw std::runtime_error("append_file: write failed: " + path.string());
+                throw std::runtime_error("Error appending to file: " + path.string());
             }
 
             total += static_cast<size_t>(written);
@@ -278,6 +254,7 @@ namespace storage
     fsync_file(const fs::path& path)
     {
 #ifdef _WIN32
+        // --- Windows ---
         HANDLE file = CreateFileW(
             path.wstring().c_str(),
             GENERIC_WRITE,
@@ -289,26 +266,38 @@ namespace storage
         );
 
         if (file == INVALID_HANDLE_VALUE)
-            throw std::runtime_error("fsync_file: CreateFile failed: " + path.string());
+            throw std::runtime_error("fsync_file: CreateFile failed");
 
         if (!FlushFileBuffers(file))
         {
             CloseHandle(file);
-            throw std::runtime_error("fsync_file: FlushFileBuffers failed: " + path.string());
+            throw std::runtime_error("fsync_file: FlushFileBuffers failed");
         }
 
         CloseHandle(file);
 #else
-        const int fd = open(path.c_str(), O_WRONLY);
+        // --- POSIX (Linux, macOS) ---
+        // Opens the file as-is (no O_CREAT/O_TRUNC) and flushes whatever the OS
+        // already has buffered for it — no content is (re)written here.
+
+        int fd = open(path.c_str(), O_WRONLY);
         if (fd < 0)
-            throw std::runtime_error("fsync_file: open failed: " + path.string());
+            throw std::runtime_error("fsync_file: open failed");
+
+        if (flock(fd, LOCK_EX) < 0)
+        {
+            close(fd);
+            throw std::runtime_error("fsync_file: flock failed");
+        }
 
         if (fsync(fd) < 0)
         {
+            flock(fd, LOCK_UN);
             close(fd);
-            throw std::runtime_error("fsync_file: fsync failed: " + path.string());
+            throw std::runtime_error("fsync_file: fsync failed");
         }
 
+        flock(fd, LOCK_UN);
         close(fd);
 #endif
     }

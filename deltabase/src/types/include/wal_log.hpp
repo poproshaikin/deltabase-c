@@ -917,6 +917,33 @@ namespace types
         }
     };
 
+    struct EndCkptRecord
+    {
+        static constexpr auto type = WALRecordType::END_CKPT;
+
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        UUID txn_id = UUID::null();
+
+        LSN begin_ckpt_lsn;
+        LSN redo_lsn;
+        std::vector<std::pair<UUID, LSN>> att;
+        std::vector<std::pair<UUID, LSN>> dpt;
+
+        EndCkptRecord() = default;
+
+        EndCkptRecord(
+            LSN begin_ckpt_lsn,
+            LSN redo_lsn,
+            std::vector<std::pair<UUID, LSN>> att,
+            std::vector<std::pair<UUID, LSN>> dpt
+        )
+            : begin_ckpt_lsn(begin_ckpt_lsn), redo_lsn(redo_lsn), att(std::move(att)),
+              dpt(std::move(dpt))
+        {
+        }
+    };
+
     using WALRecord = detail::WALRecordVariant<
         InsertRecord,
         CLRInsertRecord,
@@ -963,7 +990,11 @@ namespace types
 
         BeginTxnRecord,
         CommitTxnRecord,
-        RollbackTxnRecord>;
+        RollbackTxnRecord,
+
+        BeginCkptRecord,
+        EndCkptRecord
+    >;
 
     using WALIndexRecord = detail::WALRecordVariant<
         WriteIndexPageRecord,

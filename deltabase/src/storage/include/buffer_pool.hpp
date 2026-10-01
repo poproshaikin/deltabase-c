@@ -23,7 +23,6 @@ namespace storage
 
     class BufferPool
     {
-
     public:
         BufferPool(IIOManager& io)
             : data_pages_(cache::LRUPolicy<types::DataPageId>{}),
@@ -111,6 +110,9 @@ namespace storage
         void
         flush_dirty(types::LSN max_lsn);
 
+        std::vector<std::pair<types::UUID, types::LSN>>
+        snapshot_dpt();
+
     private:
         DataPageBuffer data_pages_;
         IndexFileBuffer index_files_;
@@ -121,6 +123,9 @@ namespace storage
 
         std::unordered_map<types::TableId, std::vector<types::DataPageId>> data_pages_per_table_;
         std::unordered_map<types::TableId, std::vector<types::IndexId>> index_files_per_table_;
+
+        std::unordered_map<types::UUID, types::LSN> dpt_;
+        std::mutex dpt_mutex_;
 
         void
         flush(DataPageBuffer::CacheEntry& page_entry);

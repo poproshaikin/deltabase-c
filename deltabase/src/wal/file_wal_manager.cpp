@@ -343,7 +343,7 @@ namespace wal
         content.write_u64(serialized.size(), false);
         content.append(serialized, serialized.size());
 
-        auto checksum = misc::crc32(serialized.data(), serialized.size());
+        auto checksum = crc32(serialized.data(), serialized.size());
         content.write(&checksum, sizeof(checksum));
         content.seek(0);
 

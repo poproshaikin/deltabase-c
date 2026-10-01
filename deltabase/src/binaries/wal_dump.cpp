@@ -150,6 +150,66 @@ namespace
     }
 
     std::string
+    index_node_to_string(const std::variant<InternalIndexNode, LeafIndexNode>& data)
+    {
+        std::ostringstream out;
+        if (std::holds_alternative<InternalIndexNode>(data))
+        {
+            const auto& node = std::get<InternalIndexNode>(data);
+            out << "internal{keys=[";
+            for (size_t i = 0; i < node.keys.size(); ++i)
+            {
+                if (i)
+                    out << ", ";
+                out << token_to_string(node.keys[i]);
+            }
+            out << "], children=[";
+            for (size_t i = 0; i < node.children.size(); ++i)
+            {
+                if (i)
+                    out << ", ";
+                out << node.children[i];
+            }
+            out << "]}";
+        }
+        else
+        {
+            const auto& leaf = std::get<LeafIndexNode>(data);
+            out << "leaf{keys=[";
+            for (size_t i = 0; i < leaf.keys.size(); ++i)
+            {
+                if (i)
+                    out << ", ";
+                out << token_to_string(leaf.keys[i]);
+            }
+            out << "], rows=[";
+            for (size_t i = 0; i < leaf.rows.size(); ++i)
+            {
+                if (i)
+                    out << ", ";
+                out << "(" << leaf.rows[i].first.to_string() << "," << leaf.rows[i].second << ")";
+            }
+            out << "], next_leaf=" << leaf.next_leaf << "}";
+        }
+        return out.str();
+    }
+
+    std::string
+    lsn_pairs_to_string(const std::vector<std::pair<UUID, LSN>>& pairs)
+    {
+        std::ostringstream out;
+        out << "[";
+        for (size_t i = 0; i < pairs.size(); ++i)
+        {
+            if (i)
+                out << ", ";
+            out << "(" << pairs[i].first.to_string() << "," << pairs[i].second << ")";
+        }
+        out << "]";
+        return out.str();
+    }
+
+    std::string
     type_to_string(WALRecordType type)
     {
         switch (type)
@@ -208,6 +268,20 @@ namespace
             return "UPDATE_SEQUENCE";
         case WALRecordType::CLR_UPDATE_SEQUENCE:
             return "CLR_UPDATE_SEQUENCE";
+        case WALRecordType::DROP_INDEX:
+            return "DROP_INDEX";
+        case WALRecordType::CLR_DROP_INDEX:
+            return "CLR_DROP_INDEX";
+        case WALRecordType::LINK_DATA_PAGE:
+            return "LINK_DATA_PAGE";
+        case WALRecordType::WRITE_INDEX_PAGE:
+            return "WRITE_INDEX_PAGE";
+        case WALRecordType::SET_INDEX_ROOT:
+            return "SET_INDEX_ROOT";
+        case WALRecordType::BEGIN_CKPT:
+            return "BEGIN_CKPT";
+        case WALRecordType::END_CKPT:
+            return "END_CKPT";
 
         default:
             return "UNKNOWN";
@@ -226,7 +300,7 @@ namespace
     {
         if (argc < 2)
             throw std::runtime_error(
-                "Usage: wal_dump.exe <db_name> [--from <lsn>] [--to <lsn>]"
+                "Usage: wal_dump <db_name> [--from <lsn>] [--to <lsn>]"
             );
 
         Args args;
@@ -418,6 +492,43 @@ main(int argc, char** argv)
                     {
                         std::cout << " undo_next=" << r.undo_next_lsn
                                   << " after=" << index_to_string(r.after);
+                    }
+                    else if constexpr (std::is_same_v<R, DropIndexRecord>)
+                    {
+                        std::cout << " before=" << index_to_string(r.before);
+                    }
+                    else if constexpr (std::is_same_v<R, CLRDropIndexRecord>)
+                    {
+                        std::cout << " undo_next=" << r.undo_next_lsn
+                                  << " before=" << index_to_string(r.before);
+                    }
+                    else if constexpr (std::is_same_v<R, LinkDataPageRecord>)
+                    {
+                        std::cout << " table=" << r.table_id.to_string()
+                                  << " page=" << r.page_id.to_string()
+                                  << " before=" << r.before.to_string()
+                                  << " after=" << r.after.to_string();
+                    }
+                    else if constexpr (std::is_same_v<R, WriteIndexPageRecord>)
+                    {
+                        std::cout << " index=" << r.index_id.to_string()
+                                  << " page=" << r.index_page_id
+                                  << " parent=" << r.parent
+                                  << " is_leaf=" << (r.is_leaf ? "true" : "false")
+                                  << " after=" << index_node_to_string(r.after);
+                    }
+                    else if constexpr (std::is_same_v<R, SetIndexRootRecord>)
+                    {
+                        std::cout << " index=" << r.index_id.to_string()
+                                  << " before=" << r.before
+                                  << " after=" << r.after;
+                    }
+                    else if constexpr (std::is_same_v<R, EndCkptRecord>)
+                    {
+                        std::cout << " begin_ckpt_lsn=" << r.begin_ckpt_lsn
+                                  << " redo_lsn=" << r.redo_lsn
+                                  << " att=" << lsn_pairs_to_string(r.att)
+                                  << " dpt=" << lsn_pairs_to_string(r.dpt);
                     }
 
                     std::cout << "\n";

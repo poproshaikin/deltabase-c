@@ -346,11 +346,11 @@ namespace storage
     StdStorageSerializer::serialize_ctrl(const ControlFile& file) const
     {
         MemoryStream stream;
-        stream.write(&file.last_checkpoint_end_lsn, sizeof(file.last_checkpoint_end_lsn));
+        stream.write(&file.last_checkpoint_lsn, sizeof(file.last_checkpoint_lsn));
 
         auto checksum = crc32(
-            reinterpret_cast<const uint8_t*>(&file.last_checkpoint_end_lsn),
-            sizeof(file.last_checkpoint_end_lsn)
+            reinterpret_cast<const uint8_t*>(&file.last_checkpoint_lsn),
+            sizeof(file.last_checkpoint_lsn)
         );
         stream.write(&checksum, sizeof(checksum));
 
@@ -804,16 +804,16 @@ namespace storage
     bool
     StdStorageSerializer::deserialize_ctrl(ReadOnlyMemoryStream& stream, ControlFile& out) const
     {
-        if (stream.read(&out.last_checkpoint_end_lsn, sizeof(out.last_checkpoint_end_lsn)) !=
-            sizeof(out.last_checkpoint_end_lsn))
+        if (stream.read(&out.last_checkpoint_lsn, sizeof(out.last_checkpoint_lsn)) !=
+            sizeof(out.last_checkpoint_lsn))
             return false;
 
         if (stream.read(&out.crc32, sizeof(out.crc32)) != sizeof(out.crc32))
             return false;
 
         auto computed = crc32(
-            reinterpret_cast<const uint8_t*>(&out.last_checkpoint_end_lsn),
-            sizeof(out.last_checkpoint_end_lsn)
+            reinterpret_cast<const uint8_t*>(&out.last_checkpoint_lsn),
+            sizeof(out.last_checkpoint_lsn)
         );
 
         if (computed != out.crc32)

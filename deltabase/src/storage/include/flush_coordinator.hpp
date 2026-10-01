@@ -8,6 +8,7 @@
 #include "catalog.hpp"
 #include "wal_manager.hpp"
 
+#include <condition_variable>
 #include <thread>
 
 namespace storage
@@ -36,6 +37,9 @@ namespace storage
 
         std::thread bg_thread_;
         std::atomic_bool stop_bg_thread_ = false;
+
+        std::mutex cv_mtx_;
+        std::condition_variable cv_;
 
         void
         run_bg_worker();

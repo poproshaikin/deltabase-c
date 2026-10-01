@@ -1,3 +1,46 @@
+#include "checkpoint_manager.hpp"
+
+#include "crc32.hpp"
+#include "logger.hpp"
+#include "transaction_manager.hpp"
+
+#include <ranges>
+
+//
+// Created by poproshaikin on 9/24/26.
+//
+namespace recovery
+{
+    using namespace types;
+    using namespace wal;
+    using namespace txn;
+    using namespace storage;
+
+    CheckpointManager::CheckpointManager(
+        IWALManager& wal,
+        IIOManager& io,
+        BufferPool& buffer_pool,
+        TransactionManager& txn_manager)
+        : running_(false), wal_(wal), io_(io), buffer_pool_(buffer_pool), txn_manager_(txn_manager)
+    {
+    }
+
+    CheckpointManager::~CheckpointManager()
+    {
+        stop_background();
+    }
+
+    void
+    CheckpointManager::start_background(std::chrono::milliseconds interval)
+    {
+        running_ = true;
+        bg_thread_ = std::thread([this, interval]
+        {
+            std::unique_lock lock(cv_mtx_);
+            while (running_)
+            {
+                if (cv_.wait_for(lock, interval, [this] { return !running_.load(); }))
+                    break;
 
                 lock.unlock();
                 try
@@ -59,6 +102,6 @@
         wal_.ensure_durable(end_lsn);
 
         io_.write_control_file(
-            {end_lsn, misc::crc32(reinterpret_cast<const uint8_t*>(&end_lsn), sizeof(end_lsn))});
+            {redo_lsn, misc::crc32(reinterpret_cast<const uint8_t*>(&redo_lsn), sizeof(redo_lsn))});
     }
 }

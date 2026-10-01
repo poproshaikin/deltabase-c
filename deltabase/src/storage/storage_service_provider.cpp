@@ -35,7 +35,6 @@ namespace storage
         catalog_ = std::make_unique<CatalogCache>(*io_manager_);
 
         recovery_manager_ = std::make_unique<recovery::RecoveryManager>(
-            cfg_,
             *wal_manager_,
             *io_manager_);
 
@@ -49,6 +48,14 @@ namespace storage
             recovery_manager_->recover();
 
         catalog_->hydrate();
+
+        checkpoint_manager_ = std::make_unique<recovery::CheckpointManager>(
+            *wal_manager_,
+            *io_manager_,
+            *buffer_pool_,
+            *txn_manager_);
+
+        checkpoint_manager_->start_background(std::chrono::milliseconds(cfg_.checkpoint_interval_ms));
 
         flush_coordinator_ = std::make_unique<FlushCoordinator>(
             *buffer_pool_,

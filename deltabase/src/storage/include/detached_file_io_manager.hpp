@@ -133,6 +133,12 @@ namespace storage
         std::vector<types::MetaSequence>
 
         read_sequences() override;
+
+        void
+        write_control_file(const types::ControlFile& file) override;
+
+        types::ControlFile
+        read_control_file() override;
     };
 } // namespace storage
 

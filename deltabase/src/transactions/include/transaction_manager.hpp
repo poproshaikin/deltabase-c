@@ -42,6 +42,9 @@ namespace txn
         Transaction
         make_transaction();
 
+        std::vector<std::pair<types::TxnId, types::LSN>>
+        snapshot_att() const;
+
     private:
         wal::IWALManager&
         wal_manager() const;
@@ -60,9 +63,6 @@ namespace txn
 
         void
         remove_active_entry(const Transaction& txn);
-
-        std::unordered_map<types::TxnId, ActiveTxnEntry>
-        snapshot_att() const;
 
         friend class Transaction;
     };

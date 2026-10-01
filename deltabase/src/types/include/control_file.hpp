@@ -10,7 +10,7 @@ namespace types
 {
     struct ControlFile
     {
-        LSN last_checkpoint_end_lsn;
+        LSN last_checkpoint_lsn;
         uint32_t crc32;
     };
 }

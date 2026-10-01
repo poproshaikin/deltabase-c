@@ -60,14 +60,16 @@ namespace txn
         active_transactions_.erase(txn.id_);
     }
 
-    std::unordered_map<types::TxnId, TransactionManager::ActiveTxnEntry>
+    std::vector<std::pair<types::TxnId, types::LSN>>
     TransactionManager::snapshot_att() const
     {
-        std::unordered_map<types::TxnId, ActiveTxnEntry> active_transactions_copy;
+        std::vector<std::pair<types::TxnId, types::LSN>> att;
         {
             std::lock_guard lock(active_transactions_mutex_);
-            active_transactions_copy = active_transactions_;
+            att.reserve(active_transactions_.size());
+            for (const auto& [txn_id, entry] : active_transactions_)
+                att.emplace_back(txn_id, entry.last_lsn);
         }
-        return active_transactions_copy;
+        return att;
     }
 } // namespace txn

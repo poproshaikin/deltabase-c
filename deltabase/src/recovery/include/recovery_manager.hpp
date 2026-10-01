@@ -20,7 +20,7 @@ namespace recovery
         redo(
             const types::WALRecord& record,
             const std::unordered_map<types::TxnId, types::LSN>& commit_lsns,
-            types::LSN redo_lsn
+            types::LSN last_checkpoint
         );
         void
         redo_data(const types::WALDataRecord& record);
@@ -181,55 +181,25 @@ namespace recovery
         undo_record(const types::DeleteRecord& record, types::DataPage& page, types::LSN last_lsn);
 
         void
-        undo_record(
-            const types::CreateSchemaRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::CreateSchemaRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
-        undo_record(
-            const types::UpdateSchemaRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::UpdateSchemaRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
-        undo_record(
-            const types::DeleteSchemaRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::DeleteSchemaRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
-        undo_record(
-            const types::CreateTableRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::CreateTableRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
-        undo_record(
-            const types::UpdateTableRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::UpdateTableRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
-        undo_record(
-            const types::DeleteTableRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::DeleteTableRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
-        undo_record(
-            const types::CreateIndexRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::CreateIndexRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
-        undo_record(
-            const types::DropIndexRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::DropIndexRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
-        undo_record(
-            const types::CreateSequenceRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::CreateSequenceRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
-        undo_record(
-            const types::UpdateSequenceRecord& record,
-            storage::CatalogCache& catalog,
-            types::LSN last_lsn);
+        undo_record(const types::UpdateSequenceRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
     };
 } // namespace recovery
 
