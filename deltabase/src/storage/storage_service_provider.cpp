@@ -4,6 +4,7 @@
 
 #include "storage_service_provider.hpp"
 
+#include "db_lock.hpp"
 #include "io_manager_factory.hpp"
 #include "wal_manager_factory.hpp"
 #include "../recovery/include/recovery_manager.hpp"
@@ -27,6 +28,8 @@ namespace storage
 
         io_manager_->init_wal();
 
+        db_lock_ = std::make_unique<DbLock>(cfg.db_path, cfg.db_name.value());
+
         wal::WalManagerFactory wal_factory;
         wal_manager_ = wal_factory.make(cfg_);
 
@@ -38,14 +41,13 @@ namespace storage
             *wal_manager_,
             *io_manager_);
 
+        recovery_manager_->recover();
+
         txn_manager_ = std::make_unique<txn::TransactionManager>(
             *wal_manager_,
             *buffer_pool_,
             *catalog_,
             *recovery_manager_);
-
-        if (cfg_.db_name.has_value())
-            recovery_manager_->recover();
 
         catalog_->hydrate();
 

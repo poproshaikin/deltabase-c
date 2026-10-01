@@ -15,6 +15,7 @@
 #include "dql_service.hpp"
 #include "row_preprocessor.hpp"
 #include "constraint_enforcer.hpp"
+#include "db_lock.hpp"
 #include "flush_coordinator.hpp"
 #include "../../types/include/config.hpp"
 #include "../../recovery/include/recovery_manager.hpp"
@@ -28,6 +29,8 @@ namespace storage
     class StorageServiceProvider
     {
         types::Config cfg_;
+
+        std::unique_ptr<DbLock> db_lock_;
 
         // infrastructure (must be declared before services)
         std::unique_ptr<IIOManager> io_manager_;

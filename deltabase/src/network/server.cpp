@@ -178,6 +178,8 @@ namespace net
         {
             auto net_code = ex.code() == EngineException::Code::DB_NOT_EXISTS
                 ? NetErrorCode::DB_NOT_EXISTS
+                : ex.code() == EngineException::Code::DB_LOCKED
+                ? NetErrorCode::DB_LOCKED
                 : NetErrorCode::SQL_ERROR;
             Logger::error(std::string("ATTACH_DB failed: ") + ex.what());
             send_pong_and_stop(handle, stop, message.session_id, net_code, message.request_id, ex.what());

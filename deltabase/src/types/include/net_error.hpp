@@ -22,6 +22,7 @@ namespace types
         DB_NOT_EXISTS,
         SQL_ERROR,
         UNINITIALIZED_SESSION,
+        DB_LOCKED,
     };
 }
 

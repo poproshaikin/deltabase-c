@@ -251,3 +251,330 @@ commands against a leftover failed run (`<db>` = the printed db name):
 ./build/bin/dp_dump  --db <db> --schema common --table test_concurrent
 ./build/bin/wal_dump <db>
 ```
+---
+
+# Part II — Follow-up analysis (code audit)
+
+## 8. The axis is not processes — it is storage stacks per session
+
+`engine::Engine` owns a `std::unique_ptr<StorageServiceProvider>`
+(`src/engine/include/engine.hpp:28`), and `NetServer` holds
+`std::unordered_map<types::UUID, engine::Engine> sessions_`
+(`src/network/include/server.hpp:24`) with a detached
+`std::thread` per accepted connection (`src/network/server.cpp:442-448`).
+`Engine::attach_db` → `reset_storage` → `std::make_unique<StorageServiceProvider>(cfg)`
+(`src/engine/engine.cpp:52`).
+
+So **N sessions attached to the same database = N complete, independent
+storage stacks inside one server process**: N `FileWalManager` (each with
+its own `next_lsn_`), N `CatalogCache` (each with its own `MetaTable`
+copies and `last_rid`), N `BufferPool` (each with its own page copies),
+N `TransactionManager`, N `CheckpointManager` background threads,
+N `FlushCoordinator` background threads
+(`src/storage/storage_service_provider.cpp:20-84`).
+
+This reframes §5. Every defect in §3 reproduces **between two sessions of a
+single server process**, with no `fork()` involved:
+
+- `next_lsn_` is hydrated per `FileWalManager` instance at construction
+  (`update_next_lsn` over the WAL files, `src/wal/file_wal_manager.cpp:120-129`),
+  then incremented in process-local memory under `mtx_`
+  (`append_log`, `:153`). Two instances in one process collide exactly as
+  two processes do.
+- `last_rid` is per `CatalogCache`, loaded from `.meta` at `hydrate()`.
+  Same.
+- `DatabaseIoLockService::shared()` being process-local (§3) is not the
+  reason this breaks. It would not help even if it were cross-process: the
+  counters are not shared state behind that lock, they are *duplicated*
+  state in each stack.
+
+**The real decision is therefore not "multi-process: yes/no". It is
+"one storage stack per session, or one per attached database".** Assuming
+"there is always exactly one server" does not make the problem go away.
+
+## 9. Worse than the counters: `recover()` runs on every attach
+
+`StorageServiceProvider`'s constructor calls
+`recovery_manager_->recover()` unconditionally
+(`src/storage/storage_service_provider.cpp:48-49`) — no clean-shutdown
+flag, no control-file gate, no exclusivity check. `RecoveryManager::recover()`
+reads the whole log (`wal_.read_all_logs()`, `src/recovery/recovery_manager.cpp:23`)
+and UNDOes every transaction without a `COMMIT` record.
+
+Consequence: opening a second session (or process) against a database that
+has an **open transaction** in the first one makes the newcomer treat that
+transaction as a recovery loser — it UNDOes the first session's in-flight
+work and writes CLRs for it, while the first session continues to believe
+the transaction is live. Attach is not a read-only operation; it is a
+destructive one.
+
+This, not the LSN collision, is the strongest argument in the whole
+document: concurrent independent attachment is not merely *incomplete*
+today, it is *actively destructive*, and no counter-allocation scheme
+from §5 addresses it.
+
+## 10. State of intra-process (inter-thread) protection, component by component
+
+| Component | Protection present | Actual state |
+|---|---|---|
+| `BufferPool::mutex_` | map structure only | **unsafe** — hands out `DataPage*`; contents mutated outside the lock |
+| page pinning | none | **unsafe** — eviction erases the map node, outstanding pointers dangle |
+| `Cache::evict_one` | — | **deadlocks** (see 10.3) |
+| `CatalogCache::mutex_` | map structure only | **unsafe** — hands out `MetaTable*`; counters mutated outside the lock |
+| index path (`IndexFile`/`BPIndexPager`) | none at all | **unsafe** — whole-file RMW, no latch, no `flock` |
+| `FileWalManager::mtx_` | own state | correct for its own state (see 10.6) |
+| `TransactionManager::active_transactions_mutex_` | ATT map | correct |
+| `Engine` | none | not thread-safe; fine only while sessions are 1:1 with threads (see 10.8) |
+| `CheckpointManager` | `checkpoint_mtx_` | correct per instance, **wrong per database** (see 10.9) |
+
+### 10.1 `BufferPool::mutex_` protects the map, not the pages
+
+Every public accessor takes `mutex_`, calls its `_impl`, and returns a raw
+`DataPage*`/`IndexFile*` into the cache entry — then releases the lock.
+All actual mutation happens in the caller, unlocked:
+`append_row` callers, `dirty_dp`, `BPIndexPager`, and the read path
+`DQLService::seq_scan_next` which does
+`auto* page = buffer_pool_.get_dp(cursor.page); ... page->rows[cursor.slot++]`
+(`src/storage/dql_service.cpp:95-108`) — bounds-checked against a `rows.size()`
+that another thread may change between the check and the index.
+
+Meanwhile `FlushCoordinator`'s background thread (every 200 ms,
+`src/storage/flush_coordinator.cpp:19-22`) reaches
+`flush_dirty_impl`, which copies `entry.value` *under* `mutex_`
+(`src/storage/buffer_pool.cpp:519-527`). Holding `mutex_` does not exclude
+the writer, because the writer is not holding it — so the flusher can
+serialize a half-mutated page. This is a live data race on every build,
+not a theoretical one.
+
+### 10.2 No pinning
+
+`misc::Cache` has no pin/unpin and no refcount. `put` → `evict_one` →
+`map_.erase(it)` (`src/misc/include/cache.hpp:82-96`) destroys the entry
+while callers may still hold `DataPage*` into it. Reachable at
+`max_size_ = 10000` pages (≈320 MB of one table).
+
+### 10.3 Eviction self-deadlocks
+
+`put_dp_impl`/`create_dp_impl` hold `BufferPool::mutex_` (a non-recursive
+`std::mutex`) → `Cache::put` → `evict_one` → `victim.flush(victim)` →
+`BufferPool::flush(DataPageBuffer::CacheEntry&)` → `std::lock_guard lock(mutex_)`
+(`src/storage/buffer_pool.cpp:254-258`). The first eviction hangs the
+process. Single-threaded bug, independent of any concurrency decision.
+
+### 10.4 `CatalogCache` — same shape
+
+`get_table_impl` returns `&it->second.value` (`src/storage/catalog.cpp:232-236`),
+and `mt.last_rid++` (`MetaTable::make_row`), `mt.total_rows++`,
+`mt.live_rows--` (`insert_row_locked`/`delete_row_locked`) all run with no
+lock held, concurrently with `flush()`/checkpoint snapshots reading the same
+fields. Pointer *validity* is safe (`std::unordered_map` nodes are stable),
+the *values* are not.
+
+### 10.5 The index path has no protection whatsoever
+
+`types::IndexFile` is the entire index in one object
+(`std::vector<IndexPage> pages`, `src/types/include/index_file.hpp:13-20`),
+cached in `index_files_` and written wholesale by `io_.write(IndexFile)`.
+So:
+- Two writers do read-modify-write of the whole index → last writer wins →
+  the other's index entries are silently lost. Data pages are protected by
+  `PageFileLock`; index files are not protected by anything.
+- `BPIndexPager::get_page` returns `IndexPage*` into `file->pages`
+  (`src/storage/BP_index_pager.cpp:47-56`) and `create_page` `push_back`s
+  into that same vector — invalidating every outstanding `IndexPage*`.
+  Latent even single-threaded.
+- `DMLService::check_row_constraints` (`src/storage/dml_service.cpp:36-67`)
+  is a check-then-act over the index with no lock: two concurrent inserts of
+  the same key both pass the uniqueness check. **UNIQUE/PRIMARY KEY is not
+  enforceable under any concurrency today.**
+
+### 10.6 WAL manager
+
+`mtx_` correctly guards `next_lsn_`/`dirty_`/`flushed_`. Note that
+`append_log(const std::vector<WALRecord>&)` loops over single-record
+`append_log` (`src/wal/file_wal_manager.cpp:168-180`) and `DbGuard` is a
+`recursive_mutex`, so the batch is *not* atomic against other appenders —
+records from two transactions interleave inside what the caller thinks is
+one batch. ARIES tolerates this (grouping is by `prev_lsn` chains, not
+adjacency), but it is worth knowing before anything relies on batch
+contiguity.
+
+### 10.7 Transactions hold no locks at all
+
+`txn::Transaction` has `id_`, `state_`, `last_lsn_` and nothing else — no
+lock set, no read/write set, no lock manager anywhere in the tree. There is
+no 2PL and no MVCC: `DataRow` carries only `OBSOLETE`
+(`src/types/include/data_row.hpp:17-20`) — no `xmin`/`xmax`, no creating
+txn id. Visibility is "is the row flagged obsolete", nothing more.
+
+### 10.8 `Engine` / session identity
+
+`Engine` is not thread-safe (`parser_`, `active_txn_`, `ctx_`) and does not
+need to be — one connection, one thread, one `Engine`. But
+`NetServer::get_session` returns `&sessions_.at(session_id)` under
+`sessions_mutex_` and the pointer is used after the lock is released
+(`src/network/server.cpp:20-29`), and `handle_close_message` erases the
+entry. Two connections presenting the *same* session UUID put two threads
+inside one `Engine` and can dangle that pointer. Worth an explicit
+"one live connection per session id" check regardless of everything else.
+
+### 10.9 Checkpointing is per-session, which makes checkpoints wrong
+
+`CheckpointManager` is constructed and `start_background`ed per
+`StorageServiceProvider` (`src/storage/storage_service_provider.cpp:52-59`).
+With two sessions on one database:
+- two independent threads append `BeginCkpt`/`EndCkpt` into the same WAL;
+- both overwrite the same control file with their own `redo_lsn`
+  (`io_.write_control_file`, `src/recovery/checkpoint_manager.cpp:99-100`);
+- each snapshot is taken from *its own* `BufferPool::snapshot_dpt()` and
+  `TransactionManager::snapshot_att()`, so every checkpoint omits the other
+  session's active transactions and dirty pages.
+
+A checkpoint that under-reports the DPT yields a `redo_lsn` that is too
+high, so recovery starts REDO *after* a change it needed to replay. Silent
+data loss on the next crash, caused purely by having two sessions open.
+
+## 11. Durability ordering is violated (independent of concurrency)
+
+`insert_row_locked` appends the `InsertRecord` via `txn.append_log(...)` —
+which only pushes onto `FileWalManager::dirty_` — and then does
+`io_.write(*page, true)`, i.e. **fsyncs the data page while its log record
+is still only in memory** (`src/storage/buffer_pool.cpp:154-168`; same in
+`delete_row_locked`, `:213-219`). There is no `ensure_durable(lsn)` between
+them.
+
+Crash in that window leaves a page whose `last_lsn` names a record that
+does not exist on disk, holding a change from an uncommitted transaction
+that can therefore never be undone. This is a WAL-protocol violation, and
+it is load-bearing: the page fsync has to happen inside the `PageFileLock`
+for the lock to mean anything cross-process, which is exactly what forces
+the write to be eager. Fixing the ordering and dropping the cross-process
+requirement are the same piece of work.
+
+## 12. Closing §4: the verifier is not under-counting, the scan is
+
+Root cause found, and it is a consequence of §8, not a separate mystery.
+
+`BufferPool::prepare_dp_impl` links a newly created page to the current tail
+only if the table already has pages *in this stack's*
+`data_pages_per_table_` (`src/storage/buffer_pool.cpp:325-364`). Both
+workers started on an empty table, so each created a page with no tail to
+link to. The table ends up with **two independent page chains, each with its
+own head and `next == null`**.
+
+`DQLService::seq_scan_begin` picks one page that is not referenced as
+anyone's `next` and returns it as the cursor start; `seq_scan_next` then
+walks **only** `page->next` (`src/storage/dql_service.cpp:86-116`). One
+chain, one page, 100 rows. `dp_dump` disagrees because it enumerates the
+directory, as does `BufferPool::get_table_data` — which is why DML's
+phase-1 candidate collection sees both pages while `SELECT` does not.
+
+Two things to take from this:
+1. It is a latent single-stack bug too: **any** page not reachable through
+   the chain is invisible to `SELECT` but visible to DML and to recovery.
+   The scan should iterate `data_pages_per_table_` (the directory-derived
+   map) and use `next` only as an ordering hint, or page linking must be
+   made an invariant that cannot be skipped.
+2. §4 can be struck from the open-questions list.
+
+## 13. Which isolation invariants DeltaBase holds today
+
+Measured against the standard levels, for **two sessions** (threads or
+processes — §8 makes them equivalent):
+
+| Anomaly | Prevented? | Why |
+|---|---|---|
+| Dirty read | **no** | `insert_row_locked` fsyncs uncommitted rows immediately; `DataRow` has no txn id, so another stack reading the page from disk returns them |
+| Dirty write / lost update | **no** | no locks; `put_dp_impl` after a disk re-read discards another path's unflushed in-memory changes |
+| Non-repeatable read | no | no read locks, no snapshot |
+| Phantom | no | as above |
+| Lost index entry | **no** | §10.5 whole-file RMW |
+| Duplicate unique key | **no** | §10.5 check-then-act |
+| Atomicity of a rolled-back txn | **no** | its uncommitted rows were already visible and may already have been read |
+| Globally unique LSN | **no** | §3.1 / §8 |
+| Unique `RowId` per table | **no** | §3.2 / §8 |
+
+So the honest statement is **below READ UNCOMMITTED**: the level ladder
+assumes atomicity and unique identity hold, and here they do not.
+
+For **one session** the engine is serial by construction, so SERIALIZABLE
+holds trivially — modulo the single-threaded defects (§10.3 eviction
+deadlock, §10.5 index pointer invalidation, §11 ordering, §12 scan
+chain), and modulo the two background threads of that same stack, which
+race the session thread per §10.1.
+
+## 14. Recommendation
+
+**Multi-process concurrent attachment: out of scope, and *enforced*, not
+merely documented. Multi-session concurrency inside one server: in scope,
+served by one storage stack per database rather than one per session.**
+
+Rationale:
+1. Nothing in §9–§11 is cheaper to solve cross-process than in-process. The
+   counters of §3 are the smallest part of the problem; `recover()`-on-attach,
+   the per-stack checkpointer, the duplicated catalog, and the unprotected
+   index are all shared *mutable* state that would need a shared-memory or
+   file-lock protocol each. All three candidate designs in §5(a-c) address
+   2 of ~9 problems.
+2. Shared-page-cache-across-processes is a research-grade problem. Every
+   real engine that allows multiple writing processes (Oracle RAC, DB2
+   pureScale) does it with a dedicated coherency layer; SQLite allows
+   multiple processes precisely *because* it gives up a shared buffer pool
+   and serializes writers with a file lock. Postgres uses one process group
+   with shared memory, i.e. the moral equivalent of one stack.
+3. The educational payload of this project — ARIES, 2PL, buffer management —
+   is entirely in-process. Cross-process coherency would add plumbing, not
+   DB-internals insight.
+
+### 14.1 Work items, in dependency order
+
+- **A. Exclusive attach, enforced.** A `<db>.lock` file held open for the
+  lifetime of the attachment with `flock(LOCK_EX | LOCK_NB)`; on failure,
+  fail the attach with "database is in use". Same primitive as
+  `PageFileLock`, ~50 lines, and it is what makes `recover()`-on-attach
+  correct (exactly one recoverer, at exclusive start). Do this first: it
+  stops the destructive case in §9 immediately.
+- **B. Cheap independent fixes:** §10.3 eviction deadlock, §11 WAL
+  ordering (`ensure_durable(lsn)` before the page fsync; then the page
+  write no longer needs to be eager), §12 scan over
+  `data_pages_per_table_`, §10.8 one-connection-per-session check.
+- **C. One `StorageServiceProvider` per attached database**, refcounted by
+  normalized db path, shared by all sessions in the process; `Engine` keeps
+  only per-session state (`parser_`, `active_txn_`, `ctx_`). This deletes
+  §3.1, §3.2.2, §3.3 and §10.9 by construction rather than patching each —
+  one `next_lsn_`, one catalog, one checkpointer, one flusher, one recovery
+  pass per database.
+- **D. Concurrency control: one rwlock per attached database, held for the
+  whole transaction** (not per statement) — exclusive for any transaction
+  that writes, shared for read-only transactions. This is degenerate
+  table-level 2PL, and because there is exactly one lock there is no
+  deadlock and no lock manager to build. It yields genuine SERIALIZABLE:
+  no dirty reads, no lost updates, no phantoms, and uniqueness checks
+  become sound. Cost: one writer at a time per database — the same deal
+  SQLite ships.
+- **E. Pinning + per-page latches in `BufferPool`.** Required for D to be
+  real, because the flush and checkpoint threads of the shared stack keep
+  running concurrently with the writer even under a global transaction
+  lock. Minimum viable shape: `get_dp` returns an RAII guard that pins the
+  entry and holds a per-page `shared_mutex`, instead of a raw pointer. Same
+  treatment for `IndexFile` (§10.5), which also removes the
+  whole-file-RMW loss. This fixes §10.1, §10.2 and §10.4 as a group.
+- **F. Rewrite `run_concurrent_two_processes_test`** as a multi-threaded,
+  single-process test: several sessions over one shared stack, asserting the
+  §13 table now reads "prevented" for every row. Keep a small second test
+  that asserts the *second* process fails to attach (item A).
+- **G. `PageFileLock`:** keep the class, stop relying on it for
+  correctness, and drop the in-`flock` fsync once §11 is fixed. Rationale
+  for keeping it at all: cheap belt-and-braces if the lock file is ever
+  bypassed (e.g. `dp_dump` run against a live database).
+
+### 14.2 Explicitly out of scope (document, do not half-support)
+
+- MVCC / snapshot isolation / non-blocking readers (would need
+  `xmin`/`xmax` on `DataRow`, a version chain and a vacuum story).
+- Row- or page-granular 2PL with a lock manager and deadlock detection.
+- Multiple *writing* processes against one database.
+- Replication, distributed transactions.
+
+Each is a separate project. Naming them as out of scope is worth more than
+the current situation, where the code implies support for the third one.
