@@ -24,22 +24,35 @@ namespace storage
     void
     BufferPool::put_dp(const DataPageId& page_id, DataPage&& page)
     {
-        std::lock_guard lock(mutex_);
-        put_dp_impl(page_id, std::move(page));
+        {
+            std::lock_guard lock(mutex_);
+            put_dp_impl(page_id, std::move(page));
+        }
+        flush_pending_evictions();
     }
 
     DataPage*
     BufferPool::get_dp(const DataPageId& page_id)
     {
-        std::lock_guard lock(mutex_);
-        return get_dp_impl(page_id);
+        DataPage* result;
+        {
+            std::lock_guard lock(mutex_);
+            result = get_dp_impl(page_id);
+        }
+        flush_pending_evictions();
+        return result;
     }
 
     DataPage*
     BufferPool::prepare_dp(size_t size, const MetaTable& mt, txn::Transaction& txn)
     {
-        std::lock_guard lock(mutex_);
-        return prepare_dp_impl(size, mt, txn);
+        DataPage* result;
+        {
+            std::lock_guard lock(mutex_);
+            result = prepare_dp_impl(size, mt, txn);
+        }
+        flush_pending_evictions();
+        return result;
     }
 
     DataPage*
@@ -92,8 +105,13 @@ namespace storage
     IndexFile*
     BufferPool::get_table_index(const UUID& table_id, const IndexId& index_id)
     {
-        std::lock_guard lock(mutex_);
-        return get_table_index_impl(table_id, index_id);
+        IndexFile* result;
+        {
+            std::lock_guard lock(mutex_);
+            result = get_table_index_impl(table_id, index_id);
+        }
+        flush_pending_evictions();
+        return result;
     }
 
     void
@@ -104,8 +122,11 @@ namespace storage
         LSN last_lsn
     )
     {
-        std::lock_guard lock(mutex_);
-        create_table_index_impl(schema_name, table, index, last_lsn);
+        {
+            std::lock_guard lock(mutex_);
+            create_table_index_impl(schema_name, table, index, last_lsn);
+        }
+        flush_pending_evictions();
     }
 
     IndexFile*
@@ -251,45 +272,22 @@ namespace storage
     }
 
     void
-    BufferPool::flush(DataPageBuffer::CacheEntry& page_entry)
+    BufferPool::flush_pending_evictions()
     {
-        bool is_dirty;
+        std::optional<DataPage> dp;
+        std::optional<IndexFile> idx_file;
         {
             std::lock_guard lock(mutex_);
-            is_dirty = page_entry.dirty;
+            dp.swap(pending_dp_eviction_);
+            idx_file.swap(pending_if_eviction_);
         }
 
-        if (is_dirty)
-        {
-            io_.write(page_entry.value, true);
-            std::lock_guard lock(mutex_);
-            page_entry.dirty = false;
-        }
+        if (dp.has_value())
+            io_.write(*dp, true);
+        if (idx_file.has_value())
+            io_.write(*idx_file, true);
     }
-
-    void
-    BufferPool::flush(IndexFileBuffer::CacheEntry& index_file_entry)
-    {
-        bool is_dirty;
-        {
-            std::lock_guard lock(mutex_);
-            is_dirty = index_file_entry.dirty;
-        }
-
-        if (is_dirty)
-        {
-            io_.write(index_file_entry.value, true);
-            std::lock_guard lock(mutex_);
-            index_file_entry.dirty = false;
-        }
-    }
-
-    // All methods suffixed with impl assume the caller holds the appropriate
-    // locks on the data structures (data_pages/index_files_/data_pages_per_table_/index_files_per_table_).
-    // *_impl methods may call other *_impl methods.
-    // The locking public API (below) may not be called from any of these methods,
-    // as doing so would cause the public methods to acquire the same lock, which would cause deadlock.
-
+    
     void
     BufferPool::initialize_impl()
     {
@@ -300,7 +298,8 @@ namespace storage
     void
     BufferPool::put_dp_impl(const DataPageId& page_id, DataPage&& page)
     {
-        data_pages_.put(page_id, {std::move(page)}, data_page_flusher_);
+        if (auto evicted = data_pages_.put(page_id, std::move(page)))
+            pending_dp_eviction_ = std::move(evicted);
     }
 
     DataPage*
@@ -314,7 +313,8 @@ namespace storage
             if (!loaded_page)
                 return nullptr;
 
-            data_pages_.put(page_id, std::move(*loaded_page), data_page_flusher_);
+            if (auto evicted = data_pages_.put(page_id, std::move(*loaded_page)))
+                pending_dp_eviction_ = std::move(evicted);
 
             entry = data_pages_.get(page_id);
         }
@@ -437,7 +437,8 @@ namespace storage
             if (!loaded_file)
                 return nullptr;
 
-            index_files_.put(index_id, std::move(*loaded_file), index_file_flusher_);
+            if (auto evicted = index_files_.put(index_id, std::move(*loaded_file)))
+                pending_if_eviction_ = std::move(evicted);
             entry = index_files_.get(index_id);
         }
 
@@ -455,7 +456,8 @@ namespace storage
         IndexFile file = io_.create_index_file(schema_name, table.name, index);
         file.last_lsn = last_lsn;
 
-        index_files_.put(index.id, std::move(file), index_file_flusher_);
+        if (auto evicted = index_files_.put(index.id, std::move(file)))
+            pending_if_eviction_ = std::move(evicted);
         dirty_if_impl(file.index_id);
 
         auto it = index_files_per_table_.find(table.id);
@@ -554,7 +556,8 @@ namespace storage
     {
         DataPageId id = DataPageId::make();
         DataPage new_page = io_.create_page(mt, id);
-        data_pages_.put(id, std::move(new_page), data_page_flusher_);
+        if (auto evicted = data_pages_.put(id, std::move(new_page)))
+            pending_dp_eviction_ = std::move(evicted);
 
         auto it = data_pages_per_table_.find(mt.id);
         if (it == data_pages_per_table_.end())

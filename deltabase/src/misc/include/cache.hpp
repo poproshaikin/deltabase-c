@@ -7,7 +7,7 @@
 
 #include <bits/basic_ios.h>
 #include <cstddef>
-#include <functional>
+#include <optional>
 #include <unordered_map>
 #include <utility>
 
@@ -31,35 +31,40 @@ namespace misc
         {
         }
 
-        using Flusher = std::function<void(CacheEntry&)>;
         struct CacheEntry
         {
             TValue value;
             bool dirty;
-            Flusher flush;
 
-            CacheEntry(TValue&& value, Flusher flush)
-                : value(std::move(value)), dirty(false), flush(std::forward<Flusher>(flush))
+            explicit CacheEntry(TValue&& value)
+                : value(std::move(value)), dirty(false)
             {
             }
         };
 
-        void
-        put(const TKey& key, TValue&& val, Flusher flush)
+        // Returns the evicted entry's value if inserting `key` evicted a dirty
+        // victim to make room (the caller is responsible for persisting it --
+        // this class does no I/O and must not be asked to, since it may be
+        // called while the owner's lock is held).
+        std::optional<TValue>
+        put(const TKey& key, TValue&& val)
         {
             auto it = map_.find(key);
             if (it != map_.end())
             {
                 it->second.value = std::move(val);
                 policy_.touch(key);
-                return;
+                return std::nullopt;
             }
 
+            std::optional<TValue> evicted;
             if (map_.size() >= max_size_)
-                evict_one();
+                evicted = evict_one();
 
-            map_.emplace(key, CacheEntry(std::move(val), std::forward<Flusher>(flush)));
+            map_.emplace(key, CacheEntry(std::move(val)));
             policy_.insert(key);
+
+            return evicted;
         }
 
         CacheEntry*
@@ -82,22 +87,22 @@ namespace misc
             it->second.dirty = true;
         }
 
-        void
+        // Evicts one entry per the policy and returns its value if it was
+        // dirty (nullopt otherwise). Does not flush -- see `put` above.
+        std::optional<TValue>
         evict_one()
         {
             TKey victim_key = policy_.evict();
             auto it = map_.find(victim_key);
             if (it == map_.end())
-                return;
+                return std::nullopt;
 
-            auto& victim = it->second;
-
-            if (victim.dirty)
-            {
-                victim.flush(victim);
-            }
+            std::optional<TValue> evicted;
+            if (it->second.dirty)
+                evicted = std::move(it->second.value);
 
             map_.erase(it);
+            return evicted;
         }
 
         iterator

@@ -13,6 +13,8 @@
 #include "../../types/include/UUID.hpp"
 #include "../../transactions/include/transaction.hpp"
 
+#include <optional>
+
 namespace storage
 {
     template <typename TKey, typename TValue>
@@ -127,21 +129,18 @@ namespace storage
         std::unordered_map<types::UUID, types::LSN> dpt_;
         std::mutex dpt_mutex_;
 
-        void
-        flush(DataPageBuffer::CacheEntry& page_entry);
-        void
-        flush(IndexFileBuffer::CacheEntry& index_file_entry);
+        // Scratch slots: when a Cache::put() call made from inside an _impl
+        // method evicts a dirty victim, the _impl stashes it here instead of
+        // flushing it itself (flushing is I/O and must not happen while
+        // mutex_ is held). The owning public method drains and writes these
+        // out after it has released mutex_. At most one of each is ever
+        // populated per public call, since each public method's _impl chain
+        // calls Cache::put at most once.
+        std::optional<types::DataPage> pending_dp_eviction_;
+        std::optional<types::IndexFile> pending_if_eviction_;
 
-        std::function<void(DataPageBuffer::CacheEntry&)> data_page_flusher_ =
-            [this](DataPageBuffer::CacheEntry& page_entry)
-        {
-            flush(page_entry);
-        };
-        std::function<void(IndexFileBuffer::CacheEntry&)> index_file_flusher_ =
-            [this](IndexFileBuffer::CacheEntry& index_file_entry)
-        {
-            flush(index_file_entry);
-        };
+        void
+        flush_pending_evictions();
 
         // All methods suffixed with impl assume the caller holds the appropriate
         // locks on the data structures (data_pages/index_files_/data_pages_per_table_/index_files_per_table_).
