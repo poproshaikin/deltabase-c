@@ -142,9 +142,10 @@ namespace storage
                     unique_col_names.push_back(mt.columns.back().name);
         }
 
-        CreateTableRecord record(mt);
-        txn.append_log(record);
-
+        // save (and look up through the catalog below) before logging: the WAL
+        // record must capture the table's final state, not this pre-mutation
+        // snapshot -- otherwise redo would clobber sequence_id/indexes added below
+        // on every future attach (redo re-applies committed records unconditionally).
         auto* saved = catalog_.save_table(std::move(mt), txn.get_last_lsn());
 
         for (auto& col : saved->columns)
@@ -152,7 +153,7 @@ namespace storage
             if (col.has_constraint<MetaAutoIncrementConstraint>())
             {
                 auto seq_id = create_sequence(
-                    mt.name + "_" + col.name + "_seq",
+                    table_name + "_" + col.name + "_seq",
                     schema->name,
                     txn);
                 col.get_constraint<MetaAutoIncrementConstraint>()->sequence_id = seq_id;
@@ -177,6 +178,10 @@ namespace storage
                 schema_name,
                 true,
                 txn);
+
+        CreateTableRecord record(*saved);
+        txn.append_log(record);
+        catalog_.mark_dirty(saved, txn.get_last_lsn());
 
         return saved;
     }
