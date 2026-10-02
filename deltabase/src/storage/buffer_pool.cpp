@@ -28,7 +28,7 @@ namespace storage
             std::lock_guard lock(mutex_);
             put_dp_impl(page_id, std::move(page));
         }
-        flush_pending_evictions();
+        flush_pending_writes();
     }
 
     DataPage*
@@ -39,7 +39,7 @@ namespace storage
             std::lock_guard lock(mutex_);
             result = get_dp_impl(page_id);
         }
-        flush_pending_evictions();
+        flush_pending_writes();
         return result;
     }
 
@@ -51,7 +51,7 @@ namespace storage
             std::lock_guard lock(mutex_);
             result = prepare_dp_impl(size, mt, txn);
         }
-        flush_pending_evictions();
+        flush_pending_writes();
         return result;
     }
 
@@ -110,7 +110,7 @@ namespace storage
             std::lock_guard lock(mutex_);
             result = get_table_index_impl(table_id, index_id);
         }
-        flush_pending_evictions();
+        flush_pending_writes();
         return result;
     }
 
@@ -126,7 +126,7 @@ namespace storage
             std::lock_guard lock(mutex_);
             create_table_index_impl(schema_name, table, index, last_lsn);
         }
-        flush_pending_evictions();
+        flush_pending_writes();
     }
 
     IndexFile*
@@ -165,7 +165,8 @@ namespace storage
         PageFileLock page_lock(page->path);
 
         // re-read while locked - to avoid races between first read and flock
-        page = io_.read_data_page(page_id);
+        // (non-locking read: a locking one would deadlock against page_lock)
+        page = io_.read_data_page_at(page->path);
 
         if (!page->has_space(size))
             return std::nullopt;
@@ -181,11 +182,10 @@ namespace storage
         mt.total_rows++;
         mt.live_rows++;
 
-        txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+        LSN to_ensure = txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+        txn.ensure_durable(to_ensure);
 
-        // must be durable before the PageFileLock below unlocks, otherwise the lock
-        // doesn't actually protect the on-disk state from a concurrent writer
-        io_.write(*page, true);
+        io_.write_nolock(*page, true);
 
         {
             std::lock_guard lock(mutex_);
@@ -209,7 +209,8 @@ namespace storage
         PageFileLock page_lock(page->path);
 
         // re-read while locked - to avoid races between first read and flock
-        page = io_.read_data_page(page_id);
+        // (non-locking read: a locking one would deadlock against page_lock)
+        page = io_.read_data_page_at(page->path);
 
         DataRow* target = nullptr;
         for (auto& row : page->rows)
@@ -231,19 +232,20 @@ namespace storage
         target->flags |= DataRowFlags::OBSOLETE;
         mt.live_rows--;
 
-        LSN lsn = txn.append_log(DeleteRecord(mt.id, page->id, before));
-        page->last_lsn = lsn;
+        LSN insert_lsn = txn.append_log(DeleteRecord(mt.id, page->id, before));
+        page->last_lsn = insert_lsn;
 
-        txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+        LSN to_ensure = txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+        txn.ensure_durable(to_ensure);
 
-        io_.write(*page, true);
+        io_.write_nolock(*page, true);
 
         {
             std::lock_guard lock(mutex_);
             put_dp_impl(page_id, std::move(*page));
         }
 
-        return lsn;
+        return insert_lsn;
     }
 
     void
@@ -272,22 +274,26 @@ namespace storage
     }
 
     void
-    BufferPool::flush_pending_evictions()
+    BufferPool::flush_pending_writes()
     {
-        std::optional<DataPage> dp;
+        std::optional<DataPage> evicted_dp;
+        std::optional<DataPage> created_dp;
         std::optional<IndexFile> idx_file;
         {
             std::lock_guard lock(mutex_);
-            dp.swap(pending_dp_eviction_);
+            evicted_dp.swap(pending_dp_eviction_);
+            created_dp.swap(pending_dp_creation_);
             idx_file.swap(pending_if_eviction_);
         }
 
-        if (dp.has_value())
-            io_.write(*dp, true);
+        if (evicted_dp.has_value())
+            io_.write(*evicted_dp, true);
+        if (created_dp.has_value())
+            io_.write(*created_dp, true);
         if (idx_file.has_value())
             io_.write(*idx_file, true);
     }
-    
+
     void
     BufferPool::initialize_impl()
     {
@@ -556,6 +562,10 @@ namespace storage
     {
         DataPageId id = DataPageId::make();
         DataPage new_page = io_.create_page(mt, id);
+
+        // no backing file yet -- stash a copy for the caller to write out after unlocking
+        pending_dp_creation_ = new_page;
+
         if (auto evicted = data_pages_.put(id, std::move(new_page)))
             pending_dp_eviction_ = std::move(evicted);
 

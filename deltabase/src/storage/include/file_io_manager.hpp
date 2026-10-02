@@ -82,6 +82,12 @@ namespace storage
         std::unique_ptr<types::DataPage>
         read_data_page(types::DataPageId id) override;
 
+        std::unique_ptr<types::DataPage>
+        read_data_page_at(const std::filesystem::path& path) override;
+
+        void
+        write_nolock(const types::DataPage& page, bool fsync = false) override;
+
         void
         write(const types::DataPage& page, bool fsync) override;
 

@@ -48,7 +48,7 @@ namespace txn
         advance_lsn(lsn);
     }
 
-    int
+    types::LSN
     Transaction::append_log(const types::WALRecord& record)
     {
         if (state_ != TransactionState::ACTIVE)
@@ -103,6 +103,12 @@ namespace txn
         state_ = TransactionState::ABORTED;
 
         mgr_->remove_active_entry(*this);
+    }
+
+    void
+    Transaction::ensure_durable(types::LSN lsn)
+    {
+        mgr_->wal_manager().ensure_durable(lsn);
     }
 
     template <typename R, typename CLR>

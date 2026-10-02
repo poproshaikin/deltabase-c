@@ -44,7 +44,7 @@ namespace txn
         void
         begin();
 
-        int
+        types::LSN
         append_log(const types::WALRecord& record);
 
         void
@@ -52,6 +52,8 @@ namespace txn
 
         void
         rollback();
+        void
+        ensure_durable(types::LSN lsn);
 
     private:
         int

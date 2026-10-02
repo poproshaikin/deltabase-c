@@ -105,6 +105,12 @@ namespace storage
         std::unique_ptr<types::DataPage>
         read_data_page(types::DataPageId id) override;
 
+        std::unique_ptr<types::DataPage>
+        read_data_page_at(const std::filesystem::path& path) override;
+
+        void
+        write_nolock(const types::DataPage& page, bool fsync = false) override;
+
         std::unordered_map<types::TableId, std::vector<types::DataPageId>>
         map_data_pages_for_table() override;
 

@@ -12,6 +12,7 @@
 #include "../../types/include/meta_table.hpp"
 #include "../../types/include/index_file.hpp"
 #include "../../misc/include/LRU_policy.hpp"
+#include <filesystem>
 #include <vector>
 
 namespace storage
@@ -57,11 +58,21 @@ namespace storage
         virtual std::unique_ptr<types::DataPage>
         read_data_page(types::DataPageId id) = 0;
 
+        // same as read_data_page, but takes no file lock - only safe when the
+        // caller already holds its own exclusive lock on this path
+        virtual std::unique_ptr<types::DataPage>
+        read_data_page_at(const std::filesystem::path& path) = 0;
+
         virtual uint64_t
         estimate_size(const types::DataRow& row) = 0;
 
         virtual void
         write(const types::DataPage& page, bool fsync = false) = 0;
+
+        // same as write, but takes no file lock - only safe when the caller
+        // already holds its own exclusive lock on this page's file
+        virtual void
+        write_nolock(const types::DataPage& page, bool fsync = false) = 0;
 
         virtual void
         write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync = false) = 0;
