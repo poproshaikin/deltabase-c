@@ -39,7 +39,7 @@ namespace engine
         return cfg;
     }
 
-    Engine::Engine() : parser_()
+    Engine::Engine(StorageRegistry* registry) : registry_(registry)
     {
         reset_storage(Config::detached());
     }
@@ -47,7 +47,10 @@ namespace engine
     void
     Engine::reset_storage(const Config& config)
     {
-        storage_service_provider_ = std::make_unique<StorageServiceProvider>(config);
+        if (registry_ && config.db_name.has_value())
+            storage_service_provider_ = registry_->acquire(config);
+        else
+            storage_service_provider_ = std::make_shared<StorageServiceProvider>(config);
 
         parser_.reset();
         planner_ = planner_factory_.make_planner(config, *storage_service_provider_);
@@ -147,7 +150,10 @@ namespace engine
         {
             active_txn_.emplace(storage_service_provider_->make_txn());
             active_txn_->begin();
-            on_done = [this] { commit_active_txn(); };
+            on_done = [this]
+            {
+                commit_active_txn();
+            };
         }
 
         ctx_.txn = active_txn_.has_value() ? &*active_txn_ : nullptr;

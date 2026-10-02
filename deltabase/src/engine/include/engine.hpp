@@ -9,6 +9,7 @@
 #include <functional>
 #include "planner_factory.hpp"
 #include "semantic_analyzer.hpp"
+#include "storage_registry.hpp"
 #include "storage_service_provider.hpp"
 #include "../../sql/include/parser.hpp"
 #include "../../types/include/execution_result.hpp"
@@ -24,9 +25,11 @@ namespace engine
         sql::SqlParser parser_;
         std::unique_ptr<exq::SemanticAnalyzer> analyzer_;
         std::unique_ptr<exq::IPlanner> planner_;
-        std::unique_ptr<storage::StorageServiceProvider> storage_service_provider_;
         exq::NodeExecutorFactory executor_factory_;
         exq::PlannerFactory planner_factory_;
+
+        std::shared_ptr<storage::StorageServiceProvider> storage_service_provider_;
+        storage::StorageRegistry* registry_ = nullptr;
 
         std::optional<txn::Transaction> active_txn_;
         types::ExecutionContext ctx_;
@@ -47,7 +50,7 @@ namespace engine
         execute(bool needs_stream, types::IPlanNode& root, std::function<void()> on_done);
 
     public:
-        Engine();
+        explicit Engine(storage::StorageRegistry* registry = nullptr);
 
         void
         attach_db(const std::string& db_name);

@@ -483,7 +483,7 @@ namespace net
         auto session_id = UUID::make();
         {
             std::lock_guard lock(sessions_mutex_);
-            sessions_[session_id] = engine::Engine();
+            sessions_[session_id] = engine::Engine(&registry_);
         }
 
         PongNetMessage pong(session_id, NetErrorCode::SUCCESS, ping.request_id);
