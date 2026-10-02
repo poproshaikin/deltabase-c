@@ -6,13 +6,15 @@
 #define DELTABASE_SCAN_CURSOR_HPP
 #include "meta_table.hpp"
 
+#include <vector>
+
 namespace types
 {
     struct ScanCursor
     {
-        DataPageId page;
-        int slot;
-        int chunk_size;
+        std::vector<DataPageId> pages;
+        size_t page_idx = 0;
+        size_t row_idx = 0;
 
         bool initialized;
     };
