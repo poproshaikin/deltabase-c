@@ -578,3 +578,235 @@ Rationale:
 
 Each is a separate project. Naming them as out of scope is worth more than
 the current situation, where the code implies support for the third one.
+
+---
+
+# Part III — Implementation log (branch `isolation-concurrency-fixes`)
+
+This part records what was actually built against the §14 plan, plus every
+additional defect found (and fixed) along the way that wasn't in the
+original plan. Each item below was verified by hand against a built binary,
+not just by inspection — see the "Verified" line on each.
+
+## A. Exclusive attach lock
+
+New `storage::DbLock` (`src/storage/include/db_lock.hpp`,
+`src/storage/db_lock.cpp`), RAII around `flock(LOCK_EX | LOCK_NB)` on a
+`db.lock` file (`path_db_lock`, `src/storage/include/path.hpp`), same
+pattern as `PageFileLock`.
+
+- Held as `StorageServiceProvider::db_lock_`
+  (`src/storage/include/storage_service_provider.hpp:33`), declared
+  **first** among the infrastructure members so it's destroyed **last** —
+  released only after `wal_manager_`/`buffer_pool_`/`catalog_` and both
+  background threads (`checkpoint_manager_`, `flush_coordinator_`) have torn
+  down and flushed.
+- Acquired in the constructor right after `io_manager_->init_wal()`, before
+  `BufferPool::initialize()`'s directory scan and before `recover()` —
+  so a second attach can't observe partial state or run recovery racing
+  the first session's in-flight transaction (the destructive scenario in
+  §9).
+- Non-blocking: on conflict, throws `EngineException` with a new
+  `Code::DB_LOCKED` (`src/misc/include/exceptions.hpp`), mapped to a new
+  `NetErrorCode::DB_LOCKED` (`src/types/include/net_error.hpp`) in
+  `NetServer::handle_attach_db_message` (`src/network/server.cpp`).
+
+**Verified:** two `cli` instances against one database — second `.c <db>`
+returns `ERR: DbLock: database <db> is already attached by another
+process/session` immediately (no hang); after the first instance exits,
+the second attach succeeds.
+
+**Known gap (documented, not fixed):** `DetachedFileIOManager`/`CREATE
+DATABASE` path takes no lock. Out of scope for A — recovery never runs for
+a detached instance, so the destructive scenario this item targets doesn't
+apply there. Revisit if/when item C (§14.1) is done.
+
+## B.1 Eviction deadlock in `misc::Cache`
+
+`misc::Cache::put`/`evict_one` (`src/misc/include/cache.hpp`) no longer do
+any I/O or call back into the owner. `evict_one` now returns
+`std::optional<TValue>` — the evicted entry's value if it was dirty,
+`std::nullopt` otherwise — instead of invoking a stored `Flusher` callback.
+The `Flusher` type and the per-entry `flush` member are gone entirely.
+
+`BufferPool` (`src/storage/buffer_pool.cpp`) collects what `Cache::put`
+hands back into scratch members —
+`pending_dp_eviction_`/`pending_dp_creation_`/`pending_if_eviction_`
+(`src/storage/include/buffer_pool.hpp:132-134`) — while still holding
+`mutex_`, then every public method that can trigger one of these
+(`put_dp`, `get_dp`, `prepare_dp`, `get_table_index`, `create_table_index`)
+calls `flush_pending_writes()` **after** releasing `mutex_`. This matches
+the discipline `flush_dirty_impl` already used elsewhere in the same file
+(copy under lock, write unlocked, re-lock only to clear state) — eviction
+was the one path that didn't follow it.
+
+The old `BufferPool::flush(CacheEntry&)` overloads and the
+`data_page_flusher_`/`index_file_flusher_` lambda members are removed —
+nothing else called them.
+
+**Verified:** by construction — `Cache` no longer has any call path that
+re-enters `BufferPool` or does I/O while `mutex_` is held, so the
+`put → evict_one → flush → lock_guard(mutex_)` re-entrancy that caused the
+deadlock no longer exists as a reachable code path. (Didn't additionally
+force a 10,000-page eviction to watch it live; the fix removes the
+mechanism, not just avoids triggering it.)
+
+## B.2 WAL-before-data ordering
+
+`Transaction::ensure_durable(LSN)` added (`src/transactions/include/transaction.hpp:56`,
+`src/transactions/transaction.cpp`) — a thin passthrough to
+`mgr_->wal_manager().ensure_durable(lsn)`, the same private accessor
+`commit()`/`rollback()` already use (`Transaction` is `friend class
+TransactionManager`).
+
+`BufferPool::insert_row_locked`/`delete_row_locked` (`src/storage/buffer_pool.cpp`)
+now call `txn.ensure_durable(to_ensure)` — `to_ensure` being the LSN of the
+`UpdateTableRecord` appended right after the `InsertRecord`/`DeleteRecord`
+— **before** the page `io_.write(..., true)`. Since WAL is flushed in
+append order and `ensure_durable` blocks until `flushed_lsn_ >= lsn`,
+waiting on the later `UpdateTableRecord`'s LSN also guarantees the earlier
+page-governing record is durable.
+
+**Verified:** build + full `CREATE TABLE`/`INSERT`×3/`UPDATE`/`DELETE`/`SELECT`
+cycle via `cli`, no behavioral regression; durability ordering itself isn't
+observable without a crash-injection harness, which wasn't built for this —
+the change was verified by code inspection against `FileWalManager`'s
+actual flush/fsync path (`write_logs` → `storage::fsync_file`, confirmed it
+really fsyncs, not just buffers).
+
+## B.3 Sequential scan ignoring disconnected page chains
+
+`types::ScanCursor` (`src/types/include/scan_cursor.hpp`) replaced
+`page`/`slot`/`chunk_size` (a single current page + a `next`-chain
+assumption) with `pages` (the full page list for the table) +
+`page_idx` + `row_idx`. `chunk_size` is gone — it was dead (`grep` showed
+nothing read it; it was only ever assigned `0`).
+
+`DQLService::seq_scan_begin`/`seq_scan_next` (`src/storage/dql_service.cpp`)
+now populate `cursor.pages` from `BufferPool::get_table_data` (the
+directory-derived source of truth) and iterate it by index.
+`page->next`-based head-finding (the `unordered_set<DataPageId>
+referenced_pages` dance) is gone — every page the buffer pool knows about
+for this table gets scanned, regardless of how many disjoint `next`-chains
+exist. A page that fails to load (`get_dp` returns null) is now skipped,
+not treated as end-of-scan.
+
+**Verified:** this closes §4/§12 (the "verifier only sees 100 of 200 rows"
+mystery) by removing the mechanism that caused it, not by re-running the
+forked two-process test (that test now intentionally fails at the `DbLock`
+step per item A — it needs rewriting per plan item F, not done yet).
+
+## C. Two further defects found during manual verification, not in the original plan
+
+Both were hit while hand-testing B.3/B.1 through the `cli`, both
+pre-existing (reproduced on `f778e5b`, the commit before this branch
+started), both are now fixed since they blocked verifying anything else.
+
+### C.1 First insert into a new table: null-deref, then flock self-deadlock
+
+`BufferPool::create_dp_impl` creates a `DataPage` purely in memory
+(`io_.create_page` → `DataPage::make` never touches disk). The very first
+row inserted into any table goes through this path, then
+`insert_row_locked` immediately does `io_.read_data_page(page_id)` — which
+scans disk and finds nothing — then dereferences the resulting `nullptr`.
+100% reproducible on **every single first insert**, confirmed on the
+pre-branch commit via a disposable `git worktree`.
+
+Fixed in two parts:
+
+1. `create_dp_impl` now stashes a copy of the new page into
+   `pending_dp_creation_` (same mechanism as B.1); `BufferPool::prepare_dp`
+   writes it out via `flush_pending_writes()` before returning, so the file
+   exists on disk by the time `insert_row_locked` looks for it.
+2. That alone surfaced a **second**, independent bug: `insert_row_locked`/
+   `delete_row_locked`'s "re-read while locked" step (re-reading the page
+   after taking `PageFileLock`, to catch a write that landed between the
+   first unlocked read and the lock) called the same locking
+   `io_.read_data_page`, which takes its own `flock(LOCK_SH)`. `flock()`
+   conflicts are per **open file description**, not per process — a second
+   `open()` on the same path by the same thread is a distinct lock domain,
+   so this unconditionally deadlocked against the `PageFileLock`'s
+   still-held `LOCK_EX`, every time, regardless of concurrency. Confirmed
+   live via `gdb -p <pid> -batch -ex "thread apply all bt"` on a hung `cli`
+   process — `Thread 1` parked in `flock()` inside `read_file`, called from
+   `read_data_page`, called from `insert_row_locked`. The same pattern hit
+   the page *write* (`io_.write(*page, true)` → `fsync_file`'s own
+   `flock(LOCK_EX)`) right after, once the read was fixed.
+
+   Fixed by adding non-locking variants used only where the caller already
+   holds its own exclusive lock on that exact path:
+   - `storage::read_file_nolock`, `write_file_nolock`, `fsync_file_nolock`
+     (`src/storage/include/file_utils.hpp`, `src/storage/file_utils.cpp`) —
+     copies of the existing helpers minus the `flock` calls.
+   - `IIOManager::read_data_page_at(path)` and `IIOManager::write_nolock(page,
+     fsync)` (`src/storage/include/io_manager.hpp`), implemented in
+     `FileIOManager` and stubbed with `unsupported()` in
+     `DetachedFileIOManager` (same convention as every other
+     detached-instance method).
+   - `insert_row_locked`/`delete_row_locked` use `read_data_page_at`/
+     `write_nolock` for everything done after `page_lock` is taken.
+
+**Verified:** full `CREATE TABLE` → `INSERT` ×3 → `UPDATE` → `DELETE` →
+`SELECT` cycle via `cli` against a fresh database, no hang, no crash,
+correct row contents at each step.
+
+### C.2 `CreateTableRecord` logged before the table's own DDL finished mutating it
+
+Unrelated to the buffer pool/locking work above — found while verifying
+C.1, reported directly by the user via a plain `AUTOINCREMENT` insert that
+crashed with `terminate called ... Sequence for autoincrement column not
+found`.
+
+`DDLService::create_table` (`src/storage/ddl_service.cpp`) built
+`CreateTableRecord record(mt); txn.append_log(record);` **before** the loop
+that assigns `sequence_id` to `AUTOINCREMENT` columns (via `create_sequence`)
+and creates `PRIMARY KEY`/`UNIQUE` indexes. The WAL record therefore
+captured the table in its pre-mutation state — no `sequence_id`, no
+indexes. Harmless on the *first* run (nothing re-reads that WAL record),
+but `RecoveryManager::redo(const CreateTableRecord&)` unconditionally
+re-applies every committed `CreateTableRecord` on **every** attach
+(REDO doesn't distinguish a clean shutdown from a crash — this is the same
+"`recover()` runs unconditionally" issue flagged in §9, just hitting a
+different field) — so every single reattach overwrote the correct,
+fully-populated table `.meta` file with the stale WAL snapshot, zeroing
+`sequence_id` back to a null UUID. A second-session reproduction wasn't
+even needed: a single `cli` process attaching, doing nothing, and
+detaching was enough (`.c <db>; .q`), confirmed by `mt_dump` before/after.
+
+Also found in the same block: `mt.name + "_" + col.name + "_seq"` read
+`mt.name` **after** `std::move(mt)` had already moved it into the catalog
+a few lines above — produced sequence names like `_id_seq` instead of
+`deble_id_seq` (not a crash, `std::string` after move is just
+valid-but-unspecified, but wrong).
+
+Fixed by moving the `CreateTableRecord` construction and `append_log` to
+the **end** of `create_table`, building it from `*saved` (the live catalog
+entry, by then fully mutated with `sequence_id` and indexes) instead of the
+original `mt`, and updating `catalog_.mark_dirty(saved, txn.get_last_lsn())`
+accordingly. Fixed the moved-from `mt.name` read to use `table_name`.
+
+**Verified:** `CREATE TABLE ... AUTOINCREMENT` → detach → reattach (no
+insert at all) → `mt_dump` shows `sequence_id` unchanged across the
+reattach (previously went to `00000000-0000-0000-0000-000000000000`).
+Followed by a full insert/select cycle generating `id=1,2` correctly.
+
+**Known gap (found, not fixed, out of scope for this pass):** in the same
+loop, a column with *both* `AUTOINCREMENT` and `PRIMARY KEY` only takes the
+`if (AUTOINCREMENT) ... else if (PRIMARY_KEY) ...` first branch — such a
+column never gets its PK index created at all. Worth its own fix; not
+touched here since it's unrelated to what crashed.
+
+## Summary table
+
+| Item | Status | Pre-existing or introduced this branch |
+|---|---|---|
+| A — exclusive attach lock | done | new |
+| B.1 — eviction deadlock | done | pre-existing (page-level-locking branch) |
+| B.2 — WAL-before-data ordering | done | pre-existing |
+| B.3 — scan over disconnected chains | done | pre-existing |
+| C.1 — new-page null-deref + flock self-deadlock (2 bugs) | done | pre-existing, masked by each other |
+| C.2 — `CreateTableRecord` logged pre-mutation | done | pre-existing |
+| C.2 addendum — AUTOINCREMENT+PRIMARY KEY index never created | **open** | pre-existing |
+| Detached/`CREATE DATABASE` path has no exclusivity lock | **open, documented** | pre-existing |
+| `Cli`/`NetServer` only catch `EngineException`, not `std::exception` | **open, documented** | pre-existing |
+| C (one `StorageServiceProvider` per DB), D (txn-scoped rwlock), E (pinning + per-page latches), F (rewrite the concurrency test) | **not started** | — |
