@@ -458,29 +458,6 @@ namespace storage
         return result;
     }
 
-    std::unique_ptr<DataPage>
-    FileIOManager::read_data_page_at(const fs::path& path)
-    {
-        DbGuard guard(*db_mutex_);
-
-        if (!fs::exists(path) || !fs::is_regular_file(path))
-            return nullptr;
-
-        auto content = read_file_nolock(path);
-        DataPage page;
-        misc::ReadOnlyMemoryStream stream(content);
-        if (!serializer_->deserialize_dp(stream, page))
-            throw std::runtime_error(
-                "FileIOManager::read_data_page_at: failed to deserialize data page " +
-                path.string()
-            );
-
-        page.path = path;
-        page.size = content.size();
-
-        return std::make_unique<DataPage>(std::move(page));
-    }
-
     // --- writes --------------------------------------------------------------
 
     void

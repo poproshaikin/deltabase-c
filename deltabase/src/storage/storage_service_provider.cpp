@@ -7,6 +7,7 @@
 #include "db_lock.hpp"
 #include "io_manager_factory.hpp"
 #include "wal_manager_factory.hpp"
+#include "whole_db_lock_manager.hpp"
 #include "../recovery/include/recovery_manager.hpp"
 #include "../transactions/include/transaction_manager.hpp"
 
@@ -43,11 +44,14 @@ namespace storage
 
         recovery_manager_->recover();
 
+        lock_manager_ = std::make_unique<txn::WholeDbLockManager>();
+
         txn_manager_ = std::make_unique<txn::TransactionManager>(
             *wal_manager_,
             *buffer_pool_,
             *catalog_,
-            *recovery_manager_);
+            *recovery_manager_,
+            *lock_manager_);
 
         catalog_->hydrate();
 
@@ -96,6 +100,12 @@ namespace storage
     StorageServiceProvider::make_txn()
     {
         return txn_manager_->make_transaction();
+    }
+
+    txn::ILockManager&
+    StorageServiceProvider::lock_manager()
+    {
+        return *lock_manager_;
     }
 
     DDLService&

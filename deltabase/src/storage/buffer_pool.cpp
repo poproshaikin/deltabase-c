@@ -4,7 +4,6 @@
 
 #include "include/buffer_pool.hpp"
 
-#include "page_file_lock.hpp"
 #include "../misc/include/utils.hpp"
 #include <algorithm>
 #include <limits>
@@ -161,12 +160,10 @@ namespace storage
         size_t size = io_.estimate_size(row);
         MetaTable mt_unchanged = mt;
 
+        // no PageFileLock needed here: Transaction::begin() already holds the
+        // whole-db write lock for the duration of this call (item D), so no
+        // other transaction can be concurrently mutating this page.
         auto page = io_.read_data_page(page_id);
-        PageFileLock page_lock(page->path);
-
-        // re-read while locked - to avoid races between first read and flock
-        // (non-locking read: a locking one would deadlock against page_lock)
-        page = io_.read_data_page_at(page->path);
 
         if (!page->has_space(size))
             return std::nullopt;
@@ -205,12 +202,8 @@ namespace storage
     {
         MetaTable mt_unchanged = mt;
 
+        // no PageFileLock needed here: see insert_row_locked above.
         auto page = io_.read_data_page(page_id);
-        PageFileLock page_lock(page->path);
-
-        // re-read while locked - to avoid races between first read and flock
-        // (non-locking read: a locking one would deadlock against page_lock)
-        page = io_.read_data_page_at(page->path);
 
         DataRow* target = nullptr;
         for (auto& row : page->rows)

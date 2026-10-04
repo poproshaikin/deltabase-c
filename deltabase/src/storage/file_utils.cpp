@@ -83,61 +83,6 @@ namespace storage
 #endif
     }
 
-    Bytes
-    read_file_nolock(const fs::path& path)
-    {
-#ifdef _WIN32
-        std::ifstream file(path, std::ios::binary | std::ios::ate);
-        if (!file)
-            throw std::runtime_error("Cannot open file: " + path.string());
-
-        std::streamsize size = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        std::vector<uint8_t> buffer(size);
-
-        if (!file.read(reinterpret_cast<char*>(buffer.data()), size))
-            throw std::runtime_error("Error reading file: " + path.string());
-
-        return buffer;
-#else
-        const int fd = open(path.c_str(), O_RDONLY);
-        if (fd < 0)
-            throw std::runtime_error("Cannot open file: " + path.string());
-
-        struct stat st;
-        if (fstat(fd, &st) < 0)
-        {
-            close(fd);
-            throw std::runtime_error("Cannot stat file: " + path.string());
-        }
-
-        const auto size = static_cast<size_t>(st.st_size);
-        std::vector<uint8_t> buffer(size);
-
-        size_t total = 0;
-        while (total < size)
-        {
-            const auto read_bytes = read(fd, buffer.data() + total, size - total);
-            if (read_bytes < 0)
-            {
-                close(fd);
-                throw std::runtime_error("Error reading file: " + path.string());
-            }
-
-            if (read_bytes == 0)
-                break;
-
-            total += static_cast<size_t>(read_bytes);
-        }
-
-        buffer.resize(total);
-        close(fd);
-
-        return buffer;
-#endif
-    }
-
     void
     write_file(const fs::path& path, const Bytes& content)
     {

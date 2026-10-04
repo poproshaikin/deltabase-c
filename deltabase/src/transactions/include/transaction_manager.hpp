@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_TRANSACTION_MANAGER_HPP
 #define DELTABASE_TRANSACTION_MANAGER_HPP
+#include "lock_manager.hpp"
 #include "../../recovery/include/recovery_manager.hpp"
 #include "../../storage/include/buffer_pool.hpp"
 #include "../../storage/include/catalog.hpp"
@@ -17,6 +18,7 @@ namespace txn
         storage::BufferPool& buffer_pool_;
         storage::CatalogCache& catalog_;
         recovery::RecoveryManager& recovery_manager_;
+        ILockManager& lock_manager_;
 
         struct ActiveTxnEntry
         {
@@ -37,7 +39,8 @@ namespace txn
             wal::IWALManager& wal_manager,
             storage::BufferPool& buffer_pool,
             storage::CatalogCache& catalog,
-            recovery::RecoveryManager& recovery_manager);
+            recovery::RecoveryManager& recovery_manager,
+            ILockManager& lock_manager);
 
         Transaction
         make_transaction();
@@ -57,6 +60,8 @@ namespace txn
 
         recovery::RecoveryManager&
         recovery_manager() const;
+        ILockManager&
+        lock_manager() const;
 
         void
         assign_active_entry(const Transaction& txn);

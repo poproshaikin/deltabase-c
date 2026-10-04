@@ -75,9 +75,6 @@ namespace storage
     std::unique_ptr<types::DataPage>
     DetachedFileIOManager::read_data_page(types::DataPageId) { unsupported(); }
 
-    std::unique_ptr<types::DataPage>
-    DetachedFileIOManager::read_data_page_at(const std::filesystem::path&) { unsupported(); }
-
     void
     DetachedFileIOManager::write_nolock(const types::DataPage&, bool) { unsupported(); }
 

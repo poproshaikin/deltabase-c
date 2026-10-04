@@ -41,6 +41,8 @@ namespace txn
         if (state_ != TransactionState::IDLE)
             throw std::runtime_error("Transaction::begin: transaction state not idle");
 
+        mgr_->lock_manager().acquire(id_, {}, LockMode::Exclusive);
+
         types::BeginTxnRecord record(0, last_lsn_, id_);
         types::LSN lsn = mgr_->wal_manager().append_log(record);
 
@@ -80,6 +82,7 @@ namespace txn
         state_ = TransactionState::COMMITTED;
 
         mgr_->remove_active_entry(*this);
+        mgr_->lock_manager().release_all(id_);
     }
 
     void
@@ -103,6 +106,7 @@ namespace txn
         state_ = TransactionState::ABORTED;
 
         mgr_->remove_active_entry(*this);
+        mgr_->lock_manager().release_all(id_);
     }
 
     void

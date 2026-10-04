@@ -12,7 +12,6 @@
 #include "../../types/include/meta_table.hpp"
 #include "../../types/include/index_file.hpp"
 #include "../../misc/include/LRU_policy.hpp"
-#include <filesystem>
 #include <vector>
 
 namespace storage
@@ -58,11 +57,6 @@ namespace storage
         virtual std::unique_ptr<types::DataPage>
         read_data_page(types::DataPageId id) = 0;
 
-        // same as read_data_page, but takes no file lock - only safe when the
-        // caller already holds its own exclusive lock on this path
-        virtual std::unique_ptr<types::DataPage>
-        read_data_page_at(const std::filesystem::path& path) = 0;
-
         virtual uint64_t
         estimate_size(const types::DataRow& row) = 0;
 
@@ -70,7 +64,9 @@ namespace storage
         write(const types::DataPage& page, bool fsync = false) = 0;
 
         // same as write, but takes no file lock - only safe when the caller
-        // already holds its own exclusive lock on this page's file
+        // already has exclusive access to this db guaranteed some other way
+        // (today: the whole-db write lock held for the active transaction, see
+        // insert_row_locked/delete_row_locked)
         virtual void
         write_nolock(const types::DataPage& page, bool fsync = false) = 0;
 
