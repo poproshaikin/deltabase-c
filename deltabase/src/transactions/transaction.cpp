@@ -43,8 +43,20 @@ namespace txn
 
         mgr_->lock_manager().acquire(id_, {}, LockMode::Exclusive);
 
-        types::BeginTxnRecord record(0, last_lsn_, id_);
-        types::LSN lsn = mgr_->wal_manager().append_log(record);
+        types::LSN lsn;
+        try
+        {
+            types::BeginTxnRecord record(0, last_lsn_, id_);
+            lsn = mgr_->wal_manager().append_log(record);
+        }
+        catch (...)
+        {
+            // state_ is still IDLE here, so neither commit() nor rollback()
+            // will ever run for this transaction -- release the lock
+            // ourselves, or it would be held forever.
+            mgr_->lock_manager().release_all(id_);
+            throw;
+        }
 
         state_ = TransactionState::ACTIVE;
         advance_lsn(lsn);

@@ -809,4 +809,13 @@ touched here since it's unrelated to what crashed.
 | C.2 addendum — AUTOINCREMENT+PRIMARY KEY index never created | **open** | pre-existing |
 | Detached/`CREATE DATABASE` path has no exclusivity lock | **open, documented** | pre-existing |
 | `Cli`/`NetServer` only catch `EngineException`, not `std::exception` | **open, documented** | pre-existing |
-| C (one `StorageServiceProvider` per DB), D (txn-scoped rwlock), E (pinning + per-page latches), F (rewrite the concurrency test) | **not started** | — |
+| C — one `StorageServiceProvider` per attached DB (`StorageRegistry`, shared via `NetServer`) | done | new |
+| D — strict 2PL at whole-database granularity (`ILockManager`/`WholeDbLockManager`, wired into `Transaction::begin/commit/rollback` and `Engine::execute_query`'s bare-read path) | done | new |
+| D addendum — lock leak if `begin()`'s `append_log(BeginTxnRecord)` throws after `acquire()` succeeds | done | new (found during D's own review) |
+| G — `PageFileLock` removed entirely (not just "stop relying on it") now that D makes it structurally redundant; `read_data_page_at`/`read_file_nolock` removed with it as now-dead code | done | new |
+| **E — pinning + per-page latches in `BufferPool`** | **open** | — |
+| **F — rewrite `run_concurrent_two_processes_test`** as multi-threaded + a small "second attach gets `DB_LOCKED`" test | **open** | — |
+
+As of this row, every item from §14.1 is done except **E** and **F**. E is the one that still matters for correctness: D only serializes *transactions* against each other: it does nothing to stop `BufferPool`'s own background threads (`FlushCoordinator`, `CheckpointManager`) from racing a foreground transaction's in-memory page mutation, since neither thread goes through `ILockManager` at all. That gap predates this branch and D does not close it. F is test-authoring debt, not a correctness gap — `run_concurrent_two_processes_test` currently just fails fast on `DB_LOCKED` (expected, per item A), so it no longer tests anything; the multi-threaded single-process replacement it should become hasn't been written.
+
+D itself was verified with a real two-thread test (not just "doesn't crash"): a writer holding the lock for an artificial 500ms delay measurably blocked both a concurrent writer and a concurrent bare reader for ~350ms (matching the remaining hold time), while an uncontended statement stayed at ~3ms — see the session's scratch `concurrency_test.cpp` (not checked into the repo; the assertions it made are the ones worth turning into F's real replacement test).
