@@ -471,6 +471,17 @@ namespace storage
             write_file(page.path, serialized.to_vector());
     }
 
+    void
+    FileIOManager::write_nolock(const DataPage& page, bool fsync)
+    {
+        DbGuard guard(*db_mutex_);
+        auto serialized = serializer_->serialize_dp(page);
+        if (fsync)
+            fsync_file_nolock(page.path, serialized.to_vector());
+        else
+            write_file_nolock(page.path, serialized.to_vector());
+    }
+
     uint64_t
     FileIOManager::estimate_size(const DataRow& row)
     {

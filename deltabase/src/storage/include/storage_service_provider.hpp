@@ -15,7 +15,9 @@
 #include "dql_service.hpp"
 #include "row_preprocessor.hpp"
 #include "constraint_enforcer.hpp"
+#include "db_lock.hpp"
 #include "flush_coordinator.hpp"
+#include "lock_manager.hpp"
 #include "../../types/include/config.hpp"
 #include "../../recovery/include/recovery_manager.hpp"
 #include "../../transactions/include/transaction_manager.hpp"
@@ -29,12 +31,15 @@ namespace storage
     {
         types::Config cfg_;
 
+        std::unique_ptr<DbLock> db_lock_;
+
         // infrastructure (must be declared before services)
         std::unique_ptr<IIOManager> io_manager_;
         std::unique_ptr<wal::IWALManager> wal_manager_;
         std::unique_ptr<BufferPool> buffer_pool_;
         std::unique_ptr<CatalogCache> catalog_;
         std::unique_ptr<recovery::RecoveryManager> recovery_manager_;
+        std::unique_ptr<txn::ILockManager> lock_manager_;
         std::unique_ptr<txn::TransactionManager> txn_manager_;
         std::unique_ptr<recovery::CheckpointManager> checkpoint_manager_;
 
@@ -60,6 +65,8 @@ namespace storage
 
         txn::Transaction
         make_txn();
+        txn::ILockManager&
+        lock_manager();
 
         DDLService&
         ddl();

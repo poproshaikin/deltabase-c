@@ -39,7 +39,7 @@ namespace engine
         return cfg;
     }
 
-    Engine::Engine() : parser_()
+    Engine::Engine(StorageRegistry* registry) : registry_(registry)
     {
         reset_storage(Config::detached());
     }
@@ -47,7 +47,10 @@ namespace engine
     void
     Engine::reset_storage(const Config& config)
     {
-        storage_service_provider_ = std::make_unique<StorageServiceProvider>(config);
+        if (registry_ && config.db_name.has_value())
+            storage_service_provider_ = registry_->acquire(config);
+        else
+            storage_service_provider_ = std::make_shared<StorageServiceProvider>(config);
 
         parser_.reset();
         planner_ = planner_factory_.make_planner(config, *storage_service_provider_);
@@ -143,11 +146,27 @@ namespace engine
 
         std::function<void()> on_done;
         bool implicit_txn = !active_txn_.has_value() && plan.needs_txn;
+        std::optional<txn::TxnId> bare_lock_id;
         if (implicit_txn)
         {
             active_txn_.emplace(storage_service_provider_->make_txn());
             active_txn_->begin();
-            on_done = [this] { commit_active_txn(); };
+            on_done = [this]
+            {
+                commit_active_txn();
+            };
+        }
+        else if (!active_txn_.has_value() && storage_service_provider_->config().db_name.has_value())
+        {
+            // bare read with no transaction at all (e.g. a standalone SELECT) --
+            // CREATE_DATABASE also lands here (needs_txn == false) but runs on a
+            // detached provider with no lock_manager_, hence the db_name guard.
+            bare_lock_id = txn::TxnId::make();
+            storage_service_provider_->lock_manager().acquire(*bare_lock_id, {}, txn::LockMode::Shared);
+            on_done = [this, id = *bare_lock_id]
+            {
+                storage_service_provider_->lock_manager().release_all(id);
+            };
         }
 
         ctx_.txn = active_txn_.has_value() ? &*active_txn_ : nullptr;
@@ -162,6 +181,10 @@ namespace engine
             {
                 active_txn_->rollback();
                 active_txn_.reset();
+            }
+            else if (bare_lock_id)
+            {
+                storage_service_provider_->lock_manager().release_all(*bare_lock_id);
             }
             throw;
         }

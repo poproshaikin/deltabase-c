@@ -15,6 +15,7 @@ public:
         DB_NOT_ATTACHED,
         DB_NOT_EXISTS,
         DB_EXISTS,
+        DB_LOCKED,
         SCHEMA_NOT_EXISTS,
         SCHEMA_EXISTS,
         TABLE_NOT_EXISTS,

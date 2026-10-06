@@ -16,6 +16,12 @@ namespace storage
     void
     write_file(const fs::path& path, const types::Bytes& content);
 
+    // same as write_file, but takes no flock - only safe when the caller
+    // already has exclusive access to the db guaranteed some other way
+    // (today: BufferPool::write_nolock, see its callers)
+    void
+    write_file_nolock(const fs::path& path, const types::Bytes& content);
+
     void
     append_file(const fs::path& path, const types::Bytes& content);
 
@@ -27,6 +33,10 @@ namespace storage
 
     void
     fsync_file(const fs::path& path);
+
+    // same as fsync_file, but takes no flock - see write_file_nolock
+    void
+    fsync_file_nolock(const fs::path& path, const types::Bytes& content);
 }
 
 #endif //DELTABASE_UTILS_HPP

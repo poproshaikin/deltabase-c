@@ -83,6 +83,9 @@ namespace storage
         read_data_page(types::DataPageId id) override;
 
         void
+        write_nolock(const types::DataPage& page, bool fsync = false) override;
+
+        void
         write(const types::DataPage& page, bool fsync) override;
 
         uint64_t

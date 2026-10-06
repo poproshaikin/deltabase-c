@@ -9,7 +9,6 @@
 #include "../misc/include/utils.hpp"
 #include "../misc/include/convert.hpp"
 
-#include <unordered_set>
 #include <stdexcept>
 
 namespace storage
@@ -42,47 +41,18 @@ namespace storage
     {
         const auto pages = buffer_pool_.get_table_data(mt.id);
 
-        ScanCursor cursor{};
-        cursor.page = DataPageId::null();
-        cursor.slot = 0;
-        cursor.chunk_size = 0;
+        ScanCursor cursor;
+        cursor.pages.reserve(pages.size());
+
+        for (const auto* page : pages)
+        {
+            if (!page)
+                continue;
+
+            cursor.pages.push_back(page->id);
+        }
+
         cursor.initialized = true;
-
-        if (pages.empty())
-            return cursor;
-
-        std::unordered_set<DataPageId> referenced_pages;
-        referenced_pages.reserve(pages.size());
-
-        for (const auto* page : pages)
-        {
-            if (!page)
-                continue;
-
-            if (page->next != DataPageId::null())
-                referenced_pages.insert(page->next);
-        }
-
-        for (const auto* page : pages)
-        {
-            if (!page)
-                continue;
-
-            if (!referenced_pages.contains(page->id))
-            {
-                cursor.page = page->id;
-                return cursor;
-            }
-        }
-
-        for (const auto* page : pages)
-        {
-            if (!page)
-                continue;
-
-            cursor.page = page->id;
-            return cursor;
-        }
 
         return cursor;
     }
@@ -93,18 +63,20 @@ namespace storage
         if (!cursor.initialized)
             return false;
 
-        while (cursor.page != DataPageId::null())
+        while (cursor.page_idx < cursor.pages.size())
         {
-            auto* page = buffer_pool_.get_dp(cursor.page);
+            auto* page = buffer_pool_.get_dp(cursor.pages[cursor.page_idx]);
             if (!page)
             {
-                cursor.page = DataPageId::null();
-                return false;
+                // page listed in the table's directory but unreadable -- skip it
+                ++cursor.page_idx;
+                cursor.row_idx = 0;
+                continue;
             }
 
-            while (cursor.slot < static_cast<int>(page->rows.size()))
+            while (cursor.row_idx < page->rows.size())
             {
-                const auto& row = page->rows[static_cast<size_t>(cursor.slot++)];
+                const auto& row = page->rows[cursor.row_idx++];
                 if (has_flag(row.flags, DataRowFlags::OBSOLETE))
                     continue;
 
@@ -112,8 +84,8 @@ namespace storage
                 return true;
             }
 
-            cursor.page = page->next;
-            cursor.slot = 0;
+            ++cursor.page_idx;
+            cursor.row_idx = 0;
         }
 
         return false;

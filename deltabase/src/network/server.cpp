@@ -178,6 +178,8 @@ namespace net
         {
             auto net_code = ex.code() == EngineException::Code::DB_NOT_EXISTS
                 ? NetErrorCode::DB_NOT_EXISTS
+                : ex.code() == EngineException::Code::DB_LOCKED
+                ? NetErrorCode::DB_LOCKED
                 : NetErrorCode::SQL_ERROR;
             Logger::error(std::string("ATTACH_DB failed: ") + ex.what());
             send_pong_and_stop(handle, stop, message.session_id, net_code, message.request_id, ex.what());
@@ -481,7 +483,7 @@ namespace net
         auto session_id = UUID::make();
         {
             std::lock_guard lock(sessions_mutex_);
-            sessions_[session_id] = engine::Engine();
+            sessions_[session_id] = engine::Engine(&registry_);
         }
 
         PongNetMessage pong(session_id, NetErrorCode::SUCCESS, ping.request_id);

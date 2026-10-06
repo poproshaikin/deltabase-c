@@ -13,6 +13,8 @@
 #include "../../types/include/UUID.hpp"
 #include "../../transactions/include/transaction.hpp"
 
+#include <optional>
+
 namespace storage
 {
     template <typename TKey, typename TValue>
@@ -127,21 +129,12 @@ namespace storage
         std::unordered_map<types::UUID, types::LSN> dpt_;
         std::mutex dpt_mutex_;
 
-        void
-        flush(DataPageBuffer::CacheEntry& page_entry);
-        void
-        flush(IndexFileBuffer::CacheEntry& index_file_entry);
+        std::optional<types::DataPage> pending_dp_eviction_;
+        std::optional<types::DataPage> pending_dp_creation_;
+        std::optional<types::IndexFile> pending_if_eviction_;
 
-        std::function<void(DataPageBuffer::CacheEntry&)> data_page_flusher_ =
-            [this](DataPageBuffer::CacheEntry& page_entry)
-        {
-            flush(page_entry);
-        };
-        std::function<void(IndexFileBuffer::CacheEntry&)> index_file_flusher_ =
-            [this](IndexFileBuffer::CacheEntry& index_file_entry)
-        {
-            flush(index_file_entry);
-        };
+        void
+        flush_pending_writes();
 
         // All methods suffixed with impl assume the caller holds the appropriate
         // locks on the data structures (data_pages/index_files_/data_pages_per_table_/index_files_per_table_).

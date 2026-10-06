@@ -4,7 +4,6 @@
 
 #include "include/buffer_pool.hpp"
 
-#include "page_file_lock.hpp"
 #include "../misc/include/utils.hpp"
 #include <algorithm>
 #include <limits>
@@ -24,22 +23,35 @@ namespace storage
     void
     BufferPool::put_dp(const DataPageId& page_id, DataPage&& page)
     {
-        std::lock_guard lock(mutex_);
-        put_dp_impl(page_id, std::move(page));
+        {
+            std::lock_guard lock(mutex_);
+            put_dp_impl(page_id, std::move(page));
+        }
+        flush_pending_writes();
     }
 
     DataPage*
     BufferPool::get_dp(const DataPageId& page_id)
     {
-        std::lock_guard lock(mutex_);
-        return get_dp_impl(page_id);
+        DataPage* result;
+        {
+            std::lock_guard lock(mutex_);
+            result = get_dp_impl(page_id);
+        }
+        flush_pending_writes();
+        return result;
     }
 
     DataPage*
     BufferPool::prepare_dp(size_t size, const MetaTable& mt, txn::Transaction& txn)
     {
-        std::lock_guard lock(mutex_);
-        return prepare_dp_impl(size, mt, txn);
+        DataPage* result;
+        {
+            std::lock_guard lock(mutex_);
+            result = prepare_dp_impl(size, mt, txn);
+        }
+        flush_pending_writes();
+        return result;
     }
 
     DataPage*
@@ -92,8 +104,13 @@ namespace storage
     IndexFile*
     BufferPool::get_table_index(const UUID& table_id, const IndexId& index_id)
     {
-        std::lock_guard lock(mutex_);
-        return get_table_index_impl(table_id, index_id);
+        IndexFile* result;
+        {
+            std::lock_guard lock(mutex_);
+            result = get_table_index_impl(table_id, index_id);
+        }
+        flush_pending_writes();
+        return result;
     }
 
     void
@@ -104,8 +121,11 @@ namespace storage
         LSN last_lsn
     )
     {
-        std::lock_guard lock(mutex_);
-        create_table_index_impl(schema_name, table, index, last_lsn);
+        {
+            std::lock_guard lock(mutex_);
+            create_table_index_impl(schema_name, table, index, last_lsn);
+        }
+        flush_pending_writes();
     }
 
     IndexFile*
@@ -140,11 +160,10 @@ namespace storage
         size_t size = io_.estimate_size(row);
         MetaTable mt_unchanged = mt;
 
+        // no PageFileLock needed here: Transaction::begin() already holds the
+        // whole-db write lock for the duration of this call (item D), so no
+        // other transaction can be concurrently mutating this page.
         auto page = io_.read_data_page(page_id);
-        PageFileLock page_lock(page->path);
-
-        // re-read while locked - to avoid races between first read and flock
-        page = io_.read_data_page(page_id);
 
         if (!page->has_space(size))
             return std::nullopt;
@@ -160,11 +179,10 @@ namespace storage
         mt.total_rows++;
         mt.live_rows++;
 
-        txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+        LSN to_ensure = txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+        txn.ensure_durable(to_ensure);
 
-        // must be durable before the PageFileLock below unlocks, otherwise the lock
-        // doesn't actually protect the on-disk state from a concurrent writer
-        io_.write(*page, true);
+        io_.write_nolock(*page, true);
 
         {
             std::lock_guard lock(mutex_);
@@ -184,11 +202,8 @@ namespace storage
     {
         MetaTable mt_unchanged = mt;
 
+        // no PageFileLock needed here: see insert_row_locked above.
         auto page = io_.read_data_page(page_id);
-        PageFileLock page_lock(page->path);
-
-        // re-read while locked - to avoid races between first read and flock
-        page = io_.read_data_page(page_id);
 
         DataRow* target = nullptr;
         for (auto& row : page->rows)
@@ -210,19 +225,20 @@ namespace storage
         target->flags |= DataRowFlags::OBSOLETE;
         mt.live_rows--;
 
-        LSN lsn = txn.append_log(DeleteRecord(mt.id, page->id, before));
-        page->last_lsn = lsn;
+        LSN insert_lsn = txn.append_log(DeleteRecord(mt.id, page->id, before));
+        page->last_lsn = insert_lsn;
 
-        txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+        LSN to_ensure = txn.append_log(UpdateTableRecord(mt_unchanged, mt));
+        txn.ensure_durable(to_ensure);
 
-        io_.write(*page, true);
+        io_.write_nolock(*page, true);
 
         {
             std::lock_guard lock(mutex_);
             put_dp_impl(page_id, std::move(*page));
         }
 
-        return lsn;
+        return insert_lsn;
     }
 
     void
@@ -251,44 +267,25 @@ namespace storage
     }
 
     void
-    BufferPool::flush(DataPageBuffer::CacheEntry& page_entry)
+    BufferPool::flush_pending_writes()
     {
-        bool is_dirty;
+        std::optional<DataPage> evicted_dp;
+        std::optional<DataPage> created_dp;
+        std::optional<IndexFile> idx_file;
         {
             std::lock_guard lock(mutex_);
-            is_dirty = page_entry.dirty;
+            evicted_dp.swap(pending_dp_eviction_);
+            created_dp.swap(pending_dp_creation_);
+            idx_file.swap(pending_if_eviction_);
         }
 
-        if (is_dirty)
-        {
-            io_.write(page_entry.value, true);
-            std::lock_guard lock(mutex_);
-            page_entry.dirty = false;
-        }
+        if (evicted_dp.has_value())
+            io_.write(*evicted_dp, true);
+        if (created_dp.has_value())
+            io_.write(*created_dp, true);
+        if (idx_file.has_value())
+            io_.write(*idx_file, true);
     }
-
-    void
-    BufferPool::flush(IndexFileBuffer::CacheEntry& index_file_entry)
-    {
-        bool is_dirty;
-        {
-            std::lock_guard lock(mutex_);
-            is_dirty = index_file_entry.dirty;
-        }
-
-        if (is_dirty)
-        {
-            io_.write(index_file_entry.value, true);
-            std::lock_guard lock(mutex_);
-            index_file_entry.dirty = false;
-        }
-    }
-
-    // All methods suffixed with impl assume the caller holds the appropriate
-    // locks on the data structures (data_pages/index_files_/data_pages_per_table_/index_files_per_table_).
-    // *_impl methods may call other *_impl methods.
-    // The locking public API (below) may not be called from any of these methods,
-    // as doing so would cause the public methods to acquire the same lock, which would cause deadlock.
 
     void
     BufferPool::initialize_impl()
@@ -300,7 +297,8 @@ namespace storage
     void
     BufferPool::put_dp_impl(const DataPageId& page_id, DataPage&& page)
     {
-        data_pages_.put(page_id, {std::move(page)}, data_page_flusher_);
+        if (auto evicted = data_pages_.put(page_id, std::move(page)))
+            pending_dp_eviction_ = std::move(evicted);
     }
 
     DataPage*
@@ -314,7 +312,8 @@ namespace storage
             if (!loaded_page)
                 return nullptr;
 
-            data_pages_.put(page_id, std::move(*loaded_page), data_page_flusher_);
+            if (auto evicted = data_pages_.put(page_id, std::move(*loaded_page)))
+                pending_dp_eviction_ = std::move(evicted);
 
             entry = data_pages_.get(page_id);
         }
@@ -437,7 +436,8 @@ namespace storage
             if (!loaded_file)
                 return nullptr;
 
-            index_files_.put(index_id, std::move(*loaded_file), index_file_flusher_);
+            if (auto evicted = index_files_.put(index_id, std::move(*loaded_file)))
+                pending_if_eviction_ = std::move(evicted);
             entry = index_files_.get(index_id);
         }
 
@@ -455,7 +455,8 @@ namespace storage
         IndexFile file = io_.create_index_file(schema_name, table.name, index);
         file.last_lsn = last_lsn;
 
-        index_files_.put(index.id, std::move(file), index_file_flusher_);
+        if (auto evicted = index_files_.put(index.id, std::move(file)))
+            pending_if_eviction_ = std::move(evicted);
         dirty_if_impl(file.index_id);
 
         auto it = index_files_per_table_.find(table.id);
@@ -554,7 +555,12 @@ namespace storage
     {
         DataPageId id = DataPageId::make();
         DataPage new_page = io_.create_page(mt, id);
-        data_pages_.put(id, std::move(new_page), data_page_flusher_);
+
+        // no backing file yet -- stash a copy for the caller to write out after unlocking
+        pending_dp_creation_ = new_page;
+
+        if (auto evicted = data_pages_.put(id, std::move(new_page)))
+            pending_dp_eviction_ = std::move(evicted);
 
         auto it = data_pages_per_table_.find(mt.id);
         if (it == data_pages_per_table_.end())

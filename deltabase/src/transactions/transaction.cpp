@@ -41,14 +41,28 @@ namespace txn
         if (state_ != TransactionState::IDLE)
             throw std::runtime_error("Transaction::begin: transaction state not idle");
 
-        types::BeginTxnRecord record(0, last_lsn_, id_);
-        types::LSN lsn = mgr_->wal_manager().append_log(record);
+        mgr_->lock_manager().acquire(id_, {}, LockMode::Exclusive);
+
+        types::LSN lsn;
+        try
+        {
+            types::BeginTxnRecord record(0, last_lsn_, id_);
+            lsn = mgr_->wal_manager().append_log(record);
+        }
+        catch (...)
+        {
+            // state_ is still IDLE here, so neither commit() nor rollback()
+            // will ever run for this transaction -- release the lock
+            // ourselves, or it would be held forever.
+            mgr_->lock_manager().release_all(id_);
+            throw;
+        }
 
         state_ = TransactionState::ACTIVE;
         advance_lsn(lsn);
     }
 
-    int
+    types::LSN
     Transaction::append_log(const types::WALRecord& record)
     {
         if (state_ != TransactionState::ACTIVE)
@@ -80,6 +94,7 @@ namespace txn
         state_ = TransactionState::COMMITTED;
 
         mgr_->remove_active_entry(*this);
+        mgr_->lock_manager().release_all(id_);
     }
 
     void
@@ -103,6 +118,13 @@ namespace txn
         state_ = TransactionState::ABORTED;
 
         mgr_->remove_active_entry(*this);
+        mgr_->lock_manager().release_all(id_);
+    }
+
+    void
+    Transaction::ensure_durable(types::LSN lsn)
+    {
+        mgr_->wal_manager().ensure_durable(lsn);
     }
 
     template <typename R, typename CLR>

@@ -8,6 +8,7 @@
 
 // data/
 // data/db_name/
+// data/db_name/db.lock
 // data/db_name/schema_name/
 // data/db_name/schema_name/schema_name.meta
 // data/db_name/schema_name/table_name/
@@ -27,6 +28,7 @@ namespace storage
     static const std::string PATH_INDEX = "index";
     static const std::string PATH_TABLES = "tables";
     static const std::string PATH_SEQUENCES = "sequences";
+    static const std::string PATH_LOCK = "db.lock";
 
     inline std::string
     make_meta_filename(const std::string& name)
@@ -57,11 +59,10 @@ namespace storage
         const fs::path& data_dir,
         const std::string& db_name,
         uint64_t first_lsn,
-        uint64_t last_lsn
-    )
+        uint64_t last_lsn)
     {
         return data_dir / db_name / PATH_WAL
-            / (std::to_string(first_lsn) + "_" + std::to_string(last_lsn));
+               / (std::to_string(first_lsn) + "_" + std::to_string(last_lsn));
     }
 
     inline fs::path
@@ -76,8 +77,7 @@ namespace storage
         const std::string& db_name,
         const std::string& schema_name,
         const std::string& table_name,
-        const std::string& page_id
-    )
+        const std::string& page_id)
     {
         return data_dir / db_name / schema_name / table_name / PATH_DATA / page_id;
     }
@@ -87,8 +87,7 @@ namespace storage
         const fs::path& data_dir,
         const std::string& db_name,
         const std::string& schema_name,
-        const std::string& table_name
-    )
+        const std::string& table_name)
     {
         return data_dir / db_name / schema_name / table_name;
     }
@@ -98,8 +97,7 @@ namespace storage
         const fs::path& data_dir,
         const std::string& db_name,
         const std::string& schema_name,
-        const std::string& table_name
-    )
+        const std::string& table_name)
     {
         return data_dir / db_name / schema_name / table_name / PATH_DATA;
     }
@@ -109,8 +107,7 @@ namespace storage
         const fs::path& data_dir,
         const std::string& db_name,
         const std::string& schema_name,
-        const std::string& table_name
-    )
+        const std::string& table_name)
     {
         return data_dir / db_name / schema_name / table_name / make_meta_filename(table_name);
     }
@@ -119,8 +116,7 @@ namespace storage
     path_db_schema(
         const fs::path& data_dir,
         const std::string& db_name,
-        const std::string& schema_name
-    )
+        const std::string& schema_name)
     {
         return data_dir / db_name / schema_name;
     }
@@ -129,8 +125,7 @@ namespace storage
     path_db_schema_meta(
         const fs::path& data_dir,
         const std::string& db_name,
-        const std::string& schema_name
-    )
+        const std::string& schema_name)
     {
         return data_dir / db_name / schema_name / make_meta_filename(schema_name);
     }
@@ -141,8 +136,7 @@ namespace storage
         const std::string& db_name,
         const std::string& schema_name,
         const std::string& table_name,
-        const std::string& index_name
-    )
+        const std::string& index_name)
     {
         return db_path / db_name / schema_name / table_name / PATH_INDEX / index_name;
     }
@@ -152,10 +146,17 @@ namespace storage
         const fs::path& db_path,
         const std::string& db_name,
         const std::string& schema_name,
-        const std::string& sequence_name
-    )
+        const std::string& sequence_name)
     {
         return db_path / db_name / schema_name / make_meta_filename(sequence_name);
+    }
+
+    inline fs::path
+    path_db_lock(
+        const fs::path& db_path,
+        const std::string& db_name)
+    {
+        return db_path / db_name / PATH_LOCK;
     }
 
 } // namespace storage

@@ -8,6 +8,7 @@
 #include "protocol.hpp"
 #include "session.hpp"
 #include "socket_handle.hpp"
+#include "storage_registry.hpp"
 
 #include <cstdint>
 
@@ -23,6 +24,8 @@ namespace net
 
         std::unordered_map<types::UUID, engine::Engine> sessions_;
         std::mutex sessions_mutex_;
+
+        storage::StorageRegistry registry_;
 
         std::unique_ptr<INetProtocol> protocol_;
 

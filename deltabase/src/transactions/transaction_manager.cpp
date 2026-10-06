@@ -9,10 +9,11 @@ namespace txn
 {
     TransactionManager::TransactionManager(
         wal::IWALManager& wal_manager, storage::BufferPool& buffer_pool,
-        storage::CatalogCache& catalog, recovery::RecoveryManager& recovery_manager
+        storage::CatalogCache& catalog, recovery::RecoveryManager& recovery_manager,
+        ILockManager& lock_manager
     )
         : wal_manager_(wal_manager), buffer_pool_(buffer_pool), catalog_(catalog),
-          recovery_manager_(recovery_manager)
+          recovery_manager_(recovery_manager), lock_manager_(lock_manager)
     {
     }
 
@@ -44,6 +45,12 @@ namespace txn
     TransactionManager::recovery_manager() const
     {
         return recovery_manager_;
+    }
+
+    ILockManager&
+    TransactionManager::lock_manager() const
+    {
+        return lock_manager_;
     }
 
     void

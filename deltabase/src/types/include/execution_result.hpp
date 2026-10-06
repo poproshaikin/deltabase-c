@@ -48,6 +48,12 @@ namespace types
         StreamedResult(std::unique_ptr<exq::INodeExecutor>&& executor);
         StreamedResult(std::unique_ptr<exq::INodeExecutor>&& executor, std::function<void()> on_exhausted);
 
+        // guarantees on_exhausted_ fires even if the stream is abandoned
+        // (LIMIT, disconnect, error) before next() ever returns false --
+        // callers may be relying on it for cleanup (e.g. releasing a lock),
+        // not just for the "scanned everything" case.
+        ~StreamedResult() override;
+
         bool
         next(DataRow& out) override;
 

@@ -37,6 +37,12 @@ namespace types
     {
     }
 
+    StreamedResult::~StreamedResult()
+    {
+        if (on_exhausted_)
+            on_exhausted_();
+    }
+
     bool
     StreamedResult::next(DataRow& out)
     {

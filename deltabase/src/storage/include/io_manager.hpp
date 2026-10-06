@@ -63,6 +63,13 @@ namespace storage
         virtual void
         write(const types::DataPage& page, bool fsync = false) = 0;
 
+        // same as write, but takes no file lock - only safe when the caller
+        // already has exclusive access to this db guaranteed some other way
+        // (today: the whole-db write lock held for the active transaction, see
+        // insert_row_locked/delete_row_locked)
+        virtual void
+        write_nolock(const types::DataPage& page, bool fsync = false) = 0;
+
         virtual void
         write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync = false) = 0;
 
