@@ -68,11 +68,6 @@ namespace storage
         write(const types::DataPage& page, bool fsync) override;
 
         void
-        write_mt(
-            const types::MetaTable& table, const std::string& schema_name, bool fsync
-        ) override;
-
-        void
         write_mt(const types::MetaTable& table, bool fsync) override;
 
         void
@@ -116,7 +111,7 @@ namespace storage
 
         types::IndexFile
         create_index_file(
-            const std::string& string, const std::string& table_name, const types::MetaIndex& mi
+            const types::UUID& schema_id, const types::UUID& table_id, const types::MetaIndex& mi
         ) override;
 
         std::unique_ptr<types::IndexFile>

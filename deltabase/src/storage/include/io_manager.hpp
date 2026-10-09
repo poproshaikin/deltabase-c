@@ -71,9 +71,6 @@ namespace storage
         write_nolock(const types::DataPage& page, bool fsync = false) = 0;
 
         virtual void
-        write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync = false) = 0;
-
-        virtual void
         write_mt(const types::MetaTable& table, bool fsync = false) = 0;
 
         virtual void
@@ -108,7 +105,7 @@ namespace storage
 
         virtual types::IndexFile
         create_index_file(
-            const std::string& schema_name, const std::string& table_name, const types::MetaIndex& mi
+            const types::UUID& schema_id, const types::UUID& table_id, const types::MetaIndex& mi
         ) = 0;
 
         virtual std::unique_ptr<types::IndexFile>

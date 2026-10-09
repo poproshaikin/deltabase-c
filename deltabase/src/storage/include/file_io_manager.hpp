@@ -92,9 +92,6 @@ namespace storage
         estimate_size(const types::DataRow& row) override;
 
         void
-        write_mt(const types::MetaTable& table, const std::string& schema_name, bool fsync) override;
-
-        void
         write_mt(const types::MetaTable& table, bool fsync) override;
 
         void
@@ -129,8 +126,8 @@ namespace storage
 
         types::IndexFile
         create_index_file(
-            const std::string& schema_name,
-            const std::string& table_name,
+            const types::UUID& schema_id,
+            const types::UUID& table_id,
             const types::MetaIndex& mi
         ) override;
 

@@ -233,8 +233,8 @@ namespace exq
         bool index = false;
 
         const std::string schema_name = stmt.table.schema_name.has_value()
-                                                ? stmt.table.schema_name.value().value
-                                                : db_config_.default_schema;
+                                            ? stmt.table.schema_name.value().value
+                                            : db_config_.default_schema;
 
         IPlanNode::Type scan_type = IPlanNode::Type::SEQ_SCAN;
         const MetaTable* table = nullptr;
@@ -307,7 +307,8 @@ namespace exq
 
         QueryPlan plan;
         plan.type = QueryPlan::Type::SELECT;
-        if (scan_type == IPlanNode::Type::SEQ_SCAN && table != nullptr && node->type() == IPlanNode::Type::SEQ_SCAN)
+        if (scan_type == IPlanNode::Type::SEQ_SCAN && table != nullptr && node->type() ==
+            IPlanNode::Type::SEQ_SCAN)
             plan.needs_stream = should_stream_for_seq_scan(*table, *node);
         else
             plan.needs_stream = false;
@@ -487,10 +488,10 @@ namespace exq
     QueryPlan
     StdPlanner::plan(const AlterTableStmt& stmt) const
     {
-
-        auto schema_name = stmt.table.schema_name.has_value()
-                               ? stmt.table.schema_name.value().value
-                               : db_config_.default_schema;
+        auto schema_name =
+            stmt.table.schema_name.has_value()
+                ? stmt.table.schema_name.value().value
+                : db_config_.default_schema;
 
         const auto* schema = ssp_.ddl().get_schema(schema_name);
 

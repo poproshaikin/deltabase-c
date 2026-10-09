@@ -85,9 +85,6 @@ namespace storage
     DetachedFileIOManager::write(const types::DataPage&, bool) { unsupported(); }
 
     void
-    DetachedFileIOManager::write_mt(const types::MetaTable&, const std::string&, bool) { unsupported(); }
-
-    void
     DetachedFileIOManager::write_mt(const types::MetaTable&, bool) { unsupported(); }
 
     void
@@ -119,7 +116,7 @@ namespace storage
 
     types::IndexFile
     DetachedFileIOManager::create_index_file(
-        const std::string&, const std::string&, const types::MetaIndex&
+        const types::UUID&, const types::UUID&, const types::MetaIndex&
     ) { unsupported(); }
 
     std::unique_ptr<types::IndexFile>

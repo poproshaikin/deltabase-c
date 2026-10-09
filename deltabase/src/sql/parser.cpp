@@ -112,7 +112,8 @@ namespace sql
                 parsed = AstNode(AstNodeType::CREATE_INDEX, parse_create_index());
 
             else
-                throw EngineException("Unsupported statement", EngineException::Code::UNSUPPORTED_STATEMENT);
+                throw EngineException("Unsupported statement",
+                                      EngineException::Code::UNSUPPORTED_STATEMENT);
         }
         else if (match(SqlKeyword::DROP))
         {
@@ -126,7 +127,8 @@ namespace sql
                 parsed = AstNode(AstNodeType::DROP_TABLE, parse_drop_table());
 
             else
-                throw EngineException("Unsupported statement", EngineException::Code::UNSUPPORTED_STATEMENT);
+                throw EngineException("Unsupported statement",
+                                      EngineException::Code::UNSUPPORTED_STATEMENT);
         }
         else if (match(SqlKeyword::ALTER))
         {
@@ -137,7 +139,8 @@ namespace sql
                 parsed = AstNode(AstNodeType::ALTER_TABLE, parse_alter_table());
 
             else
-                throw EngineException("Unsupported statement", EngineException::Code::UNSUPPORTED_STATEMENT);
+                throw EngineException("Unsupported statement",
+                                      EngineException::Code::UNSUPPORTED_STATEMENT);
         }
         else if (match(SqlKeyword::BEGIN))
         {
@@ -153,14 +156,16 @@ namespace sql
         }
         else
         {
-            throw EngineException("Unsupported statement", EngineException::Code::UNSUPPORTED_STATEMENT);
+            throw EngineException("Unsupported statement",
+                                  EngineException::Code::UNSUPPORTED_STATEMENT);
         }
 
         const bool valid_from_current = is_trailing_sequence_valid(tokens_, current_);
         const bool valid_from_next = is_trailing_sequence_valid(tokens_, current_ + 1);
 
         if (!valid_from_current && !valid_from_next)
-            throw EngineException("Unexpected tokens after statement", EngineException::Code::SYNTAX_ERROR);
+            throw EngineException("Unexpected tokens after statement",
+                                  EngineException::Code::SYNTAX_ERROR);
 
         return parsed;
     }
@@ -232,7 +237,8 @@ namespace sql
                 advance_or_throw("Invalid statement syntax");
                 if (!match(SqlTokenType::IDENTIFIER))
                 {
-                    throw EngineException("Expected column identifier in INSERT", EngineException::Code::SYNTAX_ERROR);
+                    throw EngineException("Expected column identifier in INSERT",
+                                          EngineException::Code::SYNTAX_ERROR);
                 }
                 stmt.columns.push_back(*current());
 
@@ -275,7 +281,8 @@ namespace sql
             }
 
             if (!match(SqlTokenType::LITERAL))
-                throw EngineException("Expected a literal in VALUES expression", EngineException::Code::SYNTAX_ERROR);
+                throw EngineException("Expected a literal in VALUES expression",
+                                      EngineException::Code::SYNTAX_ERROR);
 
             values.values.push_back(*current());
 
@@ -312,7 +319,8 @@ namespace sql
             {
                 misc::Logger::warn(
                     "[parse_update] ERROR: Expected assignment expression (col = value)");
-                throw EngineException("Expected assignment expression (col = value)", EngineException::Code::SYNTAX_ERROR);
+                throw EngineException("Expected assignment expression (col = value)",
+                                      EngineException::Code::SYNTAX_ERROR);
             }
 
             stmt.assignments.emplace_back(std::move(expr));
@@ -375,6 +383,30 @@ namespace sql
         return stmt;
     }
 
+    AlterTableOperation
+    SqlParser::parse_alter_table_add()
+    {
+        if (match(SqlKeyword::COLUMN))
+        {
+            advance_or_throw("Missing column definition");
+
+            return AddColumnOperation{.column = parse_column_def()};
+        }
+
+        throw EngineException("Expected COLUMN after ADD", EngineException::Code::SYNTAX_ERROR);
+    }
+
+    RenameTableOperation
+    SqlParser::parse_alter_table_rename()
+    {
+        match_or_throw(SqlKeyword::TO);
+        advance_or_throw("Specify a new name of the table");
+        auto new_name = *current();
+        advance();
+
+        return RenameTableOperation{.new_name = new_name};
+    }
+
     AlterTableStmt
     SqlParser::parse_alter_table()
     {
@@ -393,24 +425,17 @@ namespace sql
             if (match(SqlKeyword::ADD))
             {
                 advance_or_throw("You need to specify what to add in 'ALTER TABLE'");
-
-                if (match(SqlKeyword::COLUMN))
-                {
-                    advance_or_throw("Missing column definition");
-
-                    stmt.operations.push_back(
-                        AddColumnOperation{.column = parse_column_def()}
-                    );
-                }
-                else
-                {
-                    throw EngineException("Expected COLUMN after ADD", EngineException::Code::SYNTAX_ERROR);
-                }
-
-                continue;
+                stmt.operations.push_back(parse_alter_table_add());
             }
-
-            throw EngineException("Unsupported ALTER TABLE operation", EngineException::Code::UNSUPPORTED_STATEMENT);
+            else if (match(SqlKeyword::RENAME))
+            {
+                advance_or_throw("You need to specify what to rename");
+                stmt.operations.push_back(parse_alter_table_rename());
+            }
+            else
+                throw EngineException(
+                    "Unsupported ALTER TABLE operation",
+                    EngineException::Code::UNSUPPORTED_STATEMENT);
         }
 
         return stmt;
@@ -474,7 +499,8 @@ namespace sql
             auto next = current();
 
             if (!std::holds_alternative<SqlKeyword>(next->detail))
-                throw EngineException("Expected keyword after NOT", EngineException::Code::SYNTAX_ERROR);
+                throw EngineException("Expected keyword after NOT",
+                                      EngineException::Code::SYNTAX_ERROR);
 
             auto next_kw = next->get_detail<SqlKeyword>();
 
@@ -495,7 +521,8 @@ namespace sql
                 throw EngineException("Expected KEY keyword", EngineException::Code::SYNTAX_ERROR);
 
             if (key->get_detail<SqlKeyword>() != SqlKeyword::KEY)
-                throw EngineException("Expected KEY after PRIMARY", EngineException::Code::SYNTAX_ERROR);
+                throw EngineException("Expected KEY after PRIMARY",
+                                      EngineException::Code::SYNTAX_ERROR);
 
             advance();
 
@@ -544,7 +571,8 @@ namespace sql
                 }
             }
 
-            return ForeignKeyConstraint{.referenced_table = std::move(table), .referenced_column = std::move(column), .action = action};
+            return ForeignKeyConstraint{.referenced_table = std::move(table),
+                                        .referenced_column = std::move(column), .action = action};
         }
         if (kw == SqlKeyword::DEFAULT)
         {
@@ -816,10 +844,12 @@ namespace sql
         auto node = parse_binary_tree(min_priority);
 
         if (!node)
-            throw EngineException("Expected binary expression, got null node", EngineException::Code::SYNTAX_ERROR);
+            throw EngineException("Expected binary expression, got null node",
+                                  EngineException::Code::SYNTAX_ERROR);
 
         if (node->type != AstNodeType::BINARY_EXPR)
-            throw EngineException("Expected binary expression", EngineException::Code::SYNTAX_ERROR);
+            throw EngineException("Expected binary expression",
+                                  EngineException::Code::SYNTAX_ERROR);
 
         return std::get<BinaryExpr>(std::move(node->value));
     }
@@ -834,7 +864,8 @@ namespace sql
             advance();
             auto node = parse_binary_expr(0);
             if (!match(SqlSymbol::RPAREN))
-                throw EngineException("Expected right parenthesis", EngineException::Code::SYNTAX_ERROR);
+                throw EngineException("Expected right parenthesis",
+                                      EngineException::Code::SYNTAX_ERROR);
 
             return std::make_unique<AstNode>(AstNodeType::BINARY_EXPR, std::move(node));
         }

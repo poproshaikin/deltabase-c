@@ -127,9 +127,8 @@ namespace recovery
                 if (!file)
                 {
                     auto owner = find_index_owner(io_, r.index_id);
-                    auto ms = io_.read_schema_meta(owner.first.schema_id);
                     file = std::make_unique<IndexFile>(
-                        io_.create_index_file(ms.name, owner.first.name, owner.second));
+                        io_.create_index_file(owner.first.schema_id, owner.first.id, owner.second));
                 }
 
                 if (file->last_lsn < r.lsn)

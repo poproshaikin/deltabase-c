@@ -20,41 +20,41 @@ internal class StdProtocolImpl : IProtocol
         switch (message)
         {
             case PingMessage ping:
-                writer.Write(ping.RequestId);
+                WriteInt32BigEndian(writer, ping.RequestId);
                 return stream.ToArray();
 
             case PongMessage pong:
                 WriteGuid(writer, pong.SessionId);
-                writer.Write(pong.RequestId);
+                WriteInt32BigEndian(writer, pong.RequestId);
                 writer.Write((byte)pong.ErrorCode);
                 return stream.ToArray();
 
             case QueryMessage query:
                 WriteGuid(writer, query.SessionId);
-                writer.Write(query.RequestId);
+                WriteInt32BigEndian(writer, query.RequestId);
                 WriteString(writer, query.Query);
                 return stream.ToArray();
 
             case CreateDbMessage createDb:
                 WriteGuid(writer, createDb.SessionId);
-                writer.Write(createDb.RequestId);
+                WriteInt32BigEndian(writer, createDb.RequestId);
                 WriteString(writer, createDb.DbName);
                 return stream.ToArray();
 
             case AttachDbMessage attachDb:
                 WriteGuid(writer, attachDb.SessionId);
-                writer.Write(attachDb.RequestId);
+                WriteInt32BigEndian(writer, attachDb.RequestId);
                 WriteString(writer, attachDb.DbName);
                 return stream.ToArray();
 
             case CancelStreamMessage cancelStream:
                 WriteGuid(writer, cancelStream.SessionId);
-                writer.Write(cancelStream.RequestId);
+                WriteInt32BigEndian(writer, cancelStream.RequestId);
                 return stream.ToArray();
 
             case CloseMessage close:
                 WriteGuid(writer, close.SessionId);
-                writer.Write(close.RequestId);
+                WriteInt32BigEndian(writer, close.RequestId);
                 return stream.ToArray();
 
             default:
@@ -77,7 +77,7 @@ internal class StdProtocolImpl : IProtocol
         switch (messageType)
         {
             case MessageType.Ping:
-                if (!TryReadInt32(reader, out var pingRequestId))
+                if (!TryReadInt32BigEndian(reader, out var pingRequestId))
                     throw new DeltabaseException();
 
                 return new PingMessage(pingRequestId);
@@ -86,7 +86,7 @@ internal class StdProtocolImpl : IProtocol
                 if (!TryReadGuid(reader, out var pongSessionId))
                     throw new DeltabaseException();
 
-                if (!TryReadInt32(reader, out var pongRequestId))
+                if (!TryReadInt32BigEndian(reader, out var pongRequestId))
                     throw new DeltabaseException();
 
                 if (!TryReadByte(reader, out var rawErr))
@@ -101,7 +101,7 @@ internal class StdProtocolImpl : IProtocol
                 if (!TryReadGuid(reader, out var querySessionId))
                     throw new DeltabaseException();
 
-                if (!TryReadInt32(reader, out var queryRequestId))
+                if (!TryReadInt32BigEndian(reader, out var queryRequestId))
                     throw new DeltabaseException();
 
                 if (!TryReadString(reader, out var query))
@@ -113,7 +113,7 @@ internal class StdProtocolImpl : IProtocol
                 if (!TryReadGuid(reader, out var createSessionId))
                     throw new DeltabaseException();
 
-                if (!TryReadInt32(reader, out var createRequestId))
+                if (!TryReadInt32BigEndian(reader, out var createRequestId))
                     throw new DeltabaseException();
 
                 if (!TryReadString(reader, out var createDbName))
@@ -128,7 +128,7 @@ internal class StdProtocolImpl : IProtocol
                 if (!TryReadGuid(reader, out var attachSessionId))
                     throw new DeltabaseException();
 
-                if (!TryReadInt32(reader, out var attachRequestId))
+                if (!TryReadInt32BigEndian(reader, out var attachRequestId))
                     throw new DeltabaseException();
 
                 if (!TryReadString(reader, out var attachDbName))
@@ -143,7 +143,7 @@ internal class StdProtocolImpl : IProtocol
                 if (!TryReadGuid(reader, out var cancelSessionId))
                     throw new DeltabaseException();
 
-                if (!TryReadInt32(reader, out var cancelRequestId))
+                if (!TryReadInt32BigEndian(reader, out var cancelRequestId))
                     throw new DeltabaseException();
 
                 return new CancelStreamMessage(cancelSessionId, cancelRequestId);
@@ -152,7 +152,7 @@ internal class StdProtocolImpl : IProtocol
                 if (!TryReadGuid(reader, out var closeSessionId))
                     throw new DeltabaseException();
 
-                if (!TryReadInt32(reader, out var closeRequestId))
+                if (!TryReadInt32BigEndian(reader, out var closeRequestId))
                     throw new DeltabaseException();
 
                 return new CloseMessage(closeSessionId, closeRequestId);
@@ -292,15 +292,31 @@ internal class StdProtocolImpl : IProtocol
         return true;
     }
 
-    private static bool TryReadInt32(BinaryReader reader, out int value)
+    private static void WriteInt32BigEndian(BinaryWriter writer, int value)
     {
+        Span<byte> bytes = stackalloc byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32BigEndian(bytes, value);
+        writer.Write(bytes);
+    }
+
+    private static bool TryReadInt32BigEndian(BinaryReader reader, out int value)
+    {
+        value = default;
+
         if (reader.BaseStream.Position + sizeof(int) > reader.BaseStream.Length)
         {
-            value = default;
             return false;
         }
 
-        value = reader.ReadInt32();
+        Span<byte> bytes = stackalloc byte[sizeof(int)];
+        var read = reader.Read(bytes);
+
+        if (read != sizeof(int))
+        {
+            return false;
+        }
+
+        value = BinaryPrimitives.ReadInt32BigEndian(bytes);
         return true;
     }
 

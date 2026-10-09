@@ -66,7 +66,8 @@ namespace types
         REFERENCES,
         CASCADE,
         RESTRICT,
-
+        RENAME,
+        TO,
     };
 
     enum class SqlSymbol

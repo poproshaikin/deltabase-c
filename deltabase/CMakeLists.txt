@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
 project(deltabase LANGUAGES CXX)
 
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR "In-source builds are not allowed. Run cmake from the 'build/' directory instead: cmake -S . -B build -G Ninja")
+endif()
+
 enable_language(C)
 
 set(CMAKE_CXX_STANDARD 20)

@@ -75,6 +75,13 @@ namespace storage
             const types::ColumnDefinition& column,
             txn::Transaction& txn);
 
+        void
+        rename_table(
+            const std::string& table_name,
+            const std::string& schema_name,
+            const std::string& new_name,
+            txn::Transaction& txn);
+
         types::UUID
         create_sequence(
             const std::string& sequence_name,

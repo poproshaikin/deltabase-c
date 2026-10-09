@@ -295,8 +295,8 @@ namespace storage
                 auto size = io_manager_.estimate_size(new_row);
 
                 DataPage* destination = reading_page->has_space(size)
-                                             ? reading_page
-                                             : buffer_pool_.prepare_dp(size, *mt, txn);
+                                            ? reading_page
+                                            : buffer_pool_.prepare_dp(size, *mt, txn);
 
                 const DataRow old_row = row;
                 row.flags |= DataRowFlags::OBSOLETE;
@@ -326,6 +326,22 @@ namespace storage
 
         UpdateTableRecord update_table_record(unchanged_mt, *mt);
         txn.append_log(update_table_record);
+        catalog_.mark_dirty(mt, txn.get_last_lsn());
+    }
+
+    void
+    DDLService::rename_table(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const std::string& new_name,
+        txn::Transaction& txn)
+    {
+        auto mt = get_table(table_name, schema_name);
+        auto mt_unchanged = *mt;
+
+        mt->name = new_name;
+
+        txn.append_log(UpdateTableRecord(mt_unchanged, *mt));
         catalog_.mark_dirty(mt, txn.get_last_lsn());
     }
 

@@ -30,7 +30,7 @@ namespace net
     {
         MemoryStream stream;
         stream.write_message_type(msg.type);
-        stream.write(&msg.request_id, sizeof(msg.request_id));
+        stream.write_i32(msg.request_id, true);
         return stream.to_vector();
     }
 
@@ -40,7 +40,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
-        stream.write(&msg.request_id, sizeof(msg.request_id));
+        stream.write_i32(msg.request_id, true);
 
         const auto raw_err = static_cast<uint8_t>(msg.err);
         stream.write(&raw_err, sizeof(raw_err));
@@ -56,7 +56,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
-        stream.write(&msg.request_id, sizeof(msg.request_id));
+        stream.write_i32(msg.request_id, true);
         stream.write_string(msg.query, true);
         return stream.to_vector();
     }
@@ -67,7 +67,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
-        stream.write(&msg.request_id, sizeof(msg.request_id));
+        stream.write_i32(msg.request_id, true);
         stream.write_string(msg.db_name, true);
 
         return stream.to_vector();
@@ -79,7 +79,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
-        stream.write(&msg.request_id, sizeof(msg.request_id));
+        stream.write_i32(msg.request_id, true);
         stream.write_string(msg.db_name, true);
 
         return stream.to_vector();
@@ -91,7 +91,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
-        stream.write(&msg.request_id, sizeof(msg.request_id));
+        stream.write_i32(msg.request_id, true);
         return stream.to_vector();
     }
 
@@ -101,7 +101,7 @@ namespace net
         MemoryStream stream;
         stream.write_message_type(msg.type);
         stream.write_uuid(msg.session_id);
-        stream.write(&msg.request_id, sizeof(msg.request_id));
+        stream.write_i32(msg.request_id, true);
         return stream.to_vector();
     }
 
@@ -133,7 +133,7 @@ namespace net
         case NetMessageType::PING:
         {
             int32_t request_id = 0;
-            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            if (!stream.read_i32(request_id, true))
             {
                 return protocol_violation_message();
             }
@@ -148,7 +148,7 @@ namespace net
                 return protocol_violation_message();
 
             int32_t request_id = 0;
-            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            if (!stream.read_i32(request_id, true))
                 return protocol_violation_message();
 
             uint8_t raw_err = 0;
@@ -171,7 +171,7 @@ namespace net
             }
 
             int32_t request_id = 0;
-            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            if (!stream.read_i32(request_id, true))
             {
                 return protocol_violation_message();
             }
@@ -194,7 +194,7 @@ namespace net
             }
 
             int32_t request_id = 0;
-            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            if (!stream.read_i32(request_id, true))
             {
                 return protocol_violation_message();
             }
@@ -217,7 +217,7 @@ namespace net
             }
 
             int32_t request_id = 0;
-            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            if (!stream.read_i32(request_id, true))
             {
                 return protocol_violation_message();
             }
@@ -240,7 +240,7 @@ namespace net
             }
 
             int32_t request_id = 0;
-            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            if (!stream.read_i32(request_id, true))
             {
                 return protocol_violation_message();
             }
@@ -257,7 +257,7 @@ namespace net
             }
 
             int32_t request_id = 0;
-            if (!stream.read_exact(&request_id, sizeof(request_id)))
+            if (!stream.read_i32(request_id, true))
             {
                 return protocol_violation_message();
             }

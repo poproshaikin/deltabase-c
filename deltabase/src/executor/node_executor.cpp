@@ -550,7 +550,7 @@ namespace exq
     }
 
     bool
-    AlterTableNodeExecutor::next(DataRow& out)
+    AlterTableNodeExecutor::next(DataRow&)
     {
         if (executed_)
             return false;
@@ -560,6 +560,11 @@ namespace exq
             if (auto* add_col = std::get_if<AddColumnOperation>(&operation))
             {
                 service_provider_.ddl().add_column(table_name_, schema_.name, add_col->column, *ctx_.txn);
+                executed_ = true;
+            }
+            if (auto* rename_to = std::get_if<RenameTableOperation>(&operation))
+            {
+                service_provider_.ddl().rename_table(table_name_, schema_.name, rename_to->new_name, *ctx_.txn);
                 executed_ = true;
             }
         }

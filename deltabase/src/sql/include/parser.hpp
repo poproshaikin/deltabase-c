@@ -34,6 +34,11 @@ namespace sql
         types::CreateTableStmt
         parse_create_table();
 
+        types::AlterTableOperation
+        parse_alter_table_add();
+        types::RenameTableOperation
+        parse_alter_table_rename();
+
         types::AlterTableStmt
         parse_alter_table();
 

@@ -223,8 +223,14 @@ namespace types
         ColumnDefinition column;
     };
 
+    struct RenameTableOperation
+    {
+        std::string new_name;
+    };
+
     using AlterTableOperation = std::variant<
-        AddColumnOperation
+        AddColumnOperation,
+        RenameTableOperation
     >;
 
     struct AlterTableStmt

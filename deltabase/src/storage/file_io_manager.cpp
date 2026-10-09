@@ -95,9 +95,8 @@ namespace storage
         for_each_schema(
             [&](const fs::directory_entry& schema_entry)
             {
-                const auto tables_path = paths_.tables_dir(
-                    schema_entry.path().filename().string()
-                );
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto tables_path = paths_.tables_dir(schema_id);
                 if (!fs::exists(tables_path))
                     return;
 
@@ -121,8 +120,8 @@ namespace storage
         for_each_schema(
             [&](const fs::directory_entry& schema_entry)
             {
-                const auto schema_name = schema_entry.path().filename().string();
-                const auto meta_path = paths_.schema_meta(schema_name);
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto meta_path = paths_.schema_meta(schema_id);
 
                 if (!fs::exists(meta_path))
                     return;
@@ -146,60 +145,83 @@ namespace storage
     FileIOManager::read_schema_meta(const std::string& target_schema)
     {
         DbGuard guard(*db_mutex_);
-        const auto path = paths_.schema_meta(target_schema);
-        auto content = read_file(path);
-        auto stream = misc::ReadOnlyMemoryStream(content);
-        MetaSchema schema;
-        if (!serializer_->deserialize_ms(stream, schema))
-            throw std::runtime_error(
-                "FileIOManager::read_schema_meta: failed to deserialize " + path.string()
-            );
-        return schema;
-    }
-
-    MetaSchema
-    FileIOManager::read_schema_meta(const UUID& schema_id)
-    {
-        DbGuard guard(*db_mutex_);
-        MetaSchema result{};
+        std::unique_ptr<MetaSchema> result;
 
         for_each_schema(
-            [&](const fs::directory_entry& schema_entry)
+            [this, &target_schema, &result](const fs::directory_entry& schema_entry)
             {
-                if (result.id == schema_id)
+                if (result)
                     return;
 
-                const auto schema_name = schema_entry.path().filename().string();
-                const auto path = paths_.schema_meta(schema_name);
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto path = paths_.schema_meta(schema_id);
+                if (!fs::exists(path))
+                    return;
+
                 auto content = read_file(path);
                 auto stream = misc::ReadOnlyMemoryStream(content);
-
                 MetaSchema ms;
                 if (!serializer_->deserialize_ms(stream, ms))
                     throw std::runtime_error(
                         "FileIOManager::read_schema_meta: failed to deserialize " + path.string()
                     );
 
-                if (ms.id == schema_id)
-                    result = std::move(ms);
+                if (ms.name == target_schema)
+                    result = std::make_unique<MetaSchema>(std::move(ms));
             }
         );
 
-        if (result.id != schema_id)
+        if (!result)
             throw std::runtime_error(
-                "FileIOManager::read_schema_meta: schema with id " + schema_id.to_string() +
-                " not found"
+                "FileIOManager::read_schema_meta: schema '" + target_schema + "' not found"
             );
 
-        return result;
+        return *result;
+    }
+
+    MetaSchema
+    FileIOManager::read_schema_meta(const UUID& schema_id)
+    {
+        DbGuard guard(*db_mutex_);
+        const auto path = paths_.schema_meta(schema_id);
+        auto content = read_file(path);
+        auto stream = misc::ReadOnlyMemoryStream(content);
+
+        MetaSchema ms;
+        if (!serializer_->deserialize_ms(stream, ms))
+            throw std::runtime_error(
+                "FileIOManager::read_schema_meta: failed to deserialize " + path.string()
+            );
+
+        return ms;
     }
 
     bool
     FileIOManager::exists_schema(const std::string& schema_name)
     {
         DbGuard guard(*db_mutex_);
-        const auto path = paths_.schema_meta(schema_name);
-        return fs::exists(path) && fs::is_regular_file(path);
+        bool found = false;
+
+        for_each_schema(
+            [&](const fs::directory_entry& schema_entry)
+            {
+                if (found)
+                    return;
+
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto path = paths_.schema_meta(schema_id);
+                if (!fs::exists(path))
+                    return;
+
+                auto content = read_file(path);
+                auto stream = misc::ReadOnlyMemoryStream(content);
+                MetaSchema ms;
+                if (serializer_->deserialize_ms(stream, ms) && ms.name == schema_name)
+                    found = true;
+            }
+        );
+
+        return found;
     }
 
     // --- table reads ---------------------------------------------------------
@@ -208,7 +230,50 @@ namespace storage
     FileIOManager::exists_table(const std::string& table_name, const std::string& schema_name)
     {
         DbGuard guard(*db_mutex_);
-        return fs::exists(paths_.table_meta(schema_name, table_name));
+        bool found = false;
+
+        for_each_schema(
+            [&](const fs::directory_entry& schema_entry)
+            {
+                if (found)
+                    return;
+
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto schema_meta_path = paths_.schema_meta(schema_id);
+                if (!fs::exists(schema_meta_path))
+                    return;
+
+                MetaSchema ms;
+                {
+                    auto content = read_file(schema_meta_path);
+                    misc::ReadOnlyMemoryStream stream(content);
+                    if (!serializer_->deserialize_ms(stream, ms) || ms.name != schema_name)
+                        return;
+                }
+
+                const auto tables_path = paths_.tables_dir(schema_id);
+                if (!fs::exists(tables_path))
+                    return;
+
+                for (const auto& table_entry : fs::directory_iterator(tables_path))
+                {
+                    if (found || !table_entry.is_directory())
+                        continue;
+
+                    const auto meta_path = table_entry.path() / PATH_META;
+                    if (!fs::exists(meta_path))
+                        continue;
+
+                    auto content = read_file(meta_path);
+                    MetaTable mt;
+                    misc::ReadOnlyMemoryStream stream(content);
+                    if (serializer_->deserialize_mt(stream, mt) && mt.name == table_name)
+                        found = true;
+                }
+            }
+        );
+
+        return found;
     }
 
     std::vector<MetaTable>
@@ -220,8 +285,8 @@ namespace storage
         for_each_schema(
             [&](const fs::directory_entry& schema_entry)
             {
-                const auto schema_name = schema_entry.path().filename().string();
-                const auto tables_path = paths_.tables_dir(schema_name);
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto tables_path = paths_.tables_dir(schema_id);
                 if (!fs::exists(tables_path))
                     return;
 
@@ -230,8 +295,8 @@ namespace storage
                     if (!table_entry.is_directory())
                         continue;
 
-                    const auto table_name = table_entry.path().filename().string();
-                    const auto meta_path = paths_.table_meta(schema_name, table_name);
+                    const auto table_id = UUID(table_entry.path().filename().string());
+                    const auto meta_path = paths_.table_meta(schema_id, table_id);
                     if (!fs::exists(meta_path))
                         continue;
 
@@ -243,7 +308,6 @@ namespace storage
                             "FileIOManager::read_tables_meta: failed to deserialize " +
                             meta_path.string()
                         );
-                    mt.schema_name = schema_name;
                     tables.push_back(std::move(mt));
                 }
             }
@@ -256,16 +320,63 @@ namespace storage
     FileIOManager::read_table_meta(const std::string& table_name, const std::string& schema_name)
     {
         DbGuard guard(*db_mutex_);
-        const auto path = paths_.table_meta(schema_name, table_name);
-        auto content = read_file(path);
-        MetaTable table;
-        misc::ReadOnlyMemoryStream stream(content);
-        if (!serializer_->deserialize_mt(stream, table))
+        std::unique_ptr<MetaTable> result;
+
+        for_each_schema(
+            [&](const fs::directory_entry& schema_entry)
+            {
+                if (result)
+                    return;
+
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto schema_meta_path = paths_.schema_meta(schema_id);
+                if (!fs::exists(schema_meta_path))
+                    return;
+
+                MetaSchema ms;
+                {
+                    auto content = read_file(schema_meta_path);
+                    misc::ReadOnlyMemoryStream stream(content);
+                    if (!serializer_->deserialize_ms(stream, ms) || ms.name != schema_name)
+                        return;
+                }
+
+                const auto tables_path = paths_.tables_dir(schema_id);
+                if (!fs::exists(tables_path))
+                    return;
+
+                for (const auto& table_entry : fs::directory_iterator(tables_path))
+                {
+                    if (result || !table_entry.is_directory())
+                        continue;
+
+                    const auto meta_path = table_entry.path() / PATH_META;
+                    if (!fs::exists(meta_path))
+                        continue;
+
+                    auto content = read_file(meta_path);
+                    MetaTable mt;
+                    misc::ReadOnlyMemoryStream stream(content);
+                    if (!serializer_->deserialize_mt(stream, mt))
+                        throw std::runtime_error(
+                            "FileIOManager::read_table_meta: failed to deserialize " +
+                            meta_path.string()
+                        );
+
+                    if (mt.name == table_name)
+                        result = std::make_unique<MetaTable>(std::move(mt));
+                }
+            }
+        );
+
+        if (!result)
             throw std::runtime_error(
-                "FileIOManager::read_table_meta: failed to deserialize " + path.string()
+                "FileIOManager::read_table_meta: table '" + table_name +
+                "' not found in schema '" + schema_name + "'"
             );
-        table.schema_name = schema_name;
-        return table;
+
+        result->schema_name = schema_name;
+        return *result;
     }
 
     MetaTable
@@ -280,8 +391,7 @@ namespace storage
                 if (result)
                     return;
 
-                const auto table_name = table_dir.path().filename().string();
-                const auto meta_path = table_dir.path() / make_meta_filename(table_name);
+                const auto meta_path = table_dir.path() / PATH_META;
                 if (!fs::exists(meta_path) || !fs::is_regular_file(meta_path))
                     return;
 
@@ -295,11 +405,7 @@ namespace storage
                     );
 
                 if (mt.id == table_id)
-                {
-                    // table_dir is {db}/{schema}/tables/{table}
-                    mt.schema_name = table_dir.path().parent_path().parent_path().filename().string();
                     result = std::make_unique<MetaTable>(std::move(mt));
-                }
             }
         );
 
@@ -322,8 +428,8 @@ namespace storage
         for_each_schema(
             [&](const fs::directory_entry& schema_entry)
             {
-                const auto schema_name = schema_entry.path().filename().string();
-                const auto tables_path = paths_.tables_dir(schema_name);
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto tables_path = paths_.tables_dir(schema_id);
                 if (!fs::exists(tables_path))
                     return;
 
@@ -332,8 +438,8 @@ namespace storage
                     if (!table_entry.is_directory())
                         continue;
 
-                    const auto table_name = table_entry.path().filename().string();
-                    const auto meta_path = paths_.table_meta(schema_name, table_name);
+                    const auto table_id = UUID(table_entry.path().filename().string());
+                    const auto meta_path = paths_.table_meta(schema_id, table_id);
                     if (!fs::exists(meta_path))
                         continue;
 
@@ -349,7 +455,7 @@ namespace storage
                     }
 
                     std::vector<DataPage> pages;
-                    const auto data_dir = paths_.table_data_dir(schema_name, table_name);
+                    const auto data_dir = paths_.table_data_dir(schema_id, table_id);
                     if (fs::exists(data_dir) && fs::is_directory(data_dir))
                     {
                         for (const auto& page_entry : fs::directory_iterator(data_dir))
@@ -383,7 +489,8 @@ namespace storage
         DbGuard guard(*db_mutex_);
         std::vector<DataPage> pages;
 
-        const auto data_path = paths_.table_data_dir(schema_name, table_name);
+        const auto table = read_table_meta(table_name, schema_name);
+        const auto data_path = paths_.table_data_dir(table.schema_id, table.id);
         if (!fs::exists(data_path))
         {
             fs::create_directories(data_path);
@@ -489,10 +596,10 @@ namespace storage
     }
 
     void
-    FileIOManager::write_mt(const MetaTable& table, const std::string& schema_name, bool fsync)
+    FileIOManager::write_mt(const MetaTable& table, bool fsync)
     {
         DbGuard guard(*db_mutex_);
-        const auto path = paths_.table_meta(schema_name, table.name);
+        const auto path = paths_.table_meta(table.schema_id, table.id);
         auto serialized = serializer_->serialize_mt(table);
         if (fsync)
             fsync_file(path, serialized.to_vector());
@@ -501,19 +608,10 @@ namespace storage
     }
 
     void
-    FileIOManager::write_mt(const MetaTable& table, bool fsync)
-    {
-        DbGuard guard(*db_mutex_);
-        const std::string schema_name =
-            table.schema_name.empty() ? read_schema_meta(table.schema_id).name : table.schema_name;
-        write_mt(table, schema_name, fsync);
-    }
-
-    void
     FileIOManager::write_ms(const MetaSchema& ms, bool fsync)
     {
         DbGuard guard(*db_mutex_);
-        const auto path = paths_.schema_meta(ms.name);
+        const auto path = paths_.schema_meta(ms.id);
         auto serialized = serializer_->serialize_ms(ms);
         if (fsync)
             fsync_file(path, serialized.to_vector());
@@ -525,16 +623,14 @@ namespace storage
     FileIOManager::delete_mt(const MetaTable& table)
     {
         DbGuard guard(*db_mutex_);
-        const std::string schema_name =
-            table.schema_name.empty() ? read_schema_meta(table.schema_id).name : table.schema_name;
-        fs::remove_all(paths_.table(schema_name, table.name));
+        fs::remove_all(paths_.table(table.schema_id, table.id));
     }
 
     void
     FileIOManager::delete_ms(const MetaSchema& schema)
     {
         DbGuard guard(*db_mutex_);
-        fs::remove_all(paths_.schema(schema.name));
+        fs::remove_all(paths_.schema(schema.id));
     }
 
     void
@@ -591,9 +687,7 @@ namespace storage
     FileIOManager::create_page(const MetaTable& mt, const DataPageId& page_id)
     {
         DbGuard guard(*db_mutex_);
-        const std::string schema_name =
-            mt.schema_name.empty() ? read_schema_meta(mt.schema_id).name : mt.schema_name;
-        const auto data_path = paths_.table_data_dir(schema_name, mt.name);
+        const auto data_path = paths_.table_data_dir(mt.schema_id, mt.id);
         return DataPage::make(data_path, mt.id, page_id);
     }
 
@@ -608,8 +702,8 @@ namespace storage
         for_each_schema(
             [&](const fs::directory_entry& schema_entry)
             {
-                const auto schema_name = schema_entry.path().filename().string();
-                const auto tables_path = paths_.tables_dir(schema_name);
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto tables_path = paths_.tables_dir(schema_id);
                 if (!fs::exists(tables_path))
                     return;
 
@@ -618,8 +712,8 @@ namespace storage
                     if (!table_entry.is_directory())
                         continue;
 
-                    const auto table_name = table_entry.path().filename().string();
-                    const auto meta_path = paths_.table_meta(schema_name, table_name);
+                    const auto table_id = UUID(table_entry.path().filename().string());
+                    const auto meta_path = paths_.table_meta(schema_id, table_id);
                     if (!fs::exists(meta_path))
                         continue;
 
@@ -634,7 +728,7 @@ namespace storage
                             );
                     }
 
-                    const auto data_dir = paths_.table_data_dir(schema_name, table_name);
+                    const auto data_dir = paths_.table_data_dir(schema_id, table_id);
                     if (!fs::exists(data_dir) || !fs::is_directory(data_dir))
                         continue;
 
@@ -663,8 +757,8 @@ namespace storage
         for_each_schema(
             [&](const fs::directory_entry& schema_entry)
             {
-                const auto schema_name = schema_entry.path().filename().string();
-                const auto tables_path = paths_.tables_dir(schema_name);
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto tables_path = paths_.tables_dir(schema_id);
                 if (!fs::exists(tables_path))
                     return;
 
@@ -673,8 +767,8 @@ namespace storage
                     if (!table_entry.is_directory())
                         continue;
 
-                    const auto table_name = table_entry.path().filename().string();
-                    const auto meta_path = paths_.table_meta(schema_name, table_name);
+                    const auto table_id = UUID(table_entry.path().filename().string());
+                    const auto meta_path = paths_.table_meta(schema_id, table_id);
                     if (!fs::exists(meta_path))
                         continue;
 
@@ -689,7 +783,7 @@ namespace storage
                             );
                     }
 
-                    const auto index_dir = paths_.table_index_dir(schema_name, table_name);
+                    const auto index_dir = paths_.table_index_dir(schema_id, table_id);
                     if (!fs::exists(index_dir) || !fs::is_directory(index_dir))
                         continue;
 
@@ -713,7 +807,7 @@ namespace storage
 
     types::IndexFile
     FileIOManager::create_index_file(
-        const std::string& schema_name, const std::string& table_name, const MetaIndex& mi
+        const UUID& schema_id, const UUID& table_id, const MetaIndex& mi
     )
     {
         DbGuard guard(*db_mutex_);
@@ -730,7 +824,7 @@ namespace storage
         file.last_page = root.id;
         file.pages.push_back(std::move(root));
 
-        const auto path = paths_.table_index(schema_name, table_name, mi.id.to_string());
+        const auto path = paths_.table_index(schema_id, table_id, mi.id.to_string());
         fs::create_directories(path.parent_path());
         auto serialized = serializer_->serialize_if(file);
         write_file(path, serialized.to_vector());
@@ -811,22 +905,60 @@ namespace storage
     FileIOManager::read_seq(const std::string& name, const std::string& schema_name)
     {
         DbGuard guard(*db_mutex_);
-        const auto path = paths_.sequence(schema_name, name);
-        auto content = read_file(path);
-        MetaSequence sequence;
-        misc::ReadOnlyMemoryStream stream(content);
-        if (!serializer_->deserialize_seq(stream, sequence))
+        std::unique_ptr<MetaSequence> result;
+
+        for_each_schema(
+            [&](const fs::directory_entry& schema_entry)
+            {
+                if (result)
+                    return;
+
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto schema_meta_path = paths_.schema_meta(schema_id);
+                if (!fs::exists(schema_meta_path))
+                    return;
+
+                MetaSchema ms;
+                {
+                    auto content = read_file(schema_meta_path);
+                    misc::ReadOnlyMemoryStream stream(content);
+                    if (!serializer_->deserialize_ms(stream, ms) || ms.name != schema_name)
+                        return;
+                }
+
+                const auto seq_dir = paths_.sequences_dir(schema_id);
+                if (!fs::exists(seq_dir))
+                    return;
+
+                for (const auto& seq_entry : fs::directory_iterator(seq_dir))
+                {
+                    if (result || !seq_entry.is_regular_file())
+                        continue;
+
+                    auto content = read_file(seq_entry.path());
+                    MetaSequence seq;
+                    misc::ReadOnlyMemoryStream stream(content);
+                    if (serializer_->deserialize_seq(stream, seq) && seq.name == name)
+                        result = std::make_unique<MetaSequence>(std::move(seq));
+                }
+            }
+        );
+
+        if (!result)
             throw std::runtime_error(
-                "FileIOManager::read_seq: failed to deserialize sequence " + name
+                "FileIOManager::read_seq: sequence '" + name + "' not found in schema '" +
+                schema_name + "'"
             );
-        return sequence;
+
+        result->schema_name = schema_name;
+        return *result;
     }
 
     void
     FileIOManager::write_seq(const MetaSequence& sequence, bool fsync)
     {
         DbGuard guard(*db_mutex_);
-        const auto path = paths_.sequence(sequence.schema_name, sequence.name);
+        const auto path = paths_.sequence(sequence.schema_id, sequence.id);
         fs::create_directories(path.parent_path());
         auto serialized = serializer_->serialize_seq(sequence);
         write_file(path, serialized.to_vector());
@@ -836,7 +968,7 @@ namespace storage
     FileIOManager::delete_seq(const MetaSequence& sequence)
     {
         DbGuard guard(*db_mutex_);
-        const auto path = paths_.sequence(sequence.schema_name, sequence.name);
+        const auto path = paths_.sequence(sequence.schema_id, sequence.id);
         if (fs::exists(path))
             fs::remove(path);
     }
@@ -850,8 +982,8 @@ namespace storage
         for_each_schema(
             [&](const fs::directory_entry& schema_entry)
             {
-                const auto schema_name = schema_entry.path().filename().string();
-                const auto seq_dir = paths_.sequences_dir(schema_name);
+                const auto schema_id = UUID(schema_entry.path().filename().string());
+                const auto seq_dir = paths_.sequences_dir(schema_id);
                 if (!fs::exists(seq_dir) || !fs::is_directory(seq_dir))
                     return;
 
@@ -868,7 +1000,6 @@ namespace storage
                             "FileIOManager::read_sequences: failed to deserialize " +
                             seq_entry.path().filename().string()
                         );
-                    seq.schema_name = schema_name;
                     sequences.push_back(std::move(seq));
                 }
             }

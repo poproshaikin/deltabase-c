@@ -58,7 +58,9 @@ namespace sql
             {"foreign", SqlKeyword::FOREIGN},
             {"references", SqlKeyword::REFERENCES},
             {"cascade", SqlKeyword::CASCADE},
-            {"restrict", SqlKeyword::RESTRICT}
+            {"restrict", SqlKeyword::RESTRICT},
+            {"rename", SqlKeyword::RENAME},
+            {"to", SqlKeyword::TO},
         };
 
         return dictionary;

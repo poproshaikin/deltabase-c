@@ -452,7 +452,7 @@ namespace storage
         LSN last_lsn
     )
     {
-        IndexFile file = io_.create_index_file(schema_name, table.name, index);
+        IndexFile file = io_.create_index_file(table.schema_id, table.id, index);
         file.last_lsn = last_lsn;
 
         if (auto evicted = index_files_.put(index.id, std::move(file)))
