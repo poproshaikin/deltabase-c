@@ -54,10 +54,21 @@ namespace types
     {
         for (const auto& column : columns)
         {
-            if (column.name == col_name)
+            if (!column.is_dropped && column.name == col_name)
                 return true;
         }
         return false;
+    }
+
+    MetaColumn&
+    MetaTable::get_column(const std::string& col_name)
+    {
+        for (auto& column : columns)
+        {
+            if (!column.is_dropped && column.name == col_name)
+                return column;
+        }
+        throw std::runtime_error("MetaTable::get_column: column '" + col_name + "' not found");
     }
 
     const MetaColumn&
@@ -65,7 +76,7 @@ namespace types
     {
         for (const auto& column : columns)
         {
-            if (column.name == col_name)
+            if (!column.is_dropped && column.name == col_name)
                 return column;
         }
         throw std::runtime_error("MetaTable::get_column: column '" + col_name + "' not found");
@@ -97,7 +108,7 @@ namespace types
         for (const auto& index : indexes)
         {
             auto column = get_column(index.column_id);
-            if (column.name == col_name && index.is_unique)
+            if (!column.is_dropped && column.name == col_name && index.is_unique)
                 return true;
         }
 
@@ -111,7 +122,7 @@ namespace types
         for (auto& index : indexes)
         {
             auto column = get_column(index.column_id);
-            if (column.name == col_name && (!only_unique || index.is_unique))
+            if (!column.is_dropped && column.name == col_name && (!only_unique || index.is_unique))
                 result.push_back(&index);
         }
         return result;
@@ -124,7 +135,7 @@ namespace types
         for (const auto& index : indexes)
         {
             auto column = get_column(index.column_id);
-            if (column.name == col_name && (!only_unique || index.is_unique))
+            if (!column.is_dropped && column.name == col_name && (!only_unique || index.is_unique))
                 result.push_back(&index);
         }
         return result;
@@ -135,7 +146,7 @@ namespace types
     {
         for (size_t i = 0; i < columns.size(); ++i)
         {
-            if (columns[i].name == col_name)
+            if (!columns[i].is_dropped && columns[i].name == col_name)
                 return static_cast<int64_t>(i);
         }
         return -1;

@@ -82,10 +82,22 @@ namespace storage
             const std::string& new_name,
             txn::Transaction& txn);
 
+        void
+        drop_column(
+            const std::string& table_name,
+            const std::string& schema_name,
+            const std::string& column_name,
+            txn::Transaction& txn);
+
         types::UUID
         create_sequence(
             const std::string& sequence_name,
             const std::string& schema_name,
+            txn::Transaction& txn);
+
+        void
+        drop_sequence(
+            const types::UUID& sequence_id,
             txn::Transaction& txn);
 
         void
@@ -134,6 +146,9 @@ namespace storage
 
         void
         throw_if_referenced(const types::TableId& table_id) const;
+
+        void
+        throw_if_referenced(const types::TableId& table_id, const types::ColumnId& column_id) const;
     };
 }
 

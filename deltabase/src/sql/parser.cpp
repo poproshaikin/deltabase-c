@@ -228,9 +228,7 @@ namespace sql
         advance_or_throw();
         stmt.table = parse_table_identifier();
 
-        match_or_throw(SqlSymbol::LPAREN, "Expected left parenthesis");
-
-        if (!match(SqlOperator::MUL))
+        if (match(SqlSymbol::LPAREN))
         {
             while (true)
             {
@@ -248,16 +246,13 @@ namespace sql
                     break;
                 }
             }
-        }
-        else
-        {
-            advance_or_throw("Invalid statement syntax");
+
+            advance_or_throw();
+            match_or_throw(SqlSymbol::RPAREN, "Expected right parenthesis");
+
+            advance_or_throw();
         }
 
-        advance_or_throw();
-        match_or_throw(SqlSymbol::RPAREN, "Expected right parenthesis");
-
-        advance_or_throw();
         match_or_throw(SqlKeyword::VALUES, "Expected 'VALUES' keyword");
 
         advance_or_throw();
@@ -407,6 +402,23 @@ namespace sql
         return RenameTableOperation{.new_name = new_name};
     }
 
+    DropColumnOperation
+    SqlParser::parse_alter_table_drop()
+    {
+        if (match(SqlKeyword::COLUMN))
+        {
+            advance_or_throw("Missing column name");
+            match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier");
+
+            auto column_name = *current();
+            advance();
+
+            return DropColumnOperation{.column_name = column_name};
+        }
+
+        throw EngineException("Expected COLUMN after DROP", EngineException::Code::SYNTAX_ERROR);
+    }
+
     AlterTableStmt
     SqlParser::parse_alter_table()
     {
@@ -431,6 +443,11 @@ namespace sql
             {
                 advance_or_throw("You need to specify what to rename");
                 stmt.operations.push_back(parse_alter_table_rename());
+            }
+            else if (match(SqlKeyword::DROP))
+            {
+                advance_or_throw("You need to specify what to drop in 'ALTER TABLE'");
+                stmt.operations.push_back(parse_alter_table_drop());
             }
             else
                 throw EngineException(

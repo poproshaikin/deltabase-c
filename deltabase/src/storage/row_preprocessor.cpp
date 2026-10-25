@@ -27,7 +27,7 @@ namespace storage
         const DataToken null_token(Bytes{}, DataType::_NULL);
 
         // Step 1: map named columns to positional, fill gaps with NULL
-        std::vector<DataToken> normalized(mt.columns.size(), null_token);
+        std::vector normalized(mt.columns.size(), null_token);
 
         if (!cols.has_value())
         {
@@ -47,6 +47,9 @@ namespace storage
         // Step 2: apply DEFAULT for missing (NULL) positions
         for (size_t i = 0; i < mt.columns.size(); ++i)
         {
+            if (mt.columns[i].is_dropped)
+                continue;
+
             if (normalized[i].type == DataType::_NULL)
             {
                 const auto* dc = mt.columns[i].get_constraint<MetaDefaultConstraint>();
@@ -61,6 +64,9 @@ namespace storage
         for (size_t i = 0; i < mt.columns.size(); ++i)
         {
             const auto& column = mt.columns[i];
+            if (column.is_dropped)
+                continue;
+
             const auto* ai = column.get_constraint<MetaAutoIncrementConstraint>();
             if (!ai)
                 continue;

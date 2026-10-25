@@ -50,6 +50,8 @@ namespace types
         CLR_CREATE_SEQUENCE,
         UPDATE_SEQUENCE,
         CLR_UPDATE_SEQUENCE,
+        DROP_SEQUENCE,
+        CLR_DROP_SEQUENCE,
         LINK_DATA_PAGE,
         WRITE_INDEX_PAGE,
         BEGIN_CKPT,
@@ -765,6 +767,51 @@ namespace types
         }
     };
 
+    struct DropSequenceRecord
+    {
+        static constexpr auto type = WALRecordType::DROP_SEQUENCE;
+
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        UUID txn_id = UUID::null();
+        MetaSequence before;
+
+        DropSequenceRecord() = default;
+
+        DropSequenceRecord(const MetaSequence& before) : before(before)
+        {
+        }
+
+        DropSequenceRecord(LSN lsn, LSN prev_lsn, const UUID& txn_id, const MetaSequence& before)
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), before(before)
+        {
+        }
+    };
+
+    struct CLRDropSequenceRecord
+    {
+        static constexpr auto type = WALRecordType::CLR_DROP_SEQUENCE;
+
+        LSN lsn = 0;
+        LSN prev_lsn = 0;
+        UUID txn_id = UUID::null();
+
+        LSN undo_next_lsn = 0;
+        MetaSequence before;
+
+        CLRDropSequenceRecord() = default;
+
+        CLRDropSequenceRecord(LSN lsn,
+                              LSN prev_lsn,
+                              const UUID& txn_id,
+                              LSN undo_next_lsn,
+                              const MetaSequence& before)
+            : lsn(lsn), prev_lsn(prev_lsn), txn_id(txn_id), undo_next_lsn(undo_next_lsn),
+              before(before)
+        {
+        }
+    };
+
     struct BeginTxnRecord
     {
         static constexpr auto type = WALRecordType::BEGIN_TXN;
@@ -988,6 +1035,9 @@ namespace types
         UpdateSequenceRecord,
         CLRUpdateSequenceRecord,
 
+        DropSequenceRecord,
+        CLRDropSequenceRecord,
+
         BeginTxnRecord,
         CommitTxnRecord,
         RollbackTxnRecord,
@@ -1020,7 +1070,8 @@ namespace types
         CreateIndexRecord,
         DropIndexRecord,
         CreateSequenceRecord,
-        UpdateSequenceRecord>;
+        UpdateSequenceRecord,
+        DropSequenceRecord>;
 
     using WALMetaCLRRecord = detail::WALRecordVariant<
         CLRCreateSchemaRecord,
@@ -1032,7 +1083,8 @@ namespace types
         CLRCreateIndexRecord,
         CLRDropIndexRecord,
         CLRCreateSequenceRecord,
-        CLRUpdateSequenceRecord>;
+        CLRUpdateSequenceRecord,
+        CLRDropSequenceRecord>;
 
     using WALCLRRecord = detail::WALRecordVariant<
         CLRInsertRecord,
@@ -1045,7 +1097,8 @@ namespace types
         CLRUpdateTableRecord,
         CLRDeleteTableRecord,
         CLRCreateIndexRecord,
-        CLRDropIndexRecord>;
+        CLRDropIndexRecord,
+        CLRDropSequenceRecord>;
 
     using WALTxnRecord =
     detail::WALRecordVariant<BeginTxnRecord, CommitTxnRecord, RollbackTxnRecord>;

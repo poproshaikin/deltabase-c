@@ -36,6 +36,8 @@ namespace types
 
         bool
         has_column(const std::string& col_name) const;
+        MetaColumn&
+        get_column(const std::string& col_name);
 
         const MetaColumn&
         get_column(const std::string& col_name) const;

@@ -7,7 +7,6 @@
 #include "information_schema_provider.hpp"
 #include "planner.hpp"
 #include "../../types/include/config.hpp"
-#include "../../storage/include/storage_service_provider.hpp"
 
 namespace exq
 {

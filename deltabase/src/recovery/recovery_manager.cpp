@@ -304,6 +304,18 @@ namespace recovery
     }
 
     void
+    RecoveryManager::redo(const DropSequenceRecord& record)
+    {
+        io_.delete_seq(with_schema_name(record.before, io_));
+    }
+
+    void
+    RecoveryManager::redo(const CLRDropSequenceRecord& record)
+    {
+        io_.write_seq(with_schema_name(record.before, io_), true);
+    }
+
+    void
     RecoveryManager::redo(const BeginTxnRecord&)
     {
     }
@@ -646,6 +658,12 @@ namespace recovery
     }
 
     void
+    RecoveryManager::undo_record(const DropSequenceRecord& record)
+    {
+        io_.write_seq(with_schema_name(record.before, io_), true);
+    }
+
+    void
     RecoveryManager::undo_record(const CreateSchemaRecord& record,
                                  storage::CatalogCache& catalog,
                                  LSN last_lsn)
@@ -734,6 +752,14 @@ namespace recovery
 
     void
     RecoveryManager::undo_record(const UpdateSequenceRecord& record,
+                                 storage::CatalogCache& catalog,
+                                 LSN last_lsn)
+    {
+        catalog.put(record.before, last_lsn);
+    }
+
+    void
+    RecoveryManager::undo_record(const DropSequenceRecord& record,
                                  storage::CatalogCache& catalog,
                                  LSN last_lsn)
     {
@@ -862,6 +888,12 @@ namespace recovery
             record.before,
             record.after
         );
+    }
+
+    WALRecord
+    RecoveryManager::make_clr(const DropSequenceRecord& record) const
+    {
+        return CLRDropSequenceRecord(record.lsn, 0, record.txn_id, record.prev_lsn, record.before);
     }
 
     std::unordered_map<TxnId, LSN>

@@ -514,6 +514,37 @@ namespace wal
     }
 
     MemoryStream
+    StdWalSerializer::serialize(const DropSequenceRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+
+        auto serialized_seq = binary_serializer_.serialize_seq(record.before);
+        stream.append(serialized_seq, serialized_seq.size());
+
+        return stream;
+    }
+
+    MemoryStream
+    StdWalSerializer::serialize(const CLRDropSequenceRecord& record) const
+    {
+        MemoryStream stream;
+        stream.write(&record.type, sizeof(record.type));
+        stream.write(&record.lsn, sizeof(record.lsn));
+        stream.write(&record.prev_lsn, sizeof(record.prev_lsn));
+        stream.write(&record.txn_id, sizeof(uuid_t));
+        stream.write(&record.undo_next_lsn, sizeof(record.undo_next_lsn));
+
+        auto serialized_seq = binary_serializer_.serialize_seq(record.before);
+        stream.append(serialized_seq, serialized_seq.size());
+
+        return stream;
+    }
+
+    MemoryStream
     StdWalSerializer::serialize(const CommitTxnRecord& record) const
     {
         MemoryStream stream;
@@ -1396,6 +1427,49 @@ namespace wal
                 return false;
 
             out = CLRUpdateSequenceRecord(lsn, prev_lsn, txn_id, undo_next_lsn, before, after);
+            return true;
+        }
+
+        case WALRecordType::DROP_SEQUENCE:
+        {
+            LSN lsn;
+            LSN prev_lsn;
+            UUID txn_id;
+            MetaSequence before;
+
+            if (!stream.read(&lsn, sizeof(lsn)))
+                return false;
+            if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                return false;
+            if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!binary_serializer_.deserialize_seq(stream, before))
+                return false;
+
+            out = DropSequenceRecord(lsn, prev_lsn, txn_id, before);
+            return true;
+        }
+
+        case WALRecordType::CLR_DROP_SEQUENCE:
+        {
+            LSN lsn;
+            LSN prev_lsn;
+            UUID txn_id;
+            LSN undo_next_lsn;
+            MetaSequence before;
+
+            if (!stream.read(&lsn, sizeof(lsn)))
+                return false;
+            if (!stream.read(&prev_lsn, sizeof(prev_lsn)))
+                return false;
+            if (!stream.read(txn_id.raw(), sizeof(uuid_t)))
+                return false;
+            if (!stream.read(&undo_next_lsn, sizeof(undo_next_lsn)))
+                return false;
+            if (!binary_serializer_.deserialize_seq(stream, before))
+                return false;
+
+            out = CLRDropSequenceRecord(lsn, prev_lsn, txn_id, undo_next_lsn, before);
             return true;
         }
 

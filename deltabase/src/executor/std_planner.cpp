@@ -3,6 +3,7 @@
 //
 
 #include "include/std_planner.hpp"
+#include "../../storage/include/storage_service_provider.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -238,13 +239,12 @@ namespace exq
 
         IPlanNode::Type scan_type = IPlanNode::Type::SEQ_SCAN;
         const MetaTable* table = nullptr;
-        std::optional<MetaTable> virtual_table_storage;
 
         if (info_schema_provider_.is_virtual(stmt.table))
         {
             // Virtual table: minimal plan node, no index optimization
             node = std::make_unique<VirtualTablePlanNode>(stmt.table.table_name, schema_name);
-            virtual_table_storage = info_schema_provider_.get_virtual_table(stmt.table);
+            std::optional virtual_table_storage = info_schema_provider_.get_virtual_table(stmt.table);
             table = &virtual_table_storage.value();
         }
         else
@@ -273,7 +273,7 @@ namespace exq
         }
 
         // 2. WHERE
-        if (stmt.where && !index && table)
+        if (stmt.where && !index)
         {
             auto filter = std::make_unique<FilterPlanNode>(
                 *table,
@@ -283,20 +283,24 @@ namespace exq
             node = std::move(filter);
         }
 
+        std::vector<std::string> cols;
+
         // 3. PROJECT
-        if (!stmt.columns.empty() && table)
-        {
-            std::vector<std::string> cols;
+        if (!stmt.columns.empty())
             for (auto& c : stmt.columns)
                 cols.push_back(c.value);
 
-            auto project = std::make_unique<ProjectPlanNode>(
-                *table,
-                cols,
-                std::move(node));
+        else if (stmt.columns.empty())
+            for (const auto& col : table->columns)
+                if (!col.is_dropped)
+                    cols.push_back(col.name);
 
-            node = std::move(project);
-        }
+        auto project = std::make_unique<ProjectPlanNode>(
+            *table,
+            cols,
+            std::move(node));
+
+        node = std::move(project);
 
         // 4. LIMIT
         if (stmt.limit)
@@ -307,7 +311,7 @@ namespace exq
 
         QueryPlan plan;
         plan.type = QueryPlan::Type::SELECT;
-        if (scan_type == IPlanNode::Type::SEQ_SCAN && table != nullptr && node->type() ==
+        if (scan_type == IPlanNode::Type::SEQ_SCAN  && node->type() ==
             IPlanNode::Type::SEQ_SCAN)
             plan.needs_stream = should_stream_for_seq_scan(*table, *node);
         else
@@ -322,6 +326,10 @@ namespace exq
     QueryPlan
     StdPlanner::plan(InsertStmt& stmt) const
     {
+        const std::string schema_name = stmt.table.schema_name.has_value()
+                                            ? stmt.table.schema_name.value().value
+                                            : db_config_.default_schema;
+
         std::vector<DataRow> rows;
         for (auto& [vals] : stmt.values)
             rows.emplace_back(vals);
@@ -336,12 +344,21 @@ namespace exq
                 col_names.push_back(col.value);
             cols.emplace(std::move(col_names));
         }
+        else
+        {
+            const MetaTable* table = ssp_.ddl().get_table(stmt.table.table_name.value, schema_name);
+
+            std::vector<std::string> col_names;
+            for (const auto& col : table->columns)
+                if (!col.is_dropped)
+                    col_names.push_back(col.name);
+
+            cols.emplace(std::move(col_names));
+        }
 
         auto insert = std::make_unique<InsertPlanNode>(
             stmt.table.table_name.value,
-            stmt.table.schema_name.has_value()
-                ? stmt.table.schema_name.value().value
-                : db_config_.default_schema,
+            schema_name,
             cols,
             std::move(values_node)
         );

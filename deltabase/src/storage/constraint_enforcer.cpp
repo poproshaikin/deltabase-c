@@ -24,6 +24,9 @@ namespace storage
         for (size_t i = 0; i < mt.columns.size(); ++i)
         {
             const auto& col = mt.columns[i];
+            if (col.is_dropped)
+                continue;
+
             const bool is_null = i >= row.size() || row[i].type == DataType::_NULL;
 
             if (col.has_constraint<MetaNotNullConstraint>() && is_null)

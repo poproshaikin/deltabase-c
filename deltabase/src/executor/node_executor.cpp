@@ -567,6 +567,11 @@ namespace exq
                 service_provider_.ddl().rename_table(table_name_, schema_.name, rename_to->new_name, *ctx_.txn);
                 executed_ = true;
             }
+            if (auto* drop_col = std::get_if<DropColumnOperation>(&operation))
+            {
+                service_provider_.ddl().drop_column(table_name_, schema_.name, drop_col->column_name.value, *ctx_.txn);
+                executed_ = true;
+            }
         }
 
         return false;

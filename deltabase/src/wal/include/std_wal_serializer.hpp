@@ -113,6 +113,12 @@ namespace wal
         serialize(const types::CLRUpdateSequenceRecord& record) const;
 
         misc::MemoryStream
+        serialize(const types::DropSequenceRecord& record) const;
+
+        misc::MemoryStream
+        serialize(const types::CLRDropSequenceRecord& record) const;
+
+        misc::MemoryStream
         serialize(const types::BeginCkptRecord& record) const;
 
         misc::MemoryStream

@@ -142,10 +142,6 @@ namespace storage
                     unique_col_names.push_back(mt.columns.back().name);
         }
 
-        // save (and look up through the catalog below) before logging: the WAL
-        // record must capture the table's final state, not this pre-mutation
-        // snapshot -- otherwise redo would clobber sequence_id/indexes added below
-        // on every future attach (redo re-applies committed records unconditionally).
         auto* saved = catalog_.save_table(std::move(mt), txn.get_last_lsn());
 
         for (auto& col : saved->columns)
@@ -317,15 +313,52 @@ namespace storage
 
                 InsertRecord insert_record(mt->id, destination->id, new_row);
                 txn.append_log(insert_record);
-                buffer_pool_.append_row(destination,
-                                        *mt,
-                                        new_row,
-                                        txn.get_last_lsn());
+                buffer_pool_.append_row(
+                    destination,
+                    *mt,
+                    new_row,
+                    txn.get_last_lsn());
             }
         }
 
         UpdateTableRecord update_table_record(unchanged_mt, *mt);
         txn.append_log(update_table_record);
+        catalog_.mark_dirty(mt, txn.get_last_lsn());
+    }
+
+    void
+    DDLService::drop_column(
+        const std::string& table_name,
+        const std::string& schema_name,
+        const std::string& column_name,
+        txn::Transaction& txn)
+    {
+        // найти таблицу
+        // find a column
+        // check constraints of this column
+        //     if auto increment: drop a sequence
+        //     if is unique: check if this column is not referenced by other tables
+        //     if there is an index bound to this column: drop index
+
+        auto* mt = get_table(table_name, schema_name);
+        const auto unchanged_mt = *mt;
+
+        auto& col = mt->get_column(column_name);
+
+        if (col.has_constraint<MetaPrimaryKeyConstraint>() || mt->is_unique(col.name))
+            throw_if_referenced(mt->id, col.id);
+
+        for (const auto& c : col.constraints)
+            if (auto* ai = std::get_if<MetaAutoIncrementConstraint>(&c))
+                drop_sequence(ai->sequence_id, txn);
+
+        if (auto indexes = mt->get_indexes(column_name); !indexes.empty())
+            for (auto* index : indexes)
+                drop_index(index->name, table_name, schema_name, txn);
+
+        col.is_dropped = true;
+
+        txn.append_log(UpdateTableRecord(unchanged_mt, *mt));
         catalog_.mark_dirty(mt, txn.get_last_lsn());
     }
 
@@ -365,6 +398,23 @@ namespace storage
         catalog_.put(sequence, txn.get_last_lsn());
 
         return sequence.id;
+    }
+
+    void
+    DDLService::drop_sequence(
+        const UUID& sequence_id,
+        txn::Transaction& txn)
+    {
+        auto* seq = catalog_.get_sequence(sequence_id);
+        if (!seq)
+            throw std::runtime_error("DDLService::drop_sequence: sequence not found");
+
+        const MetaSequence before = *seq;
+
+        catalog_.delete_sequence(before.id);
+
+        DropSequenceRecord record(before);
+        txn.append_log(record);
     }
 
     void
@@ -562,6 +612,28 @@ namespace storage
                         throw EngineException(
                             "cannot drop table '" + mt->name + "': referenced by column '" +
                             col.name + "' in table '" + other->name + "'",
+                            EngineException::Code::FOREIGN_KEY_VIOLATION);
+        }
+    }
+
+    void
+    DDLService::throw_if_referenced(const TableId& table_id, const ColumnId& column_id) const
+    {
+        const auto* mt = catalog_.get_table(table_id);
+        const auto& col = mt->get_column(column_id);
+
+        for (const auto* other : catalog_.get_all_tables())
+        {
+            if (other->id == table_id)
+                continue;
+
+            for (const auto& other_col : other->columns)
+                if (const auto* fk = other_col.get_constraint<MetaForeignKeyConstraint>())
+                    if (fk->referenced_table_id == table_id && fk->referenced_column_id == column_id)
+                        throw EngineException(
+                            "cannot drop column '" + col.name + "' of table '" + mt->name +
+                            "': referenced by column '" + other_col.name + "' in table '" +
+                            other->name + "'",
                             EngineException::Code::FOREIGN_KEY_VIOLATION);
         }
     }

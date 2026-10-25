@@ -91,6 +91,10 @@ namespace recovery
         redo(const types::UpdateSequenceRecord& record);
         void
         redo(const types::CLRUpdateSequenceRecord& record);
+        void
+        redo(const types::DropSequenceRecord& record);
+        void
+        redo(const types::CLRDropSequenceRecord& record);
 
         void
         redo(const types::BeginTxnRecord& record);
@@ -125,6 +129,8 @@ namespace recovery
         make_clr(const types::CreateSequenceRecord& record) const;
         types::WALRecord
         make_clr(const types::UpdateSequenceRecord& record) const;
+        types::WALRecord
+        make_clr(const types::DropSequenceRecord& record) const;
         types::WALRecord
         make_clr(const types::RollbackTxnRecord& record) const;
 
@@ -164,6 +170,8 @@ namespace recovery
         void
         undo_record(const types::UpdateSequenceRecord& record);
         void
+        undo_record(const types::DropSequenceRecord& record);
+        void
         undo_record(const types::RollbackTxnRecord& record);
 
     public:
@@ -200,6 +208,8 @@ namespace recovery
         undo_record(const types::CreateSequenceRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
         void
         undo_record(const types::UpdateSequenceRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
+        void
+        undo_record(const types::DropSequenceRecord& record, storage::CatalogCache& catalog, types::LSN last_lsn);
     };
 } // namespace recovery
 

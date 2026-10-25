@@ -228,9 +228,15 @@ namespace types
         std::string new_name;
     };
 
+    struct DropColumnOperation
+    {
+        SqlToken column_name;
+    };
+
     using AlterTableOperation = std::variant<
         AddColumnOperation,
-        RenameTableOperation
+        RenameTableOperation,
+        DropColumnOperation
     >;
 
     struct AlterTableStmt

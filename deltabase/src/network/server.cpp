@@ -12,6 +12,10 @@
 
 #include <thread>
 
+#ifndef _WIN32
+#include <csignal>
+#endif
+
 namespace net
 {
     using namespace types;
@@ -356,62 +360,77 @@ namespace net
 
         auto cancel_handler = [&]
         {
-            auto msg_bytes = handle.receive_message();
-
-            if (!msg_bytes)
+            try
             {
-                Logger::warn("Client disconnected: " + get_ip(handle.addr()));
+                auto msg_bytes = handle.receive_message();
+
+                if (!msg_bytes)
+                {
+                    Logger::warn("Client disconnected: " + get_ip(handle.addr()));
+                    disconnected.store(true);
+                    cancelled.store(true);
+                    stop = true;
+                    return;
+                }
+
+                auto message = protocol_->parse(msg_bytes.value());
+
+                std::visit(
+                    [&]<typename T>(const T& msg)
+                    {
+                        if constexpr (std::is_same_v<T, CancelStreamMessage>)
+                        {
+                            if (msg.session_id != session_id)
+                            {
+                                return;
+                            }
+
+                            cancelled.store(true);
+
+                            PongNetMessage stream_cancelled(
+                                session_id,
+                                NetErrorCode::SUCCESS,
+                                msg.request_id);
+                            auto stream_cancelled_bytes = protocol_->encode(stream_cancelled);
+                            handle.send_message(stream_cancelled_bytes);
+                        }
+                    },
+                    message);
+            }
+            catch (const std::exception& ex)
+            {
+                Logger::warn("Cancel-ack write failed, client disconnected: " + std::string(ex.what()));
                 disconnected.store(true);
                 cancelled.store(true);
                 stop = true;
-                return;
             }
-
-            auto message = protocol_->parse(msg_bytes.value());
-
-            std::visit(
-                [&]<typename T>(const T& msg)
-                {
-                    if constexpr (std::is_same_v<T, CancelStreamMessage>)
-                    {
-                        if (msg.session_id != session_id)
-                        {
-                            return;
-                        }
-
-                        cancelled.store(true);
-
-                        PongNetMessage stream_cancelled(
-                            session_id,
-                            NetErrorCode::SUCCESS,
-                            msg.request_id);
-                        auto stream_cancelled_bytes = protocol_->encode(stream_cancelled);
-                        handle.send_message(stream_cancelled_bytes);
-                    }
-                },
-                message);
         };
 
         auto stream_handler = [&]
         {
-            PongNetMessage start_stream(session_id, NetErrorCode::START_STREAM, request_id);
-            handle.send_message(protocol_->encode(start_stream));
-            std::cout << "sent start stream\n";
-
-            DataTable chunk;
-            chunk.output_schema = result->output_schema();
-
-            bool has_more = false;
-
-            while (!cancelled.load() && next_chunk(*result, chunk, has_more))
+            try
             {
-                send_chunk(chunk);
-                std::cout << "sent chunk\n";
-            }
+                PongNetMessage start_stream(session_id, NetErrorCode::START_STREAM, request_id);
+                handle.send_message(protocol_->encode(start_stream));
 
-            PongNetMessage end_stream(session_id, NetErrorCode::END_STREAM, request_id);
-            handle.send_message(protocol_->encode(end_stream));
-                std::cout << "sent end stream\n";
+                DataTable chunk;
+                chunk.output_schema = result->output_schema();
+
+                bool has_more = false;
+
+                while (!cancelled.load() && next_chunk(*result, chunk, has_more))
+                    send_chunk(chunk);
+
+                PongNetMessage end_stream(session_id, NetErrorCode::END_STREAM, request_id);
+                handle.send_message(protocol_->encode(end_stream));
+            }
+            catch (const std::exception& ex)
+            {
+                Logger::warn("Stream write failed, client disconnected: " + std::string(ex.what()));
+                disconnected.store(true);
+                cancelled.store(true);
+                stop = true;
+            }
         };
 
         std::thread cancel_thread(cancel_handler);
@@ -429,6 +448,9 @@ namespace net
         Config::TransportType type)
         : listener_(SocketHandle::make_listener(port, domain, type)), port_(port)
     {
+#ifndef _WIN32
+        signal(SIGPIPE, SIG_IGN);
+#endif
         NetProtocolFactory protocol_factory;
         protocol_ = protocol_factory.make(protocol);
     }
@@ -459,7 +481,7 @@ namespace net
         auto ping_bytes = handle.receive_message();
         if (!ping_bytes)
         {
-            Logger::warn("Disconnecting client: " + get_ip(handle.addr()));
+            Logger::warn("Failed to establish a connection with " + get_ip(handle.addr()));
             handle.close();
             return;
         }
@@ -473,7 +495,14 @@ namespace net
                 NetErrorCode::PROTOCOL_VIOLATION,
                 0);
             auto pong_bytes = protocol_->encode(pong);
-            handle.send_message(pong_bytes);
+            try
+            {
+                handle.send_message(pong_bytes);
+            }
+            catch (const std::exception& ex)
+            {
+                Logger::warn("Handshake write failed, client disconnected: " + std::string(ex.what()));
+            }
             handle.close();
             return;
         }
@@ -488,14 +517,33 @@ namespace net
 
         PongNetMessage pong(session_id, NetErrorCode::SUCCESS, ping.request_id);
         auto pong_bytes = protocol_->encode(pong);
-        handle.send_message(pong_bytes);
+        try
+        {
+            handle.send_message(pong_bytes);
+        }
+        catch (const std::exception& ex)
+        {
+            Logger::warn("Handshake write failed, client disconnected: " + std::string(ex.what()));
+            std::lock_guard lock(sessions_mutex_);
+            sessions_.erase(session_id);
+            handle.close();
+            return;
+        }
 
         Logger::info("Created session " + session_id.to_string());
 
         bool stop = false;
         while (running_ && !stop)
         {
-            handle_message(handle, stop);
+            try
+            {
+                handle_message(handle, stop);
+            }
+            catch (const std::exception& ex)
+            {
+                Logger::warn("Session write failed, client disconnected: " + std::string(ex.what()));
+                stop = true;
+            }
         }
 
         {

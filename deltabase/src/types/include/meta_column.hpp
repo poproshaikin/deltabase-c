@@ -7,11 +7,9 @@
 #include "UUID.hpp"
 #include "ast_tree.hpp"
 #include "data_type.hpp"
-#include "typedefs.hpp"
 #include "data_token.hpp"
 #include "table_id.hpp"
 
-#include <optional>
 #include <vector>
 
 #include <string>
@@ -58,6 +56,7 @@ namespace types
         std::string name;
         DataType type;
         std::vector<ColumnConstraint> constraints;
+        bool is_dropped = false;
 
         explicit
         MetaColumn() = default;

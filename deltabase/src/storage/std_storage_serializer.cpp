@@ -156,6 +156,7 @@ namespace storage
                 stream.write(&tag, sizeof(uint8_t));
             }
         }
+        stream.write(&column.is_dropped, sizeof(bool));
         stream.seek(0);
         return stream;
     }
@@ -491,6 +492,9 @@ namespace storage
                 return false;
             }
         }
+
+        if (stream.read(&out.is_dropped, sizeof(out.is_dropped)) != sizeof(out.is_dropped))
+            return false;
 
         return true;
     }

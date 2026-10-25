@@ -38,6 +38,8 @@ namespace sql
         parse_alter_table_add();
         types::RenameTableOperation
         parse_alter_table_rename();
+        types::DropColumnOperation
+        parse_alter_table_drop();
 
         types::AlterTableStmt
         parse_alter_table();
