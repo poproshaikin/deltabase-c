@@ -52,6 +52,9 @@ namespace exq
         analyze_where(const types::BinaryExpr& where, const types::MetaTable& table);
 
         types::AnalysisResult
+        analyze_order_by(const types::OrderByItem& order_by, const types::MetaTable& table);
+
+        types::AnalysisResult
         analyze_column_assignment(
             const types::BinaryExpr &expr,
             const types::MetaTable& table

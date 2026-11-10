@@ -121,12 +121,20 @@ namespace types
         }
     };
 
+    struct OrderByItem
+    {
+        SqlToken column;
+        bool desc = false;
+    };
+
     struct SelectStmt
     {
         TableIdentifier table;
         std::vector<SqlToken> columns;
         std::optional<BinaryExpr> where;
+        std::vector<OrderByItem> order_by;
         std::optional<uint64_t> limit;
+        std::optional<uint64_t> offset;
     };
 
     struct ValuesExpr

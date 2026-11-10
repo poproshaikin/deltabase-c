@@ -68,6 +68,12 @@ namespace types
         RESTRICT,
         RENAME,
         TO,
+        ORDER,
+        BY,
+        ASC,
+        DESC,
+        LIMIT,
+        OFFSET,
     };
 
     enum class SqlSymbol

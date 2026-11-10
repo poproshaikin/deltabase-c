@@ -23,6 +23,7 @@ namespace types
             UNDEFINED = 0,
             FILTER,
             PROJECT,
+            ORDER_BY,
             LIMIT,
             INSERT,
             VALUES,
@@ -182,6 +183,28 @@ namespace types
         }
     };
 
+    struct OrderByPlanNode final : UnaryPlanNode
+    {
+        MetaTable table;
+        std::vector<OrderByItem> items;
+
+        explicit
+        OrderByPlanNode(
+            const MetaTable& table,
+            std::vector<OrderByItem> items,
+            std::unique_ptr<IPlanNode> child
+        )
+            : UnaryPlanNode(std::move(child)), table(table), items(std::move(items))
+        {
+        }
+
+        constexpr Type
+        type() const override
+        {
+            return Type::ORDER_BY;
+        }
+    };
+
     struct ProjectPlanNode final : UnaryPlanNode
     {
         const MetaTable table;
@@ -206,11 +229,17 @@ namespace types
 
     struct LimitPlanNode final : UnaryPlanNode
     {
-        uint64_t limit;
+        // nullopt means OFFSET without LIMIT
+        std::optional<uint64_t> limit;
+        uint64_t offset;
 
         explicit
-        LimitPlanNode(uint64_t limit, std::unique_ptr<IPlanNode> child)
-            : UnaryPlanNode(std::move(child)), limit(limit)
+        LimitPlanNode(
+            std::optional<uint64_t> limit,
+            uint64_t offset,
+            std::unique_ptr<IPlanNode> child
+        )
+            : UnaryPlanNode(std::move(child)), limit(limit), offset(offset)
         {
         }
 

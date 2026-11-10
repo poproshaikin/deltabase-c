@@ -44,6 +44,11 @@ namespace types
         // For NULL handling see Evaluator::evaluate.
         static int compare(const DataToken& a, const DataToken& b);
 
+        // Total order for sorting and index keys, with no preconditions: NULL equals NULL
+        // and sorts after any value (negate the result for NULLS FIRST). The operators
+        // below follow SQL three-valued logic and are not valid std::sort predicates.
+        static int compare_ordered(const DataToken& a, const DataToken& b);
+
         // For display only (result_formatter). Do not use in comparisons.
         template <AllowedDataTypes_c T>
         T as() const

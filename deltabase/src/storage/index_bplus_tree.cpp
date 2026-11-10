@@ -238,8 +238,8 @@ namespace storage
     int
     IndexBPlusTree::compare_token(const types::DataToken& a, const types::DataToken& b)
     {
-        if (a == b)
-            return 0;
-        return a < b ? -1 : 1;
+        // Index keys need a total order, not the three-valued logic of operator< --
+        // which reports both compare_token(NULL, x) and compare_token(x, NULL) as greater.
+        return types::DataToken::compare_ordered(a, b);
     }
 } // namespace storage

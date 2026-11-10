@@ -165,13 +165,47 @@ namespace exq
 
     class LimitNodeExecutor final : public INodeExecutor
     {
-        const uint64_t limit_ = 0;
+        const std::optional<uint64_t> limit_;
+        const uint64_t offset_ = 0;
         uint64_t current_ = 0;
+        bool skipped_ = false;
         std::unique_ptr<INodeExecutor> child_;
 
     public:
         explicit
-        LimitNodeExecutor(uint64_t limit, std::unique_ptr<INodeExecutor> child);
+        LimitNodeExecutor(
+            std::optional<uint64_t> limit,
+            uint64_t offset,
+            std::unique_ptr<INodeExecutor> child);
+
+        void
+        open() override;
+
+        bool
+        next(types::DataRow& out) override;
+
+        void
+        close() override;
+
+        types::OutputSchema
+        output_schema() override;
+    };
+
+    class OrderByNodeExecutor final : public INodeExecutor
+    {
+        const types::MetaTable table_;
+        std::vector<types::OrderByItem> items_;
+        std::unique_ptr<INodeExecutor> child_;
+        std::vector<int64_t> indices_;
+        std::vector<types::DataRow> rows_;
+        size_t idx_ = 0;
+
+    public:
+        explicit
+        OrderByNodeExecutor(
+            const types::MetaTable& table,
+            std::vector<types::OrderByItem> items,
+            std::unique_ptr<INodeExecutor> child);
 
         void
         open() override;

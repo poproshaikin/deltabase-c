@@ -61,6 +61,12 @@ namespace sql
             {"restrict", SqlKeyword::RESTRICT},
             {"rename", SqlKeyword::RENAME},
             {"to", SqlKeyword::TO},
+            {"order", SqlKeyword::ORDER},
+            {"by", SqlKeyword::BY},
+            {"asc", SqlKeyword::ASC},
+            {"desc", SqlKeyword::DESC},
+            {"limit", SqlKeyword::LIMIT},
+            {"offset", SqlKeyword::OFFSET},
         };
 
         return dictionary;

@@ -214,7 +214,88 @@ namespace sql
             stmt.where = parse_binary_expr(0);
         }
 
+        if (match(SqlKeyword::ORDER))
+            stmt.order_by = parse_order_by();
+
+        if (match(SqlKeyword::LIMIT))
+        {
+            advance_or_throw("Expected integer literal after 'LIMIT'");
+            stmt.limit = parse_unsigned_literal("LIMIT");
+        }
+
+        if (match(SqlKeyword::OFFSET))
+        {
+            advance_or_throw("Expected integer literal after 'OFFSET'");
+            stmt.offset = parse_unsigned_literal("OFFSET");
+        }
+
         return stmt;
+    }
+
+    // Expects the cursor on the ORDER keyword. Leaves it on the token following the
+    // clause, or on the clause's last token when the input ends there -- the same
+    // convention the expression parser follows (advance() is a no-op at the last token).
+    std::vector<OrderByItem>
+    SqlParser::parse_order_by()
+    {
+        match_or_throw(SqlKeyword::ORDER);
+        advance_or_throw("Expected 'BY' after 'ORDER'");
+        match_or_throw(SqlKeyword::BY, "Expected 'BY' after 'ORDER'");
+
+        std::vector<OrderByItem> items;
+
+        while (true)
+        {
+            advance_or_throw("Expected column identifier in ORDER BY");
+            match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier in ORDER BY");
+
+            OrderByItem item;
+            item.column = *current();
+
+            bool has_more = advance();
+
+            if (has_more && (match(SqlKeyword::ASC) || match(SqlKeyword::DESC)))
+            {
+                item.desc = match(SqlKeyword::DESC);
+                has_more = advance();
+            }
+
+            items.push_back(std::move(item));
+
+            if (!has_more || !match(SqlSymbol::COMMA))
+                break;
+        }
+
+        return items;
+    }
+
+    // Expects the cursor on the literal. Leaves it on the following token, or on the
+    // literal itself when the input ends there.
+    uint64_t
+    SqlParser::parse_unsigned_literal(const std::string& clause)
+    {
+        const auto err = "Expected non-negative integer literal after '" + clause + "'";
+
+        match_or_throw(SqlTokenType::LITERAL, err);
+
+        const auto* detail = std::get_if<SqlLiteral>(&current()->detail);
+        if (detail == nullptr || *detail != SqlLiteral::INTEGER)
+            throw EngineException(err, EngineException::Code::SYNTAX_ERROR);
+
+        uint64_t value;
+        try
+        {
+            value = std::stoull(current()->value);
+        }
+        catch (const std::exception&)
+        {
+            throw EngineException("Value out of range in '" + clause + "'",
+                                  EngineException::Code::SYNTAX_ERROR);
+        }
+
+        advance();
+
+        return value;
     }
 
     InsertStmt

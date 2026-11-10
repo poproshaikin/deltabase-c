@@ -52,6 +52,12 @@ namespace exq
                    k_project_selectivity;
         }
 
+        case IPlanNode::Type::ORDER_BY:
+        {
+            const auto& order_by_node = static_cast<const OrderByPlanNode&>(node);
+            return estimate_seq_scan_selectivity(table, *order_by_node.child);
+        }
+
         case IPlanNode::Type::LIMIT:
         {
             const auto& limit_node = static_cast<const LimitPlanNode&>(node);
@@ -60,8 +66,14 @@ namespace exq
 
             const auto child_sel = estimate_seq_scan_selectivity(table, *limit_node.child);
             const auto estimated_rows = static_cast<double>(table.live_rows) * child_sel;
-            const auto capped_rows =
-                std::min(estimated_rows, static_cast<double>(limit_node.limit));
+
+            // a bare OFFSET has no ceiling -- the scan still has to reach the end
+            if (!limit_node.limit)
+                return child_sel;
+
+            const auto ceiling = static_cast<double>(*limit_node.limit) +
+                                 static_cast<double>(limit_node.offset);
+            const auto capped_rows = std::min(estimated_rows, ceiling);
             return capped_rows / static_cast<double>(table.live_rows);
         }
 
@@ -283,9 +295,20 @@ namespace exq
             node = std::move(filter);
         }
 
+        // 3. ORDER BY -- below PROJECT, so ordering by a non-projected column works
+        if (!stmt.order_by.empty())
+        {
+            auto order_by = std::make_unique<OrderByPlanNode>(
+                *table,
+                stmt.order_by,
+                std::move(node));
+
+            node = std::move(order_by);
+        }
+
         std::vector<std::string> cols;
 
-        // 3. PROJECT
+        // 4. PROJECT
         if (!stmt.columns.empty())
             for (auto& c : stmt.columns)
                 cols.push_back(c.value);
@@ -302,10 +325,14 @@ namespace exq
 
         node = std::move(project);
 
-        // 4. LIMIT
-        if (stmt.limit)
+        // 5. LIMIT / OFFSET -- one node, so OFFSET always applies before LIMIT
+        if (stmt.limit || stmt.offset)
         {
-            auto limit = std::make_unique<LimitPlanNode>(stmt.limit.value(), std::move(node));
+            auto limit = std::make_unique<LimitPlanNode>(
+                stmt.limit,
+                stmt.offset.value_or(0),
+                std::move(node));
+
             node = std::move(limit);
         }
 

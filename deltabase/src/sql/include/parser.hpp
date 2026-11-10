@@ -22,6 +22,12 @@ namespace sql
         types::SelectStmt
         parse_select();
 
+        std::vector<types::OrderByItem>
+        parse_order_by();
+
+        uint64_t
+        parse_unsigned_literal(const std::string& clause);
+
         types::InsertStmt
         parse_insert();
 

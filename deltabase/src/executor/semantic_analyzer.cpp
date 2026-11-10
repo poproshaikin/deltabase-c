@@ -10,6 +10,7 @@
 #include "../sql/include/dictionary.hpp"
 
 #include <format>
+#include <stack>
 #include <unordered_set>
 
 namespace exq
@@ -67,8 +68,9 @@ namespace exq
     SemanticAnalyzer::analyze_select(const SelectStmt& stmt)
     {
         if (stmt.table.table_name.value.empty())
-            return AnalysisResult(EngineException("Select statement missing target table",
-                                                  EngineException::Code::SYNTAX_ERROR));
+            return AnalysisResult(EngineException(
+                "Select statement missing target table",
+                EngineException::Code::SYNTAX_ERROR));
 
         const MetaTable* table = nullptr;
         std::optional<MetaTable> virtual_table_storage;
@@ -89,8 +91,17 @@ namespace exq
 
         for (const SqlToken& col : stmt.columns)
             if (!table->has_column(col.value))
-                return AnalysisResult(EngineException("Column '" + col.value + "' doesn't exist",
-                                                      EngineException::Code::COLUMN_NOT_EXISTS));
+                return AnalysisResult(EngineException(
+                    "Column '" + col.value + "' doesn't exist",
+                    EngineException::Code::COLUMN_NOT_EXISTS));
+
+        for (const auto& order_by : stmt.order_by)
+        {
+            if (!table->has_column(order_by.column.value))
+                return AnalysisResult(EngineException(
+                    "Column '" + order_by.column.value + "' doesn't exist",
+                    EngineException::Code::COLUMN_NOT_EXISTS));
+        }
 
         if (stmt.where.has_value())
         {
@@ -106,8 +117,9 @@ namespace exq
     SemanticAnalyzer::analyze_insert(const InsertStmt& stmt) const
     {
         if (stmt.table.table_name.value.empty())
-            return AnalysisResult(EngineException("Insert statement missing target table",
-                                                  EngineException::Code::SYNTAX_ERROR));
+            return AnalysisResult(
+                EngineException("Insert statement missing target table",
+                                EngineException::Code::SYNTAX_ERROR));
 
         if (!ssp_.ddl().exists_table(stmt.table))
             return AnalysisResult(EngineException(
@@ -137,8 +149,9 @@ namespace exq
             }
             else if (values.values.size() > expected_value_count)
             {
-                return AnalysisResult(EngineException("VALUES count exceeds table column count",
-                                                      EngineException::Code::COLUMN_COUNT_MISMATCH));
+                return AnalysisResult(EngineException(
+                    "VALUES count exceeds table column count",
+                    EngineException::Code::COLUMN_COUNT_MISMATCH));
             }
         }
 
@@ -174,13 +187,15 @@ namespace exq
             {
                 const SqlToken& value = values.values[i];
                 if (!std::holds_alternative<SqlLiteral>(value.detail))
-                    return AnalysisResult(EngineException("Invalid literal token type",
-                                                          EngineException::Code::TYPE_MISMATCH));
+                    return AnalysisResult(EngineException(
+                        "Invalid literal token type",
+                        EngineException::Code::TYPE_MISMATCH));
 
                 auto column = get_column(i);
                 if (!column.has_value())
-                    return AnalysisResult(EngineException("Internal error: unexpected column state",
-                                                          EngineException::Code::GENERIC));
+                    return AnalysisResult(EngineException(
+                        "Internal error: unexpected column state",
+                        EngineException::Code::GENERIC));
 
                 auto literal_type = std::get<SqlLiteral>(value.detail);
                 auto column_type = column.value().get().type;

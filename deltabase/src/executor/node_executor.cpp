@@ -250,8 +250,12 @@ namespace exq
         return output_schema;
     }
 
-    LimitNodeExecutor::LimitNodeExecutor(uint64_t limit, std::unique_ptr<INodeExecutor> child)
-        : limit_(limit), child_(std::move(child))
+    LimitNodeExecutor::LimitNodeExecutor(
+        std::optional<uint64_t> limit,
+        uint64_t offset,
+        std::unique_ptr<INodeExecutor> child
+    )
+        : limit_(limit), offset_(offset), child_(std::move(child))
     {
     }
 
@@ -259,15 +263,37 @@ namespace exq
     LimitNodeExecutor::open()
     {
         child_->open();
+        current_ = 0;
+        skipped_ = false;
     }
 
     bool
     LimitNodeExecutor::next(DataRow& out)
     {
-        if (current_++ >= limit_)
+        // OFFSET is consumed on the first next(), so LIMIT counts what is left after it
+        if (!skipped_)
+        {
+            for (uint64_t i = 0; i < offset_; ++i)
+            {
+                DataRow row;
+                if (!child_->next(row))
+                {
+                    skipped_ = true;
+                    return false;
+                }
+            }
+
+            skipped_ = true;
+        }
+
+        if (limit_ && current_ >= *limit_)
             return false;
 
-        return child_->next(out);
+        if (!child_->next(out))
+            return false;
+
+        ++current_;
+        return true;
     }
 
     void
@@ -278,6 +304,86 @@ namespace exq
 
     OutputSchema
     LimitNodeExecutor::output_schema()
+    {
+        return child_->output_schema();
+    }
+
+    OrderByNodeExecutor::OrderByNodeExecutor(
+        const MetaTable& table,
+        std::vector<OrderByItem> items,
+        std::unique_ptr<INodeExecutor> child
+    )
+        : table_(table), items_(std::move(items)), child_(std::move(child))
+    {
+    }
+
+    void
+    OrderByNodeExecutor::open()
+    {
+        child_->open();
+        rows_.clear();
+        rows_.reserve(table_.live_rows);
+        indices_.clear();
+        idx_ = 0;
+
+        while (true)
+        {
+            DataRow row;
+            if (!child_->next(row))
+                break;
+
+            rows_.push_back(std::move(row));
+        }
+
+        for (const auto& item : items_)
+        {
+            const auto idx = table_.get_column_idx(item.column.value);
+            if (idx < 0)
+                throw std::runtime_error(
+                    "OrderByNodeExecutor::open: column '" + item.column.value +
+                    "' not found in table schema");
+
+            indices_.push_back(idx);
+        }
+
+        std::stable_sort(
+            rows_.begin(),
+            rows_.end(),
+            [this](const DataRow& left, const DataRow& right)
+            {
+                // cycle for each 'ORDER BY' item
+                for (size_t k = 0; k < indices_.size(); ++k)
+                {
+                    const auto idx = static_cast<size_t>(indices_[k]);
+                    const int c = DataToken::compare_ordered(left.tokens[idx], right.tokens[idx]);
+
+                    if (c != 0)
+                        return items_[k].desc ? c > 0 : c < 0;
+                }
+
+                return false;
+            });
+    }
+
+    bool
+    OrderByNodeExecutor::next(DataRow& out)
+    {
+        if (idx_ >= rows_.size())
+            return false;
+
+        // moved out rather than copied -- a row is never served twice
+        out = std::move(rows_[idx_++]);
+        return true;
+    }
+
+    void
+    OrderByNodeExecutor::close()
+    {
+        child_->close();
+    }
+
+    OutputSchema
+    OrderByNodeExecutor::output_schema()
     {
         return child_->output_schema();
     }
@@ -766,10 +872,17 @@ namespace exq
             return std::make_unique<ProjectionNodeExecutor>(
                 n.table, n.columns, from_plan(*n.child, ssp, ctx));
         }
+        case IPlanNode::Type::ORDER_BY:
+        {
+            const auto& n = static_cast<const OrderByPlanNode&>(node);
+            return std::make_unique<OrderByNodeExecutor>(
+                n.table, n.items, from_plan(*n.child, ssp, ctx));
+        }
         case IPlanNode::Type::LIMIT:
         {
             const auto& n = static_cast<const LimitPlanNode&>(node);
-            return std::make_unique<LimitNodeExecutor>(n.limit, from_plan(*n.child, ssp, ctx));
+            return std::make_unique<LimitNodeExecutor>(
+                n.limit, n.offset, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::INSERT:
         {
