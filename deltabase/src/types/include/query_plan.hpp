@@ -187,14 +187,18 @@ namespace types
     {
         MetaTable table;
         std::vector<OrderByItem> items;
+        // LIMIT + OFFSET pushed down from above
+        std::optional<uint64_t> fetch;
 
         explicit
         OrderByPlanNode(
             const MetaTable& table,
             std::vector<OrderByItem> items,
+            std::optional<uint64_t> fetch,
             std::unique_ptr<IPlanNode> child
         )
-            : UnaryPlanNode(std::move(child)), table(table), items(std::move(items))
+            : UnaryPlanNode(std::move(child)), table(table), items(std::move(items)),
+              fetch(fetch)
         {
         }
 

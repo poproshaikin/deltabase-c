@@ -188,7 +188,14 @@ namespace sql
             {
                 advance_or_throw("Invalid statement syntax");
                 if (!match(SqlTokenType::IDENTIFIER))
+                {
+                    // '*' is the only non-identifier allowed here; anything else used to
+                    // break the loop silently and drop the rest of the select list
+                    if (!match(SqlOperator::MUL))
+                        throw EngineException("Expected column identifier or '*'",
+                                              EngineException::Code::SYNTAX_ERROR);
                     break;
+                }
 
                 stmt.columns.push_back(*current());
 

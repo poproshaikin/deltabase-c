@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <limits>
 
 namespace exq
 {
@@ -18,6 +19,21 @@ namespace exq
         constexpr double k_default_filter_selectivity = 0.3;
         constexpr double k_project_selectivity = 1.0;
         constexpr double k_seq_scan_stream_threshold_rows = 2048.0;
+    }
+
+    static std::optional<uint64_t>
+    top_k_fetch(const SelectStmt& stmt)
+    {
+        if (!stmt.limit)
+            return std::nullopt;
+
+        const uint64_t limit = *stmt.limit;
+        const uint64_t offset = stmt.offset.value_or(0);
+
+        if (limit > std::numeric_limits<uint64_t>::max() - offset)
+            return std::nullopt;
+
+        return limit + offset;
     }
 
     StdPlanner::StdPlanner(const Config& db_config, storage::StorageServiceProvider& ssp)
@@ -301,6 +317,7 @@ namespace exq
             auto order_by = std::make_unique<OrderByPlanNode>(
                 *table,
                 stmt.order_by,
+                top_k_fetch(stmt),
                 std::move(node));
 
             node = std::move(order_by);

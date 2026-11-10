@@ -311,9 +311,10 @@ namespace exq
     OrderByNodeExecutor::OrderByNodeExecutor(
         const MetaTable& table,
         std::vector<OrderByItem> items,
+        std::optional<uint64_t> fetch,
         std::unique_ptr<INodeExecutor> child
     )
-        : table_(table), items_(std::move(items)), child_(std::move(child))
+        : table_(table), items_(std::move(items)), fetch_(fetch), child_(std::move(child))
     {
     }
 
@@ -322,18 +323,8 @@ namespace exq
     {
         child_->open();
         rows_.clear();
-        rows_.reserve(table_.live_rows);
         indices_.clear();
         idx_ = 0;
-
-        while (true)
-        {
-            DataRow row;
-            if (!child_->next(row))
-                break;
-
-            rows_.push_back(std::move(row));
-        }
 
         for (const auto& item : items_)
         {
@@ -346,23 +337,60 @@ namespace exq
             indices_.push_back(idx);
         }
 
-        std::stable_sort(
-            rows_.begin(),
-            rows_.end(),
-            [this](const DataRow& left, const DataRow& right)
+        if (fetch_ && *fetch_ == 0)
+            return;
+
+        rows_.reserve(
+            fetch_
+                ? std::min<uint64_t>(*fetch_, static_cast<uint64_t>(table_.live_rows))
+                : static_cast<uint64_t>(table_.live_rows));
+
+        auto row_less = [this](const DataRow& left, const DataRow& right)
+        {
+            // cycle for each 'ORDER BY' item
+            for (size_t k = 0; k < indices_.size(); ++k)
             {
-                // cycle for each 'ORDER BY' item
-                for (size_t k = 0; k < indices_.size(); ++k)
-                {
-                    const auto idx = static_cast<size_t>(indices_[k]);
-                    const int c = DataToken::compare_ordered(left.tokens[idx], right.tokens[idx]);
+                const auto idx = static_cast<size_t>(indices_[k]);
+                const int c = DataToken::compare_ordered(left.tokens[idx], right.tokens[idx]);
 
-                    if (c != 0)
-                        return items_[k].desc ? c > 0 : c < 0;
-                }
+                if (c != 0)
+                    return items_[k].desc ? c > 0 : c < 0;
+            }
 
-                return false;
-            });
+            return left.id < right.id;
+        };
+
+        while (true)
+        {
+            DataRow row;
+            if (!child_->next(row))
+                break;
+
+            if (!fetch_)
+            {
+                rows_.push_back(std::move(row));
+                continue;
+            }
+
+            if (rows_.size() < *fetch_)
+            {
+                rows_.push_back(std::move(row));
+                std::ranges::push_heap(rows_, row_less);
+                continue;
+            }
+
+            if (!row_less(row, rows_.front()))
+                continue;
+
+            std::ranges::pop_heap(rows_, row_less);
+            rows_.back() = std::move(row);
+            std::ranges::push_heap(rows_, row_less);
+        }
+
+        if (fetch_)
+            std::ranges::sort_heap(rows_, row_less);
+        else
+            std::ranges::sort(rows_, row_less);
     }
 
     bool
@@ -876,7 +904,7 @@ namespace exq
         {
             const auto& n = static_cast<const OrderByPlanNode&>(node);
             return std::make_unique<OrderByNodeExecutor>(
-                n.table, n.items, from_plan(*n.child, ssp, ctx));
+                n.table, n.items, n.fetch, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::LIMIT:
         {

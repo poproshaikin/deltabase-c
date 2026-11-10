@@ -195,6 +195,7 @@ namespace exq
     {
         const types::MetaTable table_;
         std::vector<types::OrderByItem> items_;
+        std::optional<uint64_t> fetch_;
         std::unique_ptr<INodeExecutor> child_;
         std::vector<int64_t> indices_;
         std::vector<types::DataRow> rows_;
@@ -205,6 +206,7 @@ namespace exq
         OrderByNodeExecutor(
             const types::MetaTable& table,
             std::vector<types::OrderByItem> items,
+            std::optional<uint64_t> fetch,
             std::unique_ptr<INodeExecutor> child);
 
         void
