@@ -267,8 +267,9 @@ namespace exq
 
         IPlanNode::Type scan_type = IPlanNode::Type::SEQ_SCAN;
         const MetaTable* table = nullptr;
+        const bool is_virtual = info_schema_provider_.is_virtual(stmt.table);
 
-        if (info_schema_provider_.is_virtual(stmt.table))
+        if (is_virtual)
         {
             // Virtual table: minimal plan node, no index optimization
             node = std::make_unique<VirtualTablePlanNode>(stmt.table.table_name, schema_name);
@@ -355,8 +356,10 @@ namespace exq
 
         QueryPlan plan;
         plan.type = QueryPlan::Type::SELECT;
-        if (scan_type == IPlanNode::Type::SEQ_SCAN  && node->type() ==
-            IPlanNode::Type::SEQ_SCAN)
+        // node is the root here; should_stream_for_seq_scan walks down to the scan itself.
+        // Virtual tables keep scan_type == SEQ_SCAN only by default, and their row counts
+        // are not real, so they are excluded explicitly.
+        if (!is_virtual && scan_type == IPlanNode::Type::SEQ_SCAN)
             plan.needs_stream = should_stream_for_seq_scan(*table, *node);
         else
             plan.needs_stream = false;

@@ -39,8 +39,31 @@ namespace types
 
     StreamedResult::~StreamedResult()
     {
+        finish();
+    }
+
+    void
+    StreamedResult::finish()
+    {
+        if (finished_)
+            return;
+
+        finished_ = true;
+
+        try
+        {
+            executor_->close();
+        }
+        catch (...)
+        {
+            // also runs from the destructor, so it must not escape
+        }
+
         if (on_exhausted_)
+        {
             on_exhausted_();
+            on_exhausted_ = nullptr;
+        }
     }
 
     bool
@@ -49,11 +72,7 @@ namespace types
         if (executor_->next(out))
             return true;
 
-        if (on_exhausted_)
-        {
-            on_exhausted_();
-            on_exhausted_ = nullptr;
-        }
+        finish();
         return false;
     }
 

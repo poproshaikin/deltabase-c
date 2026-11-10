@@ -43,6 +43,11 @@ namespace types
     {
         std::unique_ptr<exq::INodeExecutor> executor_;
         std::function<void()> on_exhausted_;
+        bool finished_ = false;
+
+        // closes the executor and fires on_exhausted_, at most once
+        void
+        finish();
 
     public:
         StreamedResult(std::unique_ptr<exq::INodeExecutor>&& executor);

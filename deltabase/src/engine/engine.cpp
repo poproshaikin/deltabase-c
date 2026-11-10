@@ -205,14 +205,15 @@ namespace engine
             *storage_service_provider_,
             ctx_);
 
+        exec->open();
+
         if (!needs_stream)
         {
             DataTable result_table;
             DataRow row;
 
-            exec->open();
             while (exec->next(row))
-                result_table.rows.push_back(row);
+                result_table.rows.push_back(std::move(row));
             exec->close();
             result_table.output_schema = exec->output_schema();
 
