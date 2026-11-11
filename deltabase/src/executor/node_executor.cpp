@@ -62,8 +62,10 @@ namespace exq
     VirtualTableNodeExecutor::VirtualTableNodeExecutor(
         const std::string& table_name,
         const std::string& schema_name,
-        storage::StorageServiceProvider& service_provider
-    ) : table_name_(table_name), schema_name_(schema_name), service_provider_(service_provider), index_(0)
+        storage::StorageServiceProvider& service_provider,
+        ExecutionContext& ctx
+    ) : table_name_(table_name), schema_name_(schema_name), service_provider_(service_provider),
+        ctx_(ctx), index_(0)
     {
     }
 
@@ -111,10 +113,11 @@ namespace exq
         const MetaTable& mt,
         const IndexId& index_id,
         const BinaryExpr& condition,
-        storage::StorageServiceProvider& service_provider
+        storage::StorageServiceProvider& service_provider,
+        ExecutionContext& ctx
     )
         : index_id_(index_id), condition_(condition),
-          service_provider_(service_provider), mt_(mt)
+          service_provider_(service_provider), ctx_(ctx), mt_(mt)
     {
     }
 
@@ -312,9 +315,11 @@ namespace exq
         const MetaTable& table,
         std::vector<OrderByItem> items,
         std::optional<uint64_t> fetch,
+        ExecutionContext& ctx,
         std::unique_ptr<INodeExecutor> child
     )
-        : table_(table), items_(std::move(items)), fetch_(fetch), child_(std::move(child))
+        : table_(table), items_(std::move(items)), fetch_(fetch), ctx_(ctx),
+          child_(std::move(child))
     {
     }
 
@@ -881,12 +886,14 @@ namespace exq
         {
             const auto& n = static_cast<const IndexScanPlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
-            return std::make_unique<IndexScanNodeExecutor>(mt, n.index_id, n.condition, ssp);
+            return std::make_unique<IndexScanNodeExecutor>(
+                mt, n.index_id, n.condition, ssp, ctx);
         }
         case IPlanNode::Type::VIRTUAL_TABLE:
         {
             const auto& n = static_cast<const VirtualTablePlanNode&>(node);
-            return std::make_unique<VirtualTableNodeExecutor>(n.table_name, n.schema_name, ssp);
+            return std::make_unique<VirtualTableNodeExecutor>(
+                n.table_name, n.schema_name, ssp, ctx);
         }
         case IPlanNode::Type::FILTER:
         {
@@ -904,7 +911,7 @@ namespace exq
         {
             const auto& n = static_cast<const OrderByPlanNode&>(node);
             return std::make_unique<OrderByNodeExecutor>(
-                n.table, n.items, n.fetch, from_plan(*n.child, ssp, ctx));
+                n.table, n.items, n.fetch, ctx, from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::LIMIT:
         {

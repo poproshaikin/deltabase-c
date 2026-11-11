@@ -4,6 +4,7 @@
 
 #ifndef DELTABASE_EXECUTION_CONTEXT_HPP
 #define DELTABASE_EXECUTION_CONTEXT_HPP
+#include "memory_budget.hpp"
 #include "../../transactions/include/transaction.hpp"
 
 namespace types
@@ -11,6 +12,7 @@ namespace types
     struct ExecutionContext
     {
         txn::Transaction* txn;
+        misc::MemoryBudget budget{0};
     };
 }
 

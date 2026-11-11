@@ -94,6 +94,9 @@ namespace types
 
         uint32_t checkpoint_interval_ms = 30000;
 
+        // per-query ceiling on accumulated rows, like PostgreSQL's work_mem
+        uint64_t work_mem = 64ull * 1024 * 1024;
+
         static Config
         detached()
         {

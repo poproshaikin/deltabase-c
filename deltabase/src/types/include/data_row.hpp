@@ -69,6 +69,20 @@ namespace types
         DataRow() = default;
         explicit DataRow(const std::vector<SqlToken>& sql_tokens);
     };
+
+    // Approximate in-memory size of a row, for the per-query memory budget. Distinct from
+    // IIOManager::estimate_size, which measures the serialized size and leaves out the
+    // container overhead -- several times smaller for narrow rows.
+    inline uint64_t
+    memory_footprint(const DataRow& row)
+    {
+        uint64_t size = sizeof(DataRow) + row.tokens.capacity() * sizeof(DataToken);
+
+        for (const auto& token : row.tokens)
+            size += token.bytes.capacity();
+
+        return size;
+    }
 } // namespace types
 
 #endif // DELTABASE_DATA_ROW_HPP

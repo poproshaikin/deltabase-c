@@ -50,6 +50,8 @@ namespace exq
         types::BinaryExpr condition_;
         storage::StorageServiceProvider& service_provider_;
 
+        types::ExecutionContext& ctx_;
+
         types::MetaTable mt_;
         types::DataTable data_;
         uint64_t index_ = 0;
@@ -60,7 +62,8 @@ namespace exq
             const types::MetaTable& mt,
             const types::IndexId& index_id,
             const types::BinaryExpr& condition,
-            storage::StorageServiceProvider& service_provider
+            storage::StorageServiceProvider& service_provider,
+            types::ExecutionContext& ctx
         );
 
         void
@@ -82,6 +85,8 @@ namespace exq
         std::string schema_name_;
         storage::StorageServiceProvider& service_provider_;
 
+        types::ExecutionContext& ctx_;
+
         types::MetaTable mt_;
         types::DataTable data_;
         uint64_t index_ = 0;
@@ -91,7 +96,8 @@ namespace exq
         VirtualTableNodeExecutor(
             const std::string& table_name,
             const std::string& schema_name,
-            storage::StorageServiceProvider& service_provider
+            storage::StorageServiceProvider& service_provider,
+            types::ExecutionContext& ctx
         );
 
         void
@@ -196,6 +202,7 @@ namespace exq
         const types::MetaTable table_;
         std::vector<types::OrderByItem> items_;
         std::optional<uint64_t> fetch_;
+        types::ExecutionContext& ctx_;
         std::unique_ptr<INodeExecutor> child_;
         std::vector<int64_t> indices_;
         std::vector<types::DataRow> rows_;
@@ -207,6 +214,7 @@ namespace exq
             const types::MetaTable& table,
             std::vector<types::OrderByItem> items,
             std::optional<uint64_t> fetch,
+            types::ExecutionContext& ctx,
             std::unique_ptr<INodeExecutor> child);
 
         void

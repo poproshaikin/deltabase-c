@@ -170,6 +170,7 @@ namespace engine
         }
 
         ctx_.txn = active_txn_.has_value() ? &*active_txn_ : nullptr;
+        ctx_.budget.reset(storage_service_provider_->config().work_mem);
 
         try
         {
@@ -213,7 +214,10 @@ namespace engine
             DataRow row;
 
             while (exec->next(row))
+            {
+                ctx_.budget.reserve(memory_footprint(row));
                 result_table.rows.push_back(std::move(row));
+            }
             exec->close();
             result_table.output_schema = exec->output_schema();
 

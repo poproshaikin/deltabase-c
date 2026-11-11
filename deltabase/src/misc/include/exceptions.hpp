@@ -50,7 +50,10 @@ public:
         REF_COLUMN_NOT_EXISTS,
         REF_COLUMN_TYPE_MISMATCH,
         REF_COLUMN_NOT_UNIQUE,
-        REF_COLUMN_NOT_NULL
+        REF_COLUMN_NOT_NULL,
+
+        // Internal errors
+        MEMORY_BUDGET_EXCEEDED
     };
 
     explicit EngineException(const std::string& msg, Code code)
