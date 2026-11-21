@@ -74,6 +74,8 @@ namespace types
         DESC,
         LIMIT,
         OFFSET,
+        GROUP,
+        HAVING,
     };
 
     enum class SqlSymbol

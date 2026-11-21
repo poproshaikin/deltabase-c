@@ -67,6 +67,8 @@ namespace sql
             {"desc", SqlKeyword::DESC},
             {"limit", SqlKeyword::LIMIT},
             {"offset", SqlKeyword::OFFSET},
+            {"group", SqlKeyword::GROUP},
+            {"having", SqlKeyword::HAVING},
         };
 
         return dictionary;

@@ -5,6 +5,7 @@
 #ifndef DELTABASE_AST_TREE_HPP
 #define DELTABASE_AST_TREE_HPP
 #include "sql_token.hpp"
+#include "data_type.hpp"
 #include "config.hpp"
 
 #include <memory>
@@ -127,11 +128,68 @@ namespace types
         bool desc = false;
     };
 
+    enum class AggregateKind
+    {
+        COUNT_STAR,
+        COUNT,
+        SUM,
+        AVG,
+        MIN,
+        MAX,
+    };
+
+    struct AggregateCall
+    {
+        AggregateKind kind = AggregateKind::COUNT_STAR;
+        SqlToken column;            // unused for COUNT_STAR
+    };
+
+    // argument_type is only read for SUM, MIN and MAX
+    inline DataType
+    aggregate_result_type(AggregateKind kind, DataType argument_type)
+    {
+        switch (kind)
+        {
+        case AggregateKind::COUNT_STAR:
+        case AggregateKind::COUNT:
+            return DataType::INTEGER;
+
+        case AggregateKind::AVG:
+            return DataType::REAL;
+
+        default:
+            return argument_type;
+        }
+    }
+
+    struct SelectItem
+    {
+        std::variant<SqlToken, AggregateCall> value;
+
+        bool
+        is_aggregate() const { return std::holds_alternative<AggregateCall>(value); }
+
+        const SqlToken&
+        column() const { return std::get<SqlToken>(value); }
+
+        const AggregateCall&
+        aggregate() const { return std::get<AggregateCall>(value); }
+    };
+
+    struct HavingClause
+    {
+        AggregateCall aggregate;
+        AstOperator op = AstOperator::UNDEFINED;
+        SqlToken literal;
+    };
+
     struct SelectStmt
     {
         TableIdentifier table;
-        std::vector<SqlToken> columns;
+        std::vector<SelectItem> columns;
         std::optional<BinaryExpr> where;
+        std::vector<SqlToken> group_by;
+        std::optional<HavingClause> having;
         std::vector<OrderByItem> order_by;
         std::optional<uint64_t> limit;
         std::optional<uint64_t> offset;

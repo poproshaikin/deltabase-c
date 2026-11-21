@@ -12,6 +12,25 @@ using namespace types;
 namespace
 {
     std::string
+    render(const SelectItem& item)
+    {
+        if (!item.is_aggregate())
+            return item.column().value;
+
+        const auto& call = item.aggregate();
+        switch (call.kind)
+        {
+        case AggregateKind::COUNT_STAR: return "count(*)";
+        case AggregateKind::COUNT:      return "count(" + call.column.value + ")";
+        case AggregateKind::SUM:        return "sum(" + call.column.value + ")";
+        case AggregateKind::AVG:        return "avg(" + call.column.value + ")";
+        case AggregateKind::MIN:        return "min(" + call.column.value + ")";
+        case AggregateKind::MAX:        return "max(" + call.column.value + ")";
+        default:                        return "?";
+        }
+    }
+
+    std::string
     parse_select(const std::string& query)
     {
         try
@@ -25,9 +44,16 @@ namespace
             const auto& stmt = std::get<SelectStmt>(node.value);
 
             std::string out = "cols=[";
-            for (const auto& col : stmt.columns)
+            for (const auto& item : stmt.columns)
+                out += render(item) + " ";
+            out += "] group_by=[";
+            for (const auto& col : stmt.group_by)
                 out += col.value + " ";
-            out += "] order_by=[";
+            out += "] having=";
+            out += stmt.having ? render(SelectItem{stmt.having->aggregate}) +
+                                 "?" + stmt.having->literal.value
+                               : "-";
+            out += " order_by=[";
             for (const auto& item : stmt.order_by)
                 out += item.column.value + (item.desc ? ":desc " : ":asc ");
             out += "] limit=";
@@ -61,39 +87,97 @@ namespace
 TEST(parser, select_without_new_clauses)
 {
     tst::check_eq(parse_select("select * from t"),
-                  "cols=[] order_by=[] limit=- offset=-", "bare star");
+                  "cols=[] group_by=[] having=- order_by=[] limit=- offset=-", "bare star");
     tst::check_eq(parse_select("select a, b from t"),
-                  "cols=[a b ] order_by=[] limit=- offset=-", "column list");
+                  "cols=[a b ] group_by=[] having=- order_by=[] limit=- offset=-", "column list");
     tst::check_eq(parse_select("select * from s.t where a == 1;"),
-                  "cols=[] order_by=[] limit=- offset=-", "schema, where, semicolon");
+                  "cols=[] group_by=[] having=- order_by=[] limit=- offset=-", "schema, where, semicolon");
 }
 
 TEST(parser, order_by)
 {
     tst::check_eq(parse_select("select * from t order by a"),
-                  "cols=[] order_by=[a:asc ] limit=- offset=-", "single key defaults to asc");
+                  "cols=[] group_by=[] having=- order_by=[a:asc ] limit=- offset=-", "single key defaults to asc");
     tst::check_eq(parse_select("select * from t order by a desc"),
-                  "cols=[] order_by=[a:desc ] limit=- offset=-", "desc");
+                  "cols=[] group_by=[] having=- order_by=[a:desc ] limit=- offset=-", "desc");
     tst::check_eq(parse_select("select * from t order by a asc, b desc"),
-                  "cols=[] order_by=[a:asc b:desc ] limit=- offset=-", "per-key direction");
+                  "cols=[] group_by=[] having=- order_by=[a:asc b:desc ] limit=- offset=-", "per-key direction");
     tst::check_eq(parse_select("select name from t where a == 1 order by age desc"),
-                  "cols=[name ] order_by=[age:desc ] limit=- offset=-", "after where");
+                  "cols=[name ] group_by=[] having=- order_by=[age:desc ] limit=- offset=-", "after where");
     tst::check_eq(parse_select("select * from t order by a;"),
-                  "cols=[] order_by=[a:asc ] limit=- offset=-", "trailing semicolon");
+                  "cols=[] group_by=[] having=- order_by=[a:asc ] limit=- offset=-", "trailing semicolon");
 }
 
 TEST(parser, limit_and_offset)
 {
     tst::check_eq(parse_select("select * from t limit 5"),
-                  "cols=[] order_by=[] limit=5 offset=-", "limit alone");
+                  "cols=[] group_by=[] having=- order_by=[] limit=5 offset=-", "limit alone");
     tst::check_eq(parse_select("select * from t offset 3"),
-                  "cols=[] order_by=[] limit=- offset=3", "offset alone");
+                  "cols=[] group_by=[] having=- order_by=[] limit=- offset=3", "offset alone");
     tst::check_eq(parse_select("select * from t limit 5 offset 3"),
-                  "cols=[] order_by=[] limit=5 offset=3", "limit then offset");
+                  "cols=[] group_by=[] having=- order_by=[] limit=5 offset=3", "limit then offset");
     tst::check_eq(parse_select("select * from t limit 0"),
-                  "cols=[] order_by=[] limit=0 offset=-", "limit zero");
+                  "cols=[] group_by=[] having=- order_by=[] limit=0 offset=-", "limit zero");
     tst::check_eq(parse_select("select * from t where a == 1 order by a desc limit 5 offset 3;"),
-                  "cols=[] order_by=[a:desc ] limit=5 offset=3", "every clause at once");
+                  "cols=[] group_by=[] having=- order_by=[a:desc ] limit=5 offset=3", "every clause at once");
+}
+
+TEST(parser, aggregates)
+{
+    tst::check_eq(parse_select("select count(*) from t"),
+                  "cols=[count(*) ] group_by=[] having=- order_by=[] limit=- offset=-",
+                  "count star");
+    tst::check_eq(parse_select("select count(id) from t"),
+                  "cols=[count(id) ] group_by=[] having=- order_by=[] limit=- offset=-",
+                  "count of a column");
+    tst::check_eq(parse_select("select sum(x), avg(x), min(x), max(x) from t"),
+                  "cols=[sum(x) avg(x) min(x) max(x) ] group_by=[] having=- order_by=[] limit=- offset=-",
+                  "every aggregate at once");
+    tst::check_eq(parse_select("select name, count(*) from t"),
+                  "cols=[name count(*) ] group_by=[] having=- order_by=[] limit=- offset=-",
+                  "a column and an aggregate side by side");
+}
+
+TEST(parser, group_by_and_having)
+{
+    tst::check_eq(parse_select("select name, count(*) from t group by name"),
+                  "cols=[name count(*) ] group_by=[name ] having=- order_by=[] limit=- offset=-",
+                  "one key");
+    tst::check_eq(parse_select("select count(*) from t group by a, b"),
+                  "cols=[count(*) ] group_by=[a b ] having=- order_by=[] limit=- offset=-",
+                  "several keys");
+    tst::check_eq(parse_select("select count(*) from t group by name having count(*) > 5"),
+                  "cols=[count(*) ] group_by=[name ] having=count(*)?5 order_by=[] limit=- offset=-",
+                  "having over count");
+    tst::check_eq(parse_select("select sum(x) from t where x >= 1 group by name "
+                               "having sum(x) > 10 limit 5 offset 2;"),
+                  "cols=[sum(x) ] group_by=[name ] having=sum(x)?10 order_by=[] limit=5 offset=2",
+                  "every clause at once");
+}
+
+TEST(parser, malformed_aggregates_are_rejected)
+{
+    tst::check(!accepted("select foo(x) from t"), "unknown function");
+    tst::check(!accepted("select sum(*) from t"), "only count takes a star");
+    tst::check(!accepted("select count( from t"), "unclosed call");
+    tst::check(!accepted("select count(x from t"), "missing parenthesis");
+    tst::check(!accepted("select count(*) from t group a"), "GROUP without BY");
+    tst::check(!accepted("select count(*) from t group by"), "GROUP BY without a column");
+    tst::check(!accepted("select count(*) from t group by a,"), "trailing comma");
+    tst::check(!accepted("select count(*) from t having name > 5"), "HAVING without an aggregate");
+    tst::check(!accepted("select count(*) from t having count(*)"), "HAVING without a comparison");
+    tst::check(!accepted("select count(*) from t having count(*) > x"), "HAVING against a column");
+}
+
+// Aggregate names stay identifiers, so they are still usable as column names.
+TEST(parser, aggregate_names_are_not_reserved)
+{
+    tst::check_eq(parse_select("select count from t"),
+                  "cols=[count ] group_by=[] having=- order_by=[] limit=- offset=-",
+                  "a column may be called count");
+    tst::check(accepted("create table t(count integer, sum integer);"),
+               "and declared with those names");
+    tst::check(accepted("select min, max from t order by min"), "and ordered by");
 }
 
 TEST(parser, malformed_clauses_are_rejected)

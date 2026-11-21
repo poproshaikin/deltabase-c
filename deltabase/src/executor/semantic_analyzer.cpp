@@ -89,19 +89,92 @@ namespace exq
             table = ssp_.ddl().get_table(stmt.table);
         }
 
-        for (const SqlToken& col : stmt.columns)
-            if (!table->has_column(col.value))
+        bool has_aggregate = false;
+        for (const SelectItem& item : stmt.columns)
+        {
+            if (!item.is_aggregate() && !table->has_column(item.column().value))
                 return AnalysisResult(EngineException(
-                    "Column '" + col.value + "' doesn't exist",
+                    "Column '" + item.column().value + "' doesn't exist",
                     EngineException::Code::COLUMN_NOT_EXISTS));
 
-        for (const auto& order_by : stmt.order_by)
+            if (item.is_aggregate())
+            {
+                has_aggregate = true;
+
+                auto result = analyze_aggregate(item.aggregate(), *table);
+                if (!result.is_valid)
+                    return AnalysisResult(result.err.value());
+            }
+        }
+
+        for (const auto& group_by : stmt.group_by)
         {
+            if (!table->has_column(group_by.value))
+                return AnalysisResult(EngineException(
+                    "Column '" + group_by.value + "' doesn't exist",
+                    EngineException::Code::COLUMN_NOT_EXISTS));
+        }
+
+        // aggregates or a GROUP BY make the query grouped, and the rules below follow from
+        // that rather than from aggregates alone
+        const bool is_grouped = has_aggregate || !stmt.group_by.empty();
+
+        if (is_grouped)
+        {
+            std::unordered_set<std::string> keys;
+            for (const auto& group_by : stmt.group_by)
+                keys.insert(group_by.value);
+
+            for (const SelectItem& item : stmt.columns)
+                if (!item.is_aggregate() && !keys.contains(item.column().value))
+                    return AnalysisResult(EngineException(
+                        "Column '" + item.column().value +
+                        "' must appear in GROUP BY or be used in an aggregate function",
+                        EngineException::Code::AMBIGUOUS_COLUMN));
+        }
+
+        for (const auto& order_by : stmt.order_by)
             if (!table->has_column(order_by.column.value))
                 return AnalysisResult(EngineException(
                     "Column '" + order_by.column.value + "' doesn't exist",
                     EngineException::Code::COLUMN_NOT_EXISTS));
+
+        // the sort resolves its keys against the table, and above an aggregate the rows no
+        // longer have that shape
+        if (is_grouped && !stmt.order_by.empty())
+            return AnalysisResult(EngineException(
+                "ORDER BY together with aggregate functions is not supported yet",
+                EngineException::Code::UNSUPPORTED_STATEMENT));
+
+        if (stmt.having.has_value())
+        {
+            if (!is_grouped)
+                return AnalysisResult(EngineException(
+                    "HAVING requires aggregates or a GROUP BY in the query",
+                    EngineException::Code::SYNTAX_ERROR));
+
+            auto result = analyze_aggregate(stmt.having->aggregate, *table);
+            if (!result.is_valid)
+                return AnalysisResult(result.err.value());
+
+            const auto& call = stmt.having->aggregate;
+            const auto argument_type = call.kind == AggregateKind::COUNT_STAR
+                                           ? DataType::UNDEFINED
+                                           : table->get_column(call.column.value).type;
+
+            const auto literal = stmt.having->literal.get_detail<SqlLiteral>();
+            const auto result_type = aggregate_result_type(call.kind, argument_type);
+
+            if (!is_compatible(literal, result_type))
+                return AnalysisResult(EngineException(
+                    "HAVING compares an aggregate to a literal of an incompatible type",
+                    EngineException::Code::TYPE_MISMATCH));
         }
+
+        if (is_grouped)
+            return AnalysisResult(EngineException(
+                "Aggregate functions are not supported yet",
+                EngineException::Code::UNSUPPORTED_STATEMENT));
 
         if (stmt.where.has_value())
         {
@@ -538,6 +611,29 @@ namespace exq
             return AnalysisResult(EngineException(
                 "Table '" + stmt.table.table_name.value + "' doesn't exist",
                 EngineException::Code::TABLE_NOT_EXISTS));
+
+        return AnalysisResult(true);
+    }
+
+    AnalysisResult
+    SemanticAnalyzer::analyze_aggregate(const AggregateCall& call, const MetaTable& table) const
+    {
+        if (call.kind == AggregateKind::COUNT_STAR)
+            return AnalysisResult(true);
+
+        if (!table.has_column(call.column.value))
+            return AnalysisResult(EngineException(
+                "Column '" + call.column.value + "' doesn't exist",
+                EngineException::Code::COLUMN_NOT_EXISTS));
+
+        if (call.kind == AggregateKind::SUM || call.kind == AggregateKind::AVG)
+        {
+            const auto col_type = table.get_column(call.column.value).type;
+            if (col_type != DataType::INTEGER && col_type != DataType::REAL)
+                return AnalysisResult(EngineException(
+                    "Column '" + call.column.value + "' has to be of type REAL or INTEGER",
+                    EngineException::Code::TYPE_MISMATCH));
+        }
 
         return AnalysisResult(true);
     }

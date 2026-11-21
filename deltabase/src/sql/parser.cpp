@@ -73,6 +73,9 @@ namespace sql
         return tokens_[current_ - 1];
     }
 
+    static std::optional<AstOperator>
+    to_ast_operator(SqlOperator type);
+
     AstNode
     SqlParser::parse()
     {
@@ -196,7 +199,7 @@ namespace sql
                     break;
                 }
 
-                stmt.columns.push_back(*current());
+                stmt.columns.push_back(parse_select_item());
 
                 if (!advance() || !match(SqlSymbol::COMMA))
                 {
@@ -220,6 +223,12 @@ namespace sql
             stmt.where = parse_binary_expr(0);
         }
 
+        if (match(SqlKeyword::GROUP))
+            stmt.group_by = parse_group_by();
+
+        if (match(SqlKeyword::HAVING))
+            stmt.having = parse_having();
+
         if (match(SqlKeyword::ORDER))
             stmt.order_by = parse_order_by();
 
@@ -236,6 +245,124 @@ namespace sql
         }
 
         return stmt;
+    }
+
+    namespace
+    {
+        std::optional<AggregateKind>
+        to_aggregate_kind(const std::string& name, bool star)
+        {
+            if (name == "count")
+                return star ? AggregateKind::COUNT_STAR : AggregateKind::COUNT;
+
+            if (star)
+                return std::nullopt;
+
+            if (name == "sum") return AggregateKind::SUM;
+            if (name == "avg") return AggregateKind::AVG;
+            if (name == "min") return AggregateKind::MIN;
+            if (name == "max") return AggregateKind::MAX;
+
+            return std::nullopt;
+        }
+    }
+
+    // Expects the cursor on the identifier and leaves it on the item's last token -- the
+    // identifier itself, or the closing parenthesis of an aggregate call.
+    SelectItem
+    SqlParser::parse_select_item()
+    {
+        match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier");
+        const SqlToken name = *current();
+
+        // an identifier followed by '(' is a call; anything else is a plain column
+        if (current_ + 1 >= tokens_.size())
+            return SelectItem{name};
+
+        const auto* next_symbol = std::get_if<SqlSymbol>(&tokens_[current_ + 1].detail);
+        if (next_symbol == nullptr || *next_symbol != SqlSymbol::LPAREN)
+            return SelectItem{name};
+
+        advance();
+        advance_or_throw("Expected aggregate argument");
+
+        const bool star = match(SqlOperator::MUL);
+
+        const auto kind = to_aggregate_kind(name.value, star);
+        if (!kind)
+            throw EngineException("Unknown aggregate function '" + name.value + "'",
+                                  EngineException::Code::UNSUPPORTED_STATEMENT);
+
+        AggregateCall call;
+        call.kind = *kind;
+
+        if (!star)
+        {
+            match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier as argument");
+            call.column = *current();
+        }
+
+        advance_or_throw("Expected ')' after aggregate argument");
+        match_or_throw(SqlSymbol::RPAREN, "Expected ')' after aggregate argument");
+
+        return SelectItem{call};
+    }
+
+    // Same cursor convention as parse_order_by.
+    std::vector<SqlToken>
+    SqlParser::parse_group_by()
+    {
+        match_or_throw(SqlKeyword::GROUP);
+        advance_or_throw("Expected 'BY' after 'GROUP'");
+        match_or_throw(SqlKeyword::BY, "Expected 'BY' after 'GROUP'");
+
+        std::vector<SqlToken> columns;
+
+        while (true)
+        {
+            advance_or_throw("Expected column identifier in GROUP BY");
+            match_or_throw(SqlTokenType::IDENTIFIER, "Expected column identifier in GROUP BY");
+
+            columns.push_back(*current());
+
+            if (!advance() || !match(SqlSymbol::COMMA))
+                break;
+        }
+
+        return columns;
+    }
+
+    HavingClause
+    SqlParser::parse_having()
+    {
+        match_or_throw(SqlKeyword::HAVING);
+        advance_or_throw("Expected an aggregate after 'HAVING'");
+
+        const SelectItem subject = parse_select_item();
+        if (!subject.is_aggregate())
+            throw EngineException("HAVING expects an aggregate on the left",
+                                  EngineException::Code::UNSUPPORTED_STATEMENT);
+
+        HavingClause clause;
+        clause.aggregate = subject.aggregate();
+
+        advance_or_throw("Expected a comparison operator in HAVING");
+
+        const auto* op = std::get_if<SqlOperator>(&current()->detail);
+        const auto ast_op = op ? to_ast_operator(*op) : std::nullopt;
+        if (!ast_op)
+            throw EngineException("Expected a comparison operator in HAVING",
+                                  EngineException::Code::SYNTAX_ERROR);
+
+        clause.op = *ast_op;
+
+        advance_or_throw("Expected a literal in HAVING");
+        match_or_throw(SqlTokenType::LITERAL, "Expected a literal in HAVING");
+        clause.literal = *current();
+
+        advance();
+
+        return clause;
     }
 
     // Leaves the cursor past the clause, or on its last token at end of input, as the rest

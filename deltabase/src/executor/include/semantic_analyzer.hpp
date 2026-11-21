@@ -55,6 +55,9 @@ namespace exq
         analyze_order_by(const types::OrderByItem& order_by, const types::MetaTable& table);
 
         types::AnalysisResult
+        analyze_aggregate(const types::AggregateCall& call, const types::MetaTable& table) const;
+
+        types::AnalysisResult
         analyze_column_assignment(
             const types::BinaryExpr &expr,
             const types::MetaTable& table

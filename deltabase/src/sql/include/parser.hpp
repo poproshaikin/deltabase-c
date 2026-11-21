@@ -22,6 +22,15 @@ namespace sql
         types::SelectStmt
         parse_select();
 
+        types::SelectItem
+        parse_select_item();
+
+        std::vector<types::SqlToken>
+        parse_group_by();
+
+        types::HavingClause
+        parse_having();
+
         std::vector<types::OrderByItem>
         parse_order_by();
 

@@ -327,8 +327,8 @@ namespace exq
 
         // 4. PROJECT
         if (!stmt.columns.empty())
-            for (auto& c : stmt.columns)
-                cols.push_back(c.value);
+            for (const auto& item : stmt.columns)
+                cols.push_back(item.column().value);
 
         else if (stmt.columns.empty())
             for (const auto& col : table->columns)
