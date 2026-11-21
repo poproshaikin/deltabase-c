@@ -584,7 +584,6 @@ namespace storage
             return false;
 
         out.pages.clear();
-        out.pages.reserve(pages_count);
 
         for (uint64_t i = 0; i < pages_count; ++i)
         {

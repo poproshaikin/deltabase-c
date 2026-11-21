@@ -56,7 +56,7 @@ namespace types
         }
         catch (...)
         {
-            // also runs from the destructor, so it must not escape
+            // runs from the destructor, so it must not escape
         }
 
         if (on_exhausted_)

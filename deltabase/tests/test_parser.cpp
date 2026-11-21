@@ -11,7 +11,6 @@ using namespace types;
 
 namespace
 {
-    // Parses one statement and renders what came out, so a test can compare a literal.
     std::string
     parse_select(const std::string& query)
     {
@@ -110,8 +109,6 @@ TEST(parser, malformed_clauses_are_rejected)
     tst::check(!accepted("select * from t offset 3 limit 5"), "OFFSET before LIMIT");
 }
 
-// Reserved words used to break the select list silently: the loop stopped at the first
-// non-identifier and the query was parsed as if those columns had not been written.
 TEST(parser, select_list_is_strict)
 {
     tst::check(!accepted("select order from t"), "a keyword alone must not become select *");
@@ -123,7 +120,6 @@ TEST(parser, select_list_is_strict)
     tst::check(accepted("select a, b from t"), "plain identifiers are still allowed");
 }
 
-// Quoting is the escape hatch for the words ORDER BY took over.
 TEST(parser, quoted_identifiers)
 {
     tst::check(accepted("create table t(\"order\" integer);"), "reserved word as a column name");

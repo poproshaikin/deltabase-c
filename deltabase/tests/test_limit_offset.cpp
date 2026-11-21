@@ -58,8 +58,6 @@ TEST(limit, offset)
                   "5 | 4 | ", "descending with both");
 }
 
-// Applying the limit before the sort is the classic way to get this wrong: it would return
-// three arbitrary rows in order rather than the three first rows.
 TEST(limit, applies_after_the_sort)
 {
     auto db = make_db();
@@ -74,13 +72,10 @@ TEST(limit, without_order_by)
 {
     auto db = make_db();
 
-    // No ORDER BY, so this is insertion order: 3 1 5 2 4 NULL.
     tst::check_eq(db.rows("select id from common.t limit 2 offset 1"),
                   "1 | 5 | ", "scan order, skipping one");
 }
 
-// With a LIMIT the sort keeps only limit+offset rows in a heap instead of materialising
-// everything. The result must be identical to the full sort either way.
 TEST(limit, bounded_sort_agrees_with_the_full_sort)
 {
     tst::TestDb db("limit_scale");
@@ -132,7 +127,6 @@ TEST(limit, ties_under_a_bound)
     for (const int id : ids)
         db.exec("insert into common.t (id, grp) values (" + std::to_string(id) + ", 7);");
 
-    // Every key is equal, so the bounded path must keep the same rows the full sort would.
     tst::check_eq(db.rows("select id from common.t order by grp limit 3"),
                   "3 | 1 | 5 | ", "bounded sort keeps the first rows on a full tie");
     tst::check_eq(db.rows("select id from common.t order by grp desc limit 3"),

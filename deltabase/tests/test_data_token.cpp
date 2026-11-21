@@ -57,9 +57,7 @@ namespace
         return DataToken::compare_ordered(left, right) < 0;
     }
 
-    // std::sort requires a strict weak ordering. The requirement that trips over NULL is
-    // transitivity of the induced equivalence: comparing every triple is the only way to
-    // see it, and violating it is undefined behaviour rather than a wrong order.
+    // Comparing every triple is the only way to see the equivalence requirement break.
     template <typename Less>
     void
     check_strict_weak_ordering(const std::vector<DataToken>& tokens, Less less,
@@ -114,8 +112,6 @@ TEST(data_token, compare_ordered_is_a_strict_weak_ordering)
     check_strict_weak_ordering(mixed, ordered_less, "every type and NULL");
 }
 
-// The SQL comparison operators are deliberately NOT a valid sort predicate: NULL compares
-// UNKNOWN against everything, which makes it equivalent to every value at once.
 TEST(data_token, sql_operators_are_not_a_sort_predicate)
 {
     const auto sql_less = [](const DataToken& a, const DataToken& b) { return a < b; };
@@ -170,7 +166,6 @@ TEST(data_token, text_is_ordered_by_unsigned_bytes)
     for (const auto& value : values)
         joined += "'" + value + "' ";
 
-    // Case-sensitive, uppercase before lowercase, shorter prefix first, UTF-8 by code point.
     tst::check_eq(joined,
                   "'' 'APPLE2' 'Apple' 'Banana' 'app' 'apple' 'banana' 'zebra' '\xC3\xA4pfel' ",
                   "byte-lexicographic order");
@@ -178,8 +173,7 @@ TEST(data_token, text_is_ordered_by_unsigned_bytes)
 
 TEST(data_token, sorting_with_nulls_is_safe_and_puts_them_last)
 {
-    // Large enough to reach introsort's quicksort partitioning, where a comparator that
-    // breaks the contract walks off the buffer instead of merely ordering badly.
+    // Large enough to reach introsort's partitioning, where a broken comparator runs off the end.
     std::vector<DataToken> tokens;
     std::mt19937 rng(42);
     for (int i = 0; i < 4000; ++i)

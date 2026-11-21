@@ -214,10 +214,16 @@ namespace storage
 
         // Phase 1: read-only, no locked-mutations
         std::vector<std::pair<DataPageId, RowId>> candidates;
-        for (DataPage* page : buffer_pool_.get_table_data(mt.id))
+        for (const auto& page_id : buffer_pool_.get_table_page_ids(mt.id))
+        {
+            auto* page = buffer_pool_.get_dp(page_id);
+            if (!page)
+                continue;
+
             for (const auto& row : page->rows)
                 if (ids.contains(row.id) && !has_flag(row.flags, DataRowFlags::OBSOLETE))
-                    candidates.emplace_back(page->id, row.id);
+                    candidates.emplace_back(page_id, row.id);
+        }
 
         // Phase 2: mutation. DO NOT USE DataPage* - may become mutated by someone else.
         for (const auto& [page_id, row_id] : candidates)
@@ -236,10 +242,16 @@ namespace storage
 
         // Phase 1: read-only
         std::vector<std::pair<DataPageId, RowId>> candidates;
-        for (DataPage* page : buffer_pool_.get_table_data(mt.id))
+        for (const auto& page_id : buffer_pool_.get_table_page_ids(mt.id))
+        {
+            auto* page = buffer_pool_.get_dp(page_id);
+            if (!page)
+                continue;
+
             for (const auto& row : page->rows)
                 if (ids.contains(row.id) && !has_flag(row.flags, DataRowFlags::OBSOLETE))
-                    candidates.emplace_back(page->id, row.id);
+                    candidates.emplace_back(page_id, row.id);
+        }
 
         // Phase 2
         for (const auto& [page_id, row_id] : candidates)

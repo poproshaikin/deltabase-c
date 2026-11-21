@@ -70,13 +70,11 @@ namespace tst
     class TestDb
     {
         std::string name_;
-        // held indirectly so the destructor can shut the engine down before deleting the
-        // directory underneath it -- the other order throws out of a destructor
         std::unique_ptr<engine::Engine> engine_;
 
     public:
         explicit
-        TestDb(const std::string& prefix, uint64_t work_mem = 0);
+        TestDb(const std::string& prefix, uint64_t work_mem = 0, size_t page_cache_size = 0);
 
         ~TestDb();
 
@@ -102,7 +100,6 @@ namespace tst
         uint64_t
         count(const std::string& query);
 
-        // The error message a query throws, or "" when it succeeds.
         std::string
         error(const std::string& query);
     };

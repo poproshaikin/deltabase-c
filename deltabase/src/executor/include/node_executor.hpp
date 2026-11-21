@@ -51,6 +51,7 @@ namespace exq
         storage::StorageServiceProvider& service_provider_;
 
         types::ExecutionContext& ctx_;
+        misc::MemoryReservation reservation_;
 
         types::MetaTable mt_;
         types::DataTable data_;
@@ -86,6 +87,7 @@ namespace exq
         storage::StorageServiceProvider& service_provider_;
 
         types::ExecutionContext& ctx_;
+        misc::MemoryReservation reservation_;
 
         types::MetaTable mt_;
         types::DataTable data_;
@@ -202,8 +204,11 @@ namespace exq
         const types::MetaTable table_;
         std::vector<types::OrderByItem> items_;
         std::optional<uint64_t> fetch_;
+
         types::ExecutionContext& ctx_;
+        misc::MemoryReservation reservation_;
         std::unique_ptr<INodeExecutor> child_;
+
         std::vector<int64_t> indices_;
         std::vector<types::DataRow> rows_;
         size_t idx_ = 0;

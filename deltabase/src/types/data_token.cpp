@@ -203,14 +203,13 @@ namespace types
         const int a_null = a.type == DataType::_NULL ? 1 : 0;
         const int b_null = b.type == DataType::_NULL ? 1 : 0;
 
-        // NULL sorts after every value and equals only another NULL.
         if (a_null != b_null)
             return a_null - b_null;
 
         if (a_null == 1)
             return 0;
 
-        // Arbitrary but consistent: compare() has no meaning for incomparable types.
+        // Arbitrary but consistent: compare() is meaningless across incomparable types.
         if (common_type(a.type, b.type) == DataType::UNDEFINED)
         {
             const auto a_type = static_cast<int>(a.type);

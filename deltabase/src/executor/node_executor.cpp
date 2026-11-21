@@ -65,7 +65,7 @@ namespace exq
         storage::StorageServiceProvider& service_provider,
         ExecutionContext& ctx
     ) : table_name_(table_name), schema_name_(schema_name), service_provider_(service_provider),
-        ctx_(ctx), index_(0)
+        ctx_(ctx), reservation_(ctx.budget), index_(0)
     {
     }
 
@@ -78,8 +78,16 @@ namespace exq
             SqlToken(SqlTokenType::IDENTIFIER, schema_name_, 0, 0)
         );
         mt_ = prov.get_virtual_table(tid);
+
+        reservation_.release_all();
         data_ = prov.get_virtual_data(tid);
         index_ = 0;
+
+        uint64_t footprint = 0;
+        for (const auto& row : data_.rows)
+            footprint += memory_footprint(row);
+
+        reservation_.grow(footprint);
     }
 
     bool
@@ -117,7 +125,7 @@ namespace exq
         ExecutionContext& ctx
     )
         : index_id_(index_id), condition_(condition),
-          service_provider_(service_provider), ctx_(ctx), mt_(mt)
+          service_provider_(service_provider), ctx_(ctx), reservation_(ctx.budget), mt_(mt)
     {
     }
 
@@ -125,7 +133,16 @@ namespace exq
     IndexScanNodeExecutor::open()
     {
         auto& dql = service_provider_.dql();
+
+        reservation_.release_all();
         data_ = dql.index_scan(mt_, index_id_, condition_);
+        index_ = 0;
+
+        uint64_t footprint = 0;
+        for (const auto& row : data_.rows)
+            footprint += memory_footprint(row);
+
+        reservation_.grow(footprint);
     }
 
     bool
@@ -273,7 +290,7 @@ namespace exq
     bool
     LimitNodeExecutor::next(DataRow& out)
     {
-        // OFFSET is consumed on the first next(), so LIMIT counts what is left after it
+        // consumed on the first next(), so LIMIT counts what is left after it
         if (!skipped_)
         {
             for (uint64_t i = 0; i < offset_; ++i)
@@ -319,7 +336,7 @@ namespace exq
         std::unique_ptr<INodeExecutor> child
     )
         : table_(table), items_(std::move(items)), fetch_(fetch), ctx_(ctx),
-          child_(std::move(child))
+          reservation_(ctx.budget), child_(std::move(child))
     {
     }
 
@@ -327,6 +344,7 @@ namespace exq
     OrderByNodeExecutor::open()
     {
         child_->open();
+        reservation_.release_all();
         rows_.clear();
         indices_.clear();
         idx_ = 0;
@@ -352,7 +370,6 @@ namespace exq
 
         auto row_less = [this](const DataRow& left, const DataRow& right)
         {
-            // cycle for each 'ORDER BY' item
             for (size_t k = 0; k < indices_.size(); ++k)
             {
                 const auto idx = static_cast<size_t>(indices_[k]);
@@ -373,12 +390,14 @@ namespace exq
 
             if (!fetch_)
             {
+                reservation_.grow(memory_footprint(row));
                 rows_.push_back(std::move(row));
                 continue;
             }
 
             if (rows_.size() < *fetch_)
             {
+                reservation_.grow(memory_footprint(row));
                 rows_.push_back(std::move(row));
                 std::ranges::push_heap(rows_, row_less);
                 continue;
@@ -388,6 +407,8 @@ namespace exq
                 continue;
 
             std::ranges::pop_heap(rows_, row_less);
+            reservation_.shrink(memory_footprint(rows_.back()));
+            reservation_.grow(memory_footprint(row));
             rows_.back() = std::move(row);
             std::ranges::push_heap(rows_, row_less);
         }
@@ -404,7 +425,7 @@ namespace exq
         if (idx_ >= rows_.size())
             return false;
 
-        // moved out rather than copied -- a row is never served twice
+        reservation_.shrink(memory_footprint(rows_[idx_]));
         out = std::move(rows_[idx_++]);
         return true;
     }
@@ -412,6 +433,7 @@ namespace exq
     void
     OrderByNodeExecutor::close()
     {
+        reservation_.release_all();
         child_->close();
     }
 
@@ -424,7 +446,7 @@ namespace exq
     InsertNodeExecutor::InsertNodeExecutor(
         MetaTable& mt,
         storage::StorageServiceProvider& service_provider,
-        const std::optional<std::vector<std::string> >& col_names,
+        const std::optional<std::vector<std::string>>& col_names,
         ExecutionContext& ctx,
         std::unique_ptr<INodeExecutor> child
     )
@@ -698,17 +720,26 @@ namespace exq
         {
             if (auto* add_col = std::get_if<AddColumnOperation>(&operation))
             {
-                service_provider_.ddl().add_column(table_name_, schema_.name, add_col->column, *ctx_.txn);
+                service_provider_.ddl().add_column(table_name_,
+                                                   schema_.name,
+                                                   add_col->column,
+                                                   *ctx_.txn);
                 executed_ = true;
             }
             if (auto* rename_to = std::get_if<RenameTableOperation>(&operation))
             {
-                service_provider_.ddl().rename_table(table_name_, schema_.name, rename_to->new_name, *ctx_.txn);
+                service_provider_.ddl().rename_table(table_name_,
+                                                     schema_.name,
+                                                     rename_to->new_name,
+                                                     *ctx_.txn);
                 executed_ = true;
             }
             if (auto* drop_col = std::get_if<DropColumnOperation>(&operation))
             {
-                service_provider_.ddl().drop_column(table_name_, schema_.name, drop_col->column_name.value, *ctx_.txn);
+                service_provider_.ddl().drop_column(table_name_,
+                                                    schema_.name,
+                                                    drop_col->column_name.value,
+                                                    *ctx_.txn);
                 executed_ = true;
             }
         }
@@ -887,44 +918,65 @@ namespace exq
             const auto& n = static_cast<const IndexScanPlanNode&>(node);
             const MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<IndexScanNodeExecutor>(
-                mt, n.index_id, n.condition, ssp, ctx);
+                mt,
+                n.index_id,
+                n.condition,
+                ssp,
+                ctx);
         }
         case IPlanNode::Type::VIRTUAL_TABLE:
         {
             const auto& n = static_cast<const VirtualTablePlanNode&>(node);
             return std::make_unique<VirtualTableNodeExecutor>(
-                n.table_name, n.schema_name, ssp, ctx);
+                n.table_name,
+                n.schema_name,
+                ssp,
+                ctx);
         }
         case IPlanNode::Type::FILTER:
         {
             const auto& n = static_cast<const FilterPlanNode&>(node);
             return std::make_unique<FilterNodeExecutor>(
-                n.table, n.where, from_plan(*n.child, ssp, ctx));
+                n.table,
+                n.where,
+                from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::PROJECT:
         {
             const auto& n = static_cast<const ProjectPlanNode&>(node);
             return std::make_unique<ProjectionNodeExecutor>(
-                n.table, n.columns, from_plan(*n.child, ssp, ctx));
+                n.table,
+                n.columns,
+                from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::ORDER_BY:
         {
             const auto& n = static_cast<const OrderByPlanNode&>(node);
             return std::make_unique<OrderByNodeExecutor>(
-                n.table, n.items, n.fetch, ctx, from_plan(*n.child, ssp, ctx));
+                n.table,
+                n.items,
+                n.fetch,
+                ctx,
+                from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::LIMIT:
         {
             const auto& n = static_cast<const LimitPlanNode&>(node);
             return std::make_unique<LimitNodeExecutor>(
-                n.limit, n.offset, from_plan(*n.child, ssp, ctx));
+                n.limit,
+                n.offset,
+                from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::INSERT:
         {
             const auto& n = static_cast<const InsertPlanNode&>(node);
             MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<InsertNodeExecutor>(
-                mt, ssp, n.column_names, ctx, from_plan(*n.child, ssp, ctx));
+                mt,
+                ssp,
+                n.column_names,
+                ctx,
+                from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::VALUES:
         {
@@ -936,24 +988,41 @@ namespace exq
             const auto& n = static_cast<const UpdatePlanNode&>(node);
             MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<UpdateNodeExecutor>(
-                mt, ssp, n.assignments, ctx, from_plan(*n.child, ssp, ctx));
+                mt,
+                ssp,
+                n.assignments,
+                ctx,
+                from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::DELETE:
         {
             const auto& n = static_cast<const DeletePlanNode&>(node);
             MetaTable& mt = *ssp.ddl().get_table(n.table_name, n.schema_name);
             return std::make_unique<DeleteNodeExecutor>(
-                mt, ssp, ctx, from_plan(*n.child, ssp, ctx));
+                mt,
+                ssp,
+                ctx,
+                from_plan(*n.child, ssp, ctx));
         }
         case IPlanNode::Type::CREATE_TABLE:
         {
             const auto& n = static_cast<const CreateTablePlanNode&>(node);
-            return std::make_unique<CreateTableNodeExecutor>(n.table_name, n.schema, n.columns, ssp, ctx);
+            return std::make_unique<CreateTableNodeExecutor>(
+                n.table_name,
+                n.schema,
+                n.columns,
+                ssp,
+                ctx);
         }
         case IPlanNode::Type::ALTER_TABLE:
         {
             const auto& n = static_cast<const AlterTablePlanNode&>(node);
-            return std::make_unique<AlterTableNodeExecutor>(n.table_name, n.schema, n.operations, ssp, ctx);
+            return std::make_unique<AlterTableNodeExecutor>(
+                n.table_name,
+                n.schema,
+                n.operations,
+                ssp,
+                ctx);
         }
         case IPlanNode::Type::CREATE_DB:
         {
@@ -964,12 +1033,22 @@ namespace exq
         {
             const auto& n = static_cast<const CreateIndexPlanNode&>(node);
             return std::make_unique<CreateIndexNodeExecutor>(
-                n.index_name, n.table_name, n.column_name, n.schema_name, n.is_unique, ssp, ctx);
+                n.index_name,
+                n.table_name,
+                n.column_name,
+                n.schema_name,
+                n.is_unique,
+                ssp,
+                ctx);
         }
         case IPlanNode::Type::DROP_INDEX:
         {
             const auto& n = static_cast<const DropIndexPlanNode&>(node);
-            return std::make_unique<DropIndexNodeExecutor>(n.index_name, n.table_name, n.schema_name, ssp, ctx);
+            return std::make_unique<DropIndexNodeExecutor>(n.index_name,
+                                                           n.table_name,
+                                                           n.schema_name,
+                                                           ssp,
+                                                           ctx);
         }
         case IPlanNode::Type::DROP_TABLE:
         {

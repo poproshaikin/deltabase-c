@@ -26,9 +26,9 @@ namespace storage
     class BufferPool
     {
     public:
-        BufferPool(IIOManager& io)
-            : data_pages_(cache::LRUPolicy<types::DataPageId>{}),
-              index_files_(cache::LRUPolicy<types::IndexId>{}),
+        BufferPool(IIOManager& io, size_t capacity = 10000)
+            : data_pages_(cache::LRUPolicy<types::DataPageId>{}, capacity),
+              index_files_(cache::LRUPolicy<types::IndexId>{}, capacity),
               io_(io)
         {
         }
@@ -50,9 +50,6 @@ namespace storage
         types::DataPage*
         prepare_dp(size_t size, const types::MetaTable& mt, txn::Transaction& txn);
 
-        types::DataPage*
-        find_row_owner(types::RowId row_id, const types::MetaTable& mt);
-
         void
         append_row(
             types::DataPage* destination,
@@ -60,8 +57,9 @@ namespace storage
             const types::DataRow& new_row,
             types::LSN lsn);
 
-        std::vector<types::DataPage*>
-        get_table_data(const types::UUID& table_id);
+        // A page pointer dies on the next load, so callers take one page at a time.
+        std::vector<types::DataPageId>
+        get_table_page_ids(const types::UUID& table_id);
 
         types::DataPage*
         dirty_dp(const types::DataPageId& page_id);
@@ -161,8 +159,8 @@ namespace storage
             const types::DataRow& new_row,
             types::LSN lsn);
 
-        std::vector<types::DataPage*>
-        get_table_data_impl(const types::UUID& table_id);
+        std::vector<types::DataPageId>
+        get_table_page_ids_impl(const types::UUID& table_id);
 
         types::DataPage*
         dirty_dp_impl(const types::DataPageId& page_id);

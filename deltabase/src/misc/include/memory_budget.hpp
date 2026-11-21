@@ -55,6 +55,60 @@ namespace misc
             used_ = 0;
         }
     };
+
+    class MemoryReservation
+    {
+        MemoryBudget* budget_ = nullptr;
+        uint64_t held_ = 0;
+
+    public:
+        MemoryReservation() = delete;
+
+        explicit
+        MemoryReservation(MemoryBudget& budget) : budget_(&budget)
+        {
+        }
+
+        ~MemoryReservation() { release_all(); }
+
+        MemoryReservation(const MemoryReservation&) = delete;
+        MemoryReservation& operator=(const MemoryReservation&) = delete;
+
+        void
+        grow(uint64_t bytes)
+        {
+            budget_->reserve(bytes);
+            held_ += bytes;
+        }
+
+        void
+        shrink(uint64_t bytes)
+        {
+            budget_->release(bytes);
+            held_ -= bytes;
+        }
+
+        void
+        release_all() noexcept
+        {
+            try
+            {
+                budget_->release(held_);
+            }
+            catch (...)
+            {
+                // runs from the destructor, so it must not throw
+            }
+
+            held_ = 0;
+        }
+
+        uint64_t
+        held() const
+        {
+            return held_;
+        }
+    };
 }
 
 #endif //DELTABASE_MEMORY_BUDGET_HPP

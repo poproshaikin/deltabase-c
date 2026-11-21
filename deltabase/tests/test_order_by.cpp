@@ -6,8 +6,7 @@
 
 namespace
 {
-    // Ids deliberately out of order; one row leaves id NULL. grp is equal everywhere, so
-    // ordering by it exercises nothing but the row-id tiebreaker.
+    // grp is equal in every row, so ordering by it exercises only the row-id tiebreaker.
     tst::TestDb
     make_db()
     {
@@ -34,7 +33,6 @@ TEST(order_by, ascending_and_descending)
                   "NULL | 5 | 4 | 3 | 2 | 1 | ", "descending puts NULL first");
 }
 
-// The sort sits below the projection, so a key need not appear in the select list.
 TEST(order_by, key_outside_the_select_list)
 {
     auto db = make_db();
@@ -60,8 +58,6 @@ TEST(order_by, multiple_keys_with_mixed_directions)
                   "2 1 | 2 2 | 1 3 | 1 4 | 1 5 | ", "grp descending, id ascending");
 }
 
-// Every key is equal here, so the output order comes entirely from the row-id tiebreaker,
-// which keeps it insertion-ordered rather than arbitrary.
 TEST(order_by, ties_are_deterministic)
 {
     auto db = make_db();

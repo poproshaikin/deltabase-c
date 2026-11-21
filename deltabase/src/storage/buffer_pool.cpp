@@ -54,24 +54,6 @@ namespace storage
         return result;
     }
 
-    DataPage*
-    BufferPool::find_row_owner(RowId row_id, const MetaTable& mt)
-    {
-        auto table_data = get_table_data(mt.id);
-
-        auto it = std::ranges::find_if(table_data, [&](DataPage* page)
-        {
-            if (row_id < page->min_rid || row_id > page->max_rid)
-                return false;
-            return std::ranges::find(page->rows, row_id, &DataRow::id) != page->rows.end();
-        });
-
-        if (it == table_data.end())
-            return nullptr;
-
-        return *it;
-    }
-
     void
     BufferPool::append_row(DataPage* destination, MetaTable& mt, const DataRow& new_row, LSN lsn)
     {
@@ -79,11 +61,11 @@ namespace storage
         append_row_impl(destination, mt, new_row, lsn);
     }
 
-    std::vector<DataPage*>
-    BufferPool::get_table_data(const TableId& table_id)
+    std::vector<DataPageId>
+    BufferPool::get_table_page_ids(const TableId& table_id)
     {
         std::lock_guard lock(mutex_);
-        return get_table_data_impl(table_id);
+        return get_table_page_ids_impl(table_id);
     }
 
     DataPage*
@@ -379,19 +361,14 @@ namespace storage
         dirty_dp_impl(destination->id);
     }
 
-    std::vector<DataPage*>
-    BufferPool::get_table_data_impl(const TableId& table_id)
+    std::vector<DataPageId>
+    BufferPool::get_table_page_ids_impl(const TableId& table_id)
     {
         auto pages_list_it = data_pages_per_table_.find(table_id);
         if (pages_list_it == data_pages_per_table_.end())
             return {};
 
-        std::vector<DataPage*> pages;
-
-        for (const auto& page_id : pages_list_it->second)
-            pages.push_back(get_dp_impl(page_id));
-
-        return pages;
+        return {pages_list_it->second.begin(), pages_list_it->second.end()};
     }
 
     DataPage*

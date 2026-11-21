@@ -39,21 +39,9 @@ namespace storage
     ScanCursor
     DQLService::seq_scan_begin(const MetaTable& mt)
     {
-        const auto pages = buffer_pool_.get_table_data(mt.id);
-
         ScanCursor cursor;
-        cursor.pages.reserve(pages.size());
-
-        for (const auto* page : pages)
-        {
-            if (!page)
-                continue;
-
-            cursor.pages.push_back(page->id);
-        }
-
+        cursor.pages = buffer_pool_.get_table_page_ids(mt.id);
         cursor.initialized = true;
-
         return cursor;
     }
 

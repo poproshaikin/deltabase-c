@@ -34,7 +34,7 @@ namespace storage
         wal::WalManagerFactory wal_factory;
         wal_manager_ = wal_factory.make(cfg_);
 
-        buffer_pool_ = std::make_unique<BufferPool>(*io_manager_);
+        buffer_pool_ = std::make_unique<BufferPool>(*io_manager_, cfg.page_cache_size);
         buffer_pool_->initialize();
         catalog_ = std::make_unique<CatalogCache>(*io_manager_);
 

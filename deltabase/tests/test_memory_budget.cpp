@@ -24,8 +24,6 @@ TEST(memory_budget, reserve_and_release)
     }
     tst::check(exceeded, "reserving past the limit throws MEMORY_BUDGET_EXCEEDED");
 
-    // A refused reservation must not count towards usage, or the budget stays poisoned
-    // for the rest of the query.
     budget.release(40);
     bool reusable = true;
     try
@@ -96,6 +94,55 @@ TEST(memory_budget, a_query_is_refused_rather_than_exhausting_memory)
     tst::check_eq(db.count("select * from common.t limit 3"), 3, "a small result still runs");
     tst::check_eq(db.count("select * from common.t where id >= 199"), 1,
                   "a narrow filter still runs");
+}
+
+TEST(memory_budget, a_sort_accounts_for_the_rows_it_holds)
+{
+    tst::TestDb db("budget_sort", 2000);
+    db.exec("create table common.t(id integer);");
+    for (int i = 0; i < 200; ++i)
+        db.exec("insert into common.t (id) values (" + std::to_string(i) + ");");
+
+    const auto message = db.error("select id from common.t order by id");
+    tst::check(message.find("memory budget") != std::string::npos,
+               "an unbounded sort over 200 rows is refused: " + message);
+
+    tst::check_eq(db.count("select id from common.t order by id limit 3"), 3,
+                  "a bounded sort fits");
+    tst::check_eq(db.rows("select id from common.t order by id limit 3"), "0 | 1 | 2 | ",
+                  "and still returns the right rows");
+    tst::check_eq(db.count("select id from common.t order by id desc limit 2 offset 1"), 2,
+                  "a bounded sort with an offset fits too");
+}
+
+TEST(memory_budget, serving_a_row_releases_its_reservation)
+{
+    tst::TestDb db("budget_handoff", 40000);
+    db.exec("create table common.t(id integer);");
+    for (int i = 0; i < 200; ++i)
+        db.exec("insert into common.t (id) values (" + std::to_string(i) + ");");
+
+    // Fits twice over, but not four times: a missing release would charge every row twice.
+    tst::check_eq(db.count("select id from common.t order by id"), 200,
+                  "a sort whose output is materialised is not charged twice");
+}
+
+// The planner only picks an index scan when it estimates few rows, so the amount is small.
+TEST(memory_budget, an_index_scan_accounts_for_its_table)
+{
+    tst::TestDb db("budget_index", 20000);
+    db.exec("create table common.t(id integer primary key, v integer);");
+    for (int i = 0; i < 200; ++i)
+        db.exec("insert into common.t (id, v) values (" + std::to_string(i) + ", " +
+                std::to_string(i % 10) + ");");
+
+    tst::check_eq(db.rows("select id from common.t where id == 42"), "42 | ", "index lookup");
+    tst::check_eq(db.count("select id from common.t where id == 199"), 1, "last key");
+    tst::check_eq(db.count("select id from common.t where id == 500"), 0, "absent key");
+
+    const auto message = db.error("select id, v from common.t");
+    tst::check(message.find("memory budget") != std::string::npos,
+               "a full result is still refused: " + message);
 }
 
 TEST(memory_budget, default_limit_is_generous)

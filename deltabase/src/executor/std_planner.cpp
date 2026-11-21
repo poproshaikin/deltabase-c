@@ -83,7 +83,6 @@ namespace exq
             const auto child_sel = estimate_seq_scan_selectivity(table, *limit_node.child);
             const auto estimated_rows = static_cast<double>(table.live_rows) * child_sel;
 
-            // a bare OFFSET has no ceiling -- the scan still has to reach the end
             if (!limit_node.limit)
                 return child_sel;
 
@@ -312,7 +311,7 @@ namespace exq
             node = std::move(filter);
         }
 
-        // 3. ORDER BY -- below PROJECT, so ordering by a non-projected column works
+        // 3. ORDER BY -- below PROJECT, so a key need not be in the select list
         if (!stmt.order_by.empty())
         {
             auto order_by = std::make_unique<OrderByPlanNode>(
@@ -356,9 +355,7 @@ namespace exq
 
         QueryPlan plan;
         plan.type = QueryPlan::Type::SELECT;
-        // node is the root here; should_stream_for_seq_scan walks down to the scan itself.
-        // Virtual tables keep scan_type == SEQ_SCAN only by default, and their row counts
-        // are not real, so they are excluded explicitly.
+        // Virtual tables keep scan_type == SEQ_SCAN by default; their row counts are not real.
         if (!is_virtual && scan_type == IPlanNode::Type::SEQ_SCAN)
             plan.needs_stream = should_stream_for_seq_scan(*table, *node);
         else

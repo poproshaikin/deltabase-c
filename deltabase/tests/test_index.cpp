@@ -20,10 +20,7 @@ namespace
     }
 }
 
-// A leaf fills at roughly 65 keys, and splitting it is the first place the tree allocates a
-// page while holding a reference to another one. While index pages lived in a vector, that
-// allocation could move them and the split then wrote through a dangling reference. No test
-// created a PRIMARY KEY, so the heap corruption went unnoticed.
+// The first split allocates a page while holding a reference to another one.
 TEST(index, survives_a_leaf_split)
 {
     auto db = make_indexed_db("index_leaf_split", 66);
@@ -33,7 +30,6 @@ TEST(index, survives_a_leaf_split)
     tst::check_eq(db.count("select id from common.t order by id"), 66, "sorted scan");
 }
 
-// Deep enough to split internal nodes as well, and to grow a new root.
 TEST(index, survives_internal_splits)
 {
     auto db = make_indexed_db("index_internal_split", 3000);

@@ -93,7 +93,7 @@ namespace tst
         return out;
     }
 
-    TestDb::TestDb(const std::string& prefix, uint64_t work_mem)
+    TestDb::TestDb(const std::string& prefix, uint64_t work_mem, size_t page_cache_size)
     {
         const auto stamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -107,6 +107,8 @@ namespace tst
         auto config = types::Config::std(name_);
         if (work_mem != 0)
             config.work_mem = work_mem;
+        if (page_cache_size != 0)
+            config.page_cache_size = page_cache_size;
 
         engine_ = std::make_unique<engine::Engine>();
         engine_->create_db(config);

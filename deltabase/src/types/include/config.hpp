@@ -97,6 +97,8 @@ namespace types
         // per-query ceiling on accumulated rows, like PostgreSQL's work_mem
         uint64_t work_mem = 64ull * 1024 * 1024;
 
+        size_t page_cache_size = 10000;
+
         static Config
         detached()
         {

@@ -16,8 +16,7 @@ namespace
     }
 }
 
-// The decision used to be read off the plan root, which after the projection step is never
-// a scan, so every SELECT was materialised and the streaming path never ran at all.
+// The decision used to be read off the plan root, which is never a scan after PROJECT.
 TEST(streaming, large_seq_scans_stream)
 {
     tst::TestDb db("streaming");
@@ -42,8 +41,7 @@ TEST(streaming, large_seq_scans_stream)
     tst::check_eq(db.count("select * from common.small"), 20, "and when materialised");
 }
 
-// A streamed result owns its executor, so it has to open and close it itself. Before it did,
-// a streamed scan returned nothing at all: the scan cursor was never initialised.
+// It used to return nothing: the executor was never opened.
 TEST(streaming, a_streamed_result_opens_its_executor)
 {
     tst::TestDb db("streaming_rows");
@@ -59,8 +57,7 @@ TEST(streaming, a_streamed_result_opens_its_executor)
                   "2999 | 2998 | 2997 | ", "and ordering is correct");
 }
 
-// Abandoning a result without reading it must not leave the database lock held, or the
-// next statement in the session would deadlock.
+// An unreleased lock here would deadlock the next statement.
 TEST(streaming, an_abandoned_stream_releases_its_lock)
 {
     tst::TestDb db("streaming_abandon");

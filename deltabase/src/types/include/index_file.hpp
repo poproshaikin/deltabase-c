@@ -6,6 +6,7 @@
 #define DELTABASE_INDEX_FILE_HPP
 #include "index_page.hpp"
 #include "meta_index.hpp"
+#include <deque>
 
 namespace types
 {
@@ -15,7 +16,7 @@ namespace types
         IndexPageId root_page = 0;
         IndexPageId last_page = 0;
         LSN last_lsn = 0;
-        std::vector<IndexPage> pages;
+        std::deque<IndexPage> pages;
     };
 }
 

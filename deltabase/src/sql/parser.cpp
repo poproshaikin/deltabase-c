@@ -189,8 +189,7 @@ namespace sql
                 advance_or_throw("Invalid statement syntax");
                 if (!match(SqlTokenType::IDENTIFIER))
                 {
-                    // '*' is the only non-identifier allowed here; anything else used to
-                    // break the loop silently and drop the rest of the select list
+                    // anything but '*' here used to silently drop the rest of the list
                     if (!match(SqlOperator::MUL))
                         throw EngineException("Expected column identifier or '*'",
                                               EngineException::Code::SYNTAX_ERROR);
@@ -239,9 +238,8 @@ namespace sql
         return stmt;
     }
 
-    // Expects the cursor on the ORDER keyword. Leaves it on the token following the
-    // clause, or on the clause's last token when the input ends there -- the same
-    // convention the expression parser follows (advance() is a no-op at the last token).
+    // Leaves the cursor past the clause, or on its last token at end of input, as the rest
+    // of the parser does -- advance() is a no-op on the last token.
     std::vector<OrderByItem>
     SqlParser::parse_order_by()
     {
@@ -276,8 +274,6 @@ namespace sql
         return items;
     }
 
-    // Expects the cursor on the literal. Leaves it on the following token, or on the
-    // literal itself when the input ends there.
     uint64_t
     SqlParser::parse_unsigned_literal(const std::string& clause)
     {

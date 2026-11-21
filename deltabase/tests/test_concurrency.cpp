@@ -1,8 +1,7 @@
 //
-// Multi-process concurrency test. Registered as manual: it needs the whole binary to fork,
-// and it currently fails on a database lock before the workers get going.
+// Multi-process concurrency test. Manual: it forks the whole binary, and currently fails on
+// a database lock before the workers start.
 //
-
 #include "harness.hpp"
 
 #include "static_storage.hpp"

@@ -70,9 +70,7 @@ namespace types
         explicit DataRow(const std::vector<SqlToken>& sql_tokens);
     };
 
-    // Approximate in-memory size of a row, for the per-query memory budget. Distinct from
-    // IIOManager::estimate_size, which measures the serialized size and leaves out the
-    // container overhead -- several times smaller for narrow rows.
+    // In-memory size, unlike IIOManager::estimate_size which measures the serialized one.
     inline uint64_t
     memory_footprint(const DataRow& row)
     {

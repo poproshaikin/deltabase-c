@@ -265,7 +265,6 @@ namespace storage
     {
         auto* mt = get_table(table_name, schema_name);
         const auto unchanged_mt = *mt;
-        auto data = buffer_pool_.get_table_data(mt->id);
         std::unordered_set<DataPageId> linked_pages;
 
         MetaColumn new_column = misc::convert(column);
@@ -280,45 +279,73 @@ namespace storage
             return;
         }
 
-        for (auto* reading_page : data)
+        // Phase 1: read-only. Fixing the set here also keeps the rewritten rows out of it.
+        std::vector<std::pair<DataPageId, RowId>> candidates;
+        for (const auto& page_id : buffer_pool_.get_table_page_ids(mt->id))
         {
-            for (auto& row : reading_page->rows)
+            auto* page = buffer_pool_.get_dp(page_id);
+            if (!page)
+                continue;
+
+            for (const auto& row : page->rows)
+                if (!has_flag(row.flags, DataRowFlags::OBSOLETE))
+                    candidates.emplace_back(page_id, row.id);
+        }
+
+        // Phase 2: mutation. Needs both pages at once, so all loads come first.
+        for (const auto& [page_id, row_id] : candidates)
+        {
+            auto* reading_page = buffer_pool_.get_dp(page_id);
+            if (!reading_page)
+                continue;
+
+            auto row_it = std::ranges::find(reading_page->rows, row_id, &DataRow::id);
+            if (row_it == reading_page->rows.end() ||
+                has_flag(row_it->flags, DataRowFlags::OBSOLETE))
+                continue;
+
+            DataRow new_row = extend_row(*row_it, new_column);
+            const auto size = io_manager_.estimate_size(new_row);
+            const bool fits_in_place = reading_page->has_space(size);
+
+            DataPage* destination = reading_page;
+            if (!fits_in_place)
             {
-                if (has_flag(row.flags, DataRowFlags::OBSOLETE))
+                destination = buffer_pool_.prepare_dp(size, *mt, txn);
+                const auto destination_id = destination->id;
+
+                // prepare_dp may have evicted the page being read
+                reading_page = buffer_pool_.get_dp(page_id);
+                destination = buffer_pool_.get_dp(destination_id);
+                if (!reading_page || !destination)
+                    throw std::runtime_error(
+                        "DDLService::add_column: page cache too small to rewrite a row");
+
+                row_it = std::ranges::find(reading_page->rows, row_id, &DataRow::id);
+                if (row_it == reading_page->rows.end())
                     continue;
-
-                DataRow new_row = extend_row(row, new_column);
-                auto size = io_manager_.estimate_size(new_row);
-
-                DataPage* destination = reading_page->has_space(size)
-                                            ? reading_page
-                                            : buffer_pool_.prepare_dp(size, *mt, txn);
-
-                const DataRow old_row = row;
-                row.flags |= DataRowFlags::OBSOLETE;
-                UpdateRecord update_record(mt->id, reading_page->id, old_row, row);
-                txn.append_log(update_record);
-                reading_page->last_lsn = txn.get_last_lsn();
-                buffer_pool_.dirty_dp(reading_page->id);
-
-                if (destination != reading_page && linked_pages.insert(destination->id).second)
-                {
-                    if (destination->next != DataPageId::null())
-                        throw std::runtime_error(
-                            "DDLService::add_column: destination page is not a chain tail");
-
-                    buffer_pool_.log_page_linking(destination, reading_page->next, *mt, txn);
-                    buffer_pool_.log_page_linking(reading_page, destination->id, *mt, txn);
-                }
-
-                InsertRecord insert_record(mt->id, destination->id, new_row);
-                txn.append_log(insert_record);
-                buffer_pool_.append_row(
-                    destination,
-                    *mt,
-                    new_row,
-                    txn.get_last_lsn());
             }
+
+            const DataRow old_row = *row_it;
+            row_it->flags |= DataRowFlags::OBSOLETE;
+            UpdateRecord update_record(mt->id, page_id, old_row, *row_it);
+            txn.append_log(update_record);
+            reading_page->last_lsn = txn.get_last_lsn();
+            buffer_pool_.dirty_dp(page_id);
+
+            if (destination != reading_page && linked_pages.insert(destination->id).second)
+            {
+                if (destination->next != DataPageId::null())
+                    throw std::runtime_error(
+                        "DDLService::add_column: destination page is not a chain tail");
+
+                buffer_pool_.log_page_linking(destination, reading_page->next, *mt, txn);
+                buffer_pool_.log_page_linking(reading_page, destination->id, *mt, txn);
+            }
+
+            InsertRecord insert_record(mt->id, destination->id, new_row);
+            txn.append_log(insert_record);
+            buffer_pool_.append_row(destination, *mt, new_row, txn.get_last_lsn());
         }
 
         UpdateTableRecord update_table_record(unchanged_mt, *mt);
@@ -451,11 +478,14 @@ namespace storage
         // Pre-validate unique constraint on existing data before creating index file
         if (is_unique)
         {
-            auto pages = buffer_pool_.get_table_data(table->id);
             std::unordered_set<std::string> seen_values;
 
-            for (const auto& page : pages)
+            for (const auto& page_id : buffer_pool_.get_table_page_ids(table->id))
             {
+                auto* page = buffer_pool_.get_dp(page_id);
+                if (!page)
+                    continue;
+
                 for (const auto& row : page->rows)
                 {
                     if (has_flag(row.flags, DataRowFlags::OBSOLETE))
@@ -486,10 +516,12 @@ namespace storage
         BPIndexPager pager(buffer_pool_, table->id, mi.id);
         IndexBPlusTree tree(pager);
 
-        auto pages = buffer_pool_.get_table_data(table->id);
-
-        for (const auto& page : pages)
+        for (const auto& page_id : buffer_pool_.get_table_page_ids(table->id))
         {
+            auto* page = buffer_pool_.get_dp(page_id);
+            if (!page)
+                continue;
+
             for (const auto& row : page->rows)
             {
                 if (has_flag(row.flags, DataRowFlags::OBSOLETE))
@@ -501,7 +533,7 @@ namespace storage
                 if (key.type == DataType::_NULL)
                     continue;
 
-                const RowPtr row_ptr{page->id, row.id};
+                const RowPtr row_ptr{page_id, row.id};
 
                 tree.insert(key, row_ptr, txn);
             }
